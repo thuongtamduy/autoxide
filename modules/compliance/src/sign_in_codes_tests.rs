@@ -374,13 +374,15 @@ async fn sai_lien_tiep_toi_tran_cung_thi_khoa_den_khi_mo_khoa() {
                 .await;
         assert_eq!(status, axum::http::StatusCode::OK, "{done}");
         assert_eq!(done["data"]["unlocked"], true);
+        assert_eq!(unlock_events(&app).await, 1, "the unlock is in the audit log");
         let (_, again) =
             crate::tests::call(&app, "POST", "/phone-locks/unlock", "admin", Some(unlock)).await;
         assert_eq!(again["data"]["unlocked"], false, "nothing left to unlock");
+        assert_eq!(unlock_events(&app).await, 1, "no audit entry when nothing was locked");
         let back = codes.send(&tenant, "0912000555", home).await.unwrap();
         codes.verify(&tenant, back.id, &code_in(&sms, "+84912000555")).await.unwrap();
 
-        // Chủ số xác thực lại số từ tài khoản cũng mở khoá; và không làm hết hạn mã đăng nhập đang mở của người khác.
+        // Chủ số xác thực lại số từ tài khoản cũng mở khoá — và, như mọi lần đúng, cho hết hạn mã đăng nhập còn mở của số.
         let pending = codes.send(&tenant, "0912000555", ip("198.51.100.60")).await.unwrap();
         let pending_code = code_in(&sms, "+84912000555");
         let wrong = wrong_for(&pending_code);
@@ -436,7 +438,7 @@ async fn lan_sai_dong_thoi_deu_duoc_dem() {
     .unwrap();
 }
 
-/// Job dọn hằng ngày: client quen quá 90 ngày và bộ đếm không đổi quá một năm bị xoá.
+/// Job dọn hằng ngày: client quen quá 90 ngày bị xoá; bộ đếm chỉ bị xoá khi không đổi quá một năm (100 ngày: còn).
 #[tokio::test]
 async fn job_don_client_quen_cu_va_bo_dem_cu() {
     TestDatabase::run(async |test| {
@@ -453,7 +455,7 @@ async fn job_don_client_quen_cu_va_bo_dem_cu() {
             .await
             .unwrap_err();
         let old =
-            autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(400 * 24);
+            autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(100 * 24);
         crate::entity::phone_known_client::Entity::update_many()
             .col_expr(crate::entity::phone_known_client::Column::LastSuccessAt, Expr::value(old))
             .scoped(&tenant)
@@ -476,14 +478,140 @@ async fn job_don_client_quen_cu_va_bo_dem_cu() {
                 .unwrap()
                 .is_empty()
         );
-        assert!(
+        assert_eq!(
             crate::entity::phone_failure::Entity::find()
                 .scoped(&tenant)
                 .all(read)
                 .await
                 .unwrap()
-                .is_empty()
+                .len(),
+            1,
+            "a count unchanged for 100 days is kept"
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Số event `compliance.phone_unlocked` đã ghi (audit).
+async fn unlock_events(app: &TestApp) -> i64 {
+    let database = app.database();
+    let backend = database.read().get_database_backend();
+    let sql = match backend {
+        sea_orm::DatabaseBackend::Postgres => {
+            "SELECT COUNT(*) FROM compliance_events WHERE name = $1"
+        }
+        _ => "SELECT COUNT(*) FROM compliance_events WHERE name = ?",
+    };
+    let statement = autoxide_kernel::database::statement(
+        backend,
+        sql.to_owned(),
+        vec!["compliance.phone_unlocked".to_owned().into()],
+    );
+    use sea_orm::ConnectionTrait as _;
+    let row = database.read().query_one_raw(statement).await.unwrap().unwrap();
+    row.try_get_by_index::<i64>(0).unwrap()
+}
+
+/// Hạn mức gửi mã mỗi ngày của mã đăng nhập và của mã xác minh số tách riêng: người lạ dùng hết lượt gửi mã đăng nhập
+/// của một số không chặn chủ số xác minh lại số từ tài khoản (cách tự mở khoá).
+#[tokio::test]
+async fn het_luot_gui_ma_dang_nhap_van_xac_minh_duoc_so() {
+    TestDatabase::run(async |test| {
+        let settings = [
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_DAY", "3"),
+        ];
+        let (app, codes, _) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        for n in 1..=3 {
+            codes.send(&tenant, "0912000888", ip(&format!("203.0.113.{n}"))).await.unwrap();
+        }
+        let error = codes.send(&tenant, "0912000888", ip("203.0.113.9")).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_throttled");
+        let (status, sent) = crate::tests::call(
+            &app,
+            "POST",
+            "/me/phone-verifications",
+            "alice",
+            Some(serde_json::json!({"phone": "0912000888"})),
+        )
+        .await;
+        assert_eq!(status, axum::http::StatusCode::CREATED, "{sent}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Đăng nhập đúng bằng mã chỉ cho hết hạn mã đăng nhập còn mở của số, không đụng mã xác minh số đang mở của người đã
+/// đăng nhập (mã đó thuộc tài khoản của họ).
+#[tokio::test]
+async fn dang_nhap_dung_khong_lam_het_han_ma_xac_minh() {
+    TestDatabase::run(async |test| {
+        let (app, codes, sms) = app(test).await;
+        let tenant = app.default_tenant();
+        let (status, sent) = crate::tests::call(
+            &app,
+            "POST",
+            "/me/phone-verifications",
+            "alice",
+            Some(serde_json::json!({"phone": "0912000999"})),
+        )
+        .await;
+        assert_eq!(status, axum::http::StatusCode::CREATED, "{sent}");
+        let id = sent["data"]["id"].as_str().unwrap().to_owned();
+        let verification_code = code_in(&sms, "+84912000999");
+        let signin = codes.send(&tenant, "0912000999", ip("198.51.100.90")).await.unwrap();
+        codes.verify(&tenant, signin.id, &code_in(&sms, "+84912000999")).await.unwrap();
+        let uri = format!("/me/phone-verifications/{id}/confirm");
+        let body = serde_json::json!({"code": verification_code});
+        let (status, confirmed) = crate::tests::call(&app, "POST", &uri, "alice", Some(body)).await;
+        assert_eq!(status, axum::http::StatusCode::OK, "{confirmed}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Mở khoá của quản trị viên: chỉ khi số thật sự đang khoá (bộ đếm dưới ngưỡng thì không đổi gì, không ghi audit); khi
+/// mở khoá thì hạn mức mã sai mỗi ngày cũng tính lại như sau một lần đúng.
+#[tokio::test]
+async fn mo_khoa_chi_khi_dang_khoa_va_tinh_lai_han_muc_ngay() {
+    TestDatabase::run(async |test| {
+        let settings = [
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_DAY", "1000"),
+            ("AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY", "2"),
+        ];
+        let (app, codes, sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        let home = ip("198.51.100.95");
+        let unlock = serde_json::json!({"phone": "0912000444"});
+        for _ in 0..2 {
+            let sent = codes.send(&tenant, "0912000444", home).await.unwrap();
+            let code = code_in(&sms, "+84912000444");
+            codes
+                .verify(&tenant, sent.id, if code == "000000" { "111111" } else { "000000" })
+                .await
+                .unwrap_err();
+        }
+        let error = codes.send(&tenant, "0912000444", home).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_daily_limit");
+        // Hai lần sai: chưa khoá — không có gì để mở.
+        let (_, done) =
+            crate::tests::call(&app, "POST", "/phone-locks/unlock", "admin", Some(unlock.clone()))
+                .await;
+        assert_eq!(done["data"]["unlocked"], false, "{done}");
+        assert_eq!(unlock_events(&app).await, 0);
+        // Đang khoá: mở được, và hạn mức sai trong ngày tính lại.
+        set_failures(&app, &tenant, 95).await;
+        let (_, done) =
+            crate::tests::call(&app, "POST", "/phone-locks/unlock", "admin", Some(unlock)).await;
+        assert_eq!(done["data"]["unlocked"], true, "{done}");
+        assert_eq!(unlock_events(&app).await, 1);
+        let sent = codes.send(&tenant, "0912000444", home).await.unwrap();
+        codes.verify(&tenant, sent.id, &code_in(&sms, "+84912000444")).await.unwrap();
     })
     .await
     .unwrap();

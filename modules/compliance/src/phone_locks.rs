@@ -6,11 +6,10 @@
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::response::{Data, Problem};
-use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
@@ -23,13 +22,13 @@ use validator::Validate;
 
 use crate::events;
 use crate::permissions::PHONE_LOCKS_MANAGE;
-use crate::service::ComplianceService;
+use crate::service::{ComplianceService, now};
 
 /// A phone number whose sign-in codes should be unlocked.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UnlockPhone {
-    /// The number, e.g. `0912345678` or `+84912345678`.
+    /// The number, e.g. `0912345678`; outside Vietnam `+` and the country code (`+6591234567`).
     #[schema(example = "0912345678")]
     pub phone: String,
 }
@@ -61,13 +60,14 @@ impl ComplianceService {
         actor: Actor,
         raw: &str,
     ) -> Result<bool, Error> {
-        let phone = PhoneNumber::parse(raw, "84").ok_or_else(|| {
-            Error::validation(vec![FieldError::new("phone", "invalid", "is not a phone number")])
-        })?;
+        // Cùng cách chuẩn hoá và cùng quy tắc nước của khách như khi xin mã: cùng một khoá của số.
+        let phone = self.allowed_phone(tenant, raw).await?;
         let phone_key = self.secret.phone_key(tenant.id(), &phone).await?;
         // Qua lớp `db` của kernel (handle của khách), không qua database thô.
         let transaction = tenant.db().begin_write().await?;
-        let unlocked = crate::phone_lock::clear(&transaction, tenant, &phone_key).await?;
+        let locked_from = crate::sign_in_codes::LOCKED_FROM;
+        let unlocked =
+            crate::phone_lock::unlock(&transaction, tenant, &phone_key, locked_from, now()).await?;
         if unlocked {
             // Không ghi số vào event: chỉ khoá của số (HMAC theo khách).
             let event = events::PhoneUnlocked(json!({"phone_key": phone_key}));
@@ -87,10 +87,14 @@ pub(crate) fn routes(service: Arc<ComplianceService>) -> OpenApiRouter {
 
 /// Unlock sign-in codes for a phone number.
 ///
-/// Requires `compliance.phone_locks.manage`. After 100 wrong sign-in codes in a row for a number
-/// its sign-in codes are locked (`compliance.otp_locked`); this clears the count so the owner can
-/// sign in with a code again — the way back in for an account that signs in only with its number.
-/// Check who you are talking to first. The audit log records who unlocked it.
+/// Requires `compliance.phone_locks.manage`. After 90 wrong sign-in codes in a row for a number
+/// (100 from a device its owner signed in from before) its sign-in codes are locked
+/// (`compliance.otp_locked`). This clears the count so the owner can sign in with a code again —
+/// the way back in for an account that signs in only with its number — and restarts the daily
+/// limit of wrong codes as a correct code would. The hourly and daily limits on sending codes
+/// still apply. A number that is not locked is left as it is (`unlocked: false`). Write numbers
+/// outside Vietnam as `+` and the country code (E.164). Check who you are talking to first; the
+/// audit log records who unlocked it.
 #[utoipa::path(
     post,
     path = "/phone-locks/unlock",
@@ -102,7 +106,7 @@ pub(crate) fn routes(service: Arc<ComplianceService>) -> OpenApiRouter {
         (status = 200, description = "Done; `unlocked` says whether the number was locked.", body = Data<PhoneUnlocked>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `compliance.phone_locks.manage`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "`phone` is not a phone number; see `errors`.", body = Problem),
+        (status = 422, description = "`phone` is not a phone number this tenant accepts; see `errors`.", body = Problem),
     )
 )]
 async fn unlock_phone(
@@ -120,8 +124,10 @@ pub(crate) fn tool(service: &Arc<ComplianceService>) -> Tool {
     let service = service.clone();
     Tool::new(
         "unlock_phone",
-        "Unlock sign-in codes for a phone number locked after 100 wrong codes in a row, so its owner \
-         can sign in with a code again. Check who asks first; the audit log records who unlocked it.",
+        "Unlock sign-in codes for a phone number locked after too many wrong codes in a row, so its \
+         owner can sign in with a code again; a number that is not locked is left as it is. Write \
+         numbers outside Vietnam as + and the country code. Check who asks first; the audit log \
+         records who unlocked it.",
         move |tenant: TenantContext, principal: Principal, input: UnlockPhone| {
             let service = service.clone();
             async move {
@@ -137,11 +143,14 @@ pub(crate) fn tool(service: &Arc<ComplianceService>) -> Tool {
 pub(crate) fn task(service: Arc<ComplianceService>) -> Task {
     Task::new(
         "unlock_phone",
-        "Unlock sign-in codes for a phone number locked after 100 wrong codes in a row. Writes an \
-         audit event; changes nothing when the number is not locked.",
+        "Unlock sign-in codes for a phone number locked after too many wrong codes in a row. Writes \
+         an audit event; changes nothing when the number is not locked.",
         Arc::new(UnlockTask(service)),
     )
-    .argument(TaskArgument::required("phone", "The phone number, e.g. 0912345678."))
+    .argument(TaskArgument::required(
+        "phone",
+        "The phone number, e.g. 0912345678; outside Vietnam + and the country code.",
+    ))
     .argument(TaskArgument::optional("tenant", "Slug of the tenant; default: the default tenant."))
 }
 

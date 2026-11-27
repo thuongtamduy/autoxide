@@ -48,6 +48,8 @@ pub(crate) const MAX_CONSECUTIVE_FAILURES: i32 = 100;
 /// Phần cuối của trần cứng chỉ dành cho client quen: client lạ bị khoá từ `MAX_CONSECUTIVE_FAILURES - KNOWN_RESERVE`
 /// lần sai, nên người lạ không bao giờ đẩy bộ đếm tới mức khoá được mạng quen của chủ số.
 pub(crate) const KNOWN_RESERVE: i32 = 10;
+/// Số lần sai liên tiếp từ đó số bị khoá (với client lạ): quản trị viên chỉ "mở khoá" số đã tới mức này.
+pub(crate) const LOCKED_FROM: i32 = MAX_CONSECUTIVE_FAILURES - KNOWN_RESERVE;
 /// Phạm vi khoá dấu khối địa chỉ.
 const BLOCK_SCOPE: &str = "compliance.otp";
 
@@ -105,7 +107,8 @@ impl ComplianceService {
         let known = self.known_client(tenant, &phone_key, block.as_deref()).await?;
         let failures = phone_lock::failures(database.read(), tenant, &phone_key).await?;
         Self::check_not_locked(failures, known)?;
-        self.check_wrong_today(&recent, block.as_deref(), known, now())?;
+        let unlocked = phone_lock::unlocked_at(database.read(), tenant, &phone_key).await?;
+        self.check_wrong_today(&recent, block.as_deref(), known, unlocked, now())?;
         // Số mã mỗi giờ theo cặp (số, client): người lạ xin hết lượt của họ không làm chủ số hết lượt. Thêm trần chung
         // của số (mọi client) mà client quen không chạm tới — chặn dội SMS tới một số từ nhiều nơi.
         let mut limits = vec![(
@@ -117,10 +120,11 @@ impl ComplianceService {
                 Throttle::new("compliance", otp.per_phone_all_clients_per_hour, HOUR)?,
                 format!("otp-phone-all:{}", phone.as_str()),
             ));
-            // Trần SMS mỗi ngày của số, dùng chung với mã xác thực số của người đã đăng nhập.
+            // Trần SMS mỗi ngày của số cho mã đăng nhập từ client lạ. Riêng với mã xác minh số của người đã đăng nhập
+            // (`otp-phone-day-verify:`): đường xác minh lại số — cách chủ số tự mở khoá — không bị hết lượt theo.
             limits.push((
                 Throttle::new("compliance", otp.per_phone_per_day, DAY)?,
-                format!("otp-phone-day:{}", phone.as_str()),
+                format!("otp-phone-day-signin:{}", phone.as_str()),
             ));
         }
         if let Some(ip) = ip {
@@ -225,7 +229,8 @@ impl ComplianceService {
             phone_lock::failures(&transaction, tenant, &phone_key).await?,
             known,
         )?;
-        self.check_wrong_today(&locked, row.requester_block.as_deref(), known, at)?;
+        let unlocked = phone_lock::unlocked_at(&transaction, tenant, &phone_key).await?;
+        self.check_wrong_today(&locked, row.requester_block.as_deref(), known, unlocked, at)?;
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
@@ -304,18 +309,21 @@ impl ComplianceService {
     /// - `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_ALL_CLIENTS_PER_DAY` lần trên mọi mã của số, trừ khi `block` là client
     ///   quen (`known`): người lạ nhập sai từ nhiều nơi không khoá được chủ số ở mạng họ đã đăng nhập.
     ///
-    /// Tạo mã mới không xoá lần sai đã đếm (§3.1.3.2). Tính từ bảng mã (giữ [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như
-    /// nhau trên cả hai database.
-    fn check_wrong_today(
+    /// Tạo mã mới không xoá lần sai đã đếm (§3.1.3.2). Lần quản trị viên mở khoá (`unlocked`) tính như một lần đúng.
+    /// Tính từ bảng mã (giữ [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như nhau trên cả hai database. Áp cho cả mã đăng nhập
+    /// lẫn mã xác minh số.
+    pub(crate) fn check_wrong_today(
         &self,
         rows: &[phone_challenge::Model],
         block: Option<&str>,
         known: bool,
+        unlocked: Option<Timestamp>,
         at: Timestamp,
     ) -> Result<(), Error> {
         let since = at - WRONG_WINDOW;
         // `Iterator::max` / `min` viết rõ: `ExprTrait` (sea-query) dùng trong file cũng có hàm `max` / `min`.
-        let last_success = Iterator::max(rows.iter().filter_map(|row| row.consumed_at));
+        let last_success =
+            Iterator::max(rows.iter().filter_map(|row| row.consumed_at).chain(unlocked));
         let recent: Vec<&phone_challenge::Model> = rows
             .iter()
             .filter(|row| row.created_at > since && row.attempts > 0)

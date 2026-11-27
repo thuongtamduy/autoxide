@@ -308,10 +308,11 @@ impl ComplianceService {
                 Throttle::new("compliance", otp.per_user_per_day, DAY)?,
                 format!("otp-user:{user_id}"),
             ),
-            // Trần SMS mỗi ngày của một số, dùng chung với mã đăng nhập (D-20261126-otp-nist): chặn dội SMS tới một số.
+            // Trần SMS mỗi ngày của một số cho mã xác minh (D-20261126-otp-nist): chặn dội SMS tới một số. Hạn mức RIÊNG,
+            // không chung với mã đăng nhập: xin mã đăng nhập từ nơi lạ không làm chủ số hết đường xác minh lại số.
             (
                 Throttle::new("compliance", otp.per_phone_per_day, DAY)?,
-                format!("otp-phone-day:{}", phone.as_str()),
+                format!("otp-phone-day-verify:{}", phone.as_str()),
             ),
         ];
         if let Some(ip) = ip {
@@ -402,6 +403,11 @@ impl ComplianceService {
         let pepper = self.secret.derive_for(tenant.id(), OTP_PURPOSE).await?;
         let max = self.max_accounts_per_phone(tenant).await?;
         let phone_key = sha256(&found.phone);
+        // Khoá của số cho trạng thái chống đoán mã (HMAC theo khách): tính trước transaction ghi (có thể đọc bảng
+        // secret).
+        let number = PhoneNumber::parse(&found.phone, DEFAULT_COUNTRY)
+            .ok_or_else(|| Error::internal("stored phone is not E.164"))?;
+        let lock_key = self.secret.phone_key(tenant.id(), &number).await?;
 
         let transaction = tenant.database().begin_write().await?;
         // Khoá MỌI mã của cùng số (theo ID): hai lần xác nhận cùng mã, hay hai người cùng nhận một
@@ -415,7 +421,7 @@ impl ComplianceService {
             phone_challenge::Column::Id,
         )
         .await?;
-        let Some(row) = locked.into_iter().find(|row| row.id == id) else {
+        let Some(row) = locked.iter().find(|row| row.id == id).cloned() else {
             return Err(challenge_not_found());
         };
         let at = now();
@@ -425,6 +431,13 @@ impl ComplianceService {
         if row.attempts >= self.otp.max_attempts {
             return Err(otp_attempts_exceeded());
         }
+        // Hạn mức mã sai mỗi ngày (D-20261126-otp-nist): xin mã xác minh mới liên tục không mở thêm lượt đoán. Chỉ đếm mã
+        // xác minh của chính người này với số — lần sai mã đăng nhập của người khác không chặn được đường xác minh lại số
+        // (cách chủ số tự mở khoá).
+        let unlocked = crate::phone_lock::unlocked_at(&transaction, tenant, &lock_key).await?;
+        let mine: Vec<phone_challenge::Model> =
+            locked.iter().filter(|other| other.user_id == user_id).cloned().collect();
+        self.check_wrong_today(&mine, None, true, unlocked, at)?;
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
@@ -459,10 +472,7 @@ impl ComplianceService {
         }
         // Chủ số chứng minh lại được số từ tài khoản đã đăng nhập (NIST SP 800-63B-4 §4.1, gắn lại bộ xác thực): mở khoá
         // mã đăng nhập SMS của số (D-20261126-otp-nist).
-        if let Some(number) = PhoneNumber::parse(&row.phone, "84") {
-            let key = self.secret.phone_key(tenant.id(), &number).await?;
-            crate::phone_lock::succeeded(&transaction, tenant, &row.phone, &key, id, at).await?;
-        }
+        crate::phone_lock::succeeded(&transaction, tenant, &row.phone, &lock_key, id, at).await?;
         account_verification::Entity::insert(account_verification::ActiveModel {
             tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),

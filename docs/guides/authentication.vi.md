@@ -45,14 +45,17 @@ mới gửi tới chính số của mình; sau đó thêm được passkey và �
 (`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 60 tới 600) và chỉ cho nhập sai vài lần. Theo từng số:
 
 - số mã mỗi giờ từ một client (một địa chỉ IPv4, hay một khối IPv6 /64) và từ mọi client cộng lại, và số mã mỗi
-  ngày (`429 compliance.otp_throttled`);
-- số mã sai mỗi ngày từ một client, và từ mọi client cộng lại (`429 compliance.otp_daily_limit`);
+  ngày — mã đăng nhập và mã xác minh số đếm riêng, nên xin mã đăng nhập không bao giờ làm chủ số hết đường xác minh
+  lại số (`429 compliance.otp_throttled`);
+- số mã sai mỗi ngày từ một client, và từ mọi client cộng lại, cho cả mã đăng nhập lẫn mã xác minh số
+  (`429 compliance.otp_daily_limit`);
 - số mã sai liên tiếp, không theo cửa sổ thời gian: từ 90 lần thì số bị khoá với client chưa từng đăng nhập bằng số,
   từ 100 lần thì khoá với mọi client (`403 compliance.otp_locked`).
 
 Client đã đăng nhập bằng số trong 90 ngày không bị tính vào các giới hạn "mọi client" và giữ 10 lượt cuối của 100,
 nên người lạ không khoá được chủ số ở mạng họ hay dùng. Nhập đúng thì bộ đếm về 0. Số bị khoá được mở khi chủ số đăng
-nhập bằng cách khác và xác thực lại số trong tài khoản, hay khi cửa hàng mở khoá
+nhập bằng cách khác và xác thực lại số trong tài khoản, hay khi cửa hàng mở khoá — việc này cũng tính lại từ đầu số mã
+sai mỗi ngày, còn giới hạn gửi mã vẫn áp như thường
 (`POST /api/v1/compliance/phone-locks/unlock`, permission `compliance.phone_locks.manage`; tool MCP
 `compliance.unlock_phone`; `autoxide task compliance.unlock_phone phone=…`) — đường lấy lại tài khoản cho người chỉ
 đăng nhập bằng số. **Rủi ro còn lại:** mạng di động sau NAT của nhà mạng đổi địa chỉ thường xuyên; ở mạng chủ số chưa

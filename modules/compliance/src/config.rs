@@ -55,8 +55,9 @@ pub(crate) const OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR: Setting = Setting::new(
 
 pub(crate) const OTP_PER_PHONE_PER_DAY: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_DAY",
-    "Phone codes (sign-in and phone verification) sent to one phone number per day, 1 to 1000; sign-in \
-     codes asked from a client that signed in with the number in the last 90 days are not counted.",
+    "Codes sent to one phone number per day, 1 to 1000, counted separately for sign-in codes and for \
+     phone verification codes (one cannot use up the other); sign-in codes asked from a client that \
+     signed in with the number in the last 90 days are not counted.",
 )
 .with_default("20");
 

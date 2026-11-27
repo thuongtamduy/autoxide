@@ -6,7 +6,8 @@
 //!   [`KNOWN_CLIENT_DAYS`](crate::sign_in_codes::KNOWN_CLIENT_DAYS) ngày.
 //! - `compliance_phone_failures`: số lần nhập sai liên tiếp của số kể từ lần đúng gần nhất — không theo cửa sổ thời
 //!   gian; đủ [`MAX_CONSECUTIVE_FAILURES`](crate::sign_in_codes::MAX_CONSECUTIVE_FAILURES) thì số bị khoá với mọi
-//!   client tới khi chủ số xác thực lại số từ tài khoản đã đăng nhập.
+//!   client tới khi chủ số xác thực lại số từ tài khoản đã đăng nhập, hay quản trị viên mở khoá (`unlocked_at`: lúc mở
+//!   khoá gần nhất, đếm như một lần đúng cho giới hạn mã sai mỗi ngày).
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -61,6 +62,7 @@ impl MigrationTrait for PhoneOtpState {
                     .col(schema::string_len("phone_key", 64))
                     .col(schema::integer("failures"))
                     .col(schema::timestamp_with_time_zone("updated_at"))
+                    .col(schema::timestamp_with_time_zone_null("unlocked_at"))
                     .to_owned(),
             )
             .await?;

@@ -12,7 +12,11 @@
   - Codes per hour are counted per number and client, so strangers using up their share no longer stop the owner from
     receiving codes.
   - New caps against SMS floods: `AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR` (default 5, all clients) and
-    `AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_DAY` (default 20, shared with phone verification codes).
+    `AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_DAY` (default 20, counted separately for sign-in codes and for phone
+    verification codes).
+  - `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY` now accepts at most 100 (before: 1000); a value from 101 to
+    1000 is refused at start. Phone verification codes are under this daily cap too.
+  - An administrator unlock only acts on a number that is locked, and it also restarts the daily cap on wrong codes.
   - The daily cap on wrong codes for all clients is its own setting,
     `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_ALL_CLIENTS_PER_DAY` (default 20, at most 100), instead of five times the
     per-client limit.

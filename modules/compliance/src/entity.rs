@@ -391,6 +391,8 @@ pub(crate) mod phone_failure {
         pub phone_key: String,
         pub failures: i32,
         pub updated_at: Timestamp,
+        /// Lúc quản trị viên mở khoá gần nhất: giới hạn mã sai mỗi ngày coi như một lần đúng.
+        pub unlocked_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

@@ -46,15 +46,18 @@ and `phone_code` sent to its own number; after that it can add a passkey and sig
 (`AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS`, 60 to 600) and allows a few wrong tries. Per number:
 
 - codes per hour from one client (one IPv4 address, or one IPv6 /64) and from all clients together, and
-  codes per day (`429 compliance.otp_throttled`);
-- wrong codes per day from one client, and from all clients together (`429 compliance.otp_daily_limit`);
+  codes per day — sign-in codes and phone verification codes counted apart, so asking for sign-in codes
+  never uses up the owner's way to verify the number again (`429 compliance.otp_throttled`);
+- wrong codes per day from one client, and from all clients together, for sign-in and verification codes
+  alike (`429 compliance.otp_daily_limit`);
 - wrong codes in a row, with no time window: from 90 the number is locked for clients that never signed
   in with it, and from 100 for every client (`403 compliance.otp_locked`).
 
 A client that signed in with the number in the last 90 days does not count toward the "all clients"
 limits and keeps the last 10 tries of the 100, so strangers cannot lock the owner out of the networks
 they use. A right code resets the count. A locked number is unlocked when the owner signs in another way
-and verifies the number again in their account, or when the shop unlocks it
+and verifies the number again in their account, or when the shop unlocks it — which also restarts the
+daily limit of wrong codes, while the limits on sending codes still apply
 (`POST /api/v1/compliance/phone-locks/unlock`, permission `compliance.phone_locks.manage`; MCP tool
 `compliance.unlock_phone`; `autoxide task compliance.unlock_phone phone=…`) — the way back in for an
 account that signs in only with its number. **Remaining risk:** mobile networks behind carrier NAT change

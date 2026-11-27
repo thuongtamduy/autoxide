@@ -37,6 +37,7 @@ pub(crate) async fn record_failure<C: ConnectionTrait>(
         phone_key: Set(phone_key.to_owned()),
         failures: Set(1),
         updated_at: Set(at),
+        unlocked_at: Set(None),
     })
     .on_conflict(
         OnConflict::columns([phone_failure::Column::TenantId, phone_failure::Column::PhoneKey])
@@ -52,18 +53,39 @@ pub(crate) async fn record_failure<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Xoá bộ đếm lần sai của số (quản trị viên mở khoá); `true` nếu có bộ đếm để xoá.
-pub(crate) async fn clear<C: ConnectionTrait>(
+/// Quản trị viên mở khoá số: chỉ khi số đang khoá (`locked_from` lần sai liên tiếp trở lên) — đưa bộ đếm về 0 và ghi
+/// mốc `unlocked_at` (giới hạn mã sai mỗi ngày coi như một lần đúng). `true` nếu số đang khoá và đã được mở.
+pub(crate) async fn unlock<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     phone_key: &str,
+    locked_from: i32,
+    at: Timestamp,
 ) -> Result<bool, Error> {
-    let deleted = phone_failure::Entity::delete_many()
+    let updated = phone_failure::Entity::update_many()
+        .col_expr(phone_failure::Column::Failures, Expr::value(0))
+        .col_expr(phone_failure::Column::UpdatedAt, Expr::value(at))
+        .col_expr(phone_failure::Column::UnlockedAt, Expr::value(Some(at)))
         .filter(phone_failure::Column::PhoneKey.eq(phone_key))
+        .filter(phone_failure::Column::Failures.gte(locked_from))
         .scoped(tenant)
         .exec(connection)
         .await?;
-    Ok(deleted.rows_affected > 0)
+    Ok(updated.rows_affected > 0)
+}
+
+/// Lúc quản trị viên mở khoá số gần nhất (nếu có).
+pub(crate) async fn unlocked_at<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    phone_key: &str,
+) -> Result<Option<Timestamp>, Error> {
+    Ok(phone_failure::Entity::find()
+        .filter(phone_failure::Column::PhoneKey.eq(phone_key))
+        .scoped(tenant)
+        .one(connection)
+        .await?
+        .and_then(|row| row.unlocked_at))
 }
 
 /// Lần đúng: xoá bộ đếm lần sai của số (NIST SP 800-63B-4 §3.2.2) và cho hết hạn mọi mã đăng nhập còn mở khác của số
