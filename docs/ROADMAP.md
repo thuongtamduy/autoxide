@@ -234,6 +234,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Chỉ số đo mỗi bản phát hành, ngưỡng cho 1.0: tải về tới request đầu tiên dưới 5 phút; người mới xong module đầu
       tiên dưới 30 phút; nâng cấp trong CI 100% thành công kể cả nhiều khách; agent thật làm xong việc mẫu trên 90%; p95
       đường nóng không tệ đi giữa hai bản
+      — bảng, ngưỡng và cách đo ở `docs/RELEASING.md` ("Chỉ số của mỗi bản phát hành"), workflow `release-metrics.yml` đã có;
+      còn: số đo người mới / agent làm module đầu (`docs/quality/first-module-timing.json`), file kết quả eval của G4,
+      và lần chạy đầu của `load.yml` (số gốc p95)
 
 ### G10 — Giảm tải cho agent phát triển
 
@@ -265,21 +268,30 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 - [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
       sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
 - [x] LG-4: quy tắc `privacy.subject_requests` v2 theo NĐ 356/2025 Điều 5 (hạn xác nhận và hạn thực hiện, ngày làm việc)
-- [ ] LG-5: dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
-- [ ] LG-6: module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận
+- [x] LG-5 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
+- [x] LG-6 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận
       ngoài Việt Nam; `docs/AI.md` thêm mục dữ liệu cá nhân
 - [ ] LG-7: gói thuế `vn` v2 theo NĐ 68/2026 (ngưỡng hộ kinh doanh, tỉ lệ khấu trừ); `orders` hỏi
       `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos`
-- [ ] LG-8: tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
+- [x] LG-8 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
       kiện của module sàn
 - [ ] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
 - [ ] LG-10: phát hiện và báo chênh lệch thuế giữa đơn và hoá đơn khi qua mốc đổi thuế suất
 - [x] LG-11: hạn mức và thủ tục khuyến mại theo NĐ 239/2026 và thông tư của Bộ Công Thương (thay căn cứ NĐ 81/2018 Điều 6, 7)
 - [ ] LG-12: `orders` ẩn đánh giá qua `ModerationPolicy` (ánh xạ mã lý do) hoặc sửa `COMPLIANCE.md` cho khớp code
 - [x] LG-13: căn cứ Luật An ninh mạng 116/2025 và nghị định hướng dẫn thay NĐ 53/2022 trong tài liệu lưu dữ liệu trong nước
+- [x] LG-3/5/6/8 tài liệu: `COMPLIANCE.md` mục "Chưa làm (trước 1.0)", `AI.md` dữ liệu gửi ra nước ngoài, `TAX.md` /
+      `MONEY.md` phần khấu trừ thay đã có và chưa có (EN + VI)
+- [ ] LG-5 code (**sau 1.0**): cấu hình theo khách "dịch vụ hướng tới trẻ em", tự khai tuổi khi đăng ký, sổ đồng ý ghi
+      người đồng ý thay (vai, quan hệ) — cần người có chuyên môn xác nhận điều luật và độ tuổi
+- [ ] LG-6 code (**sau 1.0**): `Module::processors()` (mặc định rỗng, D-038) khai bên xử lý và nước nhận theo cấu hình
+      đang chạy (ai, mail, SMS, lưu trữ); sổ xử lý gộp tự động; `doctor` cảnh báo bên nhận ngoài Việt Nam
+- [ ] LG-8 code (**sau 1.0**, cùng module sàn): phát `TaxWithheld` khi chi trả cho hộ kinh doanh, lập
+      `withholding_certificate`, dữ liệu tờ khai khấu trừ thay
 - [ ] LG-1b: khi có văn bản gốc NĐ 248/2026 — thêm mục kiểm mới (tiêu chí xếp hạng, quy tắc điểm thưởng, báo cáo
       định kỳ), xác nhận cơ quan tiếp nhận / online.gov.vn và hạn chuyển tiếp (D-20261126-legal-rules-r1-update)
-- [ ] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (ngày làm việc, bên xử lý thứ ba)
+- [ ] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (đơn vị: ngày theo bản phân tích,
+      chưa xác nhận ngày làm việc hay ngày thường; bên xử lý thứ ba)
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
 

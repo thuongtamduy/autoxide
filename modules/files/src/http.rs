@@ -102,6 +102,8 @@ async fn list_files(
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<FileResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::FILES_UPLOAD)?;
     let page = service.list(&tenant, &principal, &PageRequest::try_from(query)?).await?;
     Ok(page.map(FileResponse::from))
 }

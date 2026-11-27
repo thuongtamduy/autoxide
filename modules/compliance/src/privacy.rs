@@ -464,8 +464,27 @@ impl ComplianceService {
         principal: &Principal,
         row: purpose::Model,
         insert: bool,
+        cap: Option<u64>,
     ) -> Result<Purpose, Error> {
         let transaction = tenant.database().begin_write().await?;
+        if let Some(max) = cap {
+            // Đếm và chèn trong cùng một transaction ghi, sau khi khoá theo tên của khách: hai request tạo cùng
+            // lúc xếp hàng (Postgres: advisory lock tới hết transaction; SQLite: `BEGIN IMMEDIATE` đã giữ cả
+            // database), nên trần là chính xác — không vượt dù gọi đồng thời (D-20261126-purpose-cap-strict).
+            autoxide_kernel::rows::lock_key(
+                &transaction,
+                &format!("compliance.purposes:{}", tenant.id().as_uuid()),
+            )
+            .await?;
+            let own = purpose::Entity::find().scoped(tenant).count(&transaction).await?;
+            if own >= max {
+                return Err(Error::conflict(
+                    "compliance.purpose_limit_reached",
+                    "This tenant already has {max} processing purposes of its own.",
+                )
+                .with_param("max", max));
+            }
+        }
         let saved = if insert {
             purpose::ActiveModel::from(row).insert(&transaction).await.map_err(|error| {
                 if crate::service::is_unique_violation(&error) {
@@ -516,16 +535,7 @@ impl ComplianceService {
         }
         // Sổ mục đích đọc hết rồi chia trang trong bộ nhớ (gộp với mặc định của quy tắc), kể cả ở trang công khai:
         // trần ở chỗ ghi giữ nó nhỏ. Bản ghi đè mục đích mặc định cũng là dòng của khách nên được đếm; chúng có
-        // trần tự nhiên là số mục đích mặc định, chỉ tạo mới bị chặn. Hai request tạo cùng lúc có thể vượt trần
-        // một dòng — trần là để giữ sổ nhỏ, không phải hạn mức chính xác.
-        let own = purpose::Entity::find().scoped(tenant).count(tenant.database().read()).await?;
-        if own >= self.purposes_tenant_max {
-            return Err(Error::conflict(
-                "compliance.purpose_limit_reached",
-                "This tenant already has {max} processing purposes of its own.",
-            )
-            .with_param("max", self.purposes_tenant_max));
-        }
+        // trần tự nhiên là số mục đích mặc định, chỉ tạo mới bị chặn. `save_purpose` đếm trong transaction ghi.
         let row = purpose::Model {
             id: Uuid::now_v7(),
             tenant_id: tenant.id().as_uuid(),
@@ -540,9 +550,15 @@ impl ComplianceService {
             updated_by: Some(principal.user_id()),
             updated_at: now(),
         };
-        self.save_purpose(tenant, principal, row, true).await.map_err(|error| {
-            if error.code() == "compliance.purpose_exists" { purpose_exists(&key) } else { error }
-        })
+        self.save_purpose(tenant, principal, row, true, Some(self.purposes_tenant_max))
+            .await
+            .map_err(|error| {
+                if error.code() == "compliance.purpose_exists" {
+                    purpose_exists(&key)
+                } else {
+                    error
+                }
+            })
     }
 
     /// Sửa mục đích `key`: của khách thì sửa; mặc định thì tạo bản ghi đè từ bản mặc định.
@@ -615,7 +631,7 @@ impl ComplianceService {
         }
         row.updated_by = Some(principal.user_id());
         row.updated_at = now();
-        self.save_purpose(tenant, principal, row, insert).await
+        self.save_purpose(tenant, principal, row, insert, None).await
     }
 
     // ---- Thời hạn lưu --------------------------------------------------------------------------

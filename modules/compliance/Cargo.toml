@@ -38,6 +38,7 @@ validator.workspace = true
 # Danh mục hành chính giả dùng chung (`autoxide_address::api::testing`).
 autoxide-address = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true
+futures-util.workspace = true
 
 [lints]
 workspace = true

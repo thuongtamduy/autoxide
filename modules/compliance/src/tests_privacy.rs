@@ -141,6 +141,50 @@ async fn muc_dich_rieng_co_tran() {
     .unwrap();
 }
 
+/// Trần mục đích là chính xác cả khi gọi đồng thời (D-20261126-purpose-cap-strict): đếm và chèn trong một
+/// transaction ghi sau khoá theo khách, nên 8 request tạo cùng lúc với trần 3 thì đúng 3 thành công.
+#[tokio::test]
+async fn tran_muc_dich_dung_khi_tao_dong_thoi() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_COMPLIANCE_PURPOSES_TENANT_MAX", "3")
+            .user("admin", 1, PRIVACY)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let requests = (0..8).map(|index| {
+            let body = json!({
+                "key": format!("p{index}"), "category": "marketing", "legal_basis": "consent",
+                "data_categories": ["email"], "description": {"en": "Mail."},
+            });
+            let app = &app;
+            async move { call(app, "POST", "/purposes", "admin", Some(body)).await }
+        });
+        let answers = futures_util::future::join_all(requests).await;
+        let created = answers.iter().filter(|(status, _)| *status == StatusCode::CREATED).count();
+        let refused = answers
+            .iter()
+            .filter(|(status, body)| {
+                *status == StatusCode::CONFLICT
+                    && body["code"] == "compliance.purpose_limit_reached"
+            })
+            .count();
+        assert_eq!((created, refused), (3, 5), "{answers:?}");
+        let tenant = app.default_tenant();
+        let backend = tenant.db().read().get_database_backend();
+        let rows = tenant
+            .db()
+            .read()
+            .query_all_raw(Statement::from_string(backend, "SELECT id FROM compliance_purposes"))
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 3);
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn thoi_han_luu_va_so_hoat_dong_xu_ly() {
     TestDatabase::run(async |test| {
