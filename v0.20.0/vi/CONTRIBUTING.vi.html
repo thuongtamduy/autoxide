@@ -1,0 +1,385 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Đóng góp cho Autoxide - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="đóng-góp-cho-autoxide"><a class="header" href="#đóng-góp-cho-autoxide">Đóng góp cho Autoxide</a></h1>
+<p><a href="CONTRIBUTING.html">English</a> · <strong>Tiếng Việt</strong></p>
+<p>Cảm ơn bạn đã giúp. Hướng dẫn này dành cho người; nếu bạn làm cùng một AI agent viết code,
+hãy trỏ nó tới <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CLAUDE.md"><code>CLAUDE.md</code></a> (bản tiếng Anh ngắn: <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/AGENTS.md"><code>AGENTS.md</code></a>), nơi ghi đầy đủ luật agent
+làm theo. Luật dưới đây là cùng luật đó, chỉ ngắn hơn. Mọi người tham gia đều theo
+<a href="CODE_OF_CONDUCT.vi.html">quy tắc ứng xử</a>.</p>
+<h2 id="trước-khi-bắt-đầu"><a class="header" href="#trước-khi-bắt-đầu">Trước khi bắt đầu</a></h2>
+<ul>
+<li><strong>Lỗi</strong>: mở issue kèm phiên bản, database (SQLite hay PostgreSQL) và các bước tái hiện.</li>
+<li><strong>Vấn đề bảo mật</strong>: đừng mở issue; làm theo <a href="SECURITY.vi.html"><code>SECURITY.vi.md</code></a>.</li>
+<li><strong>Tính năng mới</strong>: mở issue trước và mô tả vấn đề bạn muốn giải. Core giữ trung lập với
+nghiệp vụ (không có đơn hàng, kho hay bệnh nhân trong core — những thứ đó thuộc về module),
+và thứ tự công việc theo <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>, nên trao đổi ngắn trước
+giúp bạn khỏi viết code không merge được.</li>
+</ul>
+<h2 id="chuẩn-bị-máy"><a class="header" href="#chuẩn-bị-máy">Chuẩn bị máy</a></h2>
+<p>Bạn cần:</p>
+<ul>
+<li><a href="https://rustup.rs">Rust</a> — <code>rustup</code> tự cài đúng toolchain ghim trong
+<code>rust-toolchain.toml</code> ở lần chạy <code>cargo</code> đầu tiên;</li>
+<li>một trình biên dịch C (SQLite được biên dịch từ mã nguồn);</li>
+<li><a href="https://docs.docker.com/get-docker/">Docker</a>, cho test PostgreSQL và S3 của gate đầy đủ;</li>
+<li><a href="https://github.com/EmbarkStudios/cargo-deny"><code>cargo-deny</code></a>:
+<code>cargo install cargo-deny --locked</code>;</li>
+<li>tuỳ chọn <a href="https://github.com/gitleaks/gitleaks"><code>gitleaks</code></a> (không có thì gate chạy nó
+trong Docker).</li>
+</ul>
+<p>Trên máy Linux x86_64 mới (ví dụ phiên agent trên cloud) chạy <code>scripts/cloud-setup.sh</code> thay vì cài tay: script
+cài toolchain ghim cùng <code>cargo-deny</code>, <code>gitleaks</code> và <code>cargo-nextest</code> từ bản phát hành dựng sẵn, kiểm SHA-256 đã ghim.
+Chạy lại nhiều lần được.</p>
+<p>Rồi:</p>
+<pre><code class="language-bash">git clone https://github.com/thuongtamduy/autoxide.git autoxide
+cd autoxide
+git config core.hooksPath .githooks
+cargo test --workspace
+</code></pre>
+<p>Git hook kiểm định dạng và quét secret trong thay đổi đã stage trước mỗi commit.</p>
+<h2 id="kiểm-thay-đổi-hai-mức-gate"><a class="header" href="#kiểm-thay-đổi-hai-mức-gate">Kiểm thay đổi: hai mức gate</a></h2>
+<p>Gate là định nghĩa của “xong”. Có hai mức:</p>
+<pre><code class="language-bash">./gate.sh --quick
+</code></pre>
+<p>Trong lúc làm, trước mỗi commit: định dạng, lint, kiểm ranh giới, thư viện, secret, và test
+của các crate bạn đã sửa (cùng các crate phụ thuộc vào chúng), chỉ trên SQLite. Phần test
+không cần Docker và thường mất một hai phút.</p>
+<pre><code class="language-bash">./gate.sh
+</code></pre>
+<p>Trước khi mở pull request: mọi thứ ở trên, và mọi test trên <strong>cả SQLite và PostgreSQL</strong>
+(gate tự dựng container Docker dùng xong bỏ). Một thay đổi chỉ được merge khi gate này xanh.</p>
+<p>Gate đỏ thì sửa code. Đừng nới gate, tắt lint hay bỏ qua test.</p>
+<p>Thay đổi chỉ chạm file có trong <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/scripts/rust-free-paths.txt"><code>scripts/rust-free-paths.txt</code></a> (tài liệu, SDK
+TypeScript, file mảnh changelog, quyết định) không thể đổi kết quả Rust nào: <code>--quick</code> bỏ Clippy, và ở pull request CI
+bỏ phần biên dịch và test Rust (các job vẫn báo xanh). File không có trong danh sách thì chạy đủ.</p>
+<h2 id="những-luật-quan-trọng-nhất"><a class="header" href="#những-luật-quan-trọng-nhất">Những luật quan trọng nhất</a></h2>
+<ul>
+<li><strong>Cả hai database.</strong> Mọi thứ chạm tới database — migration, query, transaction, index,
+test — phải chạy trên SQLite và PostgreSQL. Tính năng chỉ chạy trên một bên là chưa xong.
+Đừng dùng kiểu dữ liệu, hàm hay cú pháp chỉ một bên có.</li>
+<li><strong>Ranh giới module.</strong> Mỗi module là một crate riêng trong <code>modules/</code> và sở hữu bảng của
+mình (tên <code>&lt;module&gt;_…</code>). Module không bao giờ đọc, ghi hay join bảng của module khác, không
+có foreign key tới chúng; nó chỉ gọi module khác qua trait được công bố trong <code>pub mod api</code>.
+<code>cargo xtask check</code> (một phần của gate) kiểm điều này.</li>
+<li><strong>Logic ở service.</strong> Handler HTTP và tool MCP chỉ nhận dữ liệu vào, gọi service rồi trả
+response; REST và MCP dùng chung một service.</li>
+<li><strong>Lỗi có <code>code</code> ổn định.</strong> Mọi lỗi trả cho client là <code>autoxide_kernel::error::Error</code> với
+mã viết <code>snake_case</code> (lỗi của module bắt đầu bằng <code>&lt;module&gt;.</code>) và thông báo nói rõ phải sửa
+gì. Mã là hợp đồng với client: đổi mã là thay đổi phá vỡ. Mỗi mã mới cần bản dịch tiếng
+Việt trong <code>locales/vi.json</code> của crate.</li>
+<li><strong>Hợp đồng API luôn khớp.</strong> Mọi route có tài liệu OpenAPI. Đổi API hay cấu hình thì chạy
+<code>cargo xtask regen</code>: một lệnh sinh lại mọi file tự động (<code>docs/openapi.json</code>, <code>docs/mcp-tools.json</code>,
+<code>.env.example</code>, schema SDK TypeScript). Gate trên máy kiểm chúng sớm (<code>cargo xtask regen --check</code>, chỉ chạy trên máy; CI do các test giữ tài liệu khớp code kiểm) và in
+đúng lệnh này khi có file lệch.
+Không đổi hành vi của endpoint <code>/api/v1</code> đã có theo cách phá vỡ; làm endpoint mới và đánh
+dấu endpoint cũ là deprecated.</li>
+<li><strong>Test.</strong> Code mới đi kèm test. Test chạm database dùng <code>autoxide_testkit::TestDatabase</code>,
+mỗi test nhận một database trống trên SQLite hay PostgreSQL tuỳ gate đang chạy bên nào.</li>
+<li><strong>Không <code>unsafe</code>, không <code>unwrap</code> / <code>expect</code> / <code>panic!</code> ngoài test.</strong> Trả lỗi thay vào đó.</li>
+<li><strong>Không secret trong Git.</strong> Chỉ commit <code>.env.example</code>, không bao giờ <code>.env</code>.</li>
+<li><strong>Tài liệu hai ngôn ngữ.</strong> Tài liệu cho người dùng (<code>README</code>, hướng dẫn trong <code>docs/</code>, file
+này) có bản tiếng Anh và bản tiếng Việt (<code>*.vi.md</code>) cùng nội dung: sửa cả hai trong cùng
+một commit. Tài liệu nội bộ (<code>CLAUDE.md</code>, <code>STACK.md</code>, <code>docs/ROADMAP.md</code>,
+<code>docs/DECISIONS.md</code>) và comment trong code được viết tiếng Việt.</li>
+</ul>
+<p>Danh sách đầy đủ, kèm lý do của từng luật, ở <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CLAUDE.md"><code>CLAUDE.md</code></a>; các quyết định đã
+chốt có mục lục theo chủ đề ở <code>docs/decisions/INDEX.md</code>; file này sinh tự động, không commit:
+chạy <code>cargo xtask decisions</code> để tạo.</p>
+<h2 id="commit-và-pull-request"><a class="header" href="#commit-và-pull-request">Commit và pull request</a></h2>
+<ul>
+<li>Một pull request chỉ làm một thay đổi. Tách các thay đổi không liên quan.</li>
+<li>Với mọi thứ người dùng Autoxide sẽ thấy, thêm một file nhỏ vào
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/changelog.d/README.md"><code>changelog.d/</code></a> thay vì sửa <code>CHANGELOG.md</code>: đặt tên
+<code>&lt;tên&gt;.&lt;mục&gt;.md</code> (<code>added</code>, <code>changed</code>, <code>deprecated</code>, <code>removed</code>, <code>fixed</code> hoặc <code>security</code>) và viết các gạch đầu dòng
+tiếng Anh đúng như sẽ hiện trong changelog. Chúng được gộp vào <code>CHANGELOG.md</code> lúc phát hành, nên các pull request
+song song không xung đột ở đó.</li>
+<li>Trong pull request, nói bạn đã đổi gì, vì sao, và xác nhận <code>./gate.sh --quick</code> xanh (CI chạy phần còn lại, gồm
+PostgreSQL; <code>./gate.sh</code> đầy đủ bắt buộc trước khi phát hành).</li>
+</ul>
+<h3 id="commit-message"><a class="header" href="#commit-message">Commit message</a></h3>
+<p>Commit message theo một dạng nhẹ của <a href="https://www.conventionalcommits.org">Conventional Commits</a>:</p>
+<pre><code class="language-text">&lt;type&gt;(&lt;scope&gt;): &lt;tóm tắt ngắn ở thể mệnh lệnh, tối đa 72 ký tự&gt;
+
+&lt;thân tuỳ chọn: vì sao cần đổi, đã cân nhắc gì, thay đổi không làm gì&gt;
+
+Signed-off-by: Tên Của Bạn &lt;ban@example.com&gt;
+</code></pre>
+<ul>
+<li><code>type</code> là một trong <code>feat</code>, <code>fix</code>, <code>docs</code>, <code>refactor</code>, <code>perf</code>, <code>test</code>, <code>build</code>, <code>ci</code>, <code>chore</code>, <code>revert</code>.
+<code>scope</code> không bắt buộc: tên module hay crate (<code>orders</code>, <code>kernel</code>).</li>
+<li>Thay đổi phá vỡ đánh dấu bằng <code>!</code> sau scope (<code>feat(kernel)!: …</code>) và giải thích trong thân. Thay đổi phá vỡ của hạng hợp
+đồng ổn định theo <a href="docs/COMPATIBILITY.vi.html"><code>docs/COMPATIBILITY.vi.md</code></a>.</li>
+<li>Viết bằng tiếng Anh hoặc tiếng Việt. Giải thích <em>vì sao</em> trong thân khi không hiển nhiên.</li>
+<li>Tiêu đề pull request được dùng làm tiêu đề squash-merge, nên theo cùng dạng.</li>
+</ul>
+<h3 id="ký-commit-dco"><a class="header" href="#ký-commit-dco">Ký commit (DCO)</a></h3>
+<p>Autoxide dùng <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/DCO">Developer Certificate of Origin</a> (DCO) thay cho thoả thuận cấp phép của người đóng góp. Thêm dòng
+<code>Signed-off-by</code> nghĩa là bạn cam đoan mình viết thay đổi đó hoặc có quyền gửi nó theo license của dự án. Thêm bằng <code>-s</code>:</p>
+<pre><code class="language-bash">git commit -s -m "fix(notes): reject empty titles"
+</code></pre>
+<p>Để ký các commit đã làm: <code>git rebase --signoff origin/main</code> rồi push lại với <code>--force-with-lease</code>. Job <code>DCO sign-off</code>
+trong CI đỏ khi một commit của pull request không có dòng <code>Signed-off-by</code> (khi nhánh mà pull request nhắm tới chưa có <code>.github/CODEOWNERS</code> — như nhánh <code>release/X.Y</code> cắt từ tag cũ — thì không kiểm gì; commit merge không được kiểm, nên ưu tiên
+rebase hơn là gộp <code>main</code> vào nhánh của bạn). Pull request do người duy trì mở
+(login có trong <code>.github/CODEOWNERS</code> của nhánh mà pull request nhắm tới, không phải của pull request; GitHub xác thực login) được miễn, kể cả commit do phiên agent của họ viết: người
+duy trì là bên cấp license và chịu trách nhiệm về những gì họ đưa vào.</p>
+<h3 id="đóng-góp-có-ai-hỗ-trợ"><a class="header" href="#đóng-góp-có-ai-hỗ-trợ">Đóng góp có AI hỗ trợ</a></h3>
+<p>Bản thân Autoxide được xây bằng AI agent (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CLAUDE.md"><code>CLAUDE.md</code></a>), nên đóng góp có AI hỗ trợ được chào đón. Các luật này
+để luôn có một người chịu trách nhiệm và để gánh nặng review công bằng:</p>
+<ul>
+<li><strong>Nói rõ.</strong> Ghi trong mô tả pull request công cụ nào đã giúp và giúp việc gì. Thêm trailer như
+<code>Assisted-by: &lt;công cụ hay mô hình&gt;</code> vào commit nếu công cụ viết phần đáng kể.</li>
+<li><strong>Có một người chịu trách nhiệm.</strong> Dòng <code>Signed-off-by</code> là của bạn, không phải của công cụ. Bạn đã đọc từng dòng, hiểu và
+giải thích được khi review, và tự chạy <code>./gate.sh --quick</code>.</li>
+<li><strong>Kiểm những gì công cụ bịa.</strong> Xác nhận mọi dependency, hàm, API có thật ở đúng phiên bản đang ghim (skill
+<code>check-library-api</code> của repo chỉ cách làm). Gỡ tham chiếu bịa, và không bao giờ dán secret, dữ liệu cá nhân hay dữ
+liệu khách hàng vào công cụ.</li>
+<li><strong>Không gửi thứ bạn không bảo vệ được.</strong> Đầu ra hàng loạt chưa review, nhiều thay đổi không liên quan trong một pull
+request, hay câu trả lời review chỉ là đầu ra của công cụ có thể bị đóng mà không review chi tiết.</li>
+<li><strong>License.</strong> Không gửi đầu ra mà bạn biết là sao chép mã theo license không tương thích.</li>
+</ul>
+<h3 id="nhãn-và-nên-bắt-đầu-từ-đâu"><a class="header" href="#nhãn-và-nên-bắt-đầu-từ-đâu">Nhãn và nên bắt đầu từ đâu</a></h3>
+<p>Người duy trì gắn nhãn cho issue để người mới tìm được việc đầu tiên: <code>good first issue</code> (nhỏ, mô tả rõ, có người duy
+trì giúp), <code>help wanted</code> (chúng tôi muốn có đóng góp, mọi cỡ) và các nhãn còn lại ở
+<a href="GOVERNANCE.vi.html#nhãn-issue-và-pull-request"><code>GOVERNANCE.vi.md</code></a>. Bình luận vào issue trước khi bắt đầu để hai người
+không làm trùng việc.</p>
+<h2 id="license-của-phần-đóng-góp"><a class="header" href="#license-của-phần-đóng-góp">License của phần đóng góp</a></h2>
+<p>Autoxide dùng license Apache, phiên bản 2.0, hoặc license MIT, tuỳ người dùng chọn. Trừ khi
+bạn nói rõ khác đi, mọi đóng góp bạn chủ ý gửi để đưa vào Autoxide, theo định nghĩa trong
+license Apache-2.0, được cấp phép theo cả hai license như trên, không kèm điều khoản hay điều
+kiện nào khác.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="CODE_OF_CONDUCT.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="GOVERNANCE.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="CODE_OF_CONDUCT.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="GOVERNANCE.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

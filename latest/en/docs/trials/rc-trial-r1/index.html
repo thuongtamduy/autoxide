@@ -1,0 +1,434 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>RC trial, round 1 (AI agents playing users) - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../../../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../../../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../../../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../../../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../../../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../../../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../../../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../../../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../../../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../../../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../../../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../../../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="rc-trial-round-1-ai-agents-playing-users"><a class="header" href="#rc-trial-round-1-ai-agents-playing-users">RC trial, round 1 (AI agents playing users)</a></h1>
+<p><strong>English</strong> · <a href="README.vi.html">Tiếng Việt</a></p>
+<p><strong>Important:</strong> the testers were AI agents playing a role, not people. Round 1 ran on <code>main</code> at version 0.19.0 (before
+<code>1.0.0-rc.1</code>), as an early check (the project owner asked AI agents to play users before outside testers, in a few rounds). Every tester saw only public documents (README,
+<code>docs/guides</code>, <code>docs/*.md</code>, OpenAPI, <code>examples/</code>), never the source of <code>crates/</code> or <code>modules/</code> (the module-author role
+could also read <code>modules/&lt;name&gt;/src/api.rs</code>). Subagents: the newcomer role ran on a small model (to imitate a less
+experienced person), the other four on a mid-size model. No real secret and no real provider or AI model was used.</p>
+<p>Environment limits that shaped the results (not product bugs): 4 CPU cores, no Docker daemon (the Docker quickstart was
+<strong>not tried</strong>), so every role used the binary, with SQLite or a local PostgreSQL 16. The binary was built once up front
+(<code>cargo build -p autoxide</code>, debug, <strong>10 min 06 s</strong> on a cold cache); roles timed themselves from “binary exists”. Timings
+below come from the agents’ own clocks and are approximate where stated.</p>
+<h2 id="numbers-for-g9-agent-playing-a-role-not-a-person"><a class="header" href="#numbers-for-g9-agent-playing-a-role-not-a-person">Numbers for G9 (agent playing a role, not a person)</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Measure</th><th>Result</th><th>Reading</th></tr>
+</thead>
+<tbody>
+<tr><td>Minutes to the first request that returns data (binary already built, <code>.env</code> written)</td><td><strong>under 1 minute</strong> (36 s from migrate to a data request)</td><td>Does <strong>not</strong> count reading the docs, writing <code>.env</code>, or building. Building from source took 10 min 06 s (debug, cold). Quickstart with Docker not measured. G9’s “under 5 minutes from download” cannot be judged until a prebuilt binary or a working image path is measured.</td></tr>
+<tr><td>Minutes to the first module (generate, build, run an endpoint)</td><td><strong>about 33 min</strong>, of which 32 min 08 s was compiling the core into the module’s own target directory</td><td>The build was slowed by a stray second build on the same 4-core machine, so a clean run is faster but not measured. Generate: 23 s. From a finished binary to a working endpoint: about 1 minute. G9’s “under 30 minutes” is <strong>at risk</strong> on a cold build unless the guide offers a prebuilt option.</td></tr>
+<tr><td>Shop owner, product to e-invoice</td><td>about 15 min (estimate)</td><td>About 6.5 of those minutes went to discovering steps missing from the guide (promotions, sandbox, simulated payment).</td></tr>
+<tr><td>Operator, PostgreSQL from scratch to restored backup</td><td>4 min 16 s</td><td>migrate 7 s, backup 4 s, restore 14 s, graceful stop 2 s.</td></tr>
+<tr><td>AI-agent tasks (MCP)</td><td>2.5 of 3 multi-step tasks done</td><td>The third (customer, product, draft order) cannot be done with the MCP tools alone: no tool for customers, orders or price lists.</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="role-1--newcomer--ai-assisted-coding-small-model"><a class="header" href="#role-1--newcomer--ai-assisted-coding-small-model">Role 1 — Newcomer / AI-assisted coding (small model)</a></h2>
+<p>Goal: README to first request, then “ask an AI” to add a small feature.
+Result: part 1 reached; part 2 <strong>not reached</strong> (the module build did not finish in 26 minutes: the machine was loaded by
+other roles, see role 2).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Level</th><th>Where</th><th>What happened</th><th>Suggestion</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>annoying</td><td>README “Getting started”, “Configuration”</td><td>Every command is <code>cargo run -p autoxide -- …</code>; a person without Docker or Rust does not know where to get a binary. <code>docs/DEPLOY.md</code> section B explains it but README does not point there.</td><td>Add a “no Docker” paragraph: download a release binary, or <code>cargo build --release</code>, and link to DEPLOY.md B.</td></tr>
+<tr><td>2</td><td>annoying</td><td>README “Configuration”</td><td>Does not say <code>.env</code> needs two secrets (<code>AUTOXIDE_AUTH_TOKEN_SECRET</code>, <code>AUTOXIDE_SECRET_KEY</code>); <code>cp .env.example .env</code> leaves them commented.</td><td>Put the two <code>openssl</code> lines at that step.</td></tr>
+<tr><td>3</td><td>annoying</td><td>README “Configuration”</td><td>No example of a GET that returns data; the tester guessed <code>/api/v1/address/provinces</code>.</td><td>Add one, and point to <code>docs/openapi.json</code>.</td></tr>
+<tr><td>4</td><td>small</td><td>any CLI command</td><td>SMTP / files WARN lines print before every command output (even <code>task</code>, <code>user create</code>) and look like errors.</td><td>Show them only where mail or files are used.</td></tr>
+<tr><td>5</td><td>small</td><td>writing-a-module.md §1, §5</td><td>No estimate of the first build of an external module (the whole core, own target directory).</td><td>State the time; suggest a shared <code>CARGO_TARGET_DIR</code>.</td></tr>
+<tr><td>6</td><td>small</td><td>README “Try it with Docker”</td><td>Mentions the Releases page without a link.</td><td>Add the link.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Real bugs: none found in part 1. Not checked: external module, PostgreSQL.</p>
+<h2 id="role-2--module-author-outside-the-repository"><a class="header" href="#role-2--module-author-outside-the-repository">Role 2 — Module author outside the repository</a></h2>
+<p>Goal: follow <code>docs/guides/writing-a-module.md</code>, make a small module in a directory outside the repo, run <code>check-module</code>,
+test on SQLite and PostgreSQL. Result: <strong>reached.</strong> The module <code>links</code> was generated with
+<code>cargo xtask new-module --external … links link --core-path …</code> (the guide’s way); it is a renamed copy of the sample,
+the tester did not write new business logic. <code>check-module</code>: no violations. Tests: 8 + 4 pass on SQLite and on
+PostgreSQL (port 15432). <code>POST</code> / <code>GET /api/v1/links</code> work, a duplicate gives 409 <code>links.url_taken</code>.</p>
+<p>Time: generate 0:23; first server build 32:08 (compile wait, slowed by a stray build); binary to a working endpoint about
+1:00; <code>check-module</code> 1 s when the machine is free; SQLite tests 6:41 (rebuild after a machine restart), PostgreSQL 10 s.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Level</th><th>Where</th><th>What happened</th><th>Suggestion</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>annoying</td><td>guide §4 “Run it”</td><td>“The first build takes a while” with no figure (about 30 min debug on 4 cores).</td><td>State it; suggest <code>--release</code> or a cache.</td></tr>
+<tr><td>2</td><td>annoying</td><td>guide §4</td><td>Only <code>http://127.0.0.1:8080</code> is shown; no variable to change the port. The tester guessed <code>AUTOXIDE_PORT</code> / <code>AUTOXIDE_BIND</code> (silently ignored; see UT-8).</td><td>Add “change the port: <code>AUTOXIDE_HTTP_ADDRESS</code>”.</td></tr>
+<tr><td>3</td><td>small</td><td><code>migrate up</code></td><td>Prints a line for each of 395 migrations, then a long backup job log.</td><td>Summary by default, detail with <code>-v</code>.</td></tr>
+<tr><td>4</td><td>small</td><td>guide §5–6</td><td>Suggests Docker for PostgreSQL; no hint for a local server without Docker.</td><td>One line for local PostgreSQL.</td></tr>
+<tr><td>5</td><td>small</td><td>guide §6 vs <code>new-module</code> output</td><td>Two different ways to call <code>check-module</code> (<code>--manifest-path …/xtask/Cargo.toml</code> vs <code>cargo xtask</code>).</td><td>Use one.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Real bugs: none.</p>
+<h2 id="role-3--connecting-an-ai-agent-mcp"><a class="header" href="#role-3--connecting-an-ai-agent-mcp">Role 3 — Connecting an AI agent (MCP)</a></h2>
+<p>Goal: connect over MCP with an API key, list tools, do three multi-step jobs, note tools whose description is not enough.
+Result: <strong>partly reached</strong> (about 4 min, no build). Done: content (draft, search, update, revisions, review request);
+catalog + draft invoice (tax line computed correctly); pagination and filters (three pages, 3+3+1, correct). Not done:
+customer, product, draft order (no tools for it; see UT-5).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Level</th><th>Where</th><th>What happened</th><th>Suggestion</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>annoying</td><td><code>.env</code> parsing</td><td>A password with spaces needs double quotes; the error names a line index, not the variable.</td><td>Comment in <code>.env.example</code>; name the variable in the error.</td></tr>
+<tr><td>2</td><td>annoying</td><td><code>docs/guides/mcp.md</code> §6</td><td>Does not say <code>migrate up</code> must run before <code>serve</code> when starting the plain binary (388 migrations, about 20 s).</td><td>One line.</td></tr>
+<tr><td>3</td><td>annoying</td><td>mcp.md §3</td><td>How to make an MCP write idempotent is not explained: the <code>Idempotency-Key</code> header works on <code>tools/call</code>, some tools use a <code>reference</code> field instead; two different errors (<code>idempotency_key_reused</code>, <code>reference_reused</code>).</td><td>Document both and which tool uses which.</td></tr>
+<tr><td>4</td><td>annoying</td><td><code>content.*</code> <code>version</code></td><td>The value is a quoted ETag string (<code>"\"1795…\""</code>); sending it without the quotes gives <code>precondition_failed</code>. The description does not say.</td><td>Accept both forms or say “send exactly as returned”.</td></tr>
+<tr><td>5</td><td>annoying</td><td><code>precondition_failed</code> over MCP</td><td>The message tells you to send <code>If-Match</code> (a REST header).</td><td>Message for MCP: “read again and pass the new <code>version</code>”.</td></tr>
+<tr><td>6</td><td>blocking (part)</td><td><code>catalog.add_prices</code>, <code>resolve_price</code></td><td>Need <code>price_list_id</code> but no tool lists or creates price lists; none exist on a new install. No tool creates customers or orders (as mcp.md says). mcp.md §6’s “draft an invoice at the list price” row does not run on a fresh install.</td><td>Add <code>catalog.list_price_lists</code>; say what to do first over REST.</td></tr>
+<tr><td>7</td><td>small</td><td><code>tools/list</code></td><td>A key with only content permissions still sees 49 tools, including <code>auth.create_api_key</code> / <code>auth.rotate_api_key</code>, which always fail for an API key.</td><td>Hide them for API-key principals.</td></tr>
+<tr><td>8</td><td>small</td><td>missing permission</td><td>A hidden tool answers “Unknown tool”, same as a tool that does not exist; mcp.md does not say so.</td><td>Document it.</td></tr>
+<tr><td>9</td><td>small</td><td>tool schemas</td><td>Many parameters have no description or enum (<code>catalog.list_products</code> <code>readiness</code>, <code>category_id</code>, <code>kind</code>; <code>update_product</code>; <code>upsert_variant</code> <code>create</code>/<code>update</code> typed null; <code>add_prices</code>; <code>invoices.create_draft</code> <code>buyer_*</code>; <code>resolve_price</code>; variant size and <code>meta_*</code> fields).</td><td>A gate that requires a description on every tool parameter.</td></tr>
+<tr><td>10</td><td>small</td><td><code>content.create_draft</code></td><td><code>locale</code> empty gives <code>en</code> even for a Vietnamese title; the default is not stated.</td><td>State the default.</td></tr>
+<tr><td>11</td><td>small</td><td><code>invoices.create_draft</code></td><td>A wrong kind, currency and unit price together report only one error (the project rule is one pass with all errors).</td><td>Collect them.</td></tr>
+<tr><td>12</td><td>small</td><td>cursors</td><td>A cursor is accepted with a different filter.</td><td>Bind the filter to the cursor.</td></tr>
+<tr><td>13</td><td>small</td><td><code>Idempotency-Key</code> reuse with another body</td><td>Returns a raw HTTP 422, not a tool error (<code>isError</code>); an MCP client sees an HTTP-level failure.</td><td>Wrap it as a tool error.</td></tr>
+<tr><td>14</td><td>small</td><td>rate limit</td><td>Docs say 120/min/key; after a 62 s pause only 32 of 125 requests passed, then 429; the message says “address”, not key; a revoked key used 65 times also gave 429, not 401.</td><td>Reconcile docs and behaviour.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Real bugs:</p>
+<ul>
+<li><strong>An authorization scope problem in API-key management over MCP</strong> (reported privately; details withheld until it is
+fixed and then published).</li>
+<li><code>catalog.create_product</code> accepts <code>"tax_category":"nope"</code> and stores it (the description says it must be in
+<code>GET /api/v1/tax/categories</code>).</li>
+<li><code>catalog.list_products readiness:"x"</code>, <code>audit.list_entries module:"nope"</code> or <code>subject:"bad"</code> return an empty list
+instead of an error (a wrong <code>status</code> does report one): inconsistent.</li>
+<li>Audit entries of an agent show <code>actor_kind:"user"</code> with <code>actor_api_key_id</code>, no key name; mcp.md says “under the key’s name”.</li>
+</ul>
+<h2 id="role-4--operator"><a class="header" href="#role-4--operator">Role 4 — Operator</a></h2>
+<p>Goal: set up with PostgreSQL 16 (no Docker daemon), migrate, doctor, metrics, backup, restore, graceful stop, upgrade.
+Result: <strong>reached</strong> (4 min 16 s). All documented commands that could run did what the docs say. Restore: 460 tables, row
+counts match (apart from rows the tester added by logging in), the old admin password works, 3355 address units and 8 tax
+rates are intact. Not tried (no Docker, out of scope): <code>docker compose</code> / <code>docker run</code>, <code>gh attestation verify</code>,
+systemd, SQLite→PostgreSQL <code>copy</code>, multi-tenant, OTLP, encrypted backup / PITR.</p>
+<p>Upgrade: no earlier release to upgrade from. Simulated the documented module on/off path: <code>serve</code> warns
+<code>modules_turned_off</code>, <code>doctor</code> warns, <code>autoxide modules</code> says “1 table(s) with rows”, <code>backup</code> refuses with instructions;
+<code>migrate down customers</code> then <code>up</code> is clean.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Level</th><th>Where</th><th>What happened</th><th>Suggestion</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>annoying</td><td>DEPLOY.md §B</td><td>No “binary + PostgreSQL from scratch” section; §B does not name <code>AUTOXIDE_HTTP_ADDRESS</code> (the tester tried <code>AUTOXIDE_HTTP_PORT</code>).</td><td>Add a short “B+” section.</td></tr>
+<tr><td>2</td><td>small</td><td><code>config</code>, <code>serve</code></td><td>A misspelled <code>AUTOXIDE_*</code> variable is ignored; <code>config</code> says “valid”; the server listens on the default 8080.</td><td>Warn about unknown <code>AUTOXIDE_*</code> names.</td></tr>
+<tr><td>3</td><td>small</td><td><code>migrate down … --steps 0</code></td><td>Prints “no applied migrations” for a module that has 13.</td><td>Reject <code>--steps 0</code> clearly.</td></tr>
+<tr><td>4</td><td>small</td><td><code>backup</code>, <code>restore</code></td><td>434 INFO “table copied” lines hide the result.</td><td>Print a summary only.</td></tr>
+<tr><td>5</td><td>small</td><td>log while draining</td><td>Each <code>/health/ready</code> 503 <code>shutting_down</code> is logged at ERROR; <code>tenant_id=</code> repeats twice on request log lines.</td><td>Lower the level; drop the duplicate.</td></tr>
+<tr><td>6</td><td>small</td><td>unreachable PostgreSQL</td><td>Wrong port: “pool timed out” after 10 s, no “connection refused”; some errors end with an odd “at line 331”.</td><td>Show the root cause.</td></tr>
+<tr><td>7</td><td>small</td><td>error text and CHANGELOG (~lines 396–397)</td><td>Say <code>autoxide backup create</code>; the real command is <code>autoxide backup &lt;directory&gt;</code>.</td><td>Fix the text.</td></tr>
+<tr><td>8</td><td>small</td><td>DEPLOY.md “Settings worth knowing”</td><td><code>AUTOXIDE_AUTH_TOKEN_SECRET</code> is “required in production”, but without it the server runs with a random key and a WARN.</td><td>Say “recommended”.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Real bugs: none that give a wrong result (only #3, a wrong message). Good: error messages name the command to run,
+<code>doctor</code> hints each fix, start-up in 1.1 s, <code>/metrics</code> on its own port, drain as documented.</p>
+<h2 id="role-5--shop-owner-using-the-api-curl-and-the-typescript-sdk"><a class="header" href="#role-5--shop-owner-using-the-api-curl-and-the-typescript-sdk">Role 5 — Shop owner using the API (curl and the TypeScript SDK)</a></h2>
+<p>Goal: customer, product, stock, promotion, order, simulated payment, draft e-invoice. Result: <strong>partly reached.</strong> The
+whole sale flow ran with curl and with the SDK; money checked by hand (300,000; 480,000 with tax 43,636; 210,000 with tax
+19,091), integer strings plus <code>VND</code>; four buyers in parallel for the last item gave exactly one order; partial refund,
+cancel of a paid order and refund replays did not double. About 15 min (estimate); about 6.5 min of it was looking for
+steps the guide lacks. The SDK runs directly with Node 22, no <code>npm install</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>#</th><th>Level</th><th>Where</th><th>What happened</th><th>Suggestion</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>blocking (part)</td><td>shop.md, sandbox.md, README</td><td>Only real-provider instructions. The sandbox says “payments succeed”, but a <code>momo</code> payment stays <code>pending</code>; there is no official way to complete a simulated payment (the tester signed a MoMo notification with made-up keys).</td><td>A documented way to complete a simulated payment, or let the sandbox succeed by itself.</td></tr>
+<tr><td>2</td><td>annoying</td><td>shop.md “What you need”</td><td>No path to try without provider accounts: the sandbox needs <code>AUTOXIDE_TENANCY_MODE=multi</code> and <code>autoxide tenant create</code>, not in the quickstart.</td><td>A “try it without real accounts” section.</td></tr>
+<tr><td>3</td><td>annoying</td><td>sandbox.md</td><td>A new sandbox is empty (no products, prices, stock, shipping, tax profile) with no guide to build a shop in it; uses <code>uuidgen</code> (missing here); does not say <code>Autoxide-Tenant: &lt;slug&gt;</code> is needed on public routes too.</td><td>Say what is not copied; use <code>openssl rand -hex 16</code>.</td></tr>
+<tr><td>4</td><td>annoying</td><td>shop.md</td><td>Missing steps: manual shipping (zone, method, rates); tax profile (<code>PUT /tax/profiles/{org}</code>: without it tax is 0, silently); invoice series (without it no invoice is issued, only a log line <code>invoices.series_not_found</code>); <code>jq</code> is required; <code>business_lines</code> values; <code>address</code> is an object.</td><td>Add the steps.</td></tr>
+<tr><td>5</td><td>annoying</td><td>PROMOTIONS.md “Turning on”</td><td>Does not show how to create a code (<code>POST /promotions/{id}/codes</code> needs <code>code</code> + <code>purpose:"redeem"</code>), where <code>promotions.notice_province</code> lives (a unit setting: <code>PUT /organizations/units/{id}/settings/…</code>), or how to record the province notice (<code>PATCH …/notices/province:01</code>).</td><td>A complete curl sequence.</td></tr>
+<tr><td>6</td><td>annoying</td><td>PROMOTIONS.md</td><td>A promotion is refused with <code>promotions.reason.no_reference_price</code> if the variant’s price starts after the promotion’s <code>starts_at</code>; so a shop that just set its prices cannot discount today. Not documented; the reason does not say how to fix it.</td><td>Document; improve the reason.</td></tr>
+<tr><td>7</td><td>annoying</td><td>providers/momo.md</td><td>No signing formula or meaning of <code>orderId</code> for a local notification test.</td><td>Add a test example.</td></tr>
+<tr><td>8</td><td>annoying</td><td>shop.md steps 4–5</td><td>A guest does not get an <code>Order-Token</code> when ordering; it only comes from the SMS lookup (<code>lookup</code>, then <code>confirm</code>, field <code>access_token</code>). The guide says to send <code>Order-Token</code> without saying where it comes from.</td><td>Describe the flow.</td></tr>
+<tr><td>9</td><td>small</td><td>shop.md</td><td>A cart lists <code>payment_methods</code> without <code>cod</code> / <code>wallet</code>, yet both are accepted.</td><td>Make the lists match.</td></tr>
+<tr><td>10</td><td>small</td><td>checkout</td><td><code>bank_transfer</code> without a bank account: <code>ledger.bank_account_not_found</code> does not say to create one (<code>POST /ledger/bank-accounts</code>).</td><td>Clearer message.</td></tr>
+<tr><td>11</td><td>small</td><td>sandbox.md</td><td>Says e-invoice numbers start with <code>SANDBOX-</code>; the <code>number</code> is <code>1</code>, only <code>provider_ref</code> / <code>lookup_code</code> / <code>authority_code</code> do.</td><td>Fix the sentence.</td></tr>
+<tr><td>12</td><td>small</td><td><code>GET /promotions/notice-rules</code></td><td>A <code>note</code> contains an internal decision id “(D-225)”.</td><td>Remove it from the data pack.</td></tr>
+<tr><td>13</td><td>small</td><td>sdk/typescript README</td><td>Imports <code>@autoxide/sdk</code>, but copying <code>src</code> does not create that name; no tenant-header example.</td><td>Relative import; show a <code>fetch</code> wrapper.</td></tr>
+<tr><td>14</td><td>small</td><td><code>…/issue</code></td><td>With two series of the same kind the call fails with <code>series_id: is required</code>; the automatic issue at delivery only logs <code>validation_failed</code> without the reason.</td><td>Message names the fix (PATCH), log names the reason.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Real bugs:</p>
+<ul>
+<li><strong>L1 (most serious): stock <code>on_hand</code> never goes down after delivery.</strong> Sandbox tenant, one variant with 10 in stock, order
+2, pay (notification), create a shipment, <code>POST /shipping/shipments/{id}/status</code> through <code>ready_to_ship</code>,
+<code>picked_up</code>, <code>in_transit</code>, <code>delivered</code> (or <code>POST /orders/{id}/transitions</code> to <code>preparing</code>, <code>shipping</code>, <code>delivered</code>).
+Seen after waiting 20 s: order <code>delivered</code>, but <code>GET /inventory/levels</code> shows <code>on_hand 10, available 8, reserved 2</code>;
+<code>GET /inventory/movements</code> has only the <code>+10</code> adjustment, no <code>sale</code>; the reservation stays <code>confirmed</code>; the order’s
+<code>fulfillment_status</code> stays <code>unfulfilled</code>. Expected (INVENTORY.md, Reservations: “fulfil — writes <code>sale</code> lines”):
+<code>sale −2</code>, <code>on_hand 8</code>, <code>reserved 0</code>, <code>fulfilled</code>. <code>available</code> is right, so no overselling, but the ledger of stock is wrong.</li>
+<li>L2: <code>payment_actions[].payment_id</code> from checkout (and from <code>POST /orders/{id}/payment-link</code>) is not the ledger payment id:
+<code>GET /ledger/payments/{id}</code> returns 404 <code>ledger.payment_not_found</code>; the real id appears only in <code>GET /ledger/payments</code>
+(filter <code>source_id</code>).</li>
+<li>L3 (small): repeating checkout, or cancelling a guest order, with the same <code>Idempotency-Key</code> returns 200 (first call 201)
+without the <code>Idempotent-Replayed: true</code> header, unlike retries.md and the OpenAPI text.</li>
+<li>L4 (small): <code>POST /orders/{id}/payment-link</code> after a failed first payment returns the first (failed) <code>payment_id</code> and
+<code>status_token</code>; that token stays <code>pending</code> while the ledger has a new payment with another id.</li>
+<li>L5 (small): a MoMo notification with the wrong amount sets <code>needs_review</code> (as documented); a correct notification sent
+afterwards does not bring it to <code>succeeded</code> and the order stays <code>pending_payment</code>; nothing says how an operator clears it.</li>
+</ul>
+<h2 id="summary-by-priority"><a class="header" href="#summary-by-priority">Summary by priority</a></h2>
+<ol>
+<li><strong>Blocking for 1.0:</strong> UT-1 (stock never decreases on delivery), UT-2 (API-key scope problem over MCP, details withheld).</li>
+<li><strong>Annoying, fix before the RC feedback window:</strong> UT-3 (fastest path without Docker: binary, secrets, <code>migrate up</code>,
+port, PostgreSQL), UT-4 (no way to try a sale without real providers; shop guide missing steps), UT-5 (MCP tools:
+missing parameter descriptions, price lists / customers, validation of values), UT-6 (payment ids, idempotency
+headers, payment-link replay), UT-7 (first build time of a module outside the repo).</li>
+<li><strong>Small:</strong> UT-8 (messages and logs for operators), UT-9 (rate-limit docs vs behaviour, internal id in public data).</li>
+</ol>
+<p>Note: the first-build time of a module (about 30 min) puts G9’s “first module under 30 minutes” at risk.</p>
+<p>Housekeeping: a second build left running by role 1 competed with role 2 for CPU for most of its wait; it could not be
+stopped from this session. Files left in <code>/tmp</code> of the trial machine only; nothing was changed in the product code. Role 4
+and role 2 left a local PostgreSQL running (ports 15434 and 15432).</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../../docs/security/pentest-2026-11/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../../../reference/api.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../../docs/security/pentest-2026-11/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../../../reference/api.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../../../mark-09e88c2c.min.js"></script>
+        <script src="../../../searcher-09f2665d.js"></script>
+
+        <script src="../../../clipboard-1626706a.min.js"></script>
+        <script src="../../../highlight-abc7f01d.js"></script>
+        <script src="../../../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

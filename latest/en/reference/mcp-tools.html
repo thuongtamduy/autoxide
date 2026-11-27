@@ -1,0 +1,550 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>MCP tools - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="mcp-tools"><a class="header" href="#mcp-tools">MCP tools</a></h1>
+<p>Generated from <code>docs/mcp-tools.json</code>.</p>
+<ul>
+<li><strong><code>address.list_communes</code></strong> (read-only): List the communes, wards and special zones of a province, in code order. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>address.list_provinces</code></strong> (read-only): List the provinces of a country (Vietnam), in the order of the official list. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>address.search_units</code></strong> (read-only): Search administrative units by name, with or without accents (<code>ha noi</code> also finds the accented name).</li>
+<li><strong><code>address.validate_address</code></strong> (read-only): Check an address (the commune must belong to the province) and fill in the names of its units.</li>
+<li><strong><code>ai.status</code></strong> (read-only): Tell whether the server’s AI features are on (text generation, image reading, embeddings), which provider and models they use, and today’s token use against the daily limit.</li>
+<li><strong><code>analytics.funnel</code></strong> (read-only): Sessions reaching each step of a declared funnel on a website over a range of days; steps are counted on their own.</li>
+<li><strong><code>analytics.overview</code></strong> (read-only): Visitors, page views, bounce rate, top sources and daily counts of a website over a range of days (from the daily totals).</li>
+<li><strong><code>analytics.top_objects</code></strong> (read-only): The most viewed objects (<code>&lt;kind&gt;:&lt;id&gt;</code>, e.g. products) of a website over a range of days, most first; <code>kind</code> keeps one kind; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>analytics.top_pages</code></strong> (read-only): The most viewed pages of a website over a range of days, most first; the same pages as <code>GET /api/v1/analytics/pages</code>; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>audit.get_entry</code></strong> (read-only): Get one audit log entry.</li>
+<li><strong><code>audit.list_entries</code></strong> (read-only): List audit log entries — who changed what, when, before and after — newest first; filter by user, record, action or module. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>auth.count_memberships</code></strong> (read-only): Count the people of every organization unit: <code>direct</code> (memberships on the unit) and <code>total</code> (on the unit or a unit above it).</li>
+<li><strong><code>auth.count_role_members</code></strong> (read-only): Count the people holding each role (at any unit, each person once).</li>
+<li><strong><code>auth.create_api_key</code></strong> (changes data): Create an API key that acts as you, limited to the listed permissions. Needs your current password and a password session: an API key cannot create keys. The result carries the key, shown only once.</li>
+<li><strong><code>auth.create_invitation</code></strong> (changes data): Invite someone by email to work at an organization unit with given roles; the mail goes out shortly and the link can be used once.</li>
+<li><strong><code>auth.create_oidc_provider</code></strong> (changes data): Add a sign-in provider to this tenant; register the application at the provider first. The client secret is stored encrypted and never shown again.</li>
+<li><strong><code>auth.create_role</code></strong> (changes data): Create a role that grants the listed permissions (see <code>list_permissions</code>).</li>
+<li><strong><code>auth.delete_oidc_provider</code></strong> (destructive): Remove a sign-in provider from this tenant, with every account link to it.</li>
+<li><strong><code>auth.delete_role</code></strong> (destructive): Delete a role; users who had it lose its permissions. You can only delete a role you could take away: you have its permissions as widely, and every permission it bans (<code>auth.role_beyond_you</code>). The built-in <code>admin</code> role cannot be deleted.</li>
+<li><strong><code>auth.get_role</code></strong> (read-only): Get one role.</li>
+<li><strong><code>auth.get_user_roles</code></strong> (read-only): List the roles of a user (<code>id</code> is the user’s id), by name; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>auth.list_api_keys</code></strong> (read-only): List your API keys (never their secrets); called with an API key, only that key; with an OAuth token, none. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>auth.list_invitations</code></strong> (read-only): List the invitations at units in your scope, newest first; filter by status.</li>
+<li><strong><code>auth.list_memberships</code></strong> (read-only): List who works in which organization unit with which role; filter by unit, role or user, and with <code>inherited</code> also count memberships on the units above.</li>
+<li><strong><code>auth.list_my_identities</code></strong> (read-only): List the outside sign-ins (Google, Microsoft, GitHub…) linked to your own account.</li>
+<li><strong><code>auth.list_oidc_providers</code></strong> (read-only): List the sign-in providers (Google, Microsoft, GitHub, OpenID Connect) of this tenant, with disabled ones; client secrets are never shown.</li>
+<li><strong><code>auth.list_permissions</code></strong> (read-only): List every permission that roles can grant, with what each allows, by name; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>auth.list_roles</code></strong> (read-only): List roles with the permissions they grant; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>auth.list_users</code></strong> (read-only): List user accounts, newest first; <code>search</code> finds users by email or name. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>auth.replace_role</code></strong> (changes data): Replace the name, description and permissions of a role. You cannot add, widen or unban a permission you do not have as widely (<code>auth.permission_beyond_you</code>), nor turn off <code>requires_mfa</code> of a role you could not give (<code>auth.role_beyond_you</code>). The built-in <code>admin</code> role only changes <code>requires_mfa</code>.</li>
+<li><strong><code>auth.revoke_api_key</code></strong> (destructive): Revoke one of your API keys; it stops working at once. Called with an API key, only that same key can be revoked; an OAuth token revokes none.</li>
+<li><strong><code>auth.revoke_invitation</code></strong> (changes data): Revoke an invitation: its link stops working.</li>
+<li><strong><code>auth.rotate_api_key</code></strong> (changes data): Replace one of your API keys with a new one that has the same name, permissions, unit, allowed addresses and kind. The old key keeps working for <code>overlap_hours</code> (24 by default) so programs can switch. Needs your current password and a password session. The result carries the new key, shown only once.</li>
+<li><strong><code>auth.set_memberships</code></strong> (changes data): Replace every organization unit a user works in and the roles there. You can only give or take away roles whose permissions you have, in units you work in, and only take away a role whose banned permissions you all have (<code>auth.role_beyond_you</code>).</li>
+<li><strong><code>auth.set_user_roles</code></strong> (changes data): Replace every role of a user with <code>role_ids</code>. You can only give or take away roles whose permissions you have yourself, as widely, and only take away a role whose banned permissions you all have (<code>auth.role_beyond_you</code>). The last administrator cannot lose the <code>admin</code> role.</li>
+<li><strong><code>auth.update_oidc_provider</code></strong> (changes data): Change a sign-in provider of this tenant (name, issuer, client, redirect pages, allowed email domains, sign-up, default role, enabled).</li>
+<li><strong><code>auth.update_user</code></strong> (changes data): Rename, disable or enable a user account. Disabling signs the user out everywhere; the last active administrator cannot be disabled.</li>
+<li><strong><code>auth.whoami</code></strong> (read-only): Get the calling user (id, email, name) and the permissions they hold. Start here to learn what you may do.</li>
+<li><strong><code>automations.create_rule</code></strong> (changes data): Create a “when … then …” automation rule. <code>trigger</code>: <code>{"type": "event", "event": "&lt;module&gt;.&lt;event&gt;"}</code>, <code>{"type": "schedule", "every": "day", "hour": 9}</code>, <code>{"type": "manual"}</code> or <code>{"type": "metric", …}</code>; <code>conditions</code>: a tree of <code>all</code> / <code>any</code> / <code>not</code> over <code>{"field": "event.total", "op": "gt", "value": 5000000}</code>; <code>actions</code>: <code>[{"tool": "&lt;module&gt;.&lt;tool&gt;", "arguments": {…}}]</code>, values may use <code>{{ event.… }}</code>; see <code>GET /api/v1/automations/catalog</code> for the triggers and tools. Rules you create as an agent wait until a person enables them; try a rule with <code>automations.test_rule</code>.</li>
+<li><strong><code>automations.get_rule</code></strong> (read-only): Get an automation rule in your scope: trigger, conditions, actions and status.</li>
+<li><strong><code>automations.list_rules</code></strong> (read-only): List the automation rules in your scope, newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>automations.test_rule</code></strong> (read-only): Dry-run an automation rule on a sample: whether the conditions hold, the arguments after filling the templates, and what would fail (unknown tool, missing permission of the person the rule runs as, wrong arguments). Calls no tool.</li>
+<li><strong><code>automations.update_rule</code></strong> (changes data): Change an automation rule in your scope. Changing the trigger, conditions or actions checks the whole rule again with your permissions; changed by an agent, the rule waits until a person enables it again.</li>
+<li><strong><code>bookings.availability</code></strong> (read-only): Find free start times of a service between <code>from</code> and <code>to</code> (at most 31 days), with the price, deposit and cancellation terms to tell the customer before booking.</li>
+<li><strong><code>bookings.cancel_booking</code></strong> (destructive): Cancel a booking for the shop: the place is freed and any deposit paid is refunded in full through the payment partner.</li>
+<li><strong><code>bookings.create_booking</code></strong> (changes data): Book a free time for a customer (phone call, walk-in). Confirmed at once, no deposit. Fails with <code>bookings.slot_taken</code> if the time was just taken.</li>
+<li><strong><code>bookings.list_bookings</code></strong> (read-only): List the bookings of your units, newest first; filter by status, staff member and start time.</li>
+<li><strong><code>bookings.reschedule_booking</code></strong> (changes data): Move a booking to another free time (and optionally another staff member). If the new time was just taken, the booking keeps its old time.</li>
+<li><strong><code>catalog.add_prices</code></strong> (changes data): Add up to 500 prices to a price list. Rows are only added, never changed; a future <code>valid_from</code> schedules a price and <code>valid_to</code> makes it temporary.</li>
+<li><strong><code>catalog.create_product</code></strong> (changes data): Create a product as a draft with its first variant (SKU unique in the tenant).</li>
+<li><strong><code>catalog.delete_product</code></strong> (destructive): Delete a product that was never on sale, with all its variants. It cannot be restored; archive products that were on sale instead.</li>
+<li><strong><code>catalog.get_product</code></strong> (read-only): Get a product with its texts, options, variants, categories and images.</li>
+<li><strong><code>catalog.import_status</code></strong> (changes data): Status of an import you started, with the counts and the errors by row.</li>
+<li><strong><code>catalog.list_categories</code></strong> (read-only): List the categories of the tenant, by depth then display order (parents before children); follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>catalog.list_collections</code></strong> (read-only): List the product collections in your scope (manual or by rule), newest first, each with its <code>version</code>.</li>
+<li><strong><code>catalog.list_products</code></strong> (read-only): List the products in your scope, newest first; filter by status, kind, unit, category, readiness or words; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>catalog.resolve_price</code></strong> (read-only): Resolve the price of a variant at a store (optionally for a customer group, at a time) and show which price lists applied, in selection order.</li>
+<li><strong><code>catalog.save_collection</code></strong> (changes data): Draft a product collection, or change one (with <code>id</code> and <code>version</code>): texts and SEO by language, a rule (categories, attributes, price range, new, on promotion) or chosen products in order, and the sort. A tool never turns a collection on: a person sets it <code>active</code>.</li>
+<li><strong><code>catalog.set_product_status</code></strong> (changes data): Put a product on sale (<code>active</code>), stop it (<code>inactive</code>), archive it, or reopen an archived product as a <code>draft</code>. On a marketplace, goods of a seller go on sale only once the seller has verified its identity (<code>compliance.kyc_required</code>, <code>catalog.seller_verification_unavailable</code>).</li>
+<li><strong><code>catalog.start_import</code></strong> (changes data): Import products from a CSV file in the background: a known SKU updates that variant and its text, a new SKU creates a draft product. Nothing is put on sale. Follow with <code>import_status</code>.</li>
+<li><strong><code>catalog.suggest_copy</code></strong> (changes data): Ask AI for a draft short description, description and SEO texts of a product. The draft changes nothing until a person applies it (<code>POST /api/v1/catalog/suggestions/{id}/apply</code>).</li>
+<li><strong><code>catalog.update_product</code></strong> (changes data): Change the tax category, warranty, tracking or default language of a product.</li>
+<li><strong><code>catalog.upsert_variant</code></strong> (changes data): Create a variant (give <code>product_id</code> and <code>create</code>) or change one (give <code>id</code> and <code>update</code>).</li>
+<li><strong><code>comments.answer</code></strong> (changes data): Answer a shown question (a top-level comment) as yourself, like a signed-in user on the website: the answer carries your badges on the target (e.g. <code>seller</code>), follows the same moderation and may wait for approval. Needs a display name (<code>PUT /api/v1/comments/profile</code>) and, on some kinds, a verified account.</li>
+<li><strong><code>comments.get</code></strong> (read-only): Get a comment in any status with its moderation details and its <code>version</code>, needed to approve, reject or mark it as spam.</li>
+<li><strong><code>comments.moderate</code></strong> (changes data): Approve (<code>published</code>), reject (<code>rejected</code>), mark as spam (<code>spam</code>) or hold again (<code>pending</code>) a comment. Approving shows it and mails people following the comment it answers. Pass the <code>version</code> you read.</li>
+<li><strong><code>comments.queue</code></strong> (read-only): List comments for moderation, newest first: by default those waiting for approval (<code>pending</code>), with their text, author, email, hold reason and report count. Follow <code>pagination.next_cursor</code> with the same filters for more.</li>
+<li><strong><code>comments.set_target_state</code></strong> (changes data): Open or close the comments of a target (<code>open</code> / <code>closed</code>); closed targets take no new comments, existing ones stay shown.</li>
+<li><strong><code>comments.unanswered</code></strong> (read-only): List shown questions (top-level comments, e.g. on a product) that have no shown answer yet, newest first, with their text, author and badges. Answer one with <code>comments.answer</code>. Follow <code>pagination.next_cursor</code> with the same filters for more.</li>
+<li><strong><code>compliance.account_verification</code></strong> (read-only): Your account verification level for posting content (Vietnam, Decree 147/2024): <code>none</code>, <code>phone</code> (mobile number confirmed by SMS code) or <code>identity</code> (identity verified), with the verified number masked. Codes are sent and confirmed only through REST (<code>POST /api/v1/compliance/me/phone-verifications</code>).</li>
+<li><strong><code>compliance.add_case_note</code></strong> (changes data): Add an internal note to the log of a case (what was checked, who was contacted).</li>
+<li><strong><code>compliance.add_incident_entry</code></strong> (changes data): Add a line (what was found, what was done) to the log of a personal data breach.</li>
+<li><strong><code>compliance.documents</code></strong> (read-only): List the legal documents of the tenant (terms of use, privacy policy…) with their current version number, by kind; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>compliance.get_case</code></strong> (read-only): Get a report or complaint with its log (notes, answers of the reported party, restrictions, decision).</li>
+<li><strong><code>compliance.incident_draft</code></strong> (changes data): A draft notification of a personal data breach to the authority (<code>authority</code>) or to the people affected (<code>subjects</code>). A draft only: a person completes, reviews and sends it.</li>
+<li><strong><code>compliance.incidents</code></strong> (changes data): List personal data breaches with their 72-hour reporting deadline (<code>overdue</code> for those late).</li>
+<li><strong><code>compliance.kyc_profiles</code></strong> (read-only): List the identity verification profiles of the tenant (results only, never document images or full numbers).</li>
+<li><strong><code>compliance.legal_profiles</code></strong> (read-only): List the legal (owner) profiles of the tenant and its units: what Vietnamese law requires a commerce website to show about its owner.</li>
+<li><strong><code>compliance.list_cases</code></strong> (read-only): List reports of infringements (intellectual property, counterfeit, prohibited goods) and consumer complaints, with their deadlines (<code>overdue</code> for those late).</li>
+<li><strong><code>compliance.open_incident</code></strong> (changes data): Record a personal data breach. The report to the authority is due 72 hours after detection; reminders go to the <code>incident.alert_emails</code> policy.</li>
+<li><strong><code>compliance.pending_acceptances</code></strong> (read-only): The legal documents you must accept (again) before going on, by kind; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>compliance.processing_register</code></strong> (read-only): The register of processing activities: purposes, legal bases, kinds of data, recipients, retention and where the data is kept.</li>
+<li><strong><code>compliance.publish_document_version</code></strong> (changes data): Publish a new version (or a translation) of a legal document. A published version never changes. Draft texts with AI only as suggestions for a person to review.</li>
+<li><strong><code>compliance.purposes</code></strong> (read-only): List the tenant’s purposes for processing personal data with their legal basis (Vietnam, Personal Data Protection Law 91/2025/QH15), by key; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>compliance.record_subject_request</code></strong> (changes data): Record a request of a data subject received through another channel; the due date comes from the legal rule <code>privacy.subject_requests</code>. Fulfilling it (export / erase) is done through REST by a person.</li>
+<li><strong><code>compliance.restrict_case_target</code></strong> (changes data): Hide the target of an open case while it is handled (the owning module hides it, e.g. a page answers 451). Deciding the case needs a person through REST.</li>
+<li><strong><code>compliance.retention</code></strong> (read-only): How long each kind of personal data is kept, compared with the limits of the legal rule <code>privacy.retention_limits</code> (<code>ok</code>, <code>exceeds_limit</code>, <code>forever_not_allowed</code>), by module and name; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>compliance.set_website_status</code></strong> (changes data): Record what happened with a website’s file at the Ministry of Industry and Trade (submitted, notified, registered…). <code>notified</code> / <code>registered</code> need the logo code the ministry gave.</li>
+<li><strong><code>compliance.subject_requests</code></strong> (read-only): List the requests of data subjects received by email, post, phone or from an authority, with their due date (<code>overdue</code> for those late).</li>
+<li><strong><code>compliance.tracking_tags</code></strong> (changes data): List the advertising and analytics tracking tags of the websites in your scope (GA4, GTM, Google Ads, Meta, TikTok, Zalo); they load only after visitor consent.</li>
+<li><strong><code>compliance.unlock_phone</code></strong> (changes data): Unlock sign-in codes for a phone number locked after too many wrong codes in a row, so its owner can sign in with a code again; a number that is not locked is left as it is. Write numbers outside Vietnam as + and the country code. Check who asks first; the audit log records who unlocked it.</li>
+<li><strong><code>compliance.verification_status</code></strong> (read-only): Your identity verification (KYC) status: <code>none</code>, <code>pending</code>, <code>in_review</code>, <code>info_requested</code>, <code>verified</code>, <code>rejected</code>, <code>expired</code> or <code>revoked</code>.</li>
+<li><strong><code>compliance.website_checklist</code></strong> (read-only): What a website still lacks before it is notified to / registered with the Ministry of Industry and Trade; each item is <code>met</code>, <code>missing</code>, <code>unknown</code> or <code>manual</code>, with what to do.</li>
+<li><strong><code>compliance.website_dossier</code></strong> (read-only): The draft dossier of a website for the Ministry of Industry and Trade, filled from the tenant’s data (declaration; for a marketplace a draft project plan and regulations). A person reviews it with a legal professional and submits it on online.gov.vn.</li>
+<li><strong><code>compliance.websites</code></strong> (read-only): List the websites of the tenant with their kind (<code>sales</code> → notify the Ministry of Industry and Trade, <code>platform</code> → register) and status.</li>
+<li><strong><code>content.compose_page</code></strong> (changes data): Ask the AI to build a page’s block layout from a description. Runs in the background and ends as a draft marked <code>ai_assisted</code>, never published; follow it with <code>get_page_layout</code> or REST <code>GET /entries/{id}/ai/thread</code>. Counts toward the plan’s monthly AI page builds.</li>
+<li><strong><code>content.create_campaign_drafts</code></strong> (changes data): Draft a campaign from a promotion: a landing page (<code>page</code>), a text banner (<code>banner</code>, needs <code>banner_placement</code>) and a newsletter campaign (<code>newsletter</code>, needs <code>newsletter_list_id</code>). Everything is a draft in its own module — nothing is published or sent; a person reviews each one. Runs in the background: read the outcome with <code>get_campaign_drafts</code>. Counts once toward the plan’s monthly AI page builds.</li>
+<li><strong><code>content.create_draft</code></strong> (changes data): Create a post or page as a draft (not visible to readers until published). The slug is made from the title unless given.</li>
+<li><strong><code>content.draft_from_template</code></strong> (changes data): Make a draft page from a mandatory page template, filled with the unit’s legal profile and the given variables. It stays a draft until a person reviews and publishes it.</li>
+<li><strong><code>content.edit_page</code></strong> (changes data): Ask the AI to change a page’s block layout in words (“make the hero red”); <code>selection</code> limits it to some blocks. Runs in the background; the result is a new draft and the turn keeps the revision before it to undo.</li>
+<li><strong><code>content.get</code></strong> (read-only): Get a post or page: its draft (title, slug, summary, body, images, SEO fields, status) and its <code>version</code>, needed to change it.</li>
+<li><strong><code>content.get_campaign_drafts</code></strong> (read-only): Get a campaign draft request: its status and, once finished, the draft made for each channel (<code>kind</code> and <code>id</code>) or why that channel failed (<code>error_code</code>).</li>
+<li><strong><code>content.get_page_layout</code></strong> (read-only): Get the draft body of a page (its block layout) with the <code>version</code> to pass to <code>update_page_layout</code>.</li>
+<li><strong><code>content.get_translation_request</code></strong> (read-only): Get an AI translation request: <code>status</code> (queued, running, succeeded, failed), the translation’s draft (<code>result_entry_id</code>) or why it failed (<code>error_code</code>).</li>
+<li><strong><code>content.legal_templates</code></strong> (read-only): List the mandatory page templates for a commerce website in Vietnam (owner information, privacy, returns, shipping, payment, inspection, complaints, terms, general conditions; marketplace regulations, seller agreement, seller information), with the variables each needs, by key. Every text needs review by a legal professional. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>content.list</code></strong> (read-only): List posts and pages, drafts included, newest first. Filter by kind, language, status, parent page, text, category/tag or author. Follow <code>pagination.next_cursor</code> with the same filters for more.</li>
+<li><strong><code>content.list_banners</code></strong> (read-only): List banners of display placements (home hero, top strip…) within your reach, newest first, each with its <code>version</code>. Filter by placement key, unit, status or language.</li>
+<li><strong><code>content.list_blocks</code></strong> (read-only): List the block types this tenant can use in page layouts, with when to use each and its props JSON Schema. Only these blocks are accepted.</li>
+<li><strong><code>content.list_revisions</code></strong> (read-only): List the saved revisions of an entry, newest first (without their fields).</li>
+<li><strong><code>content.list_theme_variants</code></strong> (read-only): List the scheduled theme variants (seasons, holidays, hours) of a website.</li>
+<li><strong><code>content.list_types</code></strong> (read-only): List the tenant’s custom content types (team, projects, branches…).</li>
+<li><strong><code>content.order_placement</code></strong> (changes data): Set the order of the banners of a placement at once (first listed shown first).</li>
+<li><strong><code>content.publish</code></strong> (changes data): Publish the current draft of a post or page: readers see it at its address. Pass the <code>version</code> you read. With <code>content.publish_own</code>, only entries you created.</li>
+<li><strong><code>content.request_review</code></strong> (changes data): Ask a person to review and publish the draft of a post or page you wrote (emits <code>content.review_requested</code>). Use it when you may write but not publish. Pass the <code>version</code> you read.</li>
+<li><strong><code>content.resolve</code></strong> (read-only): Look up a public address in a language, as the website does: the published entry there, a redirect, or <code>gone</code>. Drafts are never returned.</li>
+<li><strong><code>content.restore_revision</code></strong> (changes data): Copy a revision back into the draft of its entry (the published version does not change until published again). Pass the entry’s <code>version</code>.</li>
+<li><strong><code>content.save_banner</code></strong> (changes data): Draft a banner, or change one (with <code>id</code> and <code>version</code>). Pictures must be public and fit the placement’s ratio and size; links point to an address or to an object such as <code>catalog.product</code>. A tool never turns a banner on: a person sets it <code>active</code>.</li>
+<li><strong><code>content.save_theme_variant</code></strong> (changes data): Create a theme variant as a draft, or replace one (pass <code>id</code> and <code>version</code>). It is never switched on by this tool: a person activates it.</li>
+<li><strong><code>content.save_type</code></strong> (changes data): Create a custom content type, or change one (pass <code>key</code> and <code>version</code>). Its own fields are custom fields of target <code>content.type.&lt;key&gt;</code>.</li>
+<li><strong><code>content.search</code></strong> (read-only): Search the posts and pages of one language (drafts included) by meaning and by words, best first, each with how it matched and the best passage. Good for finding related or duplicate content before writing.</li>
+<li><strong><code>content.seo_check</code></strong> (read-only): Check the SEO of the draft of a post or page without AI: missing or too long title and description for search engines, images without alt text, skipped heading levels, duplicate titles, missing translations. Changes nothing.</li>
+<li><strong><code>content.site_health</code></strong> (read-only): Get the last health check of a website: missing SEO descriptions or image alt texts, duplicate titles, broken links, hidden embedded records, finished countdowns and missing addresses asked for often, each with how to fix it. Checked every day; <code>null</code> before the first check.</li>
+<li><strong><code>content.suggest_seo</code></strong> (changes data): Ask the server’s AI model to suggest a title and description for search engines, a summary and up to 5 existing categories or tags for a draft. Saves nothing: apply what you accept with <code>update</code>. Uses AI tokens.</li>
+<li><strong><code>content.translate</code></strong> (changes data): Ask the server’s AI to translate a post or page into another configured language. Returns a request at once; a background job writes the translation’s draft (never published, marked ai_generated) without overwriting changes made meanwhile. Check it with <code>get_translation_request</code>. Uses AI tokens.</li>
+<li><strong><code>content.unpublish</code></strong> (destructive): Take a published post or page down; it goes back to draft and its address answers 404. Pass the <code>version</code> you read.</li>
+<li><strong><code>content.update</code></strong> (changes data): Change the draft of a post or page; omitted fields stay as they are. A published entry keeps showing its published version until published again. Pass the <code>version</code> you read.</li>
+<li><strong><code>content.update_page_layout</code></strong> (changes data): Change the draft block layout of a page: send the whole <code>layout</code>, or JSON Patch <code>operations</code> (at most 200, all or nothing). The result is checked like a person’s edit and stays a draft until published. Pass the <code>version</code> you read.</li>
+<li><strong><code>conversations.get_thread</code></strong> (read-only): Get a customer conversation in your scope with its latest 50 messages (oldest first).</li>
+<li><strong><code>conversations.list_callbacks</code></strong> (read-only): List call-back requests in your scope (phone numbers masked); calling back needs a person at the phone, so there is no tool for it.</li>
+<li><strong><code>conversations.list_calls</code></strong> (read-only): List the calls of a conversation in your scope, newest first (no phone numbers, no recordings). Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>conversations.list_threads</code></strong> (read-only): List customer conversations in your scope, latest activity first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>conversations.reply</code></strong> (changes data): Send a message to the customer of a conversation in your scope; the same <code>client_id</code> never sends twice.</li>
+<li><strong><code>conversations.suggest_reply</code></strong> (changes data): Ask the AI for a draft answer to a conversation; it is stored for an agent to edit and send, never sent by itself.</li>
+<li><strong><code>customers.get_customer</code></strong> (read-only): Get one customer profile: totals, tier, custom fields. Phone and email are masked.</li>
+<li><strong><code>customers.list_groups</code></strong> (read-only): List customer groups (manual or rule-based) in your scope.</li>
+<li><strong><code>customers.preview_group</code></strong> (read-only): Count the customers a group matches now (rule groups: matching the rule; manual groups: members).</li>
+<li><strong><code>customers.reveal_contact</code></strong> (changes data): Show the full phone number and email of a customer. Every call is written to the audit log; give a reason.</li>
+<li><strong><code>customers.search_customers</code></strong> (read-only): Find customers in your scope by name, phone number or email, or list a group’s or tier’s customers. Phone and email are masked.</li>
+<li><strong><code>customers.upsert_group</code></strong> (changes data): Create a customer group (no <code>id</code>) or change one. A rule group’s members follow its rule shortly after; check with <code>preview_group</code> first.</li>
+<li><strong><code>files.confirm_upload</code></strong> (changes data): Complete an upload started with <code>files.create_upload</code> after sending the file: the server checks its size and SHA-256 and creates the file (a mismatching file is removed). Calling it again returns the same file.</li>
+<li><strong><code>files.create_upload</code></strong> (changes data): Start uploading a large file straight to storage (S3): give its name, type, exact size and SHA-256 (hex); you get a signed link. Send the file there yourself with the given method and headers, then call <code>files.confirm_upload</code>. On disk storage this answers <code>files.direct_upload_unavailable</code>: use <code>files.upload_file</code> instead.</li>
+<li><strong><code>files.delete_file</code></strong> (destructive): Delete a file and its content; it cannot be restored. Same access as <code>get_file</code>.</li>
+<li><strong><code>files.get_file</code></strong> (read-only): Get the details of a file (name, type, size, SHA-256). Your own files need <code>files.upload</code>; anyone’s need <code>files.manage</code>.</li>
+<li><strong><code>files.list_files</code></strong> (read-only): List the files you uploaded, newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>files.read_file</code></strong> (read-only): Get a file with its content as base64, for files up to 1 MiB; download larger ones with <code>GET /api/v1/files/{id}/content</code>. Same access as <code>get_file</code>.</li>
+<li><strong><code>files.upload_file</code></strong> (changes data): Upload a small file, its content base64-encoded (the size and type limits of the server apply). Upload large files with <code>POST /api/v1/files</code>.</li>
+<li><strong><code>forms.create</code></strong> (changes data): Create a form (open unless <code>status</code> is <code>closed</code>); websites show it from <code>GET /api/v1/forms/public/{key}</code>. Every problem is reported at once. Setting <code>notify_emails</code> also needs the permission <code>forms.read</code> (the mails carry the answers). <code>fields</code> is the whole list, in display order; each field is an object <code>{key, type, label, help?, placeholder?, required?, options?, min_length?, max_length?, min?, max?}</code>: <code>key</code> a lower-case letter then lower-case letters, digits or <code>_</code>; <code>type</code> one of <code>text</code>, <code>email</code>, <code>phone</code>, <code>textarea</code>, <code>number</code>, <code>select</code>, <code>radio</code>, <code>checkbox</code>, <code>date</code>, <code>hidden</code>, <code>consent</code> (at most one); <code>label</code>, <code>help</code>, <code>placeholder</code> are <code>{"en": …, "vi": …}</code>; <code>options</code> (only <code>select</code>, <code>radio</code>, <code>checkbox</code>) is a list of <code>{value, label?}</code>. <code>success_message</code> is <code>{"en": …, "vi": …}</code>.</li>
+<li><strong><code>forms.get</code></strong> (read-only): Get a form: its fields (keys, types, labels, options), status, settings, and its <code>etag</code>, needed to change it.</li>
+<li><strong><code>forms.get_submission</code></strong> (read-only): Get a submission: answers with labels, sender email, status, and its <code>version</code>, needed to change its status.</li>
+<li><strong><code>forms.list</code></strong> (read-only): List forms, newest first, with their fields and settings. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>forms.list_submissions</code></strong> (read-only): List the submissions of a form, newest first, with their answers and the labels of the form version they were sent with. Spam is left out unless <code>status</code> is <code>spam</code>. Follow <code>pagination.next_cursor</code> with the same filters for more.</li>
+<li><strong><code>forms.set_submission_status</code></strong> (changes data): Mark a submission <code>read</code>, <code>archived</code>, <code>spam</code>, or <code>new</code> (not spam after all: the notification mail is then sent as for a new submission). Pass the <code>version</code> you read.</li>
+<li><strong><code>forms.update</code></strong> (changes data): Change a form: only the given fields change. Close it with <code>status: closed</code> (there is no delete tool: deleting a form also deletes its submissions). Pass the <code>etag</code> you read. Changing <code>notify_emails</code> also needs the permission <code>forms.read</code> (the mails carry the answers). <code>fields</code> is the whole list, in display order; each field is an object <code>{key, type, label, help?, placeholder?, required?, options?, min_length?, max_length?, min?, max?}</code>: <code>key</code> a lower-case letter then lower-case letters, digits or <code>_</code>; <code>type</code> one of <code>text</code>, <code>email</code>, <code>phone</code>, <code>textarea</code>, <code>number</code>, <code>select</code>, <code>radio</code>, <code>checkbox</code>, <code>date</code>, <code>hidden</code>, <code>consent</code> (at most one); <code>label</code>, <code>help</code>, <code>placeholder</code> are <code>{"en": …, "vi": …}</code>; <code>options</code> (only <code>select</code>, <code>radio</code>, <code>checkbox</code>) is a list of <code>{value, label?}</code>. <code>success_message</code> is <code>{"en": …, "vi": …}</code>.</li>
+<li><strong><code>inventory.adjust_stock</code></strong> (changes data): Adjust stock in one warehouse; every line needs a reason code from the list <code>inventory.adjustment</code>. Sending the same <code>reference</code> and content again changes nothing.</li>
+<li><strong><code>inventory.create_receipt</code></strong> (changes data): Receive goods into a warehouse, against a purchase order or directly from a supplier; each line updates the average cost. The same <code>reference</code> and content again changes nothing.</li>
+<li><strong><code>inventory.create_transfer</code></strong> (changes data): Create a stock transfer between two warehouses as a draft (one line per variant); ship it with the REST endpoint <code>POST /api/v1/inventory/transfers/{id}/ship</code>.</li>
+<li><strong><code>inventory.get_levels</code></strong> (read-only): List stock levels (variant × warehouse) in your scope with on hand, available, reserved and average cost; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>inventory.list_low_stock</code></strong> (read-only): List stock levels whose available stock is at or below their reorder point.</li>
+<li><strong><code>inventory.list_movements</code></strong> (read-only): List the append-only stock movement ledger in your scope, newest first.</li>
+<li><strong><code>inventory.receive_transfer</code></strong> (changes data): Receive goods of a stock transfer in transit, all (no lines) or part.</li>
+<li><strong><code>inventory.release_reservation</code></strong> (destructive): Release a stuck stock reservation by its id: units not shipped yet go back to the available stock. Releasing again changes nothing.</li>
+<li><strong><code>invoices.create_draft</code></strong> (changes data): Write a draft document; taxes are computed from the tax categories. A draft has no number until it is issued.</li>
+<li><strong><code>invoices.create_export</code></strong> (changes data): Ask for an accounting export of a period (general journal or documents, CSV or XLSX) for the accountant’s software; a background job makes the file.</li>
+<li><strong><code>invoices.document</code></strong> (read-only): An accounting document with its lines, status, number and e-invoice codes.</li>
+<li><strong><code>invoices.documents</code></strong> (read-only): List accounting documents (invoices, receipts, notes) in your scope with their lines.</li>
+<li><strong><code>invoices.export</code></strong> (read-only): The status of an accounting export; once <code>ready</code>, download it from <code>GET /api/v1/invoices/exports/{id}/download</code>.</li>
+<li><strong><code>invoices.issue</code></strong> (changes data): Issue a draft: gives it the next number of its series (no gaps), books the sale and sends the e-invoice. Issuing again returns the same number.</li>
+<li><strong><code>invoices.print</code></strong> (read-only): Print a document as HTML with its print template (the unit’s, the tenant’s or the built-in one) in <code>en</code> or <code>vi</code>. For a PDF use <code>GET /api/v1/invoices/documents/{id}/render?format=pdf</code>.</li>
+<li><strong><code>kernel.add_domain</code></strong> (changes data): Add a domain (e.g. <code>shop.example</code>) to the current tenant. Returns it <code>pending</code> with the DNS TXT record to set; then call <code>kernel.verify_domain</code>. Adding a domain the tenant already has returns it unchanged.</li>
+<li><strong><code>kernel.create_sandbox</code></strong> (changes data): Create a sandbox of your tenant: a test copy with its configuration and no personal data, where partners are simulated and mail and webhooks do not leave. Enter it with the header <code>Autoxide-Tenant: &lt;id&gt;</code> once it is active.</li>
+<li><strong><code>kernel.current_tenant</code></strong> (read-only): Tell which tenant (customer) this request is for, and whether the installation runs one tenant or many.</li>
+<li><strong><code>kernel.decide_approval</code></strong> (changes data): Approve or reject a command an AI agent asked to run. Only a person holding one of the command’s permissions decides; an agent cannot.</li>
+<li><strong><code>kernel.delete_setting</code></strong> (destructive): Remove a setting of the current tenant; the module then works as when it was never set (a partner connection stops working until it is set again).</li>
+<li><strong><code>kernel.export_tenant</code></strong> (changes data): Start an export of all the data of a tenant (yours by default) into one JSON Lines file, in the background; follow it with <code>kernel.get_tenant_export</code> until it is <code>ready</code>, then download it over REST.</li>
+<li><strong><code>kernel.extend_sandbox</code></strong> (changes data): Extend a sandbox of your tenant: it is then deleted <code>AUTOXIDE_TENANCY_SANDBOX_DAYS</code> days from now.</li>
+<li><strong><code>kernel.get_migration_run</code></strong> (read-only): Get a placement migration run: its <code>status</code> (<code>pending</code>, <code>running</code>, <code>done</code>, <code>failed</code>), the migrations applied per placement and the error.</li>
+<li><strong><code>kernel.get_module</code></strong> (read-only): Describe one installed module, like an item of <code>kernel.list_modules</code>, plus whether each of its migrations is applied to the database.</li>
+<li><strong><code>kernel.get_tenant</code></strong> (read-only): Get one tenant of the platform by id or slug (platform staff only).</li>
+<li><strong><code>kernel.get_tenant_export</code></strong> (read-only): Get a data export of a tenant: its <code>status</code> (<code>pending</code>, <code>running</code>, <code>ready</code>, <code>failed</code>, <code>expired</code>), rows per table and size.</li>
+<li><strong><code>kernel.get_tenant_move</code></strong> (read-only): Get a move of a tenant to another placement (platform staff only): its <code>state</code> (<code>copying</code>, <code>copied</code>, <code>switched</code>, <code>done</code>, <code>aborted</code>), rows copied per table and the <code>error</code> that stopped the last run, if any.</li>
+<li><strong><code>kernel.list_approvals</code></strong> (read-only): List approval requests: those of your own AI agents, and those you may decide. An agent sees here whether a person approved its command yet. A page may hold fewer items than <code>limit</code>, even none, and still have <code>pagination.next_cursor</code>: keep following it until it is null.</li>
+<li><strong><code>kernel.list_connection_webhooks</code></strong> (read-only): List the webhook addresses of the current tenant: one per webhook an installed partner connection receives (bank transactions, payment results, delivery updates…), to paste into the partner’s settings page.</li>
+<li><strong><code>kernel.list_custom_fields</code></strong> (read-only): List the custom fields this tenant added to record types you may read (key, type, labels, options, whether lists filter on it with <code>cf.&lt;key&gt;=</code>). Write their values in a record’s <code>custom_fields</code>. A page may hold fewer items than <code>limit</code>, even none, and still have <code>pagination.next_cursor</code>: keep following it until it is null.</li>
+<li><strong><code>kernel.list_domains</code></strong> (read-only): List the current tenant’s own domains, newest first, with their status (<code>pending</code>, <code>verified</code>, <code>failed</code>) and the DNS TXT record that verifies each.</li>
+<li><strong><code>kernel.list_modules</code></strong> (read-only): List the modules installed in this server, in start order, with the permissions, events, jobs, schedules, MCP tools, deprecated endpoints and migrations each declares. Use it to learn what this server can do.</li>
+<li><strong><code>kernel.list_promotable</code></strong> (read-only): List the kinds of records that can be promoted from a sandbox to your tenant.</li>
+<li><strong><code>kernel.list_sandbox_messages</code></strong> (read-only): Inside a sandbox: list what it kept instead of sending out — simulated partner calls (payments, e-invoices, identity checks), SMS, Zalo and push messages, mail to people who cannot enter the sandbox and webhooks to URLs not allowed. Newest first.</li>
+<li><strong><code>kernel.list_sandboxes</code></strong> (read-only): List the sandboxes (test copies) of your tenant, newest first.</li>
+<li><strong><code>kernel.list_settings</code></strong> (read-only): List the settings of the current tenant: every setting the installed modules take per tenant, whether it is set, and its value unless it is secret. <code>group: "connection"</code> lists only the connections to partner services (mail server, AI provider…).</li>
+<li><strong><code>kernel.list_tenants</code></strong> (read-only): List the tenants of the platform, newest first (platform staff only).</li>
+<li><strong><code>kernel.migrate_placements</code></strong> (changes data): Migrate the tenant databases (placements), or with <code>dry_run</code> only list the pending migrations. A run goes on in the background; follow it with <code>kernel.get_migration_run</code> until <code>done</code> or <code>failed</code>. Platform staff only.</li>
+<li><strong><code>kernel.move_tenant</code></strong> (destructive): Move a tenant’s data to another placement (database) (platform staff only). Dry run by default: returns what blocks the move and the rows that would be copied, changing nothing. With <code>dry_run: false</code> the tenant is unavailable (503) while a background job copies its data, switches it and deletes the old copy (unless <code>keep_source</code>); follow it with <code>kernel.get_tenant_move</code>. Calling again with the same <code>to</code> resumes a move that stopped.</li>
+<li><strong><code>kernel.navigation</code></strong> (read-only): Get the screens of the admin interface you may use in this tenant, grouped as in the side bar: <code>locked</code> screens need a feature the plan lacks. Use it to tell a person where to go; pass <code>device: "mobile"</code> for the phone layout.</li>
+<li><strong><code>kernel.ops_backlog</code></strong> (read-only): See the job and event backlogs, the dead-letter queue, the database connections and the newest backup of every database (platform staff only). Use it to find out why mail, webhooks or reports are late.</li>
+<li><strong><code>kernel.promote_sandbox</code></strong> (changes data): Promote records tried in a sandbox to your tenant as drafts (nothing is published or enabled; what is live is never overwritten). Call it in the real tenant. Each record gets <code>created_draft</code>, <code>updated_draft</code>, <code>unchanged</code> or <code>conflict</code>.</li>
+<li><strong><code>kernel.request_log</code></strong> (read-only): List the recent API and MCP calls made in this tenant (who, which route or tool, status, error code), newest first. Filter by <code>actor_kind</code> (e.g. <code>agent</code>), <code>api_key_id</code>, exact <code>path</code> (e.g. <code>mcp:content.publish_entry</code>), <code>status</code> or <code>status_class</code> (e.g. <code>5xx</code>).</li>
+<li><strong><code>kernel.set_setting</code></strong> (changes data): Set a setting of the current tenant that is not secret, e.g. a plain field of its account at a partner (<code>&lt;module&gt;.connection.&lt;kind&gt;.&lt;field&gt;</code>). Secret settings (API keys, passwords) are refused with <code>kernel.setting_secret_rest_only</code>: a person sets them with <code>PUT /api/v1/kernel/settings/{name}</code>, so the value never passes through an agent.</li>
+<li><strong><code>kernel.test_connection</code></strong> (changes data): Test the partner connection a setting belongs to (e.g. <code>mail.connection.smtp.url</code> tests the mail server) with the current tenant’s settings, and record the result. Answers <code>ok</code> and, when it failed, why. Gives up after 15 seconds.</li>
+<li><strong><code>kernel.update_domain</code></strong> (changes data): Attach one of the current tenant’s domains to a node of its organization tree (<code>org_id</code>, e.g. a store with its own site), or to the tenant as a whole (<code>org_id: null</code>). Status and verification are not affected.</li>
+<li><strong><code>kernel.verify_domain</code></strong> (changes data): Look up the DNS TXT record of one of the current tenant’s domains now and return its new status: <code>verified</code>, or still <code>pending</code> with the reason in <code>check_error</code>.</li>
+<li><strong><code>ledger.balance</code></strong> (read-only): The balance of a ledger account, now or at the end of a day.</li>
+<li><strong><code>ledger.create_payout</code></strong> (changes data): Pay a seller (in the partner collect mode) from its available balance through the payout partner. Never more than the balance; a refused payout puts the money back. The same reference and content again returns the payout already made.</li>
+<li><strong><code>ledger.create_vietqr_payment</code></strong> (changes data): Create a VietQR bank transfer payment into the unit’s own bank account: returns the QR payload and the transfer code the buyer keeps in the description. Matched automatically when the bank reports the transfer.</li>
+<li><strong><code>ledger.entries</code></strong> (read-only): List ledger entries in your scope with their lines, newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>ledger.exceptions</code></strong> (read-only): Differences between the book and the payment partners that wait for a person (amount mismatches, unknown or missing transactions, late payments).</li>
+<li><strong><code>ledger.exchange_rate</code></strong> (read-only): The exchange rate in force on a day for a currency pair (1 base = rate quote): the latest rate on or before that day, a rate entered by hand first.</li>
+<li><strong><code>ledger.flow_settings</code></strong> (read-only): The money-flow mode in force for a unit (self collect, partner collect, split at the gateway), its partners, hold days and where cash on delivery goes.</li>
+<li><strong><code>ledger.holds</code></strong> (read-only): Seller money held until the return window ends, with what is still held; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>ledger.payment</code></strong> (read-only): A payment collected through a payment partner, with its status and refunded amount.</li>
+<li><strong><code>ledger.payouts</code></strong> (read-only): Payouts of seller balances through the payout partner, with their status; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>ledger.post_entry</code></strong> (changes data): Post a manual double entry (debits equal credits). Entries are never changed: correct one by reversing it. The same reference and content again returns the entry already posted.</li>
+<li><strong><code>ledger.record_exchange_rate</code></strong> (changes data): Record an exchange rate by hand for the whole tenant, used from its day until a later rate of the pair. Recorded rates are never changed.</li>
+<li><strong><code>ledger.release_hold</code></strong> (changes data): Release held seller money now: what is still held moves to the seller’s available balance. Releasing again changes nothing.</li>
+<li><strong><code>ledger.resolve_exception</code></strong> (changes data): Resolve a difference: <code>match</code> records the money the partner collected for a payment when it is exactly the amount due, <code>accept_received</code> records the amount collected even when it differs, <code>ignore</code> closes it, <code>refunded_outside</code> notes it was refunded outside Autoxide.</li>
+<li><strong><code>ledger.simulate_payment</code></strong> (changes data): Inside a sandbox only (and when the server allows it): play the payment partner for a pending sandbox payment, reporting it <code>succeeded</code> or <code>failed</code>. Goes through the same path as a partner notification (entry posted, the order told); no money moves.</li>
+<li><strong><code>ledger.trial_balance</code></strong> (read-only): The trial balance of a book for a range of days: opening balance, debits, credits and closing balance per account.</li>
+<li><strong><code>media.confirm_upload</code></strong> (changes data): Complete an upload started with <code>media.create_upload</code> after sending the file: the server checks its real type, size and SHA-256 and creates the item (a failing file is removed). Calling it again returns the same item.</li>
+<li><strong><code>media.create_upload</code></strong> (changes data): Start uploading a large media item straight to storage (S3): give its name, real type, exact size and SHA-256 (hex), and optionally folder, tags and unit; you get a signed link. Send the file there yourself with the given method and headers, then call <code>media.confirm_upload</code>. On disk storage this answers <code>media.direct_upload_unavailable</code>: use <code>media.upload</code> instead.</li>
+<li><strong><code>media.get</code></strong> (read-only): Get a media item: name, type, size, image width and height, texts, visibility, and the <code>url</code> of its content.</li>
+<li><strong><code>media.list</code></strong> (read-only): List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash, name or missing alt text; sort by <code>created_at</code> (newest first), <code>name</code> or <code>size</code> (A→Z / smallest first); <code>order</code> reverses. Follow <code>pagination.next_cursor</code> with the same filters for more.</li>
+<li><strong><code>media.list_tags</code></strong> (read-only): List media tags by name, each with the number of items carrying it.</li>
+<li><strong><code>media.set_alt</code></strong> (changes data): Set (or, with <code>alt: null</code>, remove) the text alternative of a media item in one language, e.g. <code>vi</code> on a bilingual site; the item’s own <code>alt</code> stays the default for other languages. Pass the <code>updated_at</code> you read; the change is refused if someone changed the item since.</li>
+<li><strong><code>media.suggest_alt</code></strong> (changes data): Ask the server’s AI model to suggest alt text for an image (JPEG, PNG, GIF, WebP) in a language, optionally with context such as the post title. Saves nothing: store what you accept with <code>update</code>. Uses AI tokens.</li>
+<li><strong><code>media.trash</code></strong> (changes data): Move a media item to the trash. Its public link stops working; it can be restored until the server deletes it for good (30 days by default).</li>
+<li><strong><code>media.update</code></strong> (changes data): Change the details of a media item: name, alt text, title, caption, decorative flag, folder or visibility. Pass the <code>updated_at</code> you read; the change is refused if someone changed the item since.</li>
+<li><strong><code>media.upload</code></strong> (changes data): Add a small file (at most 1 MiB) to the media library, sent as base64. The server checks the content really is of its type and reads image sizes. Upload larger files with <code>POST /api/v1/media</code>. The answer lists items that already had the same content in <code>duplicates</code>.</li>
+<li><strong><code>menus.create_menu</code></strong> (changes data): Create a website menu: a key (e.g. <code>main</code>, <code>footer</code>), a language and an item tree. Each item is an object: <code>label</code> (up to 200 characters; may be empty with <code>ref</code> to show the object’s title); at most one of <code>url</code> (<code>https://</code>, <code>http://</code>, <code>mailto:</code> or a path starting with one <code>/</code>) and <code>ref</code> (<code>{"kind": "content.term", "id": "..."}</code>, an object of any module), with neither the item is a heading; <code>auto_children</code> (true to also list the object’s sub-items) with <code>auto_children_limit</code> (1 to 50, default 12); <code>icon</code>; <code>highlight</code> (<code>accent</code>, <code>brand</code>, <code>sale</code>, <code>muted</code>); <code>badge</code> (<code>{"text", "tone": sale|brand|new|neutral, "from"?, "until"?}</code>); <code>feature</code> (an object to feature, same shape as <code>ref</code>); <code>children</code> (same shape; 4 levels and 200 items at most).</li>
+<li><strong><code>menus.delete_menu</code></strong> (destructive): Delete a website menu and all its items. It cannot be restored.</li>
+<li><strong><code>menus.get_menu</code></strong> (read-only): Get a website menu with its items as saved, and its <code>version</code> for <code>replace_menu_items</code>.</li>
+<li><strong><code>menus.list_menus</code></strong> (read-only): List the website menus (every key and language), newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>menus.replace_menu_items</code></strong> (changes data): Replace the whole item tree of a website menu. Send the <code>version</code> from <code>get_menu</code>; if the menu changed since, nothing is saved (<code>precondition_failed</code>): read it again. Each item is an object: <code>label</code> (up to 200 characters; may be empty with <code>ref</code> to show the object’s title); at most one of <code>url</code> (<code>https://</code>, <code>http://</code>, <code>mailto:</code> or a path starting with one <code>/</code>) and <code>ref</code> (<code>{"kind": "content.term", "id": "..."}</code>, an object of any module), with neither the item is a heading; <code>auto_children</code> (true to also list the object’s sub-items) with <code>auto_children_limit</code> (1 to 50, default 12); <code>icon</code>; <code>highlight</code> (<code>accent</code>, <code>brand</code>, <code>sale</code>, <code>muted</code>); <code>badge</code> (<code>{"text", "tone": sale|brand|new|neutral, "from"?, "until"?}</code>); <code>feature</code> (an object to feature, same shape as <code>ref</code>); <code>children</code> (same shape; 4 levels and 200 items at most).</li>
+<li><strong><code>newsletter.create_campaign</code></strong> (changes data): Write a draft campaign for a list. Nothing is sent: a person (or an agent with <code>newsletter.send</code>) sends or schedules it after review. Returns the campaign with its <code>version</code>.</li>
+<li><strong><code>newsletter.find_subscribers</code></strong> (read-only): Find subscribers by part of their email address, list or subscription status, newest first, with their subscriptions. Follow <code>pagination.next_cursor</code> with the same filters for more.</li>
+<li><strong><code>newsletter.get_campaign</code></strong> (read-only): Get a campaign: content, status and progress (<code>progress.total</code>, <code>pending</code>, <code>sent</code>, <code>failed</code>, <code>skipped</code>), and the <code>version</code> needed to send or schedule it.</li>
+<li><strong><code>newsletter.list_lists</code></strong> (read-only): List the newsletter lists, newest first, with how many people are unconfirmed, confirmed and unsubscribed. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>newsletter.schedule_campaign</code></strong> (changes data): Schedule a draft or scheduled campaign to start sending at <code>at</code>. Pass the <code>version</code> you read.</li>
+<li><strong><code>newsletter.send_campaign</code></strong> (changes data): Send a draft or scheduled campaign now to every confirmed subscriber of its list. Mails go out in batches; follow the progress with <code>get_campaign</code>. Pass the <code>version</code> you read.</li>
+<li><strong><code>notifications.get_template_schema</code></strong> (read-only): Show the variables a notification template of a kind may use (<code>{{ path }}</code>), which are required, and sample data.</li>
+<li><strong><code>notifications.list_kinds</code></strong> (read-only): List the notification kinds declared by modules: key, category (<code>security</code>, <code>transactional</code>, <code>marketing</code>) and channels, by key. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>notifications.list_messages</code></strong> (read-only): List the send log of notifications (one row per channel), newest first, with status and skip reason. Shows addresses of recipients.</li>
+<li><strong><code>notifications.list_my_devices</code></strong> (read-only): List your mobile devices registered for push notifications (platform, app, last use); tokens are never shown. Newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>notifications.list_my_inbox</code></strong> (read-only): List your in-app notifications, newest first.</li>
+<li><strong><code>notifications.mark_inbox_read</code></strong> (changes data): Mark one of your in-app notifications as read, or all of them when <code>id</code> is omitted.</li>
+<li><strong><code>notifications.preview_template</code></strong> (read-only): Render a notification template (the draft by default, or the published or an older version) with the sample data of the kind or your <code>data</code>. Nothing is sent.</li>
+<li><strong><code>notifications.send_notification</code></strong> (changes data): Send a notification of a declared kind to one recipient (user, email, phone or every admin). Advertising needs <code>notifications.send_marketing</code> and is only sent to people who consented. Always pass a <code>dedupe_key</code>: retrying with it sends nothing new.</li>
+<li><strong><code>notifications.update_template_draft</code></strong> (changes data): Save the draft of a notification template (template engine syntax: <code>{{ name }}</code>, <code>{% if %}</code>, <code>{% for %}</code>). Checked against the variables of the kind; every problem is reported at once. A draft is not used until a person publishes it over REST.</li>
+<li><strong><code>orders.decide_return</code></strong> (destructive): Move a return forward: <code>approve</code> or <code>reject</code> (with a reason code of <code>orders.return_rejected</code>) the request, <code>receive</code> the items, <code>refund</code> the computed amount, or <code>close</code> it. Returns the return with its photos (<code>media_ids</code>).</li>
+<li><strong><code>orders.get_order</code></strong> (read-only): Read an order with its lines, totals and payment status.</li>
+<li><strong><code>orders.list_orders</code></strong> (read-only): List orders of shops in your scope, newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>orders.list_returns</code></strong> (read-only): List return requests of shops in your scope, newest first, with lines, photos (<code>media_ids</code>) and the refund once computed; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>orders.lookup_warranty</code></strong> (changes data): Find warranties of shops in your scope by <code>serial</code> or buyer <code>phone</code> (either matches): product, order line, start, end and <code>active</code> / <code>expired</code>. Newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>orders.refund_order</code></strong> (destructive): Refund part or all of an order: through the payment partner when the payment came through it, otherwise recorded as paid back by the shop (cash). Never more than was paid; the same <code>reference</code> returns the same refund.</li>
+<li><strong><code>orders.request_shipment</code></strong> (changes data): Ask the shipping module for a shipment of an order’s items (accepting the order first when it is confirmed); cash-on-delivery orders carry the amount to collect.</li>
+<li><strong><code>orders.transition_order</code></strong> (destructive): Move an order through its lifecycle: accept it (<code>preparing</code>), mark it shipping, delivered or failed, or cancel it (a paid order is refunded through the payment partner).</li>
+<li><strong><code>orders.update_warranty_claim</code></strong> (changes data): Move a warranty claim on: <code>received</code> → <code>inspecting</code> / <code>rejected</code>; <code>inspecting</code> → <code>repairing</code> / <code>replacing</code> / <code>rejected</code>; <code>repairing</code> / <code>replacing</code> → <code>ready</code>; <code>ready</code> → <code>returned</code>. Optionally record what was done in <code>resolution</code>.</li>
+<li><strong><code>organizations.add_group_members</code></strong> (changes data): Add units of the tenant (any branch) to a unit group; units already in it are skipped.</li>
+<li><strong><code>organizations.change_unit_status</code></strong> (destructive): Approve, suspend, archive or reactivate an organization unit. While a unit is not active, nothing can be written to it or to the units below it.</li>
+<li><strong><code>organizations.create_group</code></strong> (changes data): Create a unit group for reports. A group grants no access to its units.</li>
+<li><strong><code>organizations.create_unit</code></strong> (changes data): Create an organization unit under a parent you can write to. It is active when you can also manage units there, otherwise pending until approved.</li>
+<li><strong><code>organizations.get_settings</code></strong> (read-only): Get the settings in force at an organization unit (time zone, currency, language…) and where each value comes from: the unit, a unit above, or the default. By key; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>organizations.get_unit</code></strong> (read-only): Get one organization unit in your scope.</li>
+<li><strong><code>organizations.list_groups</code></strong> (read-only): List the unit groups of the tenant (free sets of units such as “stores in the north”, used to filter and group reports). <code>member_count</code> counts only units in your scope.</li>
+<li><strong><code>organizations.list_units</code></strong> (read-only): List the organization units in your scope (head office, regions, stores…), newest first; filter by parent, type, status or name; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>organizations.move_unit</code></strong> (changes data): Move an organization unit, with everything below it, under another parent.</li>
+<li><strong><code>organizations.remove_group_member</code></strong> (changes data): Remove one unit from a unit group (nothing happens when it is not in the group).</li>
+<li><strong><code>organizations.set_setting</code></strong> (changes data): Set a setting of an organization unit (units below follow unless they set their own), or clear it with <code>value</code> null so the unit inherits again.</li>
+<li><strong><code>organizations.update_unit</code></strong> (changes data): Rename an organization unit or change its internal code.</li>
+<li><strong><code>plans.assign_subscription</code></strong> (changes data): Platform staff: put a tenant on a plan (with the trial the first time), optionally replacing its add-ons.</li>
+<li><strong><code>plans.change_subscription</code></strong> (changes data): Move your tenant to another plan: a plan costing at least as much per month applies at once (the rest of the period is billed), a cheaper one when the period ends.</li>
+<li><strong><code>plans.create_plan</code></strong> (changes data): Platform staff: create a plan from the modules, features and limits the installed modules declare (see <code>kernel.get_module</code>).</li>
+<li><strong><code>plans.get_entitlements</code></strong> (read-only): What your tenant may use now: modules, features, limits with their use, and whether the data is read-only. Check it before offering an action the plan may not include.</li>
+<li><strong><code>plans.get_plan</code></strong> (read-only): Platform staff: get one plan.</li>
+<li><strong><code>plans.get_provisioning</code></strong> (read-only): Platform staff: how far a tenant provisioning went — its steps, and the error when it failed.</li>
+<li><strong><code>plans.get_subscription</code></strong> (read-only): Platform staff: get a tenant’s subscription and add-ons.</li>
+<li><strong><code>plans.list_plans</code></strong> (read-only): Platform staff: list every plan (drafts and retired ones too) with modules, features, limits and prices, newest first; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>plans.list_signups</code></strong> (read-only): Platform staff: list tenant sign-ups (people who signed up a new tenant by themselves), newest first, optionally by <code>status</code>; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>plans.list_usage</code></strong> (read-only): Platform staff: a tenant’s use of every limit (metered limits: this month), by limit key; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>plans.provision_tenant</code></strong> (changes data): Platform staff: create a tenant on a plan — the tenant, its subscription, sample data when asked, and an email invitation of its administrator with the role <code>admin</code>. Runs in the background; follow it with <code>get_provisioning</code>.</li>
+<li><strong><code>plans.retire_plan</code></strong> (changes data): Platform staff: stop selling a plan; tenants on it keep it.</li>
+<li><strong><code>plans.set_override</code></strong> (changes data): Platform staff: for one tenant, turn a module or feature on or off, or replace a limit, with a reason and an optional end.</li>
+<li><strong><code>plans.update_plan</code></strong> (changes data): Platform staff: replace the whole content of a plan; tenants on it get the change within the cache time.</li>
+<li><strong><code>promotions.activate_promotion</code></strong> (changes data): Turn a draft promotion on after the legal checks (discount limit and days in force, notices to authorities, price floors). Failed checks come back as errors.</li>
+<li><strong><code>promotions.create_promotion</code></strong> (changes data): Create a promotion as a draft (rule, window with a required end, limits, title and terms). Turn it on with <code>activate_promotion</code>.</li>
+<li><strong><code>promotions.end_promotion</code></strong> (changes data): End a promotion now; usage already held for orders stays valid.</li>
+<li><strong><code>promotions.evaluate_cart</code></strong> (read-only): Compute the promotions of a cart without holding anything: discounts per line with reasons, gifts, codes and vouchers that do not apply, and the fingerprint. The unit of the cart must be in your scope.</li>
+<li><strong><code>promotions.export_notice</code></strong> (read-only): Get the data of a promotion notice, one entry per authority (e.g. <code>province:79</code>): whether a notice is required under the rules in force, the last day to submit, the legal basis and what was recorded. People submit the notice; this only prepares it. Needs <code>promotions.compliance</code> too.</li>
+<li><strong><code>promotions.generate_codes</code></strong> (changes data): Add one chosen code or a batch of random codes to a promotion: <code>redeem</code> coupons for <code>code</code> promotions, <code>claim</code> codes for <code>voucher</code> promotions.</li>
+<li><strong><code>promotions.get_promotion</code></strong> (read-only): Get a promotion with its rule, texts, targets, flash-sale prices and counters.</li>
+<li><strong><code>promotions.grant_voucher</code></strong> (changes data): Put a voucher of a <code>voucher</code> promotion into a user’s wallet, with a reason. The same <code>reference</code> again returns the voucher already given.</li>
+<li><strong><code>promotions.list_promotions</code></strong> (read-only): List the promotions in your scope, newest first; filter by status, kind, unit or words in the title; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>promotions.list_vouchers_of_user</code></strong> (read-only): List the vouchers in a user’s wallet, soonest to expire first (for support staff); only vouchers of promotions in units you can read.</li>
+<li><strong><code>promotions.simulate</code></strong> (read-only): Try a promotion on sample carts: each cart computed with it (even as a draft) and without it, and what it adds to the discount. Nothing is written or held.</li>
+<li><strong><code>reporting.facts</code></strong> (read-only): List report facts (newest first) with the same visibility as <code>reporting.summary</code>; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>reporting.kinds</code></strong> (read-only): List the kinds of report figures modules declare (kind, unit, dimensions), by name. Follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>reporting.summary</code></strong> (read-only): Sum a report figure over a period, per day, week, month, tenant or unit, for your tenant and the tenants below it (as far as your scope reaches). Money is summed per currency; ask <code>currency</code> to also get a converted total.</li>
+<li><strong><code>shipping.book_shipment</code></strong> (changes data): Book a pending shipment with the carrier of its method; it gets a tracking number.</li>
+<li><strong><code>shipping.cancel_shipment</code></strong> (destructive): Cancel a shipment (also at the carrier); refused once the carrier picked it up.</li>
+<li><strong><code>shipping.get_shipment</code></strong> (read-only): Get a shipment with its parcels, items and tracking history.</li>
+<li><strong><code>shipping.list_cod_discrepancies</code></strong> (read-only): List the differences between carrier cash-on-delivery statements and shipments.</li>
+<li><strong><code>shipping.list_shipments</code></strong> (read-only): List the shipments in your scope, newest first; filter by order, status, unit or tracking number; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>shipping.quote</code></strong> (read-only): Quote the shipping options of a cart from a store to a destination, cheapest first; methods that cannot ship it are listed in <code>unavailable</code> with a reason.</li>
+<li><strong><code>shipping.update_status</code></strong> (changes data): Set the status of a shipment by hand (own delivery staff, store pickup); only moves allowed by the status table.</li>
+<li><strong><code>support.add_internal_note</code></strong> (changes data): Add an internal note (staff only) to a support ticket; mentioned colleagues are notified.</li>
+<li><strong><code>support.get_ticket</code></strong> (read-only): Get a support ticket with its messages, internal notes and linked records.</li>
+<li><strong><code>support.link_ticket</code></strong> (changes data): Link a support ticket to a record of another module (an order, a product…).</li>
+<li><strong><code>support.list_tickets</code></strong> (read-only): List the support tickets in your scope, newest first; follow <code>pagination.next_cursor</code> for more.</li>
+<li><strong><code>support.preview_auto_reply</code></strong> (changes data): Try the automatic answer on a question without sending anything: tells whether it would send an approved answer (and its exact text), leave it to staff, or hand over.</li>
+<li><strong><code>support.reply_ticket</code></strong> (changes data): Answer the customer on a support ticket (they are notified; the ticket waits for them).</li>
+<li><strong><code>support.suggest_reply</code></strong> (changes data): Draft an answer for a support ticket with AI. Nothing is sent: review the draft, then send it with <code>reply_ticket</code>.</li>
+<li><strong><code>support.update_ticket</code></strong> (changes data): Change status, priority, category or assignee of a support ticket.</li>
+<li><strong><code>tax.quote</code></strong> (read-only): Compute the taxes of a document (per line and per rate) without saving anything. Taxes are rounded once per rate on the whole document, then shared between lines.</li>
+<li><strong><code>tax.rates</code></strong> (read-only): The tax rates in force on a day for a jurisdiction, with their legal basis; by category, stage and start date, the same order and pages as <code>GET /api/v1/tax/rates</code>; follow <code>pagination.next_cursor</code>.</li>
+<li><strong><code>webhooks.list_deliveries</code></strong> (read-only): List webhook deliveries of every endpoint, newest first; filter by <code>status</code> (<code>pending</code>, <code>succeeded</code>, <code>failed</code>, <code>sandboxed</code>) or <code>endpoint_id</code>.</li>
+<li><strong><code>webhooks.redeliver</code></strong> (changes data): Send a webhook delivery that succeeded or failed again, with the same body and <code>webhook-id</code>. Refused while it is still being sent.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../reference/api.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../reference/api.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

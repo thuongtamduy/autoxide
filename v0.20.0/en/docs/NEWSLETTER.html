@@ -1,0 +1,532 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Newsletter - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="newsletter"><a class="header" href="#newsletter">Newsletter</a></h1>
+<p><em>Tiếng Việt: <a href="NEWSLETTER.vi.html">NEWSLETTER.vi.md</a></em></p>
+<p>The <code>newsletter</code> module keeps mailing lists and their subscribers, takes sign-ups from the
+public with a confirmation mail (double opt-in), unsubscribes in one click, and sends
+campaigns in batches at a rate you choose, without ever sending one person the same campaign
+twice. It keeps a suppression list fed by bounces and complaints, can turn each new post of the
+<code>content</code> module into a campaign, and exports or erases everything about an email address. It
+does <strong>not</strong> track opens or clicks. It is API only: the website shows the sign-up form, the
+confirmation page and the preferences page; the admin screens are a separate project. It lives
+under <code>/api/v1/newsletter</code>. The full contract is in <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>openapi.json</code></a>.</p>
+<p>No third-party account is needed: spam is stopped by the core’s shared anti-spam layer, and
+mail goes through the <code>mail</code> module (your SMTP relay).</p>
+<h2 id="before-you-send"><a class="header" href="#before-you-send">Before you send</a></h2>
+<ol>
+<li><strong>An SMTP relay that signs with DKIM.</strong> Gmail and Yahoo refuse bulk mail that is not
+authenticated, and the one-click unsubscribe headers (RFC 8058) only count when the DKIM
+signature covers them. Set <code>AUTOXIDE_MAIL_SMTP_URL</code> and <code>AUTOXIDE_MAIL_FROM</code> to a relay that
+signs your domain (SPF and DMARC too).</li>
+<li><strong><code>AUTOXIDE_HTTP_PUBLIC_URL</code></strong> — the address of this API, e.g. <code>https://api.example.com</code>.
+Every campaign mail carries <code>List-Unsubscribe: &lt;https://api.example.com/api/v1/newsletter/public/unsubscribe?token=…&gt;</code>.</li>
+<li><strong><code>AUTOXIDE_NEWSLETTER_CONFIRM_URL</code></strong> — your website’s confirmation page, with <code>{token}</code>.
+Set it even if no list uses double opt-in: suspicious sign-ups and people re-joining a list
+they left are confirmed by mail on every list.</li>
+<li><strong><code>AUTOXIDE_NEWSLETTER_PREFERENCES_URL</code></strong> — your website’s preferences page, with <code>{token}</code>;
+the footer of every campaign mail links there.</li>
+<li><strong><code>AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS</code></strong> — the sender’s name and postal address, printed in
+the footer; required for advertising campaigns.</li>
+</ol>
+<p>Each tenant can replace these for itself with tenant settings (<code>PUT /api/v1/kernel/settings/{name}</code>,
+see “Settings and state of each tenant” in <a href="DEPLOY.html">DEPLOY.md</a>): <code>newsletter.link.confirm</code>,
+<code>newsletter.link.preferences</code> (a page on one of the tenant’s own hosts) and
+<code>newsletter.postal_address</code>. When a tenant has not set its postal address, the owner’s name and
+address from its legal profile (module <code>compliance</code>) are used before the server’s.</p>
+<p>Nothing here is needed to start the server: a feature that needs a missing setting answers
+<code>503</code> with a code naming it (<code>public_url_missing</code>, <code>newsletter.confirm_url_missing</code>,
+<code>newsletter.preferences_url_missing</code>, <code>newsletter.postal_address_missing</code>).</p>
+<h2 id="permissions"><a class="header" href="#permissions">Permissions</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Permission</th><th>Allows</th></tr>
+</thead>
+<tbody>
+<tr><td><code>newsletter.read</code></td><td>Reading lists, subscribers (personal data), campaigns with progress, suppressions</td></tr>
+<tr><td><code>newsletter.manage</code></td><td>Lists, importing and changing subscribers, writing draft campaigns, suppressions, bounces</td></tr>
+<tr><td><code>newsletter.send</code></td><td>Sending, scheduling, pausing, resuming and cancelling campaigns; test mails; <code>new_posts: send</code> on a list</td></tr>
+<tr><td><code>newsletter.export</code></td><td>Exporting or erasing everything about an email address</td></tr>
+<tr><td><code>newsletter.subscribe</code></td><td>Adding sign-ups without the anti-spam checks for anonymous visitors (a website server’s own API key)</td></tr>
+</tbody>
+</table>
+</div>
+<p>An agent with <code>newsletter.manage</code> but not <code>newsletter.send</code> can write campaigns that a person
+then reviews and sends: changing a scheduled campaign moves it back to draft, and setting a list
+to send new posts automatically needs <code>newsletter.send</code>, so nothing goes out that nobody with
+<code>newsletter.send</code> approved. Visitors need nothing: everything under
+<code>/api/v1/newsletter/public/</code> is open. Give <code>newsletter.subscribe</code> only to the API key of a
+website server; being signed in is not enough to skip the anti-spam checks.</p>
+<h2 id="lists"><a class="header" href="#lists">Lists</a></h2>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/api/v1/newsletter/lists \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"key": "weekly", "name": {"en": "Weekly news", "vi": "Tin hằng tuần"},
+       "description": {"en": "Every Monday."}, "public": true}'
+</code></pre>
+<ul>
+<li><code>double_opt_in</code> (default <code>true</code>): public sign-ups get a confirmation mail and receive nothing
+until they open its link.</li>
+<li><code>public</code> (default <code>false</code>): shown by <code>GET /public/lists</code> and open to public sign-up.</li>
+<li><code>new_posts</code>: <code>off</code> (default), <code>draft</code> or <code>send</code> — see “New posts”. Setting <code>send</code> needs
+<code>newsletter.send</code>.</li>
+<li><code>PATCH</code> and <code>DELETE</code> need <code>If-Match</code>. A list with an unfinished campaign cannot be deleted
+(<code>409 newsletter.list_in_use</code>); deleting a list deletes its subscriptions.</li>
+</ul>
+<h2 id="the-website-sign-up"><a class="header" href="#the-website-sign-up">The website: sign-up</a></h2>
+<ol>
+<li><code>GET /api/v1/newsletter/public/lists?locale=vi</code> — the public lists and the <code>token_scope</code>
+(<code>newsletter:subscribe</code>).</li>
+<li>Each time the form is shown (never in cached HTML):
+<code>GET /api/v1/antispam/token?scope=newsletter:subscribe</code> — a form token. Show a hidden trap
+input that people leave empty, and a consent box that is <strong>not ticked in advance</strong>.</li>
+<li><code>POST /api/v1/newsletter/public/subscribe</code>:</li>
+</ol>
+<pre><code class="language-json">{"email": "ada@example.com", "lists": ["weekly"], "locale": "vi",
+ "consent_text": "Gửi tôi bản tin hằng tuần.", "source": "footer",
+ "form_token": "…", "trap": ""}
+</code></pre>
+<ul>
+<li>The answer is always <code>202 {"data": {"accepted": true}}</code> — new address, waiting for
+confirmation, already subscribed, blocked, trap filled, too many requests: nobody can learn
+which addresses are on a list. Tell the visitor to check their inbox.</li>
+<li>The request only checks the data and the anti-spam token, then queues the sign-up; a
+background job stores it and sends the confirmation mail a moment later. So the time the
+answer takes does not depend on the address either. The job worker must be running (it is,
+in the default <code>all</code> process role).</li>
+<li>Wrong data: <code>422</code> with every problem in <code>errors</code> (a key that is not a public list is
+<code>lists[0]</code>). A missing or expired token: <code>400 antispam.token_*</code> — reload the form.</li>
+<li>The consent text, its version, the time, the source and a hash of the network block are kept
+with the subscription as proof.</li>
+<li>The confirmation mail contains the list names and the link — never anything the visitor
+typed, so the form cannot be used to send spam to someone else. At most
+<code>AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY</code> such mails go to one mailbox a day. Spellings that
+reach the same mailbox count together: letter case, a <code>+tag</code> after the name, and dots in a Gmail
+name.</li>
+<li>The confirmation mail is always needed, even on a list without double opt-in, for a sign-up
+the anti-spam checks find suspicious (sent too fast…) and for an address that unsubscribed
+from that list or is still waiting for confirmation: nobody can sign someone else back up.</li>
+<li>Every stored sign-up request counts towards <code>AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY</code> for
+its address, whether it needs a mail or not, so answers take about as long either way. If the
+mail cannot be queued (for example <code>AUTOXIDE_NEWSLETTER_CONFIRM_URL</code> is not set and the list
+has no double opt-in), the answer is still <code>202</code> and the reason goes to the server log.</li>
+<li>A website server may call with its own API key instead, if that key has the permission
+<code>newsletter.subscribe</code>: no token needed, limited to
+<code>AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_USER_PER_HOUR</code>. Any other signed-in caller (for example a
+self-registered account) goes through the same checks as an anonymous visitor: without a form
+token it gets <code>400 antispam.token_missing</code>.</li>
+</ul>
+<h2 id="the-website-confirmation-and-preferences-pages"><a class="header" href="#the-website-confirmation-and-preferences-pages">The website: confirmation and preferences pages</a></h2>
+<ul>
+<li><strong>Confirmation.</strong> The mail links to <code>AUTOXIDE_NEWSLETTER_CONFIRM_URL</code>. The page sends
+<code>POST /api/v1/newsletter/public/confirm {"token": "…"}</code> (opening the link alone, as mail
+scanners do, changes nothing). <code>200</code> lists the confirmed lists; <code>400 newsletter.confirmation_invalid</code> means the link expired (after
+<code>AUTOXIDE_NEWSLETTER_CONFIRM_HOURS</code>) or was used.</li>
+<li><strong>Preferences.</strong> Every campaign mail links to <code>AUTOXIDE_NEWSLETTER_PREFERENCES_URL</code>. The page
+reads <code>GET /api/v1/newsletter/public/preferences?token=…</code> (the address, name, language, and
+every public list and list the person is on) and saves with
+<code>PUT /api/v1/newsletter/public/preferences?token=…</code>
+<code>{"lists": [{"key": "weekly", "subscribed": false}], "unsubscribe_all": false}</code>.
+Unsubscribing takes effect at once; joining a public list from here is confirmed at once (the
+token came to the person’s inbox).</li>
+<li><strong>One click.</strong> Mail apps call <code>POST /api/v1/newsletter/public/unsubscribe?token=…</code> with the
+form body <code>List-Unsubscribe=One-Click</code>; the person leaves the list of that mail at once. The
+answer is the same for any token.</li>
+</ul>
+<p>Unsubscribe links never expire. Each mail has its own random token; only its hash is stored.
+On a server with several tenants, a token may start with <code>t&lt;tenant id&gt;.</code>: it names the tenant
+itself, so confirm, preferences and unsubscribe calls work on any host of the API without the
+<code>Autoxide-Tenant</code> header. Send tokens back exactly as received (they may contain a <code>.</code>).</p>
+<h2 id="campaigns"><a class="header" href="#campaigns">Campaigns</a></h2>
+<pre><code class="language-bash"># Draft (newsletter.manage)
+curl -X POST http://localhost:8080/api/v1/newsletter/campaigns \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"list_id": "…", "subject": "This week", "body_text": "Hello…",
+       "body_html": "&lt;p&gt;Hello…&lt;/p&gt;", "locale": "en"}'
+# Read it, then send exactly that version (newsletter.send)
+curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
+  -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1762934400000000"'
+</code></pre>
+<ul>
+<li><code>POST /campaigns/{id}/test {"email": …}</code> sends one test mail. <code>GET /campaigns/{id}/preview</code>
+gives the mail as it will be sent (subject label, footer), without sending anything.</li>
+<li><code>GET /settings</code> gives the settings in use (advertising label and daily limit, postal address)
+and, in <code>missing</code>, the settings still to set before sending.</li>
+<li><code>send</code> takes every confirmed subscriber of the list at that moment (the snapshot), then hands
+mails to the mail queue in batches of <code>AUTOXIDE_NEWSLETTER_BATCH_SIZE</code>, at most
+<code>AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE</code> a minute. Right before each mail, suppressed,
+blocked and since-unsubscribed people are skipped.</li>
+<li><code>schedule {"at": "2026-12-01T08:00:00Z"}</code>, <code>pause</code>, <code>resume</code>, <code>cancel</code>. Pausing stops after
+the batch being sent; resuming sends to the recipients left — nobody gets a campaign twice,
+even when jobs are retried or run on several servers. Cancelling skips the mails not sent yet.</li>
+<li><code>send</code> and <code>schedule</code> need <code>If-Match</code>, so that the version you reviewed is the one sent. Only
+a draft or scheduled campaign can be changed; only one that never sent can be deleted.</li>
+<li>Changing a scheduled campaign (<code>PATCH</code>, with any real change) moves it back to <code>draft</code> and
+drops its schedule; the jobs already waiting for the old schedule do nothing. Someone with
+<code>newsletter.send</code> must schedule or send it again.</li>
+<li><code>body_html</code> is stored and sent as is — it is <strong>not sanitised</strong>. An admin interface must never
+insert it into its own page: preview it only inside a sandboxed <code>&lt;iframe sandbox&gt;</code> (no
+scripts, no same origin).</li>
+<li><code>GET /campaigns/{id}</code> shows <code>progress</code>: <code>total</code>, <code>pending</code>, <code>sent</code> (handed to the mail
+queue), <code>failed</code>, <code>skipped</code>, plus <code>bounced</code> (hard bounces, also in <code>failed</code>) and
+<code>unsubscribed</code> (recipients who unsubscribed with the link of this campaign’s mail).</li>
+<li>Every mail gets a footer (in the campaign’s <code>locale</code>) with the preferences link and the
+postal address, and the headers <code>List-Unsubscribe</code> and
+<code>List-Unsubscribe-Post: List-Unsubscribe=One-Click</code>.</li>
+<li>One gap cannot be closed: if a server dies right after handing a mail to the queue and before
+recording it, that recipient is marked <code>failed</code> (<code>interrupted</code>) rather than risk a second mail.</li>
+</ul>
+<h3 id="personalised-campaigns-format-template"><a class="header" href="#personalised-campaigns-format-template">Personalised campaigns (<code>format: "template"</code>)</a></h3>
+<p>A campaign is <code>format: "static"</code> by default (sent as written). With <code>"format": "template"</code> the
+subject, <code>body_text</code> and <code>body_html</code> are templates of the shared template engine, rendered for each
+recipient: <code>{{ subscriber.name }}</code>, <code>{{ subscriber.email }}</code> (masked, e.g. <code>a***@example.com</code>),
+<code>{{ list.name }}</code>, <code>{{ unsubscribe_url }}</code> (the preferences page of this recipient), with
+<code>{% if %}</code>, <code>{% for %}</code> and the filters <code>money</code>, <code>number</code>, <code>date</code>. Nothing else is available. The
+templates are checked when the campaign is saved (syntax and variables, every problem at once with
+line and column); values put into <code>body_html</code> are always HTML-escaped. Preview and test mails use a
+sample recipient (<code>Subscriber</code>, <code>s***@example.invalid</code>).</p>
+<h2 id="consent-ledger"><a class="header" href="#consent-ledger">Consent ledger</a></h2>
+<p>When the <code>compliance</code> module is installed, subscriptions share its consent ledger
+(<code>docs/COMPLIANCE.md</code>): every confirmed subscription is a consent (subject: the email, purpose
+<code>marketing</code>, scope <code>newsletter.list:&lt;id&gt;</code>, channel <code>email</code>, with the consent text, version and
+source the module stored), and unsubscribing withdraws it. Withdrawing an advertising consent in
+<code>compliance</code> (for this list, or every list) unsubscribes the person here. Right before each batch
+the ledger is asked again: a person whose consent was withdrawn there is skipped
+(<code>consent_withdrawn</code>); if the ledger cannot answer, the batch waits and retries. Subscriptions
+confirmed before this version are written into the ledger by the hourly job
+<code>newsletter.backfill_consents</code> (running it again adds nothing).</p>
+<h2 id="suppressions-and-bounces"><a class="header" href="#suppressions-and-bounces">Suppressions and bounces</a></h2>
+<ul>
+<li>A suppressed address gets no campaign mail, whatever its subscriptions.</li>
+<li>A permanent SMTP failure of a mail sent by this server that blames the address itself
+(<code>mail.delivery_failed</code>: enhanced status <code>5.1.x</code> or <code>5.2.x</code>, such as “no such mailbox”)
+suppresses the address (<code>hard_bounce</code>) and marks that mail <code>failed</code>. Other permanent errors
+(wrong SMTP password, sender not allowed, sending quota) are the sender’s problem: the mail is
+retried, then lands in the dead-letter queue (<code>autoxide jobs failed</code>), and no subscriber is
+blocked.</li>
+<li>Mail services that report bounces call <code>POST /api/v1/newsletter/bounces</code>
+<code>{"email": …, "type": "hard" | "soft" | "complaint", "reason": …}</code> with an API key that has
+<code>newsletter.manage</code>. <code>hard</code> and <code>complaint</code> suppress at once; <code>soft</code> after
+<code>AUTOXIDE_NEWSLETTER_SOFT_BOUNCE_LIMIT</code> reports.</li>
+<li><code>GET</code>/<code>POST /suppressions</code>, <code>DELETE /suppressions/{id}</code> manage the list by hand.</li>
+</ul>
+<h2 id="subscribers"><a class="header" href="#subscribers">Subscribers</a></h2>
+<ul>
+<li><code>GET /subscribers?email=&amp;list_id=&amp;status=&amp;blocked=</code> — search by part of the address, list,
+subscription status, blocked or not.</li>
+<li><code>POST /subscribers/import</code> — up to 1000 people into lists as <code>confirmed</code>, with a required
+<code>consent_source</code> (where they agreed). Someone who unsubscribed from a list stays unsubscribed.</li>
+<li><code>PATCH /subscribers/{id}</code> (<code>If-Match</code>) — name, language, attributes, <code>blocked</code>,
+<code>unsubscribe_list_ids</code>. <code>DELETE /subscribers/{id}</code> deletes them for good.</li>
+</ul>
+<h2 id="new-posts"><a class="header" href="#new-posts">New posts</a></h2>
+<p>A list with <code>new_posts</code> set to <code>draft</code> gets a draft campaign (title, summary and link of the
+post) each time the <code>content</code> module publishes a <strong>post</strong> (pages are left out); <code>send</code> sends it
+at once (setting <code>send</code> needs <code>newsletter.send</code>). <code>new_post_locale</code> keeps only posts in one language. The link is
+<code>AUTOXIDE_NEWSLETTER_SITE_URL</code> followed by the post’s path; without it (or without the settings
+needed to send) campaigns stay drafts. A post makes at most one campaign per list, ever —
+republishing it makes nothing new. Importing many old posts publishes them all: keep <code>new_posts</code>
+at <code>off</code> or <code>draft</code> while you do.</p>
+<h2 id="personal-data"><a class="header" href="#personal-data">Personal data</a></h2>
+<ul>
+<li><code>GET /api/v1/newsletter/data?email=…</code> exports, and <code>DELETE /api/v1/newsletter/data?email=…</code>
+erases for good, everything about an address: subscriber, subscriptions with consent records,
+mails sent, confirmation links (permission <code>newsletter.export</code>). A <strong>suppression of the
+address is kept</strong> so that an address that bounced, complained or asked never to be mailed is
+not mailed again; delete it with <code>DELETE /suppressions/{id}</code> if the person asks.</li>
+<li>Subscribers are not tied to user accounts: requests go by email. When an account is deleted,
+lists and campaigns it created stay; <code>created_by</code> becomes <code>null</code>.</li>
+<li>Network addresses are never stored: only a keyed hash of the network block, inside the
+consent record.</li>
+<li>Events (and so webhooks) carry ids and list keys only, never addresses or names.</li>
+<li>A daily job deletes subscriptions left unconfirmed after <code>AUTOXIDE_NEWSLETTER_UNCONFIRMED_DAYS</code>.</li>
+</ul>
+<h2 id="legal"><a class="header" href="#legal">Legal</a></h2>
+<p>What the law asks of a newsletter depends on where you and your readers are. The module gives
+you settings, not rules written in the code; <strong>the texts below were not checked against the
+original legal texts — check them for your case before you rely on them.</strong></p>
+<ul>
+<li><strong>Vietnam, Decree 91/2020/ND-CP (spam):</strong> advertising mail only to people who agreed before;
+a label at the start of the subject of advertising mail; at most 3 advertising mails to one
+address in 24 hours unless the person agreed otherwise; sender details and a way to refuse
+more. The module’s defaults follow this reading: mark a campaign <code>advertising: true</code>, and set
+<code>AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL</code> (default <code>[QC]</code>; some sources say <code>[ADV]</code>),
+<code>AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY</code> (default <code>3</code>) and
+<code>AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS</code>. Whether an editorial newsletter counts as advertising is
+for you to decide. A decree replacing 91/2020 was in draft at the time of writing.</li>
+<li><strong>Vietnam, Personal Data Protection Law 91/2025/QH15 and Decree 356/2025:</strong> consent must be
+freely given, clear and provable, silence is not consent, withdrawing must be as easy as
+giving, and people may ask for their data to be erased. The module keeps the consent text,
+version, time and source; double opt-in is on by default; unsubscribing is one click; export
+and erasure go by email. Check the deadlines for answering requests.</li>
+<li><strong>Elsewhere:</strong> for example the EU GDPR and ePrivacy rules, or the US CAN-SPAM Act (opt-outs
+within 10 business days — the module unsubscribes at once).</li>
+</ul>
+<h2 id="ai-agents-mcp"><a class="header" href="#ai-agents-mcp">AI agents (MCP)</a></h2>
+<p>Tools <code>newsletter.list_lists</code>, <code>newsletter.find_subscribers</code>, <code>newsletter.get_campaign</code>
+(progress), <code>newsletter.create_campaign</code> (draft), <code>newsletter.send_campaign</code> and
+<code>newsletter.schedule_campaign</code> (pass the <code>version</code> you read, like <code>If-Match</code>), with the same
+permissions as REST.</p>
+<h2 id="settings"><a class="header" href="#settings">Settings</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Setting</th><th>Default</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_NEWSLETTER_CONFIRM_URL</code></td><td>— (needed for confirmation mails)</td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_PREFERENCES_URL</code></td><td>— (needed to send)</td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_SITE_URL</code></td><td>— (new-post links)</td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS</code></td><td>— (needed for advertising)</td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_CONFIRM_HOURS</code></td><td><code>168</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY</code></td><td><code>3</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_UNCONFIRMED_DAYS</code></td><td><code>30</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_IP_PER_HOUR</code></td><td><code>10</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_EMAIL_PER_HOUR</code></td><td><code>5</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_USER_PER_HOUR</code></td><td><code>1000</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE</code></td><td><code>300</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_BATCH_SIZE</code></td><td><code>100</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_SOFT_BOUNCE_LIMIT</code></td><td><code>3</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL</code></td><td><code>[QC]</code></td></tr>
+<tr><td><code>AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY</code></td><td><code>3</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>AUTOXIDE_HTTP_PUBLIC_URL</code> is needed to send. The anti-spam layer (<code>AUTOXIDE_ANTISPAM_*</code>) is
+shared by every module. All are described in <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/MONEY.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/NOTIFICATIONS.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/MONEY.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/NOTIFICATIONS.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

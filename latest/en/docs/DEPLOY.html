@@ -1,0 +1,1475 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Installing and deploying Autoxide - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="installing-and-deploying-autoxide"><a class="header" href="#installing-and-deploying-autoxide">Installing and deploying Autoxide</a></h1>
+<p><a href="DEPLOY.vi.html">Tiếng Việt</a></p>
+<p>This guide takes you from nothing to a running server you can keep up to date and back
+up. Pick one of the two ways to run it (a third, one container with SQLite and no build,
+is in <a href="#c-one-container-with-sqlite">section C</a>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>Docker Compose with PostgreSQL</th><th>One binary with SQLite</th></tr>
+</thead>
+<tbody>
+<tr><td>Good for</td><td>Production, several people writing at once, several servers</td><td>A small installation on one machine, trying Autoxide</td></tr>
+<tr><td>You need</td><td>Docker with the Compose plugin</td><td>Rust (to build) or a built binary; nothing else</td></tr>
+<tr><td>Database</td><td>PostgreSQL 16 or newer, in a container</td><td>A file, <code>data/autoxide.sqlite</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>You can start with SQLite and move to PostgreSQL later without losing data (see
+<a href="#moving-from-sqlite-to-postgresql">Moving from SQLite to PostgreSQL</a>).</p>
+<h2 id="a-docker-compose-with-postgresql"><a class="header" href="#a-docker-compose-with-postgresql">A. Docker Compose with PostgreSQL</a></h2>
+<h3 id="1-get-the-code-and-set-the-secrets"><a class="header" href="#1-get-the-code-and-set-the-secrets">1. Get the code and set the secrets</a></h3>
+<pre><code class="language-bash">git clone https://github.com/thuongtamduy/autoxide.git autoxide
+cd autoxide
+</code></pre>
+<p>Create a file named <code>.env</code> next to <code>compose.yml</code> with three secrets. Never commit it.</p>
+<pre><code class="language-bash">printf 'POSTGRES_PASSWORD=%s\nAUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -hex 24)" "$(openssl rand -base64 48 | tr -d '\n')" \
+  "$(openssl rand -base64 48 | tr -d '\n')" &gt; .env
+chmod 600 .env
+</code></pre>
+<ul>
+<li><code>POSTGRES_PASSWORD</code> protects the database.</li>
+<li><code>AUTOXIDE_AUTH_TOKEN_SECRET</code> signs access tokens. To change it without signing anyone out
+(as a routine, every few months): put the new value in it and the old one in
+<code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code> on every server, restart them, and remove
+<code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code> after <code>AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS</code> (15 minutes by
+default): tokens signed with the old key are accepted until they expire. Changing it without
+the old key signs every access token out.</li>
+<li><code>AUTOXIDE_SECRET_KEY</code> signs short-lived tokens (forms, anti-spam), keys the hashes of
+visitors’ IP addresses and encrypts the secrets the server keeps (two-step sign-in, webhook
+signing secrets). Kept outside the database, a copy of the database (a backup) reveals
+neither those addresses nor those secrets.</li>
+<li>To change <code>AUTOXIDE_SECRET_KEY</code> later: put the new value in it and the old one in
+<code>AUTOXIDE_SECRET_KEY_PREVIOUS</code>, restart, run <code>autoxide secrets reseal</code>, then remove
+<code>AUTOXIDE_SECRET_KEY_PREVIOUS</code>. Setting it for the first time on a server that ran without it
+needs no extra step: the key the server kept in the database still opens what it encrypted.</li>
+</ul>
+<h3 id="2-start"><a class="header" href="#2-start">2. Start</a></h3>
+<pre><code class="language-bash">docker compose up -d --build
+</code></pre>
+<p>The first build compiles everything from source: count on roughly 20 minutes to well over an hour,
+and at least 4 GB of memory for Docker. Behind a company proxy, give Docker the proxy first (see
+<a href="../README.html#requirements">Requirements in the README</a>).</p>
+<p>Or skip building and use a released image (see the project’s GitHub releases):</p>
+<pre><code class="language-bash">echo 'AUTOXIDE_IMAGE=ghcr.io/&lt;owner&gt;/autoxide:&lt;version&gt;' &gt;&gt; .env
+docker compose up -d --no-build
+</code></pre>
+<p>Released images run on <code>linux/amd64</code> and <code>linux/arm64</code> (for example AWS Graviton or a
+Raspberry Pi 4 and newer). <code>&lt;version&gt;</code> is a release such as <code>0.12.0</code>, or <code>0.12</code> to follow its
+bug fixes. Each image is built by the project’s <code>Release</code> workflow on GitHub and carries a
+signed build provenance and a signed list of its components (SBOM). Before you run an image,
+check that it was built from this repository with the
+<a href="https://cli.github.com/">GitHub CLI</a>:</p>
+<pre><code class="language-bash">gh attestation verify oci://ghcr.io/&lt;owner&gt;/autoxide:&lt;version&gt; --owner &lt;owner&gt;
+</code></pre>
+<p>It prints the workflow, commit and tag the image was built from, and fails if the image
+was not built by this repository. The SBOM (SPDX) is attached to each GitHub release as
+<code>sbom.spdx.json</code>; check that it belongs to the image and read it with:</p>
+<pre><code class="language-bash">gh attestation verify oci://ghcr.io/&lt;owner&gt;/autoxide:&lt;version&gt; --owner &lt;owner&gt; \
+  --predicate-type https://spdx.dev/Document/v2.3 --format json \
+  | jq '.[0].verificationResult.statement.predicate.packages[].name'
+</code></pre>
+<p>Compose starts PostgreSQL, applies every migration once (the <code>migrate</code> service), then
+starts the server on <code>127.0.0.1:8080</code>. Check it:</p>
+<pre><code class="language-bash">curl http://127.0.0.1:8080/health/ready
+</code></pre>
+<p><code>{"data":{"status":"ok"}}</code> means the server and its database are ready.</p>
+<p>The image is distroless: it has no shell, <code>curl</code> or package manager (a smaller surface to attack and to patch), and runs as user
+<code>10001</code>. It checks itself with its own binary: <code>autoxide healthcheck</code> asks the server on this machine for <code>/health/ready</code>
+(<code>--live</code> for <code>/health/live</code>) and exits <code>0</code> when it answers 200. The image’s <code>HEALTHCHECK</code> and the <code>app</code> service of
+<code>compose.yml</code> use it, so <code>docker compose ps</code> shows <code>healthy</code>. To look inside a running container use
+<code>docker debug</code> or <code>kubectl debug</code> (an ephemeral container with tools), not <code>docker exec … sh</code>: there is no <code>sh</code>.</p>
+<h3 id="3-create-the-first-administrator"><a class="header" href="#3-create-the-first-administrator">3. Create the first administrator</a></h3>
+<pre><code class="language-bash">docker compose run --rm app user create --email you@example.com --name "Your Name" --admin
+</code></pre>
+<p>A strong password is printed once; store it in your password manager. Sign in with
+<code>POST /api/v1/auth/login</code>; the whole API is described at
+<code>http://127.0.0.1:8080/api/v1/openapi.json</code>.</p>
+<h3 id="4-put-it-on-the-internet"><a class="header" href="#4-put-it-on-the-internet">4. Put it on the internet</a></h3>
+<p>The server speaks plain HTTP on <code>127.0.0.1:8080</code> only. Put a reverse proxy in front that
+terminates TLS. With <a href="https://caddyserver.com">Caddy</a>, which gets certificates by
+itself, the whole configuration (<code>/etc/caddy/Caddyfile</code>) is:</p>
+<pre><code class="language-text">api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+</code></pre>
+<p>Autoxide compresses JSON and text responses itself (gzip or brotli, whichever the client
+accepts; images and other files are sent as they are), so the proxy needs no <code>encode</code>
+directive. If your proxy or CDN already compresses, set <code>AUTOXIDE_HTTP_COMPRESSION=false</code> so the
+work is not done twice.</p>
+<p>Then tell Autoxide which header carries the real client address, so that rate limiting
+counts clients and not the proxy. Add to <code>.env</code> and restart:</p>
+<pre><code class="language-bash">echo 'AUTOXIDE_HTTP_CLIENT_IP_HEADER=X-Forwarded-For' &gt;&gt; .env
+docker compose up -d
+</code></pre>
+<p><strong>More than one proxy.</strong> Each proxy adds the address that connected to it at the end of
+<code>X-Forwarded-For</code>; whatever comes before was sent by the client and can be forged. Set
+<code>AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT</code> to the number of your own proxies a request passes
+through (default <code>1</code>). A common case is a website server (such as Next.js) that calls the API
+for its visitors, behind a CDN:</p>
+<pre><code class="language-text">browser ──▶ CDN ──▶ website server ──▶ Caddy ──▶ Autoxide
+            adds     adds the CDN       adds the website
+            browser  address            server address
+X-Forwarded-For:  browser, CDN, website-server
+                  ▲ 3rd from the end → AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT=3
+</code></pre>
+<p>The website server must forward the <code>X-Forwarded-For</code> it received (and add the CDN address,
+as proxies do); otherwise every visitor looks like one client. With a count, none of your
+proxies may be reachable directly from the internet, or clients can choose their address.</p>
+<p><strong>Proxies the internet can reach.</strong> When a visitor could skip the CDN and call your website
+server directly, or requests take different paths, a count is wrong for some of them. List
+the addresses of your proxies instead, as single addresses and ranges:</p>
+<pre><code class="language-bash">echo 'AUTOXIDE_HTTP_TRUSTED_PROXIES=10.0.0.0/8, 198.51.100.0/24' &gt;&gt; .env
+</code></pre>
+<p>This replaces <code>AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT</code>. Autoxide then reads the header only when
+the connection comes from one of these addresses, and takes the last address in the header
+that is not one of them. Your CDN publishes its address ranges; keep the list up to date when
+they change.</p>
+<p>The startup log also warns when <code>AUTOXIDE_SECRET_KEY</code> is not set (see the table below): set it
+before going live.</p>
+<p>Add other settings the same way: every setting is listed, with its default, in
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a>. Settings <code>compose.yml</code> does not pass on yet go under
+<code>environment:</code> of the <code>x-autoxide</code> block.</p>
+<h3 id="5-update"><a class="header" href="#5-update">5. Update</a></h3>
+<pre><code class="language-bash">git pull
+docker compose up -d --build
+</code></pre>
+<p>The <code>migrate</code> service applies new migrations before the new server starts.</p>
+<p><strong>Updating from 0.17 or earlier:</strong> experimental modules (bookings, newsletter, comments, support,
+conversations, analytics, reporting, automations) no longer run unless <code>AUTOXIDE_MODULES</code> names
+them. Nothing is deleted, and the startup log and <code>autoxide doctor</code> tell you when the database
+holds data of a module that is off, with the line to add — see
+<a href="MODULES.html#upgrading-from-017-or-earlier">MODULES.md</a>. This applies to setups B and C too.</p>
+<p><strong>Updating to the release with the content word index</strong> (migration <code>content.m0036_word_index</code>): the
+migration fills the new table <code>content_published_words</code> with the words of every published entry, in
+batches, then builds its index and one more index on <code>content_published</code>. On a large site it takes longer and holds the migration lock meanwhile:
+update in a quiet hour. This applies to setups B and C too.</p>
+<h3 id="6-back-up-and-restore"><a class="header" href="#6-back-up-and-restore">6. Back up and restore</a></h3>
+<pre><code class="language-bash">mkdir -p backups &amp;&amp; sudo chown 10001 backups
+docker compose run --rm -v "$PWD/backups:/backups" app backup "/backups/$(date +%F)"
+</code></pre>
+<p>The backup is a directory holding a copy of the database (as a SQLite file) and of every
+stored file; it can be taken while the server runs. Copy it somewhere else — another
+machine or object storage. To restore into a fresh installation, start PostgreSQL
+alone, restore (<code>--no-deps</code> keeps Compose from applying migrations first: restore needs
+an empty database), then start everything:</p>
+<pre><code class="language-bash">docker compose up -d --wait postgres
+docker compose run --rm --no-deps -v "$PWD/backups:/backups" app restore /backups/2026-11-11
+docker compose up -d
+</code></pre>
+<p>Restore only backups you made yourself.</p>
+<h2 id="b-one-binary-with-sqlite"><a class="header" href="#b-one-binary-with-sqlite">B. One binary with SQLite</a></h2>
+<h3 id="1-build"><a class="header" href="#1-build">1. Build</a></h3>
+<p>Install Rust from <a href="https://rustup.rs">rustup.rs</a> (the right version is picked from
+<code>rust-toolchain.toml</code>) and a C compiler — SQLite and libwebp are compiled into the binary
+(on Debian or Ubuntu: <code>sudo apt install build-essential</code>) — then:</p>
+<pre><code class="language-bash">cargo build --release --locked -p autoxide
+sudo install -m 755 target/release/autoxide /usr/local/bin/autoxide
+</code></pre>
+<h3 id="2-prepare-a-directory"><a class="header" href="#2-prepare-a-directory">2. Prepare a directory</a></h3>
+<pre><code class="language-bash">sudo useradd --system --home-dir /var/lib/autoxide --create-home autoxide
+sudo -u autoxide sh -c 'cd /var/lib/autoxide &amp;&amp; printf "AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n" "$(openssl rand -base64 48 | tr -d "\n")" "$(openssl rand -base64 48 | tr -d "\n")" &gt; .env &amp;&amp; chmod 600 .env'
+</code></pre>
+<p>Autoxide reads <code>.env</code> from the directory it runs in and keeps everything it writes in
+<code>data/</code> there: the database <code>data/autoxide.sqlite</code>, uploaded files <code>data/files</code>, and mail
+<code>data/mail</code> until SMTP is configured.</p>
+<h3 id="3-migrate-and-create-the-first-administrator"><a class="header" href="#3-migrate-and-create-the-first-administrator">3. Migrate and create the first administrator</a></h3>
+<pre><code class="language-bash">cd /var/lib/autoxide
+sudo -u autoxide autoxide migrate up
+sudo -u autoxide autoxide user create --email you@example.com --name "Your Name" --admin
+</code></pre>
+<p>Lost the device of your only administrator account with two-step sign-in on? Turn it off from
+the server, then sign in with the password and turn it on again:</p>
+<pre><code class="language-bash">sudo -u autoxide autoxide user reset-mfa --email you@example.com
+</code></pre>
+<p>Lost the devices holding its passkeys? Remove them from the server, then sign in with the
+password and add new ones. Other administrators can do the same through the API with the
+permission <code>auth.passkeys.manage</code> (<code>DELETE /api/v1/auth/users/{id}/passkeys</code>).</p>
+<pre><code class="language-bash">sudo -u autoxide autoxide user remove-passkeys --email you@example.com
+</code></pre>
+<p>These three commands act on the default tenant. With several tenants
+(<code>AUTOXIDE_TENANCY_MODE=multi</code>), add <code>--tenant &lt;slug&gt;</code> to act on the account of another tenant,
+for example its first administrator:</p>
+<pre><code class="language-bash">sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
+</code></pre>
+<h3 id="3b-try-it-by-hand"><a class="header" href="#3b-try-it-by-hand">3b. Try it by hand</a></h3>
+<p>Before setting up a service, run it in the foreground and read something back. Order matters: <code>migrate up</code>
+(step 3) creates the tables, and <code>serve</code> refuses to start while migrations are pending (a first start applies
+about four hundred of them, around twenty seconds).</p>
+<pre><code class="language-bash">cd /var/lib/autoxide
+sudo -u autoxide autoxide task address.import        # reference data: the administrative units of Vietnam
+sudo -u autoxide autoxide serve                      # listens on 127.0.0.1:8080
+</code></pre>
+<p>In another terminal:</p>
+<pre><code class="language-bash">curl http://127.0.0.1:8080/health/ready
+curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # real data, no sign-in needed
+</code></pre>
+<p>Another port or address: <code>AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000</code> in <code>.env</code> (the name is exactly that: there is no
+<code>AUTOXIDE_PORT</code>). A misspelled <code>AUTOXIDE_…</code> variable is ignored, but <code>autoxide config</code> and the start-up log now
+name it and suggest the right one.</p>
+<p>A value with spaces or special characters in <code>.env</code> goes in double quotes (<code>NAME="my value"</code>); the error names
+the variable when a line cannot be read.</p>
+<h3 id="4-run-as-a-service"><a class="header" href="#4-run-as-a-service">4. Run as a service</a></h3>
+<p><code>/etc/systemd/system/autoxide.service</code>:</p>
+<pre><code class="language-ini">[Unit]
+Description=Autoxide
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=autoxide
+WorkingDirectory=/var/lib/autoxide
+ExecStart=/usr/local/bin/autoxide serve
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/autoxide
+# Above AUTOXIDE_HTTP_MAX_CONNECTIONS (4096) plus room for files and database connections.
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<pre><code class="language-bash">sudo systemctl daemon-reload
+sudo systemctl enable --now autoxide
+curl http://127.0.0.1:8080/health/ready
+</code></pre>
+<p>Put a reverse proxy in front as in <a href="#4-put-it-on-the-internet">A.4</a> and set
+<code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> in <code>.env</code>.</p>
+<h3 id="5-update-1"><a class="header" href="#5-update-1">5. Update</a></h3>
+<p>Build the new version, stop the service, migrate, start:</p>
+<pre><code class="language-bash">sudo systemctl stop autoxide
+sudo install -m 755 target/release/autoxide /usr/local/bin/autoxide
+(cd /var/lib/autoxide &amp;&amp; sudo -u autoxide autoxide migrate up)
+sudo systemctl start autoxide
+</code></pre>
+<h3 id="6-back-up-and-restore-1"><a class="header" href="#6-back-up-and-restore-1">6. Back up and restore</a></h3>
+<pre><code class="language-bash">cd /var/lib/autoxide
+sudo -u autoxide autoxide backup "backups/$(date +%F)"
+</code></pre>
+<p>To restore on a new machine, prepare the directory (steps 1–2), then run
+<code>autoxide restore &lt;backup directory&gt;</code> there before starting the service.</p>
+<p>With <code>AUTOXIDE_TENANCY_MODE=multi</code>, the backup holds the main database (the tenant register and
+every tenant on it) and all files of the shared file storage. Add <code>--all</code> to back up every other
+placement too, with its own file storage, into <code>placements/&lt;name&gt;/</code> of the directory; without it
+the command prints a warning naming them. With <code>--all</code>, <code>backup.json</code> of the main database is
+written last: if a placement fails, the command stops with an error and the directory is not a
+complete backup (remove it and run again). To bring back a lost placement, restore the main
+database first if it was lost too, create a new, empty database at the placement’s address, then
+run <code>autoxide restore &lt;backup directory&gt; --placement &lt;name&gt;</code>: it restores into that same
+placement (same name and id), not into a new one. Stop the service first, as for the main
+database; while the command runs, the placement is marked <code>migrating</code> and its tenants get 503.</p>
+<p><code>restore</code> checks the whole backup (release, modules turned off or missing, files) before it
+touches the target, so a refused restore leaves the target empty: fix the setting it names and run
+it again. If it stops later (disk full, connection lost), the target holds part of the data: drop
+and recreate that database, then run it again.</p>
+<p>A backup keeps the schema of its source exactly as it is: the command does not need the database
+migrated first, so you can back up right before an upgrade, and the release you upgrade from can
+restore that backup (<code>backup.json</code> lists the migrations it holds). A newer release restores it
+too. From this release on, an older release than the source refuses it with a clear message
+(earlier releases fail with a migration error). A backup written before 0.20 has no list of
+migrations, so <code>restore</code> cannot tell whether it holds data of a module this build lacks: restore
+those with a build that has every module the source had. Do not add files to a backup directory
+(<code>restore</code> counts the files under <code>files/</code>, so even a <code>.DS_Store</code> makes it refuse). The backup holds the modules that are turned on: if
+a module that is turned off still has data, the command stops and says which setting turns it on.
+Keep
+<code>AUTOXIDE_SECRET_KEY</code> in a safe place apart from the backups: without it, the encrypted secrets in
+a backup cannot be read.</p>
+<h2 id="b-one-binary-with-postgresql-from-scratch"><a class="header" href="#b-one-binary-with-postgresql-from-scratch">B+. One binary with PostgreSQL, from scratch</a></h2>
+<p>Same as B, with a PostgreSQL server you already run (a package, a cloud database; Docker is not needed). Create
+a database and a user, then put the URL in <code>.env</code> instead of the SQLite file:</p>
+<pre><code class="language-bash">sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'choose-a-long-password'" \
+  -c "CREATE DATABASE autoxide OWNER autoxide"
+printf 'DATABASE_URL=postgres://autoxide:choose-a-long-password@127.0.0.1:5432/autoxide\n' &gt;&gt; /var/lib/autoxide/.env
+</code></pre>
+<p>Then B steps 3, 3b and 4 as written (<code>migrate up</code>, create the administrator, <code>serve</code>). If the server cannot connect,
+the error now says why (for example “connection refused” for a wrong port) next to the pool message; <code>autoxide doctor</code> checks the connection and says what to fix.</p>
+<h2 id="c-one-container-with-sqlite"><a class="header" href="#c-one-container-with-sqlite">C. One container with SQLite</a></h2>
+<p>For trying Autoxide or a small installation on one machine, without building anything. The
+steps to the first run are in the README, <a href="../README.html#try-it-with-docker-no-build">Try it with Docker</a>.
+The rules that matter after that, with <code>IMAGE</code> and <code>RUN</code> as defined there:</p>
+<ul>
+<li>By default the server does not apply migrations by itself. Starting <code>serve</code> on an empty or older
+database stops at once with <code>N migration(s) have not been applied to the database (first: …); run autoxide migrate up first</code> (the count and the first few names, not the whole list; <code>autoxide migrate status</code> lists them all; error code <code>kernel.migrations_pending</code>): run <code>$RUN $IMAGE migrate up</code>, then start it.
+On a single server you may set <code>AUTOXIDE_MIGRATE_ON_START=true</code> instead: <code>serve</code> then applies
+them on start (the main database before it opens its port; then every tenant database in the
+background, as a migration run that <code>GET /api/v1/kernel/placements/migrations</code> shows; tenants of
+a database not migrated yet get 503 until it is), under a lock so that two servers starting
+together never both migrate. With
+<code>AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL</code> it also creates the first administrator, and with
+<code>AUTOXIDE_STARTUP_TASKS</code> it loads reference data — what <code>compose.quickstart.yml</code> does. For
+several servers, keep running <code>migrate up</code> once per deployment: you see what changes, and a
+failed migration stops the deployment before the new version takes requests.</li>
+<li>Everything the server writes is in the volume <code>autoxide-data</code> (<code>/var/lib/autoxide/data</code>):
+the database, uploaded files, and mail until SMTP is configured. A container started without
+that volume keeps its data only until it is removed.</li>
+<li><code>docker run -p 8080:8080</code> publishes the port on every network interface of the machine; use
+<code>-p 127.0.0.1:8080:8080</code> and a reverse proxy (<a href="#4-put-it-on-the-internet">A.4</a>). Put more
+settings in <code>autoxide.env</code> (one <code>NAME=value</code> per line, no quotes).</li>
+<li>Update: pull the new image, apply its migrations, replace the container. <code>--all</code> also migrates
+every tenant database (placement) in multi-tenant mode and changes nothing otherwise; a placement
+that fails does not stop the others, the command names it and exits with code 1.</li>
+</ul>
+<pre><code class="language-bash">IMAGE=ghcr.io/thuongtamduy/autoxide:&lt;new version&gt;
+docker pull $IMAGE
+$RUN $IMAGE migrate up --all
+docker rm -f autoxide
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+</code></pre>
+<ul>
+<li>Back up to a directory you mount (the image runs as user 10001, which must be able to write
+there), and restore into a new volume before starting the server:</li>
+</ul>
+<pre><code class="language-bash">mkdir -p backups &amp;&amp; sudo chown 10001 backups
+$RUN -v "$PWD/backups:/backups" $IMAGE backup "/backups/$(date +%F)"
+# on the new machine, or with the volume removed:
+$RUN -v "$PWD/backups:/backups" $IMAGE restore /backups/2026-11-11
+</code></pre>
+<p>Without the <code>chown</code>, the backup stops with <code>permission denied</code> and says which directory to
+give to uid 10001. The command prints the absolute path of the backup when done. A backup written
+to a path that is not mounted disappears with the container: inside a container, <code>backup</code> warns
+on stderr when the target is not on a volume or bind mount (it still runs).</p>
+<h2 id="moving-from-sqlite-to-postgresql"><a class="header" href="#moving-from-sqlite-to-postgresql">Moving from SQLite to PostgreSQL</a></h2>
+<p>Create an empty PostgreSQL database, stop the server, and copy. The target gets every
+migration first, then all data in one transaction:</p>
+<pre><code class="language-bash">sudo systemctl stop autoxide
+cd /var/lib/autoxide
+printf '%s' 'postgres://autoxide:&lt;password&gt;@db.example.com:5432/autoxide' \
+  | sudo -u autoxide autoxide copy --to-stdin
+</code></pre>
+<p>Then set <code>DATABASE_URL</code> in <code>.env</code> to that URL and start the server. Files stay where
+they are; to move them to S3 as well, take a backup, set the S3 settings, and restore
+into a new database.</p>
+<h2 id="settings-worth-knowing"><a class="header" href="#settings-worth-knowing">Settings worth knowing</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Setting</th><th>What for</th></tr>
+</thead>
+<tbody>
+<tr><td><code>DATABASE_URL</code></td><td><code>sqlite://data/autoxide.sqlite</code> (default) or <code>postgres://user:password@host:5432/db</code></td></tr>
+<tr><td><code>AUTOXIDE_MODULES</code></td><td>Which modules run: <code>official</code> (default), <code>core</code>, <code>all</code>, names to add, <code>-name</code> to leave out. Experimental modules must be named. See <a href="MODULES.html">MODULES.md</a></td></tr>
+<tr><td><code>AUTOXIDE_AUTH_TOKEN_SECRET</code></td><td>Signs access tokens; recommended in production (without it a random key is made at start and tokens stop working after a restart), the same on every server</td></tr>
+<tr><td><code>AUTOXIDE_SECRET_KEY</code></td><td>Signs short-lived tokens of every module and keys the hashes of visitors’ IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can open the secrets stored encrypted and work the IP blocks back out of the stored hashes</td></tr>
+<tr><td><code>AUTOXIDE_SECRET_KEY_PREVIOUS</code></td><td>Old values of <code>AUTOXIDE_SECRET_KEY</code>, separated by commas, while rotating the key; remove them after <code>autoxide secrets reseal</code></td></tr>
+<tr><td><code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code></td><td>Old values of <code>AUTOXIDE_AUTH_TOKEN_SECRET</code>, separated by commas, while rotating it; only used to check tokens, remove after the access token lifetime</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code></td><td>Behind a reverse proxy: the header with the client address</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT</code></td><td>How many of your proxies a request passes (default <code>1</code>)</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_TRUSTED_PROXIES</code></td><td>Instead of a count: the addresses and ranges of your proxies, e.g. <code>10.0.0.0/8, 192.0.2.7</code></td></tr>
+<tr><td><code>AUTOXIDE_HTTP_MAX_CONNECTIONS</code></td><td>Most open connections at once, WebSockets included (default <code>4096</code>, <code>0</code>: no limit); over it new connections wait. Keep it below the open file limit (<code>ulimit -n</code>, often 1024; systemd <code>LimitNOFILE</code>, <code>docker run --ulimit nofile=…</code>) with some room for database connections and files — the server warns at startup when it is not. Your reverse proxy should still limit connections per client</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_PUBLIC_URL</code></td><td>The address the internet reaches the API at, e.g. <code>https://api.example.com</code>; needed for links back to the API in mail (newsletter unsubscribe)</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_CORS_ORIGINS</code></td><td>Web pages on other origins allowed to call the API; tenants’ verified domains are allowed for their own tenant without being listed, see <a href="#custom-domains-of-tenants">Custom domains of tenants</a></td></tr>
+<tr><td><code>AUTOXIDE_HTTP_HSTS_SECONDS</code></td><td><code>Strict-Transport-Security</code> is <strong>on by default in production</strong>: when <code>AUTOXIDE_HTTP_PUBLIC_URL</code> starts with <code>https://</code>, every response carries <code>max-age=31536000</code> (one year) unless you set this. Set a number of seconds to change it, or <code>0</code> to turn HSTS off (for example while some clients still use plain HTTP to this host); <code>autoxide doctor</code> warns when the public URL is <code>https://</code> and HSTS is off. Without a public URL, or with an <code>http://</code> one (development), no HSTS is sent. Browsers ignore the header on plain HTTP, so terminate TLS in front of the API before you set an <code>https://</code> public URL. Every response already carries <code>nosniff</code>, <code>Referrer-Policy</code>, <code>X-Frame-Options</code> and a strict <code>Content-Security-Policy</code> (<code>AUTOXIDE_HTTP_SECURITY_HEADERS</code>, <code>AUTOXIDE_HTTP_REFERRER_POLICY</code>)</td></tr>
+<tr><td><code>AUTOXIDE_MAIL_SMTP_URL</code>, <code>AUTOXIDE_MAIL_FROM</code></td><td>Send mail (password reset, email verification)</td></tr>
+<tr><td><code>AUTOXIDE_FILES_S3_BUCKET</code> and <code>AWS_…</code></td><td>Store files in S3 or an S3-compatible service; also add a bucket lifecycle rule that aborts incomplete multipart uploads after a day</td></tr>
+<tr><td><code>AUTOXIDE_AUTH_PASSWORD_RESET_URL</code>, <code>AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL</code></td><td>Link mails to your own pages</td></tr>
+<tr><td><code>AUTOXIDE_AUTH_PASSKEY_RP_ID</code>, <code>AUTOXIDE_AUTH_PASSKEY_ORIGINS</code></td><td>Turn on passkey sign-in for your domain</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_DRAIN_SECONDS</code></td><td>Behind a load balancer: how long to keep serving while <code>/health/ready</code> says <code>503</code> on shutdown, see <a href="#updating-without-dropping-requests">below</a></td></tr>
+<tr><td><code>AUTOXIDE_PROCESS_ROLE</code></td><td><code>api</code> / <code>worker</code> to run the API and background work in separate processes</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_COMPRESSION</code></td><td><code>true</code> (default): compress JSON and text with gzip or brotli; <code>false</code> when a reverse proxy or CDN in front already compresses</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS</code></td><td>How long a CDN may keep a public read (default <code>60</code>), see <a href="#a-cdn-in-front-of-autoxide">A CDN in front of Autoxide</a></td></tr>
+<tr><td><code>AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE</code></td><td>Several tenants: requests one tenant may make per minute, all its users and API keys together (default <code>0</code>, off), so a busy tenant cannot slow the others; over it, 429 <code>tenant_rate_limited</code> with <code>Retry-After</code>. A plan’s limit <code>kernel.api_rate_per_minute</code> replaces it for that tenant (in a plan <code>0</code> blocks every request; here <code>0</code> means off). Only signed-in callers are counted, against the tenant they act in (their own, or one that delegated work to them): requests without a valid credential (public pages, inbound webhooks), platform staff operating in a tenant and support access only meet the per-address limit, so nobody can use up a tenant’s budget from outside. A write batch counts once. With <code>AUTOXIDE_HTTP_RATE_LIMIT_STORE=database</code> a small burst means nearly one database write per request: prefer <code>memory</code> for low levels on a single server</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_METRICS</code></td><td>Prometheus metrics at <code>/metrics</code>, which has no authentication. Add <code>AUTOXIDE_HTTP_METRICS_ADDRESS</code> (e.g. <code>127.0.0.1:9090</code>) to serve it on its own port, away from the API; without it, <code>/metrics</code> is on the API port: block it in your reverse proxy (Caddy: <code>respond /metrics 404</code>) and scrape it from the machine itself</td></tr>
+<tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td>Send traces to an OpenTelemetry collector</td></tr>
+</tbody>
+</table>
+</div>
+<p>Check the configuration without starting anything: <code>autoxide config</code>. It lists every
+setting with its value (secrets hidden) and reports every problem at once.</p>
+<h2 id="mail-that-bounces"><a class="header" href="#mail-that-bounces">Mail that bounces</a></h2>
+<p>When the receiving server refuses the recipient address itself for good while a mail is being sent
+— SMTP <code>5xx</code> with enhanced status <code>5.1.1</code> (no such mailbox), <code>5.1.2</code> (no such domain), <code>5.1.3</code> (bad
+address), <code>5.1.6</code> (mailbox moved) or <code>5.1.10</code> (the domain takes no mail) — the address gets a bounce
+record in its tenant. Errors of the sending side (<code>5.1.7</code>, <code>5.1.8</code>, a wrong sender address or a
+blocked SMTP account), a disabled mailbox (<code>5.2.1</code>), a full mailbox (<code>5.2.2</code>), a message too big
+(<code>5.2.3</code>), or a reply without an enhanced status are
+not counted, so a sending misconfiguration never suppresses recipients. Bounces count towards
+suppression at most once per 24 hours: after <code>AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT</code> (default 3) counted
+bounces the address is <strong>suppressed</strong> for that tenant only: new mail to it — password resets
+included — is not sent, and each skipped mail is counted on the record with its source (e.g.
+<code>auth.password_reset</code>), so “why did this person get no mail” has an answer. The API still answers
+as if the mail was sent, so nobody learns which addresses are suppressed.</p>
+<p>A tenant’s administrator (or platform staff entering the tenant):</p>
+<ul>
+<li><code>GET /api/v1/mail/bounces?email=ada@example.com</code> — did mail to this address bounce, how often,
+the last SMTP code, whether it is suppressed (<code>mail.bounces.read</code>);</li>
+<li><code>GET /api/v1/mail/bounces/stats</code> — addresses, suppressed, bounced and skipped in 30 days;</li>
+<li><code>POST /api/v1/mail/bounces/{id}/release</code> — mail it again once the address works
+(<code>mail.bounces.manage</code>); a user who changes to another address is mailed at once;</li>
+<li><code>DELETE /api/v1/mail/bounces/{id}</code> — erase the record (a data subject’s request).</li>
+</ul>
+<p>Records are deleted <code>AUTOXIDE_MAIL_BOUNCE_RETENTION_DAYS</code> (default 365) after the last bounce or
+skipped mail. Metrics: <code>mail_bounces_total{kind}</code>, <code>mail_suppressed_total</code>,
+<code>mail_skipped_suppressed_total</code>. Bounces that arrive later as a delivery report (DSN), and
+bounce webhooks of mail providers, are not read yet; the newsletter keeps its own suppression list
+(<code>POST /api/v1/newsletter/bounces</code>).</p>
+<h2 id="a-cdn-in-front-of-autoxide"><a class="header" href="#a-cdn-in-front-of-autoxide">A CDN in front of Autoxide</a></h2>
+<p>Public reads of a website (<code>/api/v1/content/public/…</code>, <code>/api/v1/catalog/public/…</code>) answer with
+<code>Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300</code>, an <code>ETag</code> and
+<code>Vary: Accept-Language, Accept-Encoding, Origin, autoxide-tenant</code>. A CDN (Cloudflare, CloudFront, Fastly…) keeps
+such a response for <code>AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS</code> seconds (default <code>60</code>; <code>0</code> makes it ask every time);
+browsers always ask again and get <code>304 Not Modified</code> when nothing changed. A changed post reaches visitors
+within that many seconds. Media files with <code>?v=</code> in the address never change and are kept for a year
+(<code>immutable</code>).</p>
+<p>Autoxide never lets a shared cache keep anything personal: a request with <code>Authorization</code> or a cookie gets
+<code>private</code> (or <code>no-store</code>), and draft previews get <code>no-store</code>; writes are never cached. Set the CDN to:</p>
+<ul>
+<li><strong>respect the origin’s cache headers</strong> (Cloudflare: Cache Rules → “Use cache-control header if present”;
+CloudFront: a cache policy with minimum TTL <code>0</code>, honouring <code>Cache-Control</code>);</li>
+<li><strong>never cache a request that has <code>Authorization</code></strong> — Cloudflare and CloudFront skip it by default when the
+origin says <code>private</code>; check that no rule overrides it;</li>
+<li>include the <strong>host</strong> in the cache key (it chooses the tenant) and forward <code>Accept-Language</code>, <code>Origin</code> and
+the <code>autoxide-tenant</code> header if your websites send it;</li>
+<li>not compress again if it already does — then set <code>AUTOXIDE_HTTP_COMPRESSION=false</code>.</li>
+</ul>
+<h2 id="settings-and-state-of-each-tenant"><a class="header" href="#settings-and-state-of-each-tenant">Settings and state of each tenant</a></h2>
+<p>With several tenants (<code>AUTOXIDE_TENANCY_MODE=multi</code>), the settings above apply to every tenant.
+Some behaviour of the modules can also be set per tenant, replacing the server’s value for that
+tenant only:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Tenant setting</th><th>Replaces</th></tr>
+</thead>
+<tbody>
+<tr><td><code>kernel.public_url</code></td><td><code>AUTOXIDE_HTTP_PUBLIC_URL</code> in links sent by mail</td></tr>
+<tr><td><code>mail.connection.smtp.url</code>, <code>mail.connection.smtp.from</code></td><td><code>AUTOXIDE_MAIL_SMTP_URL</code>, <code>AUTOXIDE_MAIL_FROM</code></td></tr>
+<tr><td><code>ai.connection.text.api_key</code>, <code>ai.connection.text.model</code></td><td>the key and model of the server’s AI provider (<code>AUTOXIDE_AI_API_KEY</code>, <code>AUTOXIDE_AI_MODEL</code>)</td></tr>
+<tr><td><code>comments.banned_words</code>, <code>comments.suspect_words</code>, <code>comments.max_links</code>, <code>comments.guest_moderation</code>, <code>comments.user_moderation</code></td><td>the same <code>AUTOXIDE_COMMENTS_…</code> settings (<a href="COMMENTS.html#per-tenant">comments</a>)</td></tr>
+<tr><td><code>forms.retention_days</code></td><td><code>AUTOXIDE_FORMS_RETENTION_DAYS</code> (<a href="FORMS.html#settings">forms</a>)</td></tr>
+<tr><td><code>content.locales</code>, <code>content.default_locale</code></td><td><code>AUTOXIDE_CONTENT_LOCALES</code>, <code>AUTOXIDE_CONTENT_DEFAULT_LOCALE</code> (<a href="CONTENT.html#languages">content</a>)</td></tr>
+<tr><td><code>media.alt_locales</code></td><td><code>AUTOXIDE_MEDIA_ALT_LOCALES</code> (<a href="MEDIA.html">media</a>)</td></tr>
+<tr><td><code>content.embed_hosts</code></td><td><code>AUTOXIDE_CONTENT_EMBED_HOSTS</code></td></tr>
+<tr><td><code>analytics.allowed_hosts</code></td><td><code>AUTOXIDE_ANALYTICS_ALLOWED_HOSTS</code> (the tenant’s verified domains are always accepted)</td></tr>
+<tr><td><code>catalog.locales</code></td><td><code>AUTOXIDE_CATALOG_LOCALES</code></td></tr>
+<tr><td><code>menus.locales</code>, <code>menus.default_locale</code></td><td><code>AUTOXIDE_MENUS_LOCALES</code>, <code>AUTOXIDE_MENUS_DEFAULT_LOCALE</code></td></tr>
+<tr><td><code>auth.passkey_rp_id</code></td><td><code>AUTOXIDE_AUTH_PASSKEY_RP_ID</code> (only one of the tenant’s own verified domains; checked when set and at every use — if the domain is lost or moves to another tenant, the server’s setting applies again and passkeys registered on it stop working)</td></tr>
+<tr><td><code>newsletter.postal_address</code></td><td><code>AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS</code>; when unset, the owner’s name and address in the tenant’s legal profile (module <code>compliance</code>) come first</td></tr>
+<tr><td><code>&lt;module&gt;.link.&lt;page&gt;</code> (group <code>link</code>, see below)</td><td>the <code>AUTOXIDE_…_URL</code> page addresses in mail: <code>auth.link.password_reset</code>, <code>auth.link.email_verification</code>, <code>auth.link.invitation</code>, <code>auth.link.login</code>, <code>auth.link.email_change_report</code>, <code>support.link.guest_ticket</code>, <code>compliance.link.case_tracking</code>, <code>inventory.link.restock_confirm</code>, <code>notifications.link.unsubscribe</code>, <code>comments.link.verify</code>, <code>comments.link.unsubscribe</code>, <code>newsletter.link.confirm</code>, <code>newsletter.link.preferences</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>GET /api/v1/kernel/settings</code> lists them with what the current tenant set. A tenant’s
+administrator (permission <code>kernel.settings.manage</code>) sets one with
+<code>PUT /api/v1/kernel/settings/{name}</code> and <code>{"value": "…"}</code>, and removes it (back to the server’s
+value) with <code>DELETE</code>. Platform staff do the same for any tenant under
+<code>/api/v1/kernel/tenants/{id}/settings</code> (<code>kernel.tenants.read</code> to list, <code>kernel.tenants.manage</code> to
+change). Values are checked when they are set; secret ones are stored encrypted and never shown
+again. Other servers use a new value within <code>AUTOXIDE_TENANCY_CACHE_SECONDS</code>.</p>
+<p>Settings that connect a tenant to a partner service (its mail server, its AI provider account…)
+are in the group <code>connection</code> and are named <code>&lt;module&gt;.connection.&lt;kind&gt;.&lt;field&gt;</code>:
+<code>GET /api/v1/kernel/settings?group=connection</code> lists only those, which is what a “partner
+connections” screen needs. Every setting in the list carries its <code>group</code> (<code>null</code> when it has
+none).</p>
+<h3 id="links-in-mail-per-tenant"><a class="header" href="#links-in-mail-per-tenant">Links in mail, per tenant</a></h3>
+<p>Mail sent for a tenant links to pages of that tenant’s website or app. Two layers, the second wins:</p>
+<ol>
+<li><code>kernel.public_url</code> (e.g. <code>https://shop.example</code>) replaces the scheme and host of every page
+address the server has (<code>AUTOXIDE_AUTH_PASSWORD_RESET_URL</code>…), keeping its path.</li>
+<li>A link setting (group <code>link</code>, <code>GET /api/v1/kernel/settings?group=link</code>) gives the whole page
+address of one link, path included, for a site whose pages are not where the server’s are —
+e.g. <code>auth.link.password_reset</code> = <code>https://shop.example/dat-lai-mat-khau?token={token}</code>. A
+tenant can also turn on a mail link the server has no address for.</li>
+</ol>
+<p>Both <code>kernel.public_url</code> and a link setting point mail at a host, so the host is checked
+(D-20261125-tenant-site-verified):</p>
+<ul>
+<li><strong>Several tenants</strong> (<code>AUTOXIDE_TENANCY_MODE=multi</code>): the address must be <code>https://</code>, on the default
+port, on a domain the tenant has <strong>verified</strong> right now (see “Custom domains of tenants”) or on the
+platform’s own host (<code>AUTOXIDE_HTTP_PUBLIC_URL</code>). A domain that is pending (also after a failed
+re-verification or after adding a revoked domain again), failed its DNS recheck, revoked, never
+added, or verified by another tenant is refused: <code>PUT</code> answers <code>422</code>
+(<code>kernel.public_url_not_allowed</code>, <code>kernel.link_host_not_allowed</code>). <strong>Verify the domain before
+setting <code>kernel.public_url</code>.</strong></li>
+<li><strong>One tenant</strong> (the default mode, no domain list): a link setting must be on the platform’s host
+or on the address of <code>kernel.public_url</code>; a new <code>kernel.public_url</code> must be <code>https://</code> except on
+<code>localhost</code> or <code>127.0.0.1</code>.</li>
+</ul>
+<p>A link setting also needs every placeholder its description names (<code>{token}</code>, <code>{id}</code>…), no user
+name and no placeholder in the host part (<code>kernel.link_placeholder_missing</code>,
+<code>kernel.link_template_invalid</code>). Hosts are checked again every time a mail is sent: when a domain is
+revoked, fails its DNS recheck or moves to another tenant, mail falls back to the server’s address
+(with a warning in the log) — at once on the server that saw the change, within
+<code>AUTOXIDE_TENANCY_CACHE_SECONDS</code> (default 10 seconds) on the others. A value stored before these
+rules that does not meet them is kept but not used; <code>GET /api/v1/kernel/settings</code> shows it with
+<code>problem: kernel.public_url_unverified</code> or <code>kernel.link_unverified</code>, and it works again once the
+domain is verified.</p>
+<p>The connection settings of mail and AI were renamed to this pattern. Their former names
+(<code>mail.smtp_url</code>, <code>mail.from</code>, <code>ai.api_key</code>, <code>ai.model</code>) still work: a value a tenant set under a
+former name keeps applying, and <code>PUT</code> / <code>DELETE</code> accept the former name. The list shows the
+current names only.</p>
+<p>A tenant can be stopped in two ways, independent of each other:</p>
+<ul>
+<li><strong>Suspended</strong> — <code>autoxide tenant suspend &lt;tenant&gt;</code> (back with <code>resume</code>), or <code>PATCH /api/v1/kernel/tenants/{id}</code> with <code>{"status": "suspended"}</code>: every request to the tenant, reads
+included, answers <code>403 tenant_suspended</code>, and its domains get no new certificates.</li>
+<li><strong>Read-only</strong> — <code>autoxide tenant read-only &lt;tenant&gt;</code> (back with <code>writable</code>), or <code>{"read_only": true}</code>: reads work, its users can still sign in, reset their password, export their data and use
+the links in mails (confirm an address, unsubscribe); every other change answers <code>403 tenant_read_only</code>, and so do MCP tools that are not read-only. Use it, for example, while a
+customer has not paid.</li>
+</ul>
+<p>Background jobs and events of either kind of tenant keep running: they finish work that was
+accepted before, and deletions after the retention times keep happening. The platform tenant can
+be neither suspended nor read-only.</p>
+<p><code>GET /api/v1/kernel/tenants</code> (platform staff) takes filters for a control panel — <code>status</code>,
+<code>read_only</code>, <code>placement_kind</code>, <code>schema_state</code>, and <code>subscription_status</code> / <code>near_limit</code>, which
+match no tenant until the plans module (subscriptions and limits) is installed — and
+<code>expand=placement</code> to get each tenant’s placement in the same answer.</p>
+<h2 id="custom-domains-of-tenants"><a class="header" href="#custom-domains-of-tenants">Custom domains of tenants</a></h2>
+<p>With several tenants (<code>AUTOXIDE_TENANCY_MODE=multi</code>), each tenant can serve its site on its own
+domain, such as <code>shop.example</code>: a request to a verified domain reaches that tenant without the
+<code>Autoxide-Tenant</code> header. An installation with one tenant does not need this: its domain is the
+platform’s.</p>
+<ol>
+<li>
+<p>An administrator of the tenant (permission <code>kernel.domains.manage</code>) adds the domain:</p>
+<pre><code class="language-bash">curl -X POST https://api.example.com/api/v1/kernel/domains \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"domain": "shop.example"}'
+</code></pre>
+<p>The answer has <code>"status": "pending"</code> and a <code>record</code> to create at the domain’s DNS provider: a
+TXT record named <code>_autoxide-challenge.shop.example</code> with the value <code>autoxide-verify=…</code>.</p>
+</li>
+<li>
+<p>At the DNS provider, create that TXT record and point the domain itself at your server (an
+<code>A</code> / <code>AAAA</code> record, or a <code>CNAME</code> to the platform’s domain).</p>
+</li>
+<li>
+<p>Verify: <code>POST /api/v1/kernel/domains/{id}/verify</code> looks the record up at once and answers
+<code>verified</code>, or still <code>pending</code> with the reason in <code>check_error</code>. Pending domains are also
+checked every 10 minutes; one not verified within 7 days becomes <code>failed</code> (fix the record,
+then verify it again). <code>DELETE /api/v1/kernel/domains/{id}</code> removes a domain.</p>
+</li>
+<li>
+<p>Keep the TXT record. A verified domain is checked again once a day: when the record is missing
+at 3 checks in a row, the domain becomes <code>failed</code> (event <code>kernel.domain_failed</code>) and requests
+to it no longer reach the tenant. <code>failed_checks</code> counts the misses; one check that finds the
+record (or <code>POST …/verify</code> after fixing it) resets it to 0. A DNS server that does not answer
+does not count as a miss.</p>
+</li>
+</ol>
+<p>The platform’s own domain (the host of <code>AUTOXIDE_HTTP_PUBLIC_URL</code>), IP addresses and <code>localhost</code>
+are refused. A domain belongs to one tenant at a time: another tenant can claim it only after it
+was removed or failed.</p>
+<p>A domain can belong to one node of the tenant’s organization tree — a store with its own site,
+for example: <code>PATCH /api/v1/kernel/domains/{id}</code> with <code>{"org_id": "&lt;id of the node&gt;"}</code> attaches
+it, <code>{"org_id": null}</code> detaches it (the domain then stands for the tenant as a whole). The node
+must be one of the tenant’s own; while no installed module keeps an organization tree, only
+<code>null</code> is accepted. Attaching does not change the domain’s status or its DNS record; a removed
+domain answers <code>409 tenant_domain_revoked</code>. Each change records the event
+<code>kernel.domain_updated</code>.</p>
+<p><strong>Browser calls (CORS).</strong> A page served at <code>https://&lt;domain&gt;</code> of a verified domain may call the
+API from the browser without adding it to <code>AUTOXIDE_HTTP_CORS_ORIGINS</code> and without a restart —
+but only for its own tenant: a request from that page whose token, <code>Autoxide-Tenant</code> header or
+<code>Host</code> points at another tenant answers <code>403 tenant_origin_mismatch</code>, and a refresh token or
+email link of another tenant counts as wrong in any request from that page, however the request
+names its tenant; outside such pages a token names its own tenant as before. This is extra
+protection inside browsers, not a security boundary: tokens are sent in a header, never as cookies, so a page can only use secrets
+it already holds, and a program outside a browser sends any <code>Origin</code> it likes, or none. Only the exact origin
+<code>https://&lt;domain&gt;</code> counts (no <code>http</code>, no port, no other subdomain); give a second front end, such
+as <code>admin.shop.example</code>, its own verified domain. Origins in <code>AUTOXIDE_HTTP_CORS_ORIGINS</code> (your
+platform’s own front ends, <code>http://localhost:5173</code> while developing) may call for any tenant: a
+shared sign-up or sign-in form of the platform that you place on a tenant’s domain needs that
+origin listed there too. A
+removed or failed domain loses the right at once on the server that changed it and within
+<code>AUTOXIDE_TENANCY_CACHE_SECONDS</code> (default 10 s) on the others.</p>
+<p><strong>TLS certificates.</strong> Let Caddy get a certificate when the first visitor of a domain arrives
+(on-demand TLS), after asking Autoxide whether the domain is allowed:
+<code>GET /api/v1/kernel/domains/allowed?domain=…</code> answers <code>200</code> only for a verified domain of an
+active tenant, so nobody can make your server request certificates for names you do not serve.</p>
+<pre><code class="language-text">{
+    on_demand_tls {
+        ask http://127.0.0.1:8080/api/v1/kernel/domains/allowed
+    }
+}
+
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+    reverse_proxy 127.0.0.1:8080
+}
+</code></pre>
+<p>Caddy’s <code>reverse_proxy</code> passes the original <code>Host</code> header on, and that is how Autoxide tells the
+tenant. When another proxy in front rewrites <code>Host</code>, it must send the visitor’s domain in
+<code>X-Forwarded-Host</code> (or <code>Forwarded: host=…</code>), and its addresses must be listed in
+<code>AUTOXIDE_HTTP_TRUSTED_PROXIES</code>: Autoxide reads those headers only from trusted proxies. The
+<code>ask</code> endpoint counts toward the per-address rate limit like any other; Caddy asks once per new
+certificate. Verifying, removing a domain or suspending its tenant reaches every server within
+<code>AUTOXIDE_TENANCY_CACHE_SECONDS</code> (default <code>10</code>).</p>
+<h2 id="accounts-of-a-tenant-staff-customers-delegation"><a class="header" href="#accounts-of-a-tenant-staff-customers-delegation">Accounts of a tenant: staff, customers, delegation</a></h2>
+<p>Each tenant has two kinds of accounts. <strong>Staff</strong> (<code>realm: staff</code>, the default) work with roles and
+permissions. <strong>Customers</strong> (<code>realm: customer</code>) are the accounts of the tenant’s shop: they sign in,
+have no permission, and are separate from staff even with the same email. Customers register with
+<code>POST /api/v1/auth/registrations</code> and sign in with <code>POST /api/v1/auth/login</code>, both with
+<code>"realm": "customer"</code>; a tenant closes customer sign-up with the organization setting
+<code>auth.customer_registration</code> (<code>false</code>). Staff manage them with <code>GET /api/v1/auth/customers</code> and
+<code>PATCH /api/v1/auth/customers/{id}</code> (permissions <code>auth.customers.read</code>, <code>auth.customers.manage</code>).</p>
+<p><strong>Sign-in policy per tenant.</strong> Organization settings at a tenant’s root unit (<code>PUT /api/v1/organizations/units/{id}/settings/{key}</code>) let a tenant decide for itself, within the server’s
+limits:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Setting</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>auth.staff_registration</code></td><td><code>true</code> / <code>false</code>: anyone may create their own staff account (<code>POST /api/v1/auth/register</code>, or a first sign-in with a provider that allows sign-up). Unset: <code>AUTOXIDE_AUTH_SELF_REGISTRATION</code></td></tr>
+<tr><td><code>auth.password_min_length</code></td><td>15 to 128: shortest new password. Only raises the server’s minimum of 15</td></tr>
+<tr><td><code>auth.session_days</code></td><td>1 to 365: lifetime of each refresh token. Only shortens <code>AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS</code>; a longer value is ignored</td></tr>
+<tr><td><code>auth.totp_issuer</code></td><td>Name shown in authenticator apps (no <code>:</code>), instead of <code>AUTOXIDE_AUTH_TOTP_ISSUER</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Password rules</strong> (NIST SP 800-63B-4). A new password — at sign-up, when an administrator or
+<code>autoxide user create</code> sets one, on change, reset and when accepting an invitation — must be 15 to 128
+characters and must not be on the list of common or breached passwords that ships inside the binary
+(about 56,000 entries of 15 characters or more; checked offline, case-insensitively, nothing leaves
+the server). This includes <code>AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD</code>: a password that breaks the rules stops
+<code>autoxide serve</code> at startup. A refused password gets <code>422</code> with field code <code>common_password</code>. There are no rules about digits or symbols,
+and passwords never expire. Existing passwords keep working: the rules apply when a password is set.</p>
+<p><strong>Inviting staff.</strong> Instead of creating accounts with passwords, invite people:
+<code>POST /api/v1/auth/invitations</code> with an <code>email</code>, the <code>role_ids</code> and the unit (<code>org_id</code>) they get
+(permission <code>auth.invitations.manage</code>; you cannot invite with roles whose permissions you lack),
+or from the command line:</p>
+<pre><code class="language-bash">autoxide user invite --email new.colleague@example.com --role editor
+</code></pre>
+<p>The mail carries a one-time link to <code>AUTOXIDE_AUTH_INVITATION_URL</code> (a page of your interface with
+<code>{token}</code>; unset: the mail carries the token), valid <code>AUTOXIDE_AUTH_INVITATION_DAYS</code> days (7).
+Accepting creates the account (or, when the email already has one, adds the roles after the person
+signs in). <strong>Signing in with a link</strong> (no password) is off by default; turn it on with
+<code>AUTOXIDE_AUTH_LOGIN_LINK=true</code> and set <code>AUTOXIDE_AUTH_LOGIN_LINK_URL</code> to your interface’s page.
+<strong>Signing in with Google, Microsoft, GitHub or OpenID Connect</strong> is off by default; turn it on with
+<code>AUTOXIDE_AUTH_OIDC=true</code>. Each tenant registers its application at the provider and adds it with
+<code>POST /api/v1/auth/oidc-providers</code> (<a href="guides/oidc.html"><code>docs/guides/oidc.md</code></a>); client secrets are
+stored encrypted with <code>AUTOXIDE_SECRET_KEY</code>. The server calls providers only on public addresses;
+keep <code>AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=false</code> in production, and let the server reach the
+providers over HTTPS (outbound port 443).
+Links and invitations need working mail (<code>AUTOXIDE_MAIL_SMTP_URL</code>) and a running worker. The organization tree of
+a tenant is at most <code>AUTOXIDE_ORGANIZATIONS_MAX_DEPTH</code> levels deep (8 by default). Import the list of
+administrative units once, for checking addresses: <code>autoxide task address.import</code>
+(<a href="ADDRESS.html"><code>docs/ADDRESS.md</code></a>).</p>
+<p><strong>Platform staff and a tenant’s data.</strong> Platform staff (accounts of the platform tenant) never
+enter a tenant’s data just because of their role: someone with <code>auth.support.grant</code> grants one
+staff member time-limited access with <code>POST /api/v1/auth/support-grants</code> (<code>tenant_id</code>,
+<code>staff_user_id</code>, a platform <code>role_id</code>, <code>basis</code> <code>support</code> or <code>legal_request</code> with its document
+number, a <code>reason</code>, at most <code>AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS</code> hours, 8 by default). The
+tenant sees every grant, its first use and every change made (<code>GET /api/v1/auth/support-access</code>),
+can revoke a running <code>support</code> grant (<code>DELETE /api/v1/auth/support-access/{id}</code>), and can turn
+support access off with the setting <code>auth.support_access</code> (then only <code>legal_request</code> grants work).</p>
+<p>In a chain of tenants (a tenant with <code>parent_id</code>), the parent can let holders of one of its roles
+work in a child: <code>POST /api/v1/auth/delegations</code> with <code>child_tenant_id</code>, <code>role_id</code>, optional
+<code>org_id</code> (a unit of the child) and <code>expires_at</code>, and a <code>reason</code> (permission
+<code>auth.delegations.manage</code>). Those people keep their own sign-in and add the header
+<code>Autoxide-Tenant: &lt;child id&gt;</code>; <code>GET /api/v1/auth/me/tenants</code> lists where they can go. Every change
+they make in the child is recorded with the delegation as the way in (<code>actor_access</code> in the
+child’s events and audit log); revoking (<code>DELETE /api/v1/auth/delegations/{id}</code>) takes effect at
+their next request. The child sees what it received with
+<code>GET /api/v1/auth/delegations?direction=incoming</code>.</p>
+<h2 id="moving-a-tenant-to-another-database"><a class="header" href="#moving-a-tenant-to-another-database">Moving a tenant to another database</a></h2>
+<p>With several tenants, each tenant’s data lives on a <em>placement</em>: <code>main</code> (the database of
+<code>DATABASE_URL</code>, shared by many tenants) or another database added with <code>autoxide placement add</code>.
+Move a tenant to give a growing customer a database of its own, or to bring it back:</p>
+<ol>
+<li>
+<p>Add the target and apply the migrations to it:</p>
+<pre><code class="language-bash">printf '%s' 'postgres://autoxide:&lt;password&gt;@db2.example.com:5432/acme' \
+  | autoxide placement add acme-db --kind dedicated --url -
+autoxide migrate up --all
+</code></pre>
+<p>Platform staff can also migrate the placements from the API, without a shell on the server:
+<code>POST /api/v1/kernel/placements/migrations</code> with <code>{"dry_run": true}</code> lists what would run;
+without <code>dry_run</code> it starts a run in the background (follow it with
+<code>GET /api/v1/kernel/placements/migrations/{id}</code>). <code>main</code> is always migrated by
+<code>autoxide migrate up</code> before the server starts.</p>
+</li>
+<li>
+<p>Try it first. A dry run changes nothing:</p>
+<pre><code class="language-bash">autoxide tenant move acme --to acme-db --dry-run
+</code></pre>
+<p>It lists the rows of the tenant that would be copied, per table, and everything that blocks
+the move: migrations not applied on one side, a target that is the same database as the
+source, a tenant that is not active, another move of the tenant. The platform tenant
+(<code>default</code>) always stays on <code>main</code>.</p>
+</li>
+<li>
+<p>Move, in a maintenance window:</p>
+<pre><code class="language-bash">autoxide tenant move acme --to acme-db
+</code></pre>
+<p>From the start, the tenant answers <code>503 tenant_maintenance</code> with <code>Retry-After</code>; other tenants
+are not affected. The command waits until every server has seen the move
+(<code>AUTOXIDE_TENANCY_CACHE_SECONDS</code>) and requests in progress are done
+(<code>AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS</code>), and until jobs and events of the tenant already
+being run have finished. Then it copies every row of the tenant, queued jobs and undelivered
+events included, in one transaction; compares the row counts of every table; switches the
+tenant to the new placement (it works again from there); and deletes the old copy. SQLite and
+PostgreSQL can be mixed in either direction. Files (under <code>tenants/&lt;id&gt;/</code>) stay where they are
+when both placements use the same file storage; when the target has its own storage (below),
+they are copied there before the rows and deleted from the old storage at the end. The dry run
+shows how many files would be copied.</p>
+</li>
+</ol>
+<p><code>--keep-source</code> keeps the old copy as a backup instead of deleting it (its queued jobs and events
+are deleted, so nothing runs twice; its files stay too). Nothing uses it; delete it once you are
+satisfied:</p>
+<pre><code class="language-bash">autoxide tenant purge-copy acme --placement main
+</code></pre>
+<p>Over the API, platform staff with <code>kernel.tenants.move</code> call
+<code>POST /api/v1/kernel/tenants/{id}/move</code> with <code>{"to": "acme-db"}</code>: that is a dry run. Add
+<code>"dry_run": false</code> to start the move as a background job, and follow it at the <code>Location</code> of the
+answer (<code>GET /api/v1/kernel/tenants/{id}/moves/{move_id}</code>); the MCP tool is <code>kernel.move_tenant</code>.
+A job may run for about four minutes: move large tenants (the dry run shows the row count) with
+the command, which has no time limit.</p>
+<p><strong>A placement’s own file storage.</strong> By default every tenant’s files are kept in the storage of
+the <code>files</code> module settings (<code>AUTOXIDE_FILES_DIR</code> or <code>AUTOXIDE_FILES_S3_BUCKET</code>), under
+<code>tenants/&lt;id&gt;/</code>. Give a placement — typically a <code>dedicated</code> one — its own bucket or directory, so
+a customer’s files live apart too:</p>
+<pre><code class="language-bash">printf '%s' "$SECRET_ACCESS_KEY" | autoxide placement storage acme-db \
+  --s3-bucket acme-files --s3-region eu-west-1 \
+  --s3-endpoint https://&lt;account&gt;.r2.cloudflarestorage.com \
+  --s3-access-key-id "$ACCESS_KEY_ID" --s3-secret-access-key -
+# or a directory on the server:
+autoxide placement storage acme-db --dir /var/lib/autoxide/files-acme
+</code></pre>
+<p>The settings are stored encrypted with <code>AUTOXIDE_SECRET_KEY</code>; <code>autoxide placement list</code> and
+<code>GET /api/v1/kernel/placements</code> show the bucket or directory, never the keys. The bucket must
+exist; a wrong key shows up at the first upload. Set the storage while the placement has no
+tenants, then move tenants onto it: the move copies their files. Changing it later is refused
+(their files are in the old storage), except with <code>--force</code> when the new storage already holds
+the same files — for example a new access key for the same bucket. <code>--clear</code> sends the files of
+new uploads back to the shared storage (same rule). Every server must run the <code>files</code> module.</p>
+<p><strong>When a move stops half-way</strong> (the process dies, a database cannot be reached, row counts
+differ), nothing is lost. Before the switch the tenant keeps answering <code>503</code> on its old placement;
+after it, the tenant works from the new placement and only the old copy waits to be deleted.</p>
+<ul>
+<li>Run the same <code>autoxide tenant move acme --to acme-db</code> again: it resumes where it stopped
+(before the switch it deletes the rows it had copied to the target and copies again).</li>
+<li>Or, before the switch, give up: <code>autoxide tenant move acme --abort</code> deletes what was copied and
+makes the tenant active again on its old placement.</li>
+<li><code>GET /api/v1/kernel/tenants/{id}/moves/{move_id}</code> shows the <code>state</code> of the move and the <code>error</code>
+that stopped it. A move started over the API is retried by its job; starting another run while
+one is running answers <code>tenant_move_running</code>.</li>
+</ul>
+<p><strong>Data residency.</strong> Record where each placement’s servers are with <code>autoxide placement country &lt;name&gt; VN</code> (<code>-</code> for unknown; <code>autoxide placement list</code> shows it). A tenant that must keep its data in
+one country (set by platform staff with <code>PUT /api/v1/compliance/residency</code>) cannot move to a placement
+in another country or of unknown country: the move answers <code>tenant_residency_violation</code>. See
+<a href="COMPLIANCE.html#data-residency">COMPLIANCE.md</a>.</p>
+<h2 id="splitting-a-branch-into-its-own-tenant-and-merging-tenants"><a class="header" href="#splitting-a-branch-into-its-own-tenant-and-merging-tenants">Splitting a branch into its own tenant, and merging tenants</a></h2>
+<p>A tenant’s organization tree can outgrow it: a region becomes a company of its own, or a shop that
+had its own tenant joins a chain. Platform staff split a branch into a new tenant on another
+database, or merge a tenant into another one under one of its units. Every row keeps its id, so
+splitting and merging back gives the original data again.</p>
+<pre><code class="language-bash"># Split unit &lt;north&gt; of `acme` into the tenant `acme-north` on placement `acme-north-db`.
+autoxide tenant split acme --org &lt;north&gt; --slug acme-north --name "Acme North" \
+  --placement acme-north-db --reason "Contract 2026-11: the region becomes its own company" --dry-run
+# Merge `acme-north` back into `acme` under unit &lt;root-or-other-unit&gt;.
+autoxide tenant merge acme-north --into acme --under-org &lt;unit&gt; --reason "…" --dry-run
+</code></pre>
+<ul>
+<li><strong>Dry run first.</strong> It lists, for every table, the rows that move, are copied, stay, or must run
+first (queued events and due jobs), what blocks (a tenant that is not active, another split, merge
+or move in progress, migrations missing, a target that is the same database), and the
+<strong>conflicts</strong>: rows that point across the boundary (a row that goes refers to a row that stays,
+or the other way) and unique values the receiving tenant already has (two pages with the same
+slug). Fix them, then run the same command without <code>--dry-run</code>.</li>
+<li><strong>Two databases.</strong> The target placement must be another database than the source tenant’s. To
+split into the shared database, or to merge two tenants of the same database, move one of them
+first (<code>autoxide tenant move</code>).</li>
+<li><strong>What happens.</strong> The tenant (both tenants when merging) answers <code>503 tenant_maintenance</code>; its
+queued events and due jobs run first (<code>AUTOXIDE_RELOCATION_DRAIN_SECONDS</code>, default 300). Then the
+rows are copied in one transaction on the target, keeping their ids; the new tenant gets the id
+of the branch’s root unit, which becomes its root. Rows are checked, the tenants switch in one
+transaction (domains attached to units of the branch go with it; a merged tenant becomes
+<code>merged</code>), and the rows that left are deleted from the source. Files of what moved are copied
+under the new tenant’s prefix. The audit log of what moved is written again into the target’s
+hash chain; the source keeps its own chain untouched. Ledger books move with their unit, and their
+seal chain still verifies. The report store of the tree follows (<code>reporting.rehome</code>).</li>
+<li><strong>What stays.</strong> Each module declares how its tables move (<code>Module::relocation</code>): personal data of
+the tenant (subscribers, consents, identity checks, comments) stays with the source when
+splitting and moves when merging; staff accounts with a role in the branch are copied (they sign in
+again); roles and similar settings are copied; subscriptions, sessions and counters stay.</li>
+<li><strong>Legal basis.</strong> Moving data between two tenants can transfer personal data between two
+controllers; <code>--reason</code> is required and kept with the run and in the audit log.</li>
+<li><strong>Resume.</strong> If it stops half-way, run <code>autoxide tenant split --resume &lt;id&gt;</code> (or <code>merge</code>); every
+step can run again. <code>autoxide tenant relocation-status &lt;id&gt;</code> shows the state and the error.</li>
+</ul>
+<p>Over the API, platform staff with <code>kernel.tenants.relocate</code> call <code>POST /api/v1/kernel/relocations</code>
+(<code>{"kind": "split", "tenant": "acme", "org_id": "…", "slug": "…", "name": "…", "placement": "…", "reason": "…"}</code>): that is a dry run; add <code>"dry_run": false</code> to run it as a background job and follow
+it at <code>GET /api/v1/kernel/relocations/{id}</code>. A tenant cannot split or merge itself: its
+administrators (<code>kernel.relocations.request</code>) send a request with
+<code>POST /api/v1/kernel/tenant/relocation-requests</code>, which lands in the work inbox of the platform staff,
+who run it with <code>"request_id"</code>.</p>
+<h2 id="personal-data-breaches"><a class="header" href="#personal-data-breaches">Personal data breaches</a></h2>
+<p>When personal data may have leaked (a stolen backup, an exposed database, a wrong mail sent), the report
+to the authority is due <strong>72 hours after detection</strong> in Vietnam. Record the breach in the API at once
+(<code>POST /api/v1/compliance/incidents</code>), set the tenant policy <code>incident.alert_emails</code> so reminders reach
+people, and follow the runbook in <a href="COMPLIANCE.html#personal-data-breaches-the-72-hour-runbook">COMPLIANCE.md</a>.
+<code>autoxide doctor</code> warns when a breach is past its deadline.</p>
+<h2 id="running-several-servers"><a class="header" href="#running-several-servers">Running several servers</a></h2>
+<p>With PostgreSQL, run as many <code>app</code> processes as you need behind the reverse proxy: they
+share nothing but the database (and S3 for files), and background jobs are claimed so
+that each runs once. Set the same <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> everywhere. To scale the
+API and the background work separately, run some processes with
+<code>AUTOXIDE_PROCESS_ROLE=api</code> and at least one with <code>worker</code>. SQLite allows one server
+process.</p>
+<p>Limits are counted per process by default: with N servers a client address or an API key gets
+up to N times its limit. To share the limit per API key between servers, set
+<code>AUTOXIDE_HTTP_RATE_LIMIT_STORE=database</code>: every server counts in the database, taking requests
+in small lots (a quarter of <code>AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST</code>), so a key gets at most one
+lot per server more than its limit each minute. The limit per address stays per process.</p>
+<h2 id="kubernetes"><a class="header" href="#kubernetes">Kubernetes</a></h2>
+<p><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/deploy/kubernetes/autoxide.yaml"><code>deploy/kubernetes/autoxide.yaml</code></a> is a minimal, commented
+example: a migration <code>Job</code>, a <code>Deployment</code> of two pods, a <code>Service</code> and an <code>Ingress</code> with HTTPS. It
+follows the rules of <a href="#running-several-servers">Running several servers</a>:</p>
+<ul>
+<li>PostgreSQL runs outside the cluster file (a managed database or your own operator); SQLite allows
+one process and does not fit here.</li>
+<li>Files go to S3 (<code>AUTOXIDE_FILES_S3_BUCKET</code>) and mail to SMTP (<code>AUTOXIDE_MAIL_SMTP_URL</code>): pods keep
+nothing on disk, so any pod can be replaced.</li>
+<li>Secrets (<code>DATABASE_URL</code>, <code>AUTOXIDE_AUTH_TOKEN_SECRET</code>, <code>AUTOXIDE_SECRET_KEY</code>, the S3 keys, the SMTP
+URL) live in a Kubernetes <code>Secret</code> you create with <code>kubectl create secret</code>, never in the file.</li>
+<li>Migrations run once per release in the <code>Job</code>; pods refuse to start while one is pending, so the
+old pods keep serving until the <code>Job</code> has finished.</li>
+<li><code>readinessProbe</code> on <code>/health/ready</code>, <code>livenessProbe</code> on <code>/health/live</code>, a drain of 15 seconds and
+<code>terminationGracePeriodSeconds: 50</code> give rolling updates without dropped requests (see
+<a href="#updating-without-dropping-requests">Updating without dropping requests</a>).</li>
+<li><code>AUTOXIDE_HTTP_RATE_LIMIT_STORE=database</code> shares the per-key limit between pods, and
+<code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> with one trusted proxy reads the client’s address that the
+ingress controller passes on.</li>
+<li>The pods run as the image’s non-root user (<code>10001</code>) without extra privileges.</li>
+</ul>
+<p>The commands to create the secret, apply the file and update are at the top of the file. To split
+the API from the background work, copy the <code>Deployment</code> into a second one with
+<code>AUTOXIDE_PROCESS_ROLE=worker</code> (no <code>Service</code>, at least one pod) and set <code>AUTOXIDE_PROCESS_ROLE=api</code>
+on the first.</p>
+<h2 id="uploads-straight-to-s3"><a class="header" href="#uploads-straight-to-s3">Uploads straight to S3</a></h2>
+<p>With files on S3, clients can upload large files straight to the bucket
+(<code>POST /api/v1/files/uploads</code>, guide: <a href="guides/direct-uploads.html"><code>docs/guides/direct-uploads.md</code></a>).
+Browsers need the bucket to allow it (CORS). On Amazon S3, for example:</p>
+<pre><code class="language-json">[{"AllowedOrigins": ["https://admin.example.com"], "AllowedMethods": ["PUT"],
+  "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"], "MaxAgeSeconds": 3600}]
+</code></pre>
+<p>The server checks every completed upload by reading it back (size and SHA-256), because not every
+S3-compatible service checks the signed checksum; raise <code>AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS</code>
+if you allow very large files. Abandoned uploads are removed by an hourly job.</p>
+<h3 id="updating-without-dropping-requests"><a class="header" href="#updating-without-dropping-requests">Updating without dropping requests</a></h3>
+<p>When a server is told to stop (<code>SIGTERM</code>, as Docker, systemd and Kubernetes send), it
+goes through two phases:</p>
+<ol>
+<li><strong>Drain</strong> for <code>AUTOXIDE_HTTP_DRAIN_SECONDS</code> (default <code>0</code>): it keeps handling every
+request, but <code>/health/ready</code> answers <code>503</code> with code <code>shutting_down</code>, so your load
+balancer stops sending it new requests. <code>/health/live</code> stays <code>200</code>: the process must
+not be restarted.</li>
+<li><strong>Stop</strong>: it stops accepting connections and gives requests in progress up to
+<code>AUTOXIDE_HTTP_SHUTDOWN_SECONDS</code> (default <code>30</code>) to finish.</li>
+</ol>
+<p>For a rolling update behind a load balancer:</p>
+<ul>
+<li>Point the load balancer’s health check (or the Kubernetes <code>readinessProbe</code>) at
+<code>/health/ready</code>, and the <code>livenessProbe</code> at <code>/health/live</code>.</li>
+<li>Set <code>AUTOXIDE_HTTP_DRAIN_SECONDS</code> longer than the load balancer needs to take a server
+out: its check interval times the number of failed checks it waits for. A check every
+5 seconds that gives up after 2 failures needs more than 10, so <code>15</code>.</li>
+<li>Give the process time for both phases before it is killed: Docker Compose
+<code>stop_grace_period</code>, Kubernetes <code>terminationGracePeriodSeconds</code>, systemd
+<code>TimeoutStopSec</code> must be at least drain + shutdown (<code>45s</code> for <code>15</code> + <code>30</code>). Docker waits
+only 10 seconds by default; the <code>compose.yml</code> in this repository sets <code>40s</code>, enough for
+no drain — raise it when you set one.</li>
+<li>Start the new servers and wait until their <code>/health/ready</code> answers <code>200</code> before stopping
+the old ones.</li>
+</ul>
+<p>With a single server and no load balancer, keep the drain at <code>0</code>: there is nowhere else to
+send requests, and the drain would only delay the stop.</p>
+<h2 id="scheduled-backups"><a class="header" href="#scheduled-backups">Scheduled backups</a></h2>
+<p>Besides <code>autoxide backup</code> run by hand, every process that runs background work backs up every
+database it handles each <code>AUTOXIDE_BACKUP_INTERVAL_HOURS</code> hours (default 24; <code>0</code> turns this off),
+the same way <code>autoxide backup</code> does, into the file storage of the <code>files</code> module (the directory or
+the S3 bucket) under <code>kernel/backups/&lt;database&gt;/&lt;id&gt;/</code>. Only the newest <code>AUTOXIDE_BACKUP_KEEP</code> good
+backups of each database are kept (default 7). Each backup is a <code>backup.json</code>, a <code>database.sqlite</code>
+and, with <code>AUTOXIDE_BACKUP_INCLUDE_FILES=true</code>, the stored files under <code>files/</code>.</p>
+<ul>
+<li>The backups sit on the same storage as the uploads, so they protect against lost or broken data,
+not against losing that storage: copy the bucket or directory (backups and uploads) to another
+place, for example with the bucket’s replication or a nightly <code>rclone sync</code>. That is also why the
+files are not copied into each backup by default.</li>
+<li>To restore one, copy its directory out of the storage (for S3:
+<code>aws s3 cp --recursive s3://&lt;bucket&gt;/kernel/backups/main/&lt;id&gt;/ ./restore/</code>; for a directory,
+<code>cp -r</code>), then restore that directory as in “Restoring, step by step” below.</li>
+<li>Each run is recorded in the table <code>kernel_backups</code> (status, size, error). <code>autoxide doctor</code> warns
+when a database has no good backup from the last two intervals, and <code>/metrics</code> has
+<code>backup_last_success_timestamp_seconds</code>, <code>backup_runs_total</code>, <code>backup_duration_seconds</code> and
+<code>backup_size_bytes</code> (alerts <code>AutoxideBackupTooOld</code>, <code>AutoxideBackupFailed</code>).</li>
+<li>A backup holds personal data. Data erased on someone’s request stays in the backups made before,
+until they are rotated out (<code>AUTOXIDE_BACKUP_KEEP</code> × interval): say so in your privacy notice.
+Keep the storage private, in the country where the tenants’ data must stay, and keep
+<code>AUTOXIDE_SECRET_KEY</code> apart from it. Accounting records that must be kept for 10 years live in the
+<code>invoices</code> and <code>ledger</code> modules, not in rotated backups. (Legal details: check the original texts
+or someone qualified.)</li>
+<li>While a backup of a SQLite database runs, its <code>-wal</code> file grows until the backup ends: plan disk
+space for it.</li>
+</ul>
+<h3 id="restoring-step-by-step"><a class="header" href="#restoring-step-by-step">Restoring, step by step</a></h3>
+<p>Practise this before you need it: the test <code>dien_tap_backup_restore_roi_khoi_dong</code> does the same on
+every gate run.</p>
+<ol>
+<li><strong>Get the backup directory.</strong> From a scheduled backup, copy <code>kernel/backups/&lt;database&gt;/&lt;id&gt;/</code> out
+of the file storage (S3: <code>aws s3 cp --recursive s3://&lt;bucket&gt;/kernel/backups/main/&lt;id&gt;/ ./restore/</code>;
+a directory: <code>cp -r</code>). Take the newest row with status <code>succeeded</code> in <code>kernel_backups</code>, or the
+newest directory. From <code>autoxide backup</code>, use its directory as it is. Only restore backups you
+made yourself.</li>
+<li><strong>Prepare an empty target</strong>: a new, empty database (<code>createdb</code> on PostgreSQL, or a path to a
+SQLite file that does not exist yet) and an empty file storage. Use the same
+<code>AUTOXIDE_SECRET_KEY</code> as when the backup was made, or the encrypted secrets in it cannot be read.
+A backup taken from PostgreSQL can be restored into SQLite and the other way round.</li>
+<li><strong>Stop the servers</strong> that point at the target, then run <code>autoxide restore &lt;directory&gt;</code> with
+<code>DATABASE_URL</code> and the file storage settings of the target. It applies the migrations of this
+version, copies every table and file, and refuses a database that already has Autoxide tables.</li>
+<li><strong>Start and check</strong>: <code>autoxide doctor</code>, then <code>autoxide serve</code>; <code>/health/ready</code> must answer <code>200</code>
+and an administrator must be able to sign in. Run <code>autoxide migrate up --all</code> first in
+multi-tenant mode.</li>
+<li><strong>Multi-tenant mode</strong>: a backup holds one database. Restore each placement’s database the same
+way. To get back the data of a single tenant, restore the backup into a temporary installation
+and read or export that tenant’s data from there; there is no command that restores one tenant
+into a live database.</li>
+</ol>
+<h2 id="encrypted-off-site-backups-and-point-in-time-recovery"><a class="header" href="#encrypted-off-site-backups-and-point-in-time-recovery">Encrypted off-site backups and point-in-time recovery</a></h2>
+<p><code>autoxide backup</code> and the scheduled backups are consistent snapshots: restoring one brings the data
+back as it was when it was taken, and what happened after is lost. Two additions cover the rest.</p>
+<h3 id="encrypting-a-backup-before-it-leaves-the-machine"><a class="header" href="#encrypting-a-backup-before-it-leaves-the-machine">Encrypting a backup before it leaves the machine</a></h3>
+<p>A backup holds every module’s data, personal data included. Encrypt it before copying it to another
+machine or a bucket, for example with <a href="https://age-encryption.org">age</a> and a key pair whose private
+half is kept offline:</p>
+<pre><code class="language-bash">age-keygen -o backup-key.txt            # once; keep backup-key.txt offline, apart from the backups
+age-keygen -y backup-key.txt            # prints the public key, age1…, used below
+
+autoxide backup "backups/$(date +%F)"
+tar -C backups -c "$(date +%F)" | age -r age1… &gt; "autoxide-$(date +%F).tar.age"
+# copy autoxide-&lt;date&gt;.tar.age off-site, then delete the clear directory
+
+# to restore: decrypt, then restore the directory as in "Restoring, step by step"
+age -d -i backup-key.txt autoxide-2026-11-21.tar.age | tar -x -C restore/
+</code></pre>
+<p>Keep <code>AUTOXIDE_SECRET_KEY</code> apart from the backups as well: without it the encrypted secrets inside a
+backup cannot be read, which is the point.</p>
+<h3 id="point-in-time-recovery-on-postgresql"><a class="header" href="#point-in-time-recovery-on-postgresql">Point-in-time recovery on PostgreSQL</a></h3>
+<p>To get the database back as it was at any second — just before a wrong bulk change, for example —
+PostgreSQL must keep its write-ahead log (WAL) next to regular base backups. Autoxide needs nothing
+special for this: it is the standard PostgreSQL setup.</p>
+<ul>
+<li>
+<p><strong>Managed PostgreSQL</strong> (Amazon RDS, Google Cloud SQL, Azure, …): turn on automated backups with
+point-in-time recovery and storage encryption in the provider’s console; restoring creates a new
+database at the time you choose. Point <code>DATABASE_URL</code> at it.</p>
+</li>
+<li>
+<p><strong>Your own server</strong>: <a href="https://pgbackrest.org">pgBackRest</a> keeps base backups and WAL in a bucket,
+encrypted on the database server before they are sent. A sketch (check the pgBackRest user guide
+of your version; on Debian or Ubuntu, <code>apt install pgbackrest</code>; with the <code>compose.yml</code> PostgreSQL
+container, use an image that adds it):</p>
+<pre><code class="language-ini"># /etc/pgbackrest/pgbackrest.conf
+[global]
+repo1-type=s3
+repo1-s3-bucket=&lt;bucket&gt;
+repo1-s3-endpoint=s3.&lt;region&gt;.amazonaws.com
+repo1-s3-region=&lt;region&gt;
+repo1-path=/pgbackrest
+# client-side encryption: a long random value, kept apart from the bucket
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass=&lt;openssl rand -base64 48&gt;
+repo1-retention-full=2
+
+[autoxide]
+pg1-path=/var/lib/postgresql/16/main
+</code></pre>
+<pre><code class="language-ini"># postgresql.conf
+wal_level = replica
+archive_mode = on
+archive_command = 'pgbackrest --stanza=autoxide archive-push %p'
+</code></pre>
+<p>The S3 keys go in <code>PGBACKREST_REPO1_S3_KEY</code> and <code>PGBACKREST_REPO1_S3_KEY_SECRET</code> (or
+<code>repo1-s3-key</code>, <code>repo1-s3-key-secret</code> in a file only <code>postgres</code> reads). Then, as the <code>postgres</code>
+user:</p>
+<pre><code class="language-bash">pgbackrest --stanza=autoxide stanza-create
+pgbackrest --stanza=autoxide check
+pgbackrest --stanza=autoxide --type=full backup   # weekly, from cron
+pgbackrest --stanza=autoxide --type=diff backup   # daily, from cron
+</code></pre>
+<p>To go back to a point in time: stop the Autoxide servers and PostgreSQL, then</p>
+<pre><code class="language-bash">pgbackrest --stanza=autoxide --delta --type=time --target-action=promote \
+  "--target=2026-11-21 09:59:00+00" restore
+</code></pre>
+<p>start PostgreSQL, run <code>autoxide doctor</code>, then start the servers.</p>
+</li>
+</ul>
+<p>Point-in-time recovery covers the database only. Files in S3 are not rolled back with it: turn on
+versioning of the bucket to get deleted or overwritten files back. In multi-tenant mode each
+placement is its own database and needs its own setup. Practise a restore before you need one, as
+for snapshots.</p>
+<h2 id="monitoring"><a class="header" href="#monitoring">Monitoring</a></h2>
+<p>Turn on <code>AUTOXIDE_HTTP_METRICS=true</code>. <code>/metrics</code> has no authentication, so give it its own port with
+<code>AUTOXIDE_HTTP_METRICS_ADDRESS</code> — <code>127.0.0.1:9090</code> on a machine, <code>0.0.0.0:9090</code> in a container or a
+Kubernetes pod (publish that port to Prometheus only, never to the internet) — and point Prometheus
+at it; <code>/metrics</code> then leaves the API port. Without it, <code>/metrics</code> is served on the API port: block
+it in the reverse proxy and scrape it from the machine itself. Besides the request figures (<code>http_requests_total</code>,
+<code>http_request_duration_seconds</code>), every process that runs background work (<code>AUTOXIDE_PROCESS_ROLE</code>
+<code>all</code> or <code>worker</code>) updates the backlog gauges every <code>AUTOXIDE_METRICS_BACKLOG_SECONDS</code> (default 30),
+labelled by <code>database</code> and <code>module</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Gauge</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>jobs_pending</code></td><td>Jobs not done yet, scheduled ones included</td></tr>
+<tr><td><code>jobs_oldest_pending_seconds</code></td><td>How long the oldest job that is due has waited (0 when none)</td></tr>
+<tr><td><code>jobs_dead</code></td><td>Jobs in the dead-letter queue (<code>autoxide jobs failed</code>)</td></tr>
+<tr><td><code>events_pending</code>, <code>events_oldest_pending_seconds</code>, <code>events_dead</code></td><td>The same for events waiting to be delivered to subscribers</td></tr>
+<tr><td><code>database_connections{pool,state}</code>, <code>database_connections_max{pool}</code></td><td>Connections of the <code>read</code> and <code>write</code> pools, <code>in_use</code> or <code>idle</code>, and their maximum</td></tr>
+</tbody>
+</table>
+</div>
+<p>The <code>database</code> label names the database (<code>main</code>, or the placement of a tenant with its own database);
+past <code>AUTOXIDE_METRICS_MAX_DATABASE_LABELS</code> (default 50) databases, the others are added up under
+<code>database="other"</code>. There is no label per tenant: look a tenant up in the logs and traces.</p>
+<p><strong>One tenant.</strong> Metrics have no tenant label (a label per tenant would make Prometheus series grow
+without bound). To look into one tenant:</p>
+<ul>
+<li><strong>Logs and traces.</strong> Every request line carries <code>tenant_id</code> once the tenant is known (in JSON logs
+under <code>span.tenant_id</code>), and so do the spans of background jobs (<code>job</code>), event deliveries
+(<code>event_delivery</code>) and MCP tools (<code>mcp_tool</code>); with <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> the traces carry the
+same <code>tenant_id</code> attribute. Filter by it: <code>jq 'select(.span.tenant_id == "&lt;id&gt;")'</code>, or
+<code>tenant_id="&lt;id&gt;"</code> in your log or trace search.</li>
+<li><strong>Usage.</strong> <code>GET /api/v1/plans/tenants/{tenant_id}/usage</code> (module <code>plans</code>) gives the tenant’s use of
+each limit.</li>
+<li><strong>Backlog.</strong> <code>GET /api/v1/kernel/ops/backlog</code> (platform staff, <code>kernel.ops.read</code>) counts the waiting
+jobs and events of each database and module; a tenant with its own database is its own line.</li>
+</ul>
+<p>The repository ships ready-made files:</p>
+<ul>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/deploy/prometheus/autoxide-alerts.yml"><code>deploy/prometheus/autoxide-alerts.yml</code></a>: alerting
+rules — server errors above 2%, slow p95, a job waiting more than 10 minutes, jobs going to the
+dead-letter queue, events not delivered for 5 minutes, a connection pool 90% used. Each rule has an
+<code>action</code> annotation saying what to do; the steps are in the runbook below. Add it to <code>rule_files</code>
+in <code>prometheus.yml</code> and route the alerts with Alertmanager.</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/deploy/grafana/autoxide-dashboard.json"><code>deploy/grafana/autoxide-dashboard.json</code></a>: a Grafana
+dashboard (Dashboards › New › Import) with requests, errors, p95 by route, backlogs, the dead-letter
+queue and connections, filtered by database.</li>
+</ul>
+<p>With several worker processes each one publishes the same gauges (one series per <code>instance</code>); the
+rules and the dashboard take the largest value, not the sum.</p>
+<h2 id="runbook"><a class="header" href="#runbook">Runbook</a></h2>
+<p>Each case: what you see, how to check, how to fix it. Incidents that need decisions and several steps (a leaked key,
+mass revocation, restoring one tenant, lost data) are in <a href="RUNBOOK.html"><code>RUNBOOK.md</code></a>.</p>
+<h3 id="server-errors"><a class="header" href="#server-errors">Server errors</a></h3>
+<ul>
+<li><strong>Sign:</strong> alert <code>AutoxideHigh5xxRate</code>; clients get <code>500</code> problems.</li>
+<li><strong>Check:</strong> every error response carries a <code>request_id</code>; search the logs for it. <code>autoxide doctor</code>
+checks the configuration, the database, migrations, file storage and mail in one go.</li>
+<li><strong>Fix:</strong> what the log says (a database that went away, a full disk, an outside service down). An
+error inside the code is a bug: report it with the log lines, without secrets or personal data.</li>
+</ul>
+<h3 id="slow-requests"><a class="header" href="#slow-requests">Slow requests</a></h3>
+<ul>
+<li><strong>Sign:</strong> alert <code>AutoxideSlowP95</code> names the route.</li>
+<li><strong>Check:</strong> whether <code>database_connections</code> is near its maximum (requests wait for a connection), and
+the query plan of that route’s queries (<code>EXPLAIN ANALYZE</code> on PostgreSQL, <code>EXPLAIN QUERY PLAN</code> on
+SQLite).</li>
+<li><strong>Fix:</strong> a missing index belongs in a new migration of the module that owns the table; a pool too
+small, see “Database connections”.</li>
+</ul>
+<h3 id="stuck-queue"><a class="header" href="#stuck-queue">Stuck queue</a></h3>
+<ul>
+<li><strong>Sign:</strong> alert <code>AutoxideJobsStuck</code> or <code>AutoxideEventsBacklog</code>; mail, webhooks or reports arrive late.</li>
+<li><strong>Check:</strong> that at least one process runs with <code>AUTOXIDE_PROCESS_ROLE</code> <code>all</code> or <code>worker</code>
+(<code>/health/ready</code> of that process, its logs); <code>jobs_pending</code> by module shows which module is behind;
+in multi-tenant mode a database still being migrated (<code>503 tenant_maintenance</code>) waits until
+<code>autoxide migrate up --all</code> finishes.</li>
+<li><strong>Fix:</strong> start (or restart) the worker; raise <code>AUTOXIDE_JOBS_CONCURRENCY</code> or add worker processes
+when one module always has a long queue. Events wait for a subscriber that keeps failing: its error
+is in the logs (<code>event delivery failed</code>).</li>
+</ul>
+<h3 id="dead-letter-queue"><a class="header" href="#dead-letter-queue">Dead-letter queue</a></h3>
+<ul>
+<li><strong>Sign:</strong> alert <code>AutoxideDeadLetterGrowing</code>; <code>jobs_dead</code> goes up.</li>
+<li><strong>Check:</strong> <code>autoxide jobs failed</code> lists the jobs that gave up, newest first, with their last error
+(<code>--module</code> to narrow).</li>
+<li><strong>Fix:</strong> fix the cause first (a wrong SMTP password, an outside service down), then
+<code>autoxide jobs retry &lt;module&gt; &lt;id&gt;</code> for each job. A job retried before the fix goes back to the
+queue only to fail again.</li>
+</ul>
+<h3 id="too-many-connections"><a class="header" href="#too-many-connections">Too many connections</a></h3>
+<ul>
+<li><strong>Sign:</strong> requests wait before any byte is answered; <code>/health/ready</code> is slow or times out, while the
+process is otherwise healthy.</li>
+<li><strong>Check:</strong> open connections (<code>ss -tn state established '( sport = :8080 )' | wc -l</code>) against
+<code>AUTOXIDE_HTTP_MAX_CONNECTIONS</code>; at the limit, new connections — health checks on the same port
+included — wait until one closes.</li>
+<li><strong>Fix:</strong> limit connections per client in the reverse proxy (most of a flood comes from few clients),
+then raise the setting together with the open file limit. Give the liveness probe a timeout and a
+failure threshold that ride out a short saturation (<code>/health/live</code>, for example 5 seconds × 3): a
+restart drops every connection; a slow readiness probe only takes the instance out of rotation, which
+is what you want while it is full.</li>
+</ul>
+<h3 id="database-connections"><a class="header" href="#database-connections">Database connections</a></h3>
+<ul>
+<li><strong>Sign:</strong> alert <code>AutoxideDbPoolExhausted</code>; slow requests that wait for a connection.</li>
+<li><strong>Check:</strong> <code>database_connections{state="in_use"}</code> by pool; on PostgreSQL, long queries in
+<code>pg_stat_activity</code>.</li>
+<li><strong>Fix:</strong> end what holds connections (a slow query, a stuck job), then raise
+<code>AUTOXIDE_DATABASE_READ_CONNECTIONS</code> / <code>AUTOXIDE_DATABASE_WRITE_CONNECTIONS</code> — every process opens
+that many, so keep the total under the server’s <code>max_connections</code>. SQLite has one write connection
+by design. Public text search (content posts with <code>q</code>, <code>/public/search</code>, suggestions) never takes
+more than the read pool minus 2 per database (<code>AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY</code>, lowered
+automatically), and gives up after 2 seconds, waiting for a connection included.</li>
+</ul>
+<h3 id="database-full"><a class="header" href="#database-full">Database full</a></h3>
+<ul>
+<li><strong>Sign:</strong> writes fail with “disk full” or “no space left on device” in the logs.</li>
+<li><strong>Check:</strong> SQLite: the size of the database file and of its <code>-wal</code> file (a long-running read, a
+backup for example, keeps the <code>-wal</code> file growing until it ends). PostgreSQL: the largest tables,
+<code>SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 10;</code>.</li>
+<li><strong>Fix:</strong> free or add disk space first. Finished jobs and delivered events are removed after 7 days
+on their own; on PostgreSQL run <code>VACUUM</code> on a large table after deleting much from it.</li>
+</ul>
+<h3 id="backups"><a class="header" href="#backups">Backups</a></h3>
+<ul>
+<li><strong>Sign:</strong> alert <code>AutoxideBackupTooOld</code> or <code>AutoxideBackupFailed</code>; <code>autoxide doctor</code> warns about
+<code>kernel.backup_age</code>.</li>
+<li><strong>Check:</strong> the newest rows of <code>kernel_backups</code> for that database (<code>status</code>, <code>error</code>), the log line
+<code>backup failed</code>, free space on the server (a backup is first built in the temporary directory, as
+large as the database) and on the file storage.</li>
+<li><strong>Fix:</strong> what the error says (no <code>files</code> module, a full disk, storage credentials). A row stuck
+in <code>running</code> whose process died is marked <code>failed</code> by the next run after 15 minutes. Take a backup
+by hand with <code>autoxide backup &lt;directory&gt;</code> until the scheduled ones work again.</li>
+</ul>
+<h3 id="a-key-leaked"><a class="header" href="#a-key-leaked">A key leaked</a></h3>
+<ul>
+<li><code>AUTOXIDE_AUTH_TOKEN_SECRET</code>: set a new value on every server and restart, WITHOUT putting the leaked
+one in <code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code>. Every access token stops working; clients get a new
+one with their refresh token, which stays valid. (Routine changes keep the old key there for a
+while so nobody notices — see “Get the code and set the secrets”.)</li>
+<li><code>AUTOXIDE_SECRET_KEY</code>: rotate it as described in “Get the code and set the secrets” (new value,
+old one in <code>AUTOXIDE_SECRET_KEY_PREVIOUS</code>, <code>autoxide secrets reseal</code>). Backups taken before still open
+with the old key: delete them or keep them as safe as the key. Counters by visitor address start
+again under the new key.</li>
+<li>An API key or a webhook secret: revoke the key, rotate the webhook secret from the API.</li>
+</ul>
+<h3 id="the-last-administrator-is-gone"><a class="header" href="#the-last-administrator-is-gone">The last administrator is gone</a></h3>
+<ul>
+<li><strong>Sign:</strong> nobody can sign in with the <code>admin</code> role (the account was removed, locked out, or the
+person left). <code>autoxide doctor</code> warns when no active administrator exists.</li>
+<li><strong>Fix:</strong> on the server, <code>autoxide user create --email … --name … --admin</code> makes a new administrator
+and prints its password. For an administrator who only lost their second factor or passkeys:
+<code>autoxide user reset-mfa</code> / <code>autoxide user remove-passkeys</code>.</li>
+</ul>
+<h3 id="migration-locks"><a class="header" href="#migration-locks">Migration locks</a></h3>
+<p>Only one process migrates at a time. There are two locks: one for the main database (<code>migrate up</code>, a
+server starting with <code>AUTOXIDE_MIGRATE_ON_START</code>) and one for the tenant databases (<code>migrate up --all</code>
+takes it after the first, the background migration runs and tenant moves take only it), so a long run
+over the tenant databases never holds up a server that starts. On PostgreSQL each lock is an advisory
+lock on its own connection; if a proxy or a failover cuts that connection the lock is gone, and the
+run stops before the next tenant database (run it again). Keep PgBouncer in session mode for the
+command, or point it straight at the database. On SQLite the locks are files next to the database
+(<code>.migrate-lock</code>, <code>.placements-lock</code>); an in-memory SQLite database has no lock (one process only).
+<code>migrate up --all</code> keeps the main lock while it waits (up to 15 minutes) for the tenant-database lock,
+so during that wait a server that starts with work to do on start (<code>AUTOXIDE_MIGRATE_ON_START</code>, the
+first administrator, start-up tasks) waits too.
+During a rolling update from a release older than this lock, servers of the old version may still run
+a migration run without it: let the update finish before starting runs from the API.</p>
+<h3 id="updating-while-two-versions-run"><a class="header" href="#updating-while-two-versions-run">Updating while two versions run</a></h3>
+<p>During a rolling update, old and new servers run side by side on the same database, so a release
+changes the database in two steps (“expand, then contract”):</p>
+<ol>
+<li><strong>Expand:</strong> the new version adds what it needs (a new column, nullable or with a default; a new
+table) and writes both the old and the new shape. The old version keeps working: it does not know
+the new column.</li>
+<li><strong>Contract:</strong> a later release, once no server of the old version runs, stops writing the old shape
+and drops it.</li>
+</ol>
+<p><code>autoxide serve</code> refuses to start while migrations are missing, so run <code>autoxide migrate up --all</code>
+(the main database, then every tenant database; the same as <code>migrate up</code> in single-tenant mode)
+before starting the new servers, then replace the old ones as in
+“Updating without dropping requests”.</p>
+<h3 id="rolling-back-to-an-earlier-release"><a class="header" href="#rolling-back-to-an-earlier-release">Rolling back to an earlier release</a></h3>
+<p><code>autoxide rollback --to X.Y.Z</code> brings the main database and every tenant database back to the
+migrations of release <code>X.Y.Z</code> (0.14.0 or later), so the servers of that release start again. Run it
+with the binary of the release you are leaving: only it knows how to revert its own migrations.</p>
+<ol>
+<li><code>autoxide rollback --to X.Y.Z --dry-run</code> lists, per database, the migrations it would revert, the
+tables and columns it would drop with how many rows or values they hold (a column that only holds
+its default value loses nothing), and the rows a revert deletes. It changes nothing. On SQLite it
+works on a copy of the database, in a private directory (<code>.autoxide-rollback-…</code>, readable by the
+server’s user only) next to the database file, deleted when it is done: keep free space the size
+of the database there. The real run, once the servers are stopped, measures without a copy. On
+PostgreSQL it runs the reverts inside a transaction that is
+rolled back, so for that time it holds locks on the tables it changes: it waits at most
+<code>--lock-timeout-seconds</code> (default 2) for a busy table, then stops and says so — run it when the
+load is low, or once the servers are stopped.</li>
+<li>Stop every server and worker of the current release. If the dry run shows data that would be
+dropped, take a backup first (<code>autoxide backup</code>).</li>
+<li><code>autoxide rollback --to X.Y.Z --yes</code>, adding <code>--accept-data-loss</code> when data is dropped. Tenant
+databases go first, the main database last; if a tenant database fails, the main database is
+left as it is: fix the cause and run the same command again.</li>
+<li>Start the servers of <code>X.Y.Z</code>.</li>
+</ol>
+<p>Modules your own binary adds (<code>.module(…)</code>) are not in the release table: the rollback leaves their
+migrations as they are and says so; <code>--revert-untracked</code> reverts them too. The rollback is recorded as
+a migration run of kind <code>rollback</code>; when the target release predates that record (0.19.0 and
+earlier), the run is closed before the main database is rolled back, and an error there is only
+printed.</p>
+<p>A migration that cannot give an earlier release its data back (the contract step of an expand–contract
+change) refuses the rollback; the changelog lists such migrations under the upgrade notes, and the way
+back across them is the backup taken before the upgrade.</p>
+<h2 id="checklist-before-going-live"><a class="header" href="#checklist-before-going-live">Checklist before going live</a></h2>
+<ul>
+<li><input disabled="" type="checkbox"> <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> and <code>AUTOXIDE_SECRET_KEY</code> set to long random values, kept
+secret (<code>autoxide doctor</code> warns when one is missing)</li>
+<li><input disabled="" type="checkbox"> TLS in front (reverse proxy), port 8080 not reachable from the internet</li>
+<li><input disabled="" type="checkbox"> <code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> set to your proxy’s header</li>
+<li><input disabled="" type="checkbox"> SMTP configured, so password reset and email verification work</li>
+<li><input disabled="" type="checkbox"> Backups taken on a schedule and copied to another machine; a restore tried once</li>
+<li><input disabled="" type="checkbox"> <code>/health/ready</code> watched by your monitoring</li>
+<li><input disabled="" type="checkbox"> Placement countries recorded (<code>autoxide placement country</code>) when tenants must keep data in Vietnam,
+and <code>incident.alert_emails</code> set for the 72-hour breach reminders</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/CUSTOMERS.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/FORMS.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/CUSTOMERS.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/FORMS.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

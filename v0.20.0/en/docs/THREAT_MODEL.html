@@ -1,0 +1,701 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Threat model of the core - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="threat-model-of-the-core"><a class="header" href="#threat-model-of-the-core">Threat model of the core</a></h1>
+<p><em>Tiếng Việt: <a href="THREAT_MODEL.vi.html">THREAT_MODEL.vi.md</a></em></p>
+<blockquote>
+<p><strong>What this is:</strong> the maintainers’ model of what an attacker could aim at in an Autoxide server, which controls
+exist today and what is still open. It was written with AI assistance from the code and the decision log, as input
+for a round of penetration testing by people outside the project. It is <strong>not</strong> an audit and does not claim that
+Autoxide is free of vulnerabilities. To report a problem, follow <a href="../SECURITY.html"><code>SECURITY.md</code></a>.</p>
+</blockquote>
+<ul>
+<li><strong>Date:</strong> 2026-11-26, <code>main</code> of the <code>0.x</code> series before 1.0</li>
+<li><strong>Roadmap item:</strong> step 71, G13 (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>)</li>
+<li><strong>Builds on:</strong> the <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/security/review-2026-11.md">November 2026 review</a> (code review and black-box test) and the
+<a href="security/pentest-2026-11/README.html">November 2026 security and performance test</a> (29,566 cases on both databases)</li>
+<li><strong>Method:</strong> <a href="https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats">STRIDE</a> per
+trust boundary — <strong>S</strong>poofing, <strong>T</strong>ampering, <strong>R</strong>epudiation, <strong>I</strong>nformation disclosure, <strong>D</strong>enial of service,
+<strong>E</strong>levation of privilege</li>
+</ul>
+<h2 id="how-to-read-this-document"><a class="header" href="#how-to-read-this-document">How to read this document</a></h2>
+<p>Each of the eight boundaries below has the same parts:</p>
+<ul>
+<li><strong>Assets</strong> — what an attacker wants at that boundary.</li>
+<li><strong>Entry points</strong> — where data crosses it.</li>
+<li><strong>Trust assumptions</strong> — what the design takes for granted. A test that breaks an assumption is a finding.</li>
+<li><strong>STRIDE table</strong> — threat → existing control → residual risk or open item. A control names where it lives: a code
+path (relative to the repository root), a decision ID (<code>D-…</code> in <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/DECISIONS.md"><code>docs/DECISIONS.md</code></a> or
+<code>docs/decisions/D-….md</code>) or a gate rule of <code>cargo xtask check</code>. A control marked <strong>(to verify)</strong> is described by
+the design or the documentation but was not traced end to end in the code for this document; the list is at the
+end, in <a href="#controls-to-verify">Controls to verify</a>.</li>
+</ul>
+<p>Findings of the earlier rounds keep their IDs: <code>H-</code>, <code>M-</code>, <code>L-</code>, <code>I-</code>, <code>P-</code> (review) and <code>PT-</code> (test).</p>
+<h2 id="system-overview"><a class="header" href="#system-overview">System overview</a></h2>
+<pre><code class="language-text">               browsers, apps, AI agents, partner servers, payment / carrier / bank callbacks
+                                         │  HTTPS (TLS ends at a reverse proxy)
+  ┌──────────────────────────────────────▼───────────────────────────────────────────────┐
+  │ (1) HTTP layer: request id → security headers → log → limits → CORS → tenant → auth  │
+  │     REST /api/v1/…  ·  OpenAPI  ·  SSE / WebSocket  ·  public routes  ·  webhooks in │
+  │ (2) MCP endpoint /mcp, /mcp/&lt;module&gt;                                                 │
+  ├──────────────────────────────────────────────────────────────────────────────────────┤
+  │ (3) kernel: Principal and permissions, tenancy, throttle, idempotency, outbox, jobs, │
+  │     config and secrets, seal, outbound address filter, storage and AI traits         │
+  ├──────────────────────────────────────────────────────────────────────────────────────┤
+  │ (4) modules (one crate each, own tables, talk through traits and events)             │
+  ├──────────────────────────────────────────────────────────────────────────────────────┤
+  │ (5) databases: control database + placements (SQLite or PostgreSQL), file storage    │
+  └───────────────┬───────────────────────────────────────────────────┬──────────────────┘
+                  │ (6) placement: tenants on shared or own databases │
+                  ▼                                                   ▼
+  (7) external providers: payments, bank feed, carrier, SMS,   (8) AI providers chosen by the
+      e-invoice, mail, outbound webhooks, web push                 installer (TextModel / Embedder)
+</code></pre>
+<p><strong>Modes.</strong> <code>AUTOXIDE_TENANCY_MODE=single</code> serves one default tenant and ignores <code>Host</code> and the tenant header.
+<code>multi</code> serves many tenants from one process; this is the mode with the most boundaries and the one to test.</p>
+<h3 id="actors"><a class="header" href="#actors">Actors</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Actor</th><th>Credential</th><th>What they are trusted with</th></tr>
+</thead>
+<tbody>
+<tr><td>Anonymous visitor</td><td>none</td><td>public routes of one tenant (storefront, published content, forms, comments, public search)</td></tr>
+<tr><td>Customer (buyer)</td><td>access token of a customer account</td><td>their own records; never staff data</td></tr>
+<tr><td>Tenant staff</td><td>access token, optionally TOTP / passkey; permissions from roles, possibly scoped to an organization unit</td><td>what their permissions allow, inside their tenant and branch</td></tr>
+<tr><td>Tenant administrator</td><td>as staff, holding admin-equivalent permissions</td><td>everything in their tenant; <strong>not</strong> other tenants (see <a href="../SECURITY.html"><code>SECURITY.md</code></a>, “What is not a vulnerability”)</td></tr>
+<tr><td>Machine / AI agent</td><td>API key <code>axk1_…</code> (scope ∩ owner’s current rights, optional IP fence)</td><td>the key’s scope; never more than the owner</td></tr>
+<tr><td>SCIM client</td><td>SCIM token bound to its creator’s rights</td><td>provisioning within its creator’s reach</td></tr>
+<tr><td>Platform staff</td><td>account of the platform tenant with <code>kernel.tenants.*</code> permissions</td><td>operating tenants; entering a tenant only by a time-limited support grant</td></tr>
+<tr><td>Parent tenant</td><td>delegation</td><td>working in a descendant tenant, at a node, with a role’s permissions</td></tr>
+<tr><td>Provider</td><td>per-tenant webhook URL + provider signature</td><td>reporting payments, bank credits, shipment status</td></tr>
+<tr><td>Operator</td><td>shell on the server, environment, database</td><td>everything (out of scope)</td></tr>
+<tr><td>External module author</td><td>code compiled into the binary</td><td>everything the process can do (see boundary 4)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="global-assumptions"><a class="header" href="#global-assumptions">Global assumptions</a></h3>
+<ul>
+<li>TLS is terminated by a reverse proxy or load balancer in front of the server; the server itself speaks HTTP
+(<a href="DEPLOY.html"><code>docs/DEPLOY.md</code></a>). <code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> / <code>AUTOXIDE_HTTP_TRUSTED_PROXIES</code> are set only
+when such a proxy exists (<code>crates/kernel/src/config/http.rs</code>).</li>
+<li><code>AUTOXIDE_SECRET_KEY</code> and <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> are set to random values in production; the example values
+of <code>.env.example</code> are refused at startup (H-3; <code>crates/kernel/src/security/secret.rs</code>, <code>modules/auth/src/config.rs</code>).</li>
+<li>The database and the file store are reachable only by the server and the operator.</li>
+<li>The code is memory-safe Rust: <code>unsafe_code = "forbid"</code> for every workspace crate (<code>Cargo.toml</code>); release builds
+keep overflow checks (an overflow is a 500, not a wrap — PT-5).</li>
+</ul>
+<hr>
+<h2 id="1-client--http-layer"><a class="header" href="#1-client--http-layer">1. Client ↔ HTTP layer</a></h2>
+<p><strong>Assets:</strong> availability of the API; the mapping request → tenant; credentials in transit; tenant data in responses;
+browser sessions of tenants’ websites.</p>
+<p><strong>Entry points:</strong> every REST route under <code>/api/v1/</code> (<code>docs/openapi.json</code>, about 1,300 operations); public routes
+(<code>security((), ("bearer" = []))</code>); <code>/api/v1/openapi.json</code>, <code>/api/docs</code> (opt-in), <code>/llms.txt</code>; <code>/health/*</code>;
+<code>/metrics</code> (opt-in); <code>GET /api/v1/kernel/events/stream</code> (SSE) and <code>/events/ws</code> (WebSocket); inbound provider
+webhooks (boundary 7); headers <code>Host</code>, <code>Origin</code>, <code>Autoxide-Tenant</code>, <code>Authorization</code>, <code>Idempotency-Key</code>,
+<code>If-Match</code>, the client-address header.</p>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>The tenant of an authenticated request comes <strong>from the credential</strong>, never from <code>Host</code> or a header alone
+(<code>crates/kernel/src/data/tenancy/request.rs</code>).</li>
+<li>A <code>Host</code> maps to a tenant only when that tenant has <strong>verified</strong> the domain by DNS TXT
+(<code>crates/kernel/src/data/tenancy/domains.rs</code>).</li>
+<li>Public routes only return data the tenant has published; choosing another tenant for a public request (by host,
+header or <code>?site=</code>) is allowed and exposes only that tenant’s public data.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Pretend to be another tenant by sending its <code>Host</code> or <code>Autoxide-Tenant</code> with one’s own credential</td><td>Credential’s tenant compared with header and verified domain → <code>tenant_mismatch</code>; only platform staff with <code>kernel.tenants.operate</code>, a delegation or a support grant may enter another tenant (<code>data/tenancy/request.rs</code>, <code>modules/auth/src/delegation.rs</code>, <code>modules/auth/src/support.rs</code>)</td><td>Tested on both databases in P14 and the 2026-11 test (IDOR, TOKEN groups)</td></tr>
+<tr><td>S</td><td>Claim a domain one does not own</td><td>DNS TXT <code>_autoxide-challenge.&lt;domain&gt;</code>; daily recheck, 3 misses → <code>failed</code>; one <code>verified</code> row per domain (partial unique index, P-4, D-20261125-domain-claims)</td><td>Test that deterministically hits the “lost race” branch is open (P16)</td></tr>
+<tr><td>S</td><td>Spoof the client address to dodge per-address limits</td><td>Address read from the configured header only, counted from the trusted proxies (<code>http/client.rs</code>); IPv4 address or IPv6 /64 as the key (<code>throttle::address_key</code>, PT-4, D-20261125-address-keys, gate <code>address-key</code>)</td><td>Gate only catches one textual pattern (P17)</td></tr>
+<tr><td>T</td><td>Cross-site requests from a browser page</td><td>CORS: allow-list <code>AUTOXIDE_HTTP_CORS_ORIGINS</code>, or <code>https://&lt;verified domain&gt;</code> of the same tenant only (<code>http/cors.rs</code>, D-20261125-tenant-cors); credentials are bearer headers, not cookies</td><td><code>*</code> is a documented misconfiguration and logs a warning (L-5)</td></tr>
+<tr><td>T</td><td>Replayed or doubled writes (retries, agents)</td><td><code>Idempotency-Key</code> stored per caller and request; other body → 422; in flight → 409 (<code>security/idempotency.rs</code>, <code>http/idempotency.rs</code>, D-058); optimistic concurrency with <code>If-Match</code></td><td>—</td></tr>
+<tr><td>T</td><td>Injection through query parameters, cursors, sort keys, bodies</td><td>SeaORM with bound values; raw statements only through <code>database::statement</code> (D-20261121-raw-statement); cursors carry values, the server chooses the column; <code>ValidJson&lt;T&gt;</code> + service validation (D-083); NUL in URL refused (<code>http/mod.rs</code>)</td><td>8,061 INPUT cases per database passed (2026-11 test)</td></tr>
+<tr><td>R</td><td>A caller denies having made a request</td><td>Request id on every response; per-tenant request log with user, API key, actor kind, route template, status, <code>Idempotency-Key</code> (<code>ops/request_log.rs</code>, D-202); audit chain of every change (boundary 4)</td><td>Public (unauthenticated) requests are not in the request log by design</td></tr>
+<tr><td>I</td><td>Error bodies, headers or logs leak internals or secrets</td><td>RFC 9457 <code>Problem</code> with stable <code>code</code>, no stack or SQL text; logs record the route template, never the raw path, query or body (<code>http/log.rs</code>); security headers on every response incl. CSP <code>default-src 'none'; sandbox</code> (<code>http/security_headers.rs</code>, D-320)</td><td><code>/metrics</code> on a public port is a documented misconfiguration (warning at start)</td></tr>
+<tr><td>I</td><td>Learn which records or fields exist without permission</td><td>Shared permission gate reads <code>x-permissions</code> and answers 403 before body parsing, <code>If-Match</code> and lookups (<code>http/permission_gate.rs</code>, PT-13/14, D-20261126-permission-gate)</td><td>Endpoints with <code>x-permissions: []</code> (any signed-in caller) still validate first</td></tr>
+<tr><td>I</td><td>Read drafts or private data through public routes</td><td>Public lists, search, feed, sitemap and slug filter on published state; preview tokens are HMAC-signed and compared in constant time (<code>modules/content/src/publishing/preview.rs</code>)</td><td>PT-11 (taxonomy terms not yet used by a published entry) open (P17)</td></tr>
+<tr><td>D</td><td>Large or deep bodies, compression bombs</td><td>Body limit per route (<code>http/body_limit.rs</code>, D-066); request bodies with <code>Content-Encoding</code> are not inflated (review P14); JSON depth handled by the parser (2026-11 DOS group)</td><td>—</td></tr>
+<tr><td>D</td><td>Slow or idle connections</td><td>Header read timeout 30 s, idle connections closed, <code>AUTOXIDE_HTTP_MAX_CONNECTIONS</code> (M-5, L-10; <code>http/server.rs</code>)</td><td>—</td></tr>
+<tr><td>D</td><td>Request floods by one client, one key or one tenant</td><td>GCRA per client address (<code>http/rate_limit.rs</code>), per API key, per tenant from its plan (<code>http/tenant_rate_limit.rs</code>, D-20261126-tenant-rate-limit)</td><td>Volumetric DoS is out of scope (<code>SECURITY.md</code>)</td></tr>
+<tr><td>D</td><td>Expensive public search</td><td>Concurrency cap per process, per-address limit and a time limit (<code>AUTOXIDE_CONTENT_PUBLIC_SEARCH_*</code>; D-20261126-idle-polling)</td><td>Each search still scans with <code>LIKE</code>; full-text index behind a trait is open (PT-15, P17)</td></tr>
+<tr><td>D</td><td>Evict the <code>domain_site</code> cache by random <code>Host</code> values</td><td>Cache bounded at 10,000 entries</td><td>Eviction policy is open (P16): real domains may hit the database on every request under such a flood</td></tr>
+<tr><td>E</td><td>Call an endpoint without the right permission</td><td><code>Principal::require</code> in every handler (rule 7) plus the shared <code>x-permissions</code> gate; 2,691 PERM cases per database passed</td><td>—</td></tr>
+<tr><td>E</td><td>Use the event stream to see other tenants’ or branches’ events</td><td><code>StreamHub</code> filters by tenant, permission and reach (<code>event/stream.rs</code>, D-378); one connection limit per user</td><td>WebSocket endpoint does not check <code>Origin</code> yet (low: auth is a header a browser cannot set on a WebSocket) (P16)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="2-api-and-mcp-endpoint"><a class="header" href="#2-api-and-mcp-endpoint">2. API and MCP endpoint</a></h2>
+<p><strong>Assets:</strong> the same data and actions as REST; the permission model; the parity promise “an MCP tool never does
+more than REST with the same permission” (CLAUDE.md rule 8).</p>
+<p><strong>Entry points:</strong> <code>POST /mcp</code> and <code>/mcp/&lt;module&gt;</code> (Streamable HTTP, JSON-RPC): <code>tools/list</code>, <code>tools/call</code>,
+<code>resources/list|read</code>, <code>prompts/list|get</code>, <code>server/discover</code> (<code>crates/kernel/src/http/mcp.rs</code>,
+<code>http/mcp/protocol.rs</code>, <code>http/mcp/transport.rs</code>; D-068, D-20261121-mcp-server). The manifest is
+<code>docs/mcp-tools.json</code> (about 310 tools).</p>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>MCP is authenticated exactly like REST (<code>Authorization: Bearer</code> access token or API key), in a layer before the
+protocol code.</li>
+<li>A tool handler is a thin adapter: it calls the same service function as the REST handler, and passes the
+<code>Principal</code> whenever REST limits that permission by scope.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Call tools without a credential or with a forged one</td><td>Same authenticator as REST, 401 before protocol handling (<code>http/mcp.rs</code>); 312 MCPAUTH cases per database passed</td><td>—</td></tr>
+<tr><td>S</td><td>DNS rebinding against a local MCP client</td><td><code>Origin</code> checked against the same <code>OriginGrant</code> as CORS; tenant-domain origins bound to their tenant (<code>http/mcp/transport.rs</code>)</td><td>—</td></tr>
+<tr><td>T</td><td>A tool writes outside the caller’s scope (branch, own records)</td><td>Gate <code>mcp-principal</code>: a tool whose permission REST checks by scope must use its <code>Principal</code> (<code>xtask/src/mcp_principal.rs</code>, D-20261121-security-lints); tools call service functions, not tables</td><td>The gate is textual: permissions passed through variables and named handler functions are not checked (documented limits in the rule)</td></tr>
+<tr><td>T</td><td>Money or destructive actions from a stale session</td><td>Step-up applies to tool calls exactly as to REST (<code>security/access/step_up.rs</code>, D-20261119-step54-step-up; M-3 for automations)</td><td>—</td></tr>
+<tr><td>R</td><td>Agent actions cannot be attributed</td><td>One request-log row per tool call (<code>mcp:&lt;tool&gt;</code>, no parameters) with the API key; changes go to the audit chain with actor and key (<code>ops/request_log.rs</code>)</td><td>—</td></tr>
+<tr><td>I</td><td><code>tools/list</code> reveals what the caller may not use</td><td>Lists, resources and prompts filtered by permission; a forbidden tool answers like a nonexistent one (<code>http/mcp.rs</code>)</td><td>—</td></tr>
+<tr><td>I</td><td>List tools return more rows than REST</td><td>Same <code>limit</code> / <code>cursor</code> and <code>pagination</code> as REST (CLAUDE.md “Luật code”)</td><td>362 MCPIDOR cases per database: nothing of the other tenant returned</td></tr>
+<tr><td>D</td><td>Huge <code>tools/list</code> payloads, expensive calls</td><td>One endpoint per module (<code>/mcp/&lt;module&gt;</code>); REST and MCP authenticate through the same per-API-key rate-limited authenticator (<code>http/mod.rs</code>, <code>rate_limit::ApiKeyLimited</code>)</td><td>—</td></tr>
+<tr><td>E</td><td>A tool reaches what REST with the same permission cannot</td><td>Rule 8; <code>mcp-principal</code> gate; L-2 fixed (tool missing a REST check)</td><td>MCP tools are not yet linked to REST <code>operationId</code> one by one; the test team asked for it (P17, item with PT-11, PT-12, PT-18)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="3-kernel"><a class="header" href="#3-kernel">3. Kernel</a></h2>
+<p>The kernel (<code>crates/kernel</code>) holds what every module relies on. The authentication module <code>auth</code> is a module, but
+its guarantees are kernel-level for this model, so it is covered here.</p>
+<p><strong>Assets:</strong> signing keys and sealed secrets; accounts, passwords, second factors, sessions, API keys; the permission
+catalog and role assignments; the organization tree; idempotency records; the outbox and the job queue;
+configuration.</p>
+<p><strong>Entry points:</strong> <code>/api/v1/auth/*</code> (sign-in, refresh, logout, MFA, passkeys, sign-in links, reset, invitations,
+OIDC, SCIM, API keys, roles, delegations, support grants); <code>/api/v1/kernel/*</code> (settings, tenants, domains, jobs,
+records, tags…); background jobs and the event dispatcher; process configuration.</p>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>A business module checks permissions only through <code>Principal</code> (<code>security/access/mod.rs</code>) and never depends on
+<code>auth</code> (D-046).</li>
+<li>Jobs and event handlers receive their tenant from the stored row, not from a request.</li>
+<li>Configuration comes from the environment through <code>ConfigReader</code>; per-tenant settings go through the tenancy
+settings API.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Forged access tokens (<code>alg</code> confusion, other tenant’s <code>tid</code>)</td><td>Hand-written JWT accepting only <code>HS256</code>, signature checked in constant time, per-tenant derived key (<code>modules/auth/src/token.rs</code>, D-045, D-285); token checked against a live session; lifetime 900 s by default (<code>AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS</code>)</td><td>47 TOKEN cases per database passed</td></tr>
+<tr><td>S</td><td>Stolen refresh token</td><td>Rotation with families and reuse detection: reuse revokes the family (<code>modules/auth/src/session/</code>); only a hash is stored (<code>session/entity.rs</code> <code>token_hash</code>)</td><td>—</td></tr>
+<tr><td>S</td><td>Password guessing</td><td>Argon2id (OWASP parameters, <code>modules/auth/src/password.rs</code>); throttling per email + address pair with a wider cap per email, counted in the database (<code>session/throttle.rs</code>, D-079, D-116, D-20261121-login-throttle-pair)</td><td>—</td></tr>
+<tr><td>S</td><td>Second-factor bypass</td><td>TOTP codes single-use per step (<code>mfa/service.rs</code>), recovery codes; roles that require two-step sign-in apply in delegations and support access too (M-4); passkey-only accounts must use the passkey (M-8); passkeys via <code>webauthn_rp</code> with single-use ceremonies (D-077)</td><td>Passkeys and OIDC were not tested end to end in a browser (2026-11 “not covered”)</td></tr>
+<tr><td>S</td><td>SMS one-time codes guessed or flooded</td><td>Per-number, per-client-block and shared caps (PT-4, PT-7, D-20261125-otp-wrong-by-block)</td><td>The shared cap still lets a stranger lock a number out of SMS sign-in for a while (PT-7 follow-up, P17)</td></tr>
+<tr><td>S</td><td>One-time tokens (reset, verify, sign-in link) reused or moved between tenants</td><td>32 random bytes, SHA-256 stored, purpose- and tenant-scoped, consumed atomically (<code>security/tokens.rs</code>, D-117); link tokens carry the tenant (<code>data/tenancy/link_token.rs</code>, D-281)</td><td>—</td></tr>
+<tr><td>S</td><td>API keys used from elsewhere</td><td>Key = scope ∩ owner’s current rights, hashed with SHA-256 at rest, optional IP / CIDR fence, rotation (<code>modules/auth/src/api_key/</code>, <code>access.rs</code>); keys cannot create keys, SCIM tokens or sign-in providers (P-1, <code>auth.session_required</code>); a key lists and revokes only itself, over REST and MCP alike, and revoking someone else’s key needs covering its owner’s permissions (UT-2, #572)</td><td>Until #572 is merged, a key can list and revoke the other keys of its owner (found by the user-trial round)</td></tr>
+<tr><td>T</td><td>Tamper with sessions or roles to gain rights</td><td>“Only grant what you hold”, also to oneself (PT-9, D-20261126-no-self-grant); SCIM changes judged by the token creator’s rights (PT-1..3, D-20261125-scim-grant-cover)</td><td>Several grant-rule inconsistencies (scope vs. name comparison, 422 vs. 403, narrowing another person’s role) are listed under P16</td></tr>
+<tr><td>T</td><td>Decide on an organization unit that is not in the tenant</td><td><code>OrgTree::contains</code> / <code>ensure_exists</code> (PT-8, D-20261125-org-must-exist); closure table (<code>data/tenancy/org_tree.rs</code>)</td><td>Older rows pointing at unknown units need a clean-up command (P17)</td></tr>
+<tr><td>T</td><td>Jobs or events processed twice or by two workers</td><td>Jobs claimed with <code>SKIP LOCKED</code> (PostgreSQL) or one atomic statement (SQLite) behind the <code>Claim</code> trait (<code>job/claim.rs</code>, D-009); events written in the business transaction and claimed with a conditional update (<code>event/outbox.rs</code>, <code>event/dispatcher.rs</code>, D-054); subscribers must tolerate redelivery</td><td>Multi-server CI test is a separate G13 item</td></tr>
+<tr><td>T</td><td>Change configuration at runtime</td><td>Settings declared once with <code>Setting</code> and read through <code>ConfigReader</code>; no direct <code>std::env::var</code> (gate <code>env-access</code>); per-tenant secret settings write-only and sealed (<code>contracts/provider.rs</code>, <code>data/tenancy/settings.rs</code>)</td><td>—</td></tr>
+<tr><td>R</td><td>Security actions without a trace</td><td>Events for sign-in, role changes, grants, delegations, support access, key changes go to the audit chain; support access needs a reason (<code>modules/auth/src/support.rs</code>)</td><td>The audit chain is unkeyed: see boundary 5</td></tr>
+<tr><td>I</td><td>Secrets at rest readable from a database dump</td><td>TOTP secrets, webhook secrets, provider keys and placement URLs sealed with AES-256-GCM bound to purpose, tenant and row (<code>security/seal.rs</code>, D-257); key rotation with <code>autoxide secrets reseal</code></td><td>If <code>AUTOXIDE_SECRET_KEY</code> is unset, the root key is stored in the database (<code>kernel_secrets</code>) and travels with backups (<code>security/secret.rs</code>, D-113)</td></tr>
+<tr><td>I</td><td>Personal data in logs</td><td>No bodies, tokens, query strings or raw IPs in logs; IPs hashed with a keyed HMAC by /24 or /64 where stored (<code>security/ip_hash.rs</code>, D-115); first admin’s email not logged (I-4)</td><td>Field-level encryption of sensitive personal data is not implemented (G13 item)</td></tr>
+<tr><td>D</td><td>Throttle tables or idempotency tables grown without bound</td><td>Rows expire and cleanup jobs delete them <strong>(to verify for every throttle table)</strong></td><td>—</td></tr>
+<tr><td>D</td><td>Outbox / job poll load</td><td>Idle passes cost one <code>EXISTS</code> per database (D-20261126-idle-polling); graceful stop between batches (PT-17)</td><td>—</td></tr>
+<tr><td>E</td><td>A narrow principal reaches admin actions</td><td>Permissions named <code>&lt;module&gt;.&lt;action&gt;</code>, scopes per organization unit, <code>Principal::only</code> for automations (D-20261126-automation-owner-revoked)</td><td><code>run_as_limit</code> compares permission names only, not scopes; a dead-lettered revocation event does not pause a rule (P16)</td></tr>
+<tr><td>E</td><td>Platform staff read a tenant without consent</td><td>Entering a tenant needs a time-limited support grant with a reason; a tenant can turn support access off (<code>modules/auth/src/support.rs</code>, D-313)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="4-modules"><a class="header" href="#4-modules">4. Modules</a></h2>
+<p><strong>Assets:</strong> each module’s tables and invariants (stock, money, publication state); the contracts between modules
+(traits in <code>api</code>, events); the public Rust API used by modules outside the repository.</p>
+<p><strong>Entry points:</strong> a module’s routes, tools, event subscriptions, jobs; <code>context.require::&lt;dyn Trait&gt;()</code>;
+<code>Autoxide::new().module(…)</code> for external modules (<code>crates/app/src/lib.rs</code>).</p>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>Modules in this repository follow the boundary rules, enforced by <code>cargo xtask check</code> (D-031): a module exposes
+only <code>pub mod api</code> and <code>pub fn module(…)</code>, does not import another module’s internals (<code>module-import</code>), does
+not query the database in handlers (<code>handler-database</code>), does not read the environment (<code>env-access</code>).</li>
+<li>A module owns its tables (<code>&lt;module&gt;_…</code>), with no foreign key across modules and no join into another module’s
+tables (rules 1 and 4).</li>
+<li><strong>External modules are trusted code.</strong> They are compiled into the same process, with the same database
+connections and keys (D-20261121-external-modules). The repository’s gate rules do not run on code outside the
+repository.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>A module pretends to be another to publish events or provide a trait</td><td>Event names carry the module prefix and are declared through <code>Module::events</code>; traits are registered once at start (<code>module/registry/</code>)</td><td>Inside one process this is a code-review matter, not a runtime boundary</td></tr>
+<tr><td>T</td><td>A module writes another module’s tables</td><td>Table-name prefix per module and the ownership test in the gate (“luật sở hữu bảng”); <code>module-import</code> rule</td><td>Not enforced for external modules</td></tr>
+<tr><td>T</td><td>Business invariants broken by races (overselling, double use of a coupon, double settlement)</td><td>Atomic bounded updates and conditional claims (review “Money”; M-2); concurrency tests on both databases (CLAUDE.md “Gate”)</td><td>P17 follow-ups: price caps for very large values, currency checks in some purchase and POS paths</td></tr>
+<tr><td>T</td><td>Event payloads trusted blindly by a subscriber</td><td>Subscribers re-read state from their own tables or the publisher’s trait; must tolerate redelivery (D-054)</td><td>Events of modules with unit data must carry <code>org_id</code> everywhere (P16, D-20261125-event-org)</td></tr>
+<tr><td>R</td><td>Changes made through a module are not traceable</td><td><code>audit</code> subscribes to every event and appends to a hash chain (<code>modules/audit/src/lib.rs</code>, D-055, D-183)</td><td>—</td></tr>
+<tr><td>I</td><td>Personal data left behind after an account is deleted or exported partially</td><td>Modules register their personal data for export and deletion (M-7; <code>contracts/privacy.rs</code>)</td><td>Each new module must register; no gate checks it <strong>(to verify)</strong></td></tr>
+<tr><td>D</td><td>A turned-off module still reachable</td><td>A module turned off serves no routes, tools, jobs or events (<code>module/selection.rs</code>, <code>module/dormant.rs</code>, <a href="MODULES.html"><code>docs/MODULES.md</code></a>)</td><td>—</td></tr>
+<tr><td>E</td><td>Experimental modules weaken the core</td><td>Off by default; an official module never depends on an experimental one (<a href="MODULES.html"><code>docs/MODULES.md</code></a>)</td><td>Experimental modules got the same automated tests but less review</td></tr>
+<tr><td>E</td><td>An external module bypasses the kernel’s checks</td><td>None at runtime: Rust has no in-process sandbox</td><td>Installers must review external modules like any dependency; the <a href="MODULE_GUIDE.html">module guide</a> asks authors to use <code>Principal</code>, <code>.scoped(&amp;tenant)</code> and the <code>api</code> contracts</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="5-database"><a class="header" href="#5-database">5. Database</a></h2>
+<p><strong>Assets:</strong> all data at rest; schema integrity; backups; the migration history; the audit chain.</p>
+<p><strong>Entry points:</strong> the server’s connections (read pool and write connection per database); <code>autoxide migrate</code>,
+<code>autoxide backup</code>, <code>autoxide restore</code>, <code>autoxide copy</code> (CLI on the server); scheduled backups to the file store; the
+tenant export job.</p>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>Every feature runs on SQLite and PostgreSQL (CLAUDE.md “Luật số một”); a check that only holds on one database
+is a finding.</li>
+<li>Every tenant-level table has <code>tenant_id</code>, and every query on it filters through <code>.scoped(&amp;tenant)</code>
+(<code>data/tenancy/scope.rs</code>, D-253) — also when the tenant has its own database.</li>
+<li>Only the operator can reach database files, credentials and backups.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>A request writes through the read connection</td><td>Read connections are read-only on both databases (SQLite <code>read_only</code>, PostgreSQL <code>default_transaction_read_only</code>) (<code>data/database.rs</code>, D-009)</td><td>—</td></tr>
+<tr><td>T</td><td>A query forgets the tenant filter</td><td><code>.scoped(&amp;tenant)</code> and gate <code>tenant-scope</code> (<code>xtask/src/tenant_scope.rs</code>, D-20261121-security-lints; M-6 extended it to module macros); deliberate cross-tenant reads must carry a <code>// tenant-scope:</code> reason</td><td>The rule is textual: generic <code>E::find()</code>, queries passed to helpers and single-row <code>update</code> / <code>delete</code> are not seen (documented limits). 1,119 REST + 362 MCP cross-tenant cases per database found nothing</td></tr>
+<tr><td>T</td><td>SQL injection through hand-written statements</td><td><code>database::statement</code> with bound, typed values (D-20261121-raw-statement); raw SQL only where measured (CLAUDE.md “Luật dữ liệu”)</td><td>—</td></tr>
+<tr><td>T</td><td>Two processes migrate at once</td><td>Migration lock: PostgreSQL advisory lock, operating-system file lock for SQLite (<code>data/migration/lock.rs</code>); committed migrations are never edited</td><td>—</td></tr>
+<tr><td>T</td><td>Undetected edits to audit rows</td><td>Audit rows form a SHA-256 chain; <code>autoxide doctor</code> reports the first edited, deleted or inserted row (D-183)</td><td>The chain is <strong>not keyed and not anchored outside</strong>: someone with write access to the database can rebuild it. A tamper-resistant log is a G13 item</td></tr>
+<tr><td>T</td><td>Ledger entries edited outside the module</td><td>Append-only entries, reversals instead of edits, hash chain (<code>modules/ledger/src/lib.rs</code>, D-342)</td><td>Same limit as the audit chain</td></tr>
+<tr><td>R</td><td>Operator actions on the database are not recorded</td><td>Out of scope (operator is trusted)</td><td>—</td></tr>
+<tr><td>I</td><td>Backups readable by other users of the machine</td><td>Backup directory created <code>0700</code> (<code>data/backup.rs</code>, D-158); scheduled backups skip earlier backups</td><td>The server does not encrypt backup files itself; a backup holds password hashes, sealed secrets and, if <code>AUTOXIDE_SECRET_KEY</code> is not set, the root key. Encrypting before off-site copy is an operator step (<a href="DEPLOY.html"><code>docs/DEPLOY.md</code></a>, “Encrypted off-site backups”)</td></tr>
+<tr><td>I</td><td>Tenant export leaks secrets</td><td>Export job omits the job queue, outbox and secret columns (hashes, secrets); download needs a signed-in request or a 24-hour signed link; platform staff only through a valid support grant (<code>data/tenancy/exports.rs</code>, D-328)</td><td>—</td></tr>
+<tr><td>I</td><td><code>autoxide copy</code> mixes data into a used database</td><td>Target must be new (no migrations before), one transaction, same schema version (<code>data/transfer.rs</code>, D-070)</td><td>—</td></tr>
+<tr><td>D</td><td>SQLite write contention</td><td>One write connection, writes queue in the application (D-009); no <code>busy</code> error seen under 1,024 connections (2026-11 test)</td><td>Capacity guidance per database is a separate G13 item</td></tr>
+<tr><td>D</td><td>Unbounded lists or deep offsets</td><td>Keyset pagination only (<code>fetch_page</code>, no <code>OFFSET</code>), index per sorted column; gate <code>api-unpaged-list</code></td><td>Older lists still waiting in <code>xtask/api-shape-allow.txt</code> (P9)</td></tr>
+<tr><td>E</td><td>Tenant code reaches control-plane tables</td><td>Control-plane tables (tenants, domains, placements, moves) live in the control database; tenant routes reach them only through platform-only services (<code>data/tenancy/admin.rs</code>, <code>require_platform</code>)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="6-placement"><a class="header" href="#6-placement">6. Placement</a></h2>
+<p><strong>Assets:</strong> which database and file store hold each tenant; placement connection URLs; domain → tenant mapping;
+data residency promises; tenants during a move, split or merge.</p>
+<p><strong>Entry points:</strong> <code>autoxide tenant move</code> and the platform-only REST / MCP endpoints for placements, moves and
+relocations (<code>data/tenancy/placements.rs</code>, <code>moves*</code>, <code>relocate*</code>; permissions <code>kernel.placements.read</code>,
+<code>kernel.tenants.move</code>, <code>kernel.tenants.relocate</code>); domain endpoints of each tenant (<code>data/tenancy/domains*</code>);
+sandboxes (<code>data/tenancy/sandbox*</code>).</p>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>Only accounts of the platform tenant can move, split, merge or erase tenants (<code>require_platform</code>); a staff member
+who entered a tenant through support access cannot.</li>
+<li>A tenant on its own database is still filtered by <code>tenant_id</code> (defence in depth).</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>A tenant administrator triggers a move or relocation</td><td><code>require_platform</code> + <code>kernel.tenants.move</code> / <code>relocate</code> (<code>data/tenancy/moves/http.rs</code>, <code>relocate/http.rs</code>)</td><td>—</td></tr>
+<tr><td>S</td><td>A tenant keeps traffic for a domain it no longer controls</td><td>Daily DNS recheck; three misses → <code>failed</code>; DNS errors do not count as misses (<code>data/tenancy/domains.rs</code>)</td><td>Up to about three days of stale routing after a domain changes hands</td></tr>
+<tr><td>T</td><td>Data lost or duplicated during a move</td><td>Dry run by default; preflight checks (schema version, running moves); the copy runs as a job through state phases; tables are copied by <code>tenant_id</code> with typed columns (<code>data/tenancy/moves/</code>, <code>data/transfer.rs</code>)</td><td>Moves under load and the dedicated-database placement were not covered by the 2026-11 test</td></tr>
+<tr><td>T</td><td>A split or merge breaks references</td><td>Each module declares a relocation policy per table (<code>Module::relocation</code>, <code>data/tenancy/relocate/policy.rs</code>, D-20261118-step38-relocation)</td><td>A policy inferred from columns is a guess; the binary’s test blocks undeclared tables (<code>crates/kernel/src/module.rs</code>), which covers modules in this repository only</td></tr>
+<tr><td>I</td><td>Placement credentials disclosed</td><td>Connection URLs and own-storage settings sealed, bound to the placement id (<code>data/tenancy/registry.rs</code>)</td><td>—</td></tr>
+<tr><td>I</td><td>Data leaves the agreed country</td><td>Per-tenant residency; moves to a placement in another or unknown country are refused (<code>data/tenancy/residency.rs</code>, D-360)</td><td>The country of a placement is declared by the operator, not measured</td></tr>
+<tr><td>I</td><td>Sandbox copies personal data</td><td>A sandbox copies configuration only, stays on the source tenant’s placement and expires (<code>data/tenancy/sandbox.rs</code>, D-232)</td><td>Completeness of “configuration only” per module <strong>(to verify)</strong></td></tr>
+<tr><td>D</td><td>Too many open pools</td><td>At most <code>AUTOXIDE_TENANCY_MAX_OPEN_DATABASES</code> pools, least recently used dropped (<code>data/tenancy/registry.rs</code>)</td><td>—</td></tr>
+<tr><td>D</td><td>Cache staleness after suspension or domain removal</td><td>Invalidation at once on the server that changed it; others within <code>AUTOXIDE_TENANCY_CACHE_SECONDS</code></td><td>Suspension and domain removal take up to one TTL on other servers</td></tr>
+<tr><td>E</td><td>A tenant reaches another tenant’s database</td><td>The registry opens a placement only for the tenant found from the credential, header or verified domain; no tenant-supplied connection strings</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="7-external-providers"><a class="header" href="#7-external-providers">7. External providers</a></h2>
+<p><strong>Assets:</strong> money flows (payments, refunds, bank credits — the core never holds buyers’ money, D-187); shipment state;
+tax invoices; per-tenant provider credentials; outbound webhook secrets; the server’s network position (SSRF).</p>
+<p><strong>Entry points:</strong></p>
+<ul>
+<li><strong>Inbound:</strong> <code>/api/v1/ledger/webhooks/{provider}/{hook}</code>, <code>/api/v1/ledger/bank-feeds/{provider}/{hook}</code>,
+<code>/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}</code> (and older forms); MoMo IPN, SePay bank feed, GHN status
+callbacks (<code>modules/momo</code>, <code>modules/sepay</code>, <code>modules/ghn</code>).</li>
+<li><strong>Outbound:</strong> payment, carrier, SMS (<code>modules/esms</code>), e-invoice (<code>modules/einvoice_sepay</code>) and mail calls; outbound
+webhooks (<code>modules/webhooks</code>, Standard Webhooks signatures, D-081); OIDC discovery; tenant SMTP; web push
+(<code>WebPushSender</code> contract).</li>
+<li><strong>Addresses chosen by users:</strong> webhook targets, OIDC issuers, SMTP hosts, push subscription endpoints, payment
+<code>return_url</code>, KYC <code>return_url</code>.</li>
+</ul>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>Every provider account belongs to a tenant and is configured by that tenant; the server never falls back to
+another tenant’s account (<code>crates/kernel/src/contracts/provider.rs</code>, D-20261121-provider-accounts).</li>
+<li>Provider connectors in this repository are <strong>experimental</strong>: written from public documentation, not yet run
+against the live services (header of each connector’s <code>lib.rs</code>).</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Forged payment, bank or carrier callbacks</td><td>Tenant found first from an unguessable per-tenant identifier in the URL, then the provider signature is checked with that tenant’s secret, in constant time (<code>contracts/provider.rs</code>, <code>modules/momo/src/gateway.rs</code>, <code>modules/sepay/src/feed.rs</code>)</td><td>Real provider signatures were not tested (fakes only)</td></tr>
+<tr><td>S</td><td>A callback from one seller’s carrier account updates another seller’s shipment</td><td>Updates only match shipments booked through the receiving carrier account (H-1, <code>modules/shipping/src/webhooks.rs</code>)</td><td>—</td></tr>
+<tr><td>T</td><td>Amount, currency or account mismatch settles a payment</td><td>Amount and currency checked against the stored payment; bank credit must reach the payment’s bank account (M-1); reconciliation item claimed before settlement (M-2); refunds bounded by amount captured (L-6); refund provider must match (I-1)</td><td>Foreign-currency payment after reconciliation goes to dead letter without an operator guide (P17)</td></tr>
+<tr><td>T</td><td>Replayed callbacks</td><td>Deliveries deduplicated (review “Inbound webhooks”) — per-connector mechanism <strong>(to verify)</strong></td><td>—</td></tr>
+<tr><td>R</td><td>Disputes about what a provider said</td><td>Provider calls logged without secrets, with metrics (<code>contracts/provider.rs</code> <code>send</code>); ledger entries append-only</td><td>—</td></tr>
+<tr><td>I</td><td>Provider secrets leak</td><td>Secret settings sealed per tenant and row, write-only through the settings API (<code>contracts/provider.rs</code>, D-257)</td><td>—</td></tr>
+<tr><td>I</td><td>Open redirect after payment or identity check</td><td>Payment <code>return_url</code> must be <code>https://</code> on a verified domain of the tenant or a listed origin (P-5, <code>ledger.return_url_not_allowed</code>)</td><td>KYC <code>return_url</code> has no allow-list yet (L-11, P16); no identity provider connector ships today</td></tr>
+<tr><td>I</td><td>SSRF: the server calls internal addresses</td><td>Shared filter <code>crates/kernel/src/security/net.rs</code> (D-149, D-20261121-ssrf-targets): non-public IPs refused at save; names resolved through <code>PublicOnly</code> at connect time (DNS rebinding), redirects off, system proxy ignored (L-4); non-HTTP protocols resolve once and connect to that IP</td><td>65 SSRF cases per database: nothing reached the local listener</td></tr>
+<tr><td>I</td><td>Web push to internal addresses</td><td>Push subscriptions accept public hosts only; the <code>WebPushSender</code> contract requires public-IP connections (PT-10, <code>contracts/push.rs</code>)</td><td>No real web push sender ships in this repository</td></tr>
+<tr><td>D</td><td>Outbound calls hang or return huge bodies</td><td><code>http_client</code> with timeout and no redirects; response bodies capped by <code>AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES</code> (I-2); webhook bodies capped per route (<code>ledger</code> <code>webhook_max_bytes</code>)</td><td>—</td></tr>
+<tr><td>D</td><td>SMS cost abuse (each SMS paid by the shop)</td><td>Per-number, per-client-block and per-hour limits (P-2, PT-4)</td><td>—</td></tr>
+<tr><td>E</td><td>Provider calls inside a write transaction lock the database</td><td>Rule: no network call inside a write transaction (CLAUDE.md “Luật dữ liệu”, <code>contracts/provider.rs</code>)</td><td>Enforced by review, not by a gate</td></tr>
+<tr><td>E</td><td>Outbound webhooks leak events the receiver’s owner may not see</td><td>Creating a webhook requires the event’s stream permission; payloads signed (<code>modules/webhooks</code>)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="8-ai"><a class="header" href="#8-ai">8. AI</a></h2>
+<p><strong>Assets:</strong> tenant content sent to a model; the operator’s model budget; integrity of what gets published; the
+instructions given to the model.</p>
+<p><strong>Entry points:</strong> features that call <code>TextModel</code> or <code>Embedder</code> (<code>crates/kernel/src/contracts/ai.rs</code>, published by
+<code>modules/ai</code>): SEO and alt-text suggestions, translations, product description drafts (<code>catalog</code>), support reply
+drafts (<code>support/src/ai.rs</code>), review summaries (<code>orders/src/reviews.rs</code>), conversation drafts, search by meaning.
+AI agents as API clients are covered by boundaries 1–3.</p>
+<p><strong>Trust assumptions:</strong></p>
+<ul>
+<li>AI is off until the installer configures a provider (<a href="AI.html"><code>docs/AI.md</code></a>).</li>
+<li>Model output is untrusted data: it must match a JSON Schema and only becomes a <strong>suggestion or draft</strong>; a person
+(or an agent with the publish permission) decides (D-109).</li>
+<li>Rules for the model are in <code>instructions</code>; user data is only in <code>input</code> (<code>Prompt::new(…).input(…)</code>).</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Threat</th><th>Existing control</th><th>Residual / open</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Content an attacker controls (a review, a ticket, a product text) tells the model to do something else (prompt injection)</td><td>Instructions and input separated; output must match a JSON Schema (<code>ai.output_invalid</code>); the model has no tools and no credentials; results are drafts only (D-109)</td><td>Injection can still bias a draft; the human reviewer is the control. AI-generated entries carry <code>ai_generated</code> and publication records <code>ai_reviewed</code> (<a href="AI.html"><code>docs/AI.md</code></a>)</td></tr>
+<tr><td>T</td><td>A draft overwrites a human edit</td><td>Translation saves only if nobody changed the target since the request (<code>content.translation_conflict</code>)</td><td>—</td></tr>
+<tr><td>T</td><td>Model output carries unsafe markup or links</td><td>Translation keeps links, images and ids from the original; numbered tags must round-trip exactly</td><td>Sanitising of every AI draft before it is shown by a client <strong>(to verify per feature)</strong></td></tr>
+<tr><td>R</td><td>Who published AI-generated text</td><td><code>ai_reviewed</code> with person and time on publication; audit chain</td><td>—</td></tr>
+<tr><td>I</td><td>Sending personal or private data to a provider</td><td>Documented list of what is sent; private images only with <code>AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true</code>; support history sent without email and phone; prompts, content and keys never logged (<a href="AI.html"><code>docs/AI.md</code></a>, <code>modules/support/src/ai.rs</code>)</td><td>The provider is chosen by the installer; data processing agreements are theirs</td></tr>
+<tr><td>D</td><td>Budget exhaustion</td><td>Daily token limit per tenant, from its plan (<code>ai.daily_tokens</code>) or <code>AUTOXIDE_AI_DAILY_TOKEN_LIMIT</code>, counted in the database across servers (<code>modules/ai/src/config.rs</code>, <code>ai_usage</code>); jobs cut off and retried; per-key rate limits</td><td>—</td></tr>
+<tr><td>E</td><td>An AI agent publishes or deletes beyond its role</td><td><code>_own</code> permissions limit an agent key to entries created with the same key; no archive / delete without the permission (<code>content.write_own</code>, <code>content.publish_own</code>)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="out-of-scope"><a class="header" href="#out-of-scope">Out of scope</a></h2>
+<ul>
+<li>The operator: anyone with a shell, the environment, the database or the backups. Misconfigurations that
+<a href="../SECURITY.html"><code>SECURITY.md</code></a> lists (CORS <code>*</code>, public <code>/metrics</code>, rate limits at <code>0</code>, client-address header
+without a proxy, unset secrets).</li>
+<li>Volumetric denial of service; cheap single-request amplification <strong>is</strong> in scope.</li>
+<li>Administrators doing what administrators may do inside their own tenant.</li>
+<li>User interfaces and SDK consumers (separate repositories), the reverse proxy, TLS configuration, the operating
+system, the container runtime, DNS of tenants’ domains.</li>
+<li>Real provider accounts (payments, bank, SMS, carrier, e-invoice, identity) and AI providers; their own security.</li>
+<li>Supply chain beyond what <code>cargo deny</code>, <code>gitleaks</code>, pinned actions and signed releases cover
+(<a href="VERIFYING.html"><code>docs/VERIFYING.md</code></a>).</li>
+<li>Legal compliance as such (see <a href="COMPLIANCE.html"><code>docs/COMPLIANCE.md</code></a>); this model covers its technical controls only.</li>
+</ul>
+<h2 id="known-open-items"><a class="header" href="#known-open-items">Known open items</a></h2>
+<p>Status lives in <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>, step 70, items <strong>P16</strong> (follow-ups of the November 2026 review) and
+<strong>P17</strong> (fixes from the November 2026 test), and in the status table of
+<a href="security/pentest-2026-11/README.html#status-of-the-findings"><code>docs/security/pentest-2026-11/README.md</code></a>. At the time
+of writing, the open classes are:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Class</th><th>Boundary</th><th>Where tracked</th></tr>
+</thead>
+<tbody>
+<tr><td>Open redirect class: identity verification <code>return_url</code> without an allow-list</td><td>7</td><td>P16 (L-11)</td></tr>
+<tr><td>Grant-rule inconsistencies (permission name vs. scope; status codes; narrowing a role someone else holds; SCIM pending members, creator of a SCIM link)</td><td>3</td><td>P16</td></tr>
+<tr><td>Automation rules: owner’s scope not captured; revocation event in dead letter does not pause a rule</td><td>3</td><td>P16</td></tr>
+<tr><td>Events of unit-level data without <code>org_id</code> in some modules</td><td>4</td><td>P16</td></tr>
+<tr><td>Cache eviction under random <code>Host</code> floods; WebSocket <code>Origin</code>; deterministic test of the domain-claim race and of a hung domain snapshot read</td><td>1, 6</td><td>P16</td></tr>
+<tr><td>Expensive public search (full-text index behind a trait)</td><td>1</td><td>P17 (PT-15)</td></tr>
+<tr><td>Information exposure of low value: unused taxonomy terms, analytics pollution, newsletter confirmation cap</td><td>1</td><td>P17 (PT-11, PT-12, PT-18)</td></tr>
+<tr><td>Very large prices or weights saturating instead of being refused; currency checks in some purchase / POS paths</td><td>4, 7</td><td>P17</td></tr>
+<tr><td>Records pointing at unknown organization units created before PT-8</td><td>3</td><td>P17</td></tr>
+<tr><td>SMS sign-in shared cap can lock a number for a while</td><td>3</td><td>P17 (PT-7 follow-up)</td></tr>
+<tr><td><code>address-key</code> gate catches only one textual pattern</td><td>1</td><td>P17</td></tr>
+<tr><td>Tamper-resistant audit log (keyed or anchored chain); field-level encryption of sensitive personal data with managed and rotated keys</td><td>3, 5</td><td>G13 (this step)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Only classes are named here. Details of an open issue are shared privately, through the channel in
+<a href="../SECURITY.html"><code>SECURITY.md</code></a>.</p>
+<h2 id="how-to-use-this-for-the-external-test"><a class="header" href="#how-to-use-this-for-the-external-test">How to use this for the external test</a></h2>
+<p><strong>Set-up.</strong> Use <code>AUTOXIDE_TENANCY_MODE=multi</code>, at least two tenants plus the platform tenant, an organization tree
+with unit-scoped staff, and both databases. The scripts of the November 2026 round
+(<a href="https://github.com/thuongtamduy/autoxide/tree/v0.20.0/docs/security/pentest-2026-11/scripts"><code>docs/security/pentest-2026-11/scripts/</code></a>) build such a set-up and a case
+matrix; reuse them as a baseline rather than repeating the generated groups. Point every provider at a local fake or
+a sandbox account you own; test only your own installation.</p>
+<p><strong>Suggested focus, most value first:</strong></p>
+<ol>
+<li><strong>What the earlier rounds did not cover:</strong> passkeys and OIDC end to end in a browser; payment, bank-feed and carrier
+callbacks with real provider signatures (sandbox accounts); tenant move, split and merge between databases under
+load; tenants on their own database; file and media uploads at their size limits; WebSocket beyond the per-user
+cap; <code>ai</code> with a real model.</li>
+<li><strong>Grant and scope logic (boundary 3):</strong> roles, memberships, delegations, support grants, SCIM, API key scope ∩
+owner, automations’ <code>run_as</code>, step-up — look for any path where a principal ends up with more than its creator
+or holder. The P16 list names the areas known to be inconsistent.</li>
+<li><strong>Tenant and branch isolation where the gate is blind (boundary 5):</strong> code paths the <code>tenant-scope</code> and
+<code>mcp-principal</code> rules do not see (generic queries, helpers, named handler functions) — compare MCP tools with
+their REST endpoints one by one.</li>
+<li><strong>Host-based tenant resolution and CORS (boundary 1):</strong> verified domains, <code>?site=</code>, domain changes between
+tenants, cache TTLs across several servers, suspended tenants.</li>
+<li><strong>Money paths (boundaries 4, 7):</strong> currency and amount checks across every payment, refund, POS, stored-value
+and promotion path; races on both databases.</li>
+<li><strong>AI drafts (boundary 8):</strong> whether injected content in reviews, tickets or product text can produce a draft that
+a client would render unsafely or that misleads a reviewer.</li>
+<li><strong>Each control marked (to verify)</strong> below.</li>
+</ol>
+<p><strong>Reporting.</strong> Use the severity scale of the <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/security/review-2026-11.md#severity">November 2026 review</a> and the
+private channel in <a href="../SECURITY.html"><code>SECURITY.md</code></a>. Name the boundary and STRIDE category from this document.</p>
+<h2 id="controls-to-verify"><a class="header" href="#controls-to-verify">Controls to verify</a></h2>
+<p>Controls described by the design or documentation but not traced end to end in the code for this document:</p>
+<ol>
+<li>Every throttle and idempotency table has an expiry and a cleanup job (boundary 3).</li>
+<li>Every module that holds personal data registers it for export and deletion; nothing enforces it for new modules
+(boundary 4).</li>
+<li>A sandbox copies configuration only, for every module (boundary 6).</li>
+<li>Inbound provider callbacks: the replay / deduplication mechanism of each connector (boundary 7).</li>
+<li>AI drafts: output sanitising for every feature that stores model text (boundary 8).</li>
+</ol>
+<h2 id="keeping-this-document-current"><a class="header" href="#keeping-this-document-current">Keeping this document current</a></h2>
+<p>Update this file in the same pull request as a change that adds a boundary, an entry point class (a new kind of
+credential, a new inbound callback, a new outbound protocol) or a control listed here, and keep the Vietnamese
+version in step.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/TAX.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/VERIFYING.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/TAX.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/VERIFYING.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

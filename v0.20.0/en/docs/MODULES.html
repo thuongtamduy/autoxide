@@ -1,0 +1,446 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Modules: what runs, and how to choose - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="modules-what-runs-and-how-to-choose"><a class="header" href="#modules-what-runs-and-how-to-choose">Modules: what runs, and how to choose</a></h1>
+<p><a href="MODULES.vi.html">Tiếng Việt</a></p>
+<p>The Autoxide binary contains every module, but an installation only runs the modules it needs.
+One setting chooses them: <code>AUTOXIDE_MODULES</code>.</p>
+<h2 id="three-tiers"><a class="header" href="#three-tiers">Three tiers</a></h2>
+<ul>
+<li><strong>core</strong> — the server does not run without them (sign-in, idempotent writes, and what those
+need). Always on; they cannot be turned off.</li>
+<li><strong>official</strong> — on by default. Its API has no breaking change within one release line: a change
+that would break clients is made as a new endpoint, and the old one is declared deprecated with
+a removal date. A new release always reads the data of an older one (migrations run on their
+own). Security fixes reach every release line that is under long-term support.</li>
+<li><strong>experimental</strong> — off by default; turn one on by naming it. It works and is tested on SQLite and
+PostgreSQL like the rest, but its API <strong>may change between releases, breaking changes
+included</strong>; each change is listed in the changelog. The system never deletes its data on its
+own, but moving that data to a new release may need a manual step, described in the upgrade
+notes. An experimental module can be removed if nobody uses it, or become official.</li>
+</ul>
+<p>A module is in one tier as a whole; tiers do not split a module. An official module never depends
+on an experimental one.</p>
+<p><strong>Becoming official:</strong> no open items left in the roadmap; real users; an API that did not have
+to change over several releases in a row; and, for a connector to an outside provider, a test run
+with a real account.</p>
+<h2 id="the-modules"><a class="header" href="#the-modules">The modules</a></h2>
+<p><code>Needs</code> lists the modules a module cannot start without; they are turned on with it. A module also
+<em>uses</em> other modules when they are on (for example <code>orders</code> takes shipping rates from <code>shipping</code>
+and stock holds from <code>inventory</code>), and simply offers less when they are off.</p>
+<!-- modules:begin -->
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Module</th><th>Tier</th><th>Needs</th><th>What it does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>mail</code></td><td>core</td><td>—</td><td>Outgoing mail for every module, queued and retried, over SMTP or to files in development.</td></tr>
+<tr><td><code>auth</code></td><td>core</td><td><code>mail</code></td><td>User accounts, sign-in with passwords, passkeys and TOTP, access and refresh tokens, API keys, roles and permissions.</td></tr>
+<tr><td><code>idempotency</code></td><td>core</td><td>—</td><td>Storage of <code>Idempotency-Key</code> results, so retried writes run once.</td></tr>
+<tr><td><code>ai</code></td><td>official</td><td>—</td><td>Connection to AI models (text generation and embeddings) for every module; off by default.</td></tr>
+<tr><td><code>files</code></td><td>official</td><td>—</td><td>File storage for every module, on disk or on S3-compatible storage.</td></tr>
+<tr><td><code>address</code></td><td>official</td><td>—</td><td>Administrative units of Vietnam (provinces and communes after the 2025 merger) and address checks, shared by every tenant.</td></tr>
+<tr><td><code>organizations</code></td><td>official</td><td>—</td><td>The organization tree inside each tenant (head office, regions, stores, sellers…), its unit types, life cycle and settings.</td></tr>
+<tr><td><code>audit</code></td><td>official</td><td>—</td><td>Append-only audit log: who changed what, on which record, when, before and after.</td></tr>
+<tr><td><code>webhooks</code></td><td>official</td><td>—</td><td>Signed webhooks (Standard Webhooks) that send module events to other systems, with retries and delivery history.</td></tr>
+<tr><td><code>tax</code></td><td>official</td><td>—</td><td>Tax engine: tax groups and rates as dated data, tax profiles per organization unit, withholding and invoice requirements.</td></tr>
+<tr><td><code>ledger</code></td><td>official</td><td>—</td><td>Double-entry ledger per organization unit: accounts, append-only entries, balances, holds, payouts and payments through licensed partners.</td></tr>
+<tr><td><code>invoices</code></td><td>official</td><td><code>tax</code>, <code>ledger</code></td><td>Accounting documents and e-invoices: drafts, numbered issue, adjustment, replacement and cancellation.</td></tr>
+<tr><td><code>compliance</code></td><td>official</td><td>—</td><td>Vietnamese compliance basics: identity checks, legal documents and acceptances, website registration, personal data requests and incidents.</td></tr>
+<tr><td><code>notifications</code></td><td>official</td><td>—</td><td>Notifications to users by email, SMS, Zalo ZNS, web push, mobile push and an in-app inbox, with templates and preferences.</td></tr>
+<tr><td><code>plans</code></td><td>official</td><td>—</td><td>Plans that sell modules, features and limits per tenant, with add-ons, overrides, subscriptions and usage.</td></tr>
+<tr><td><code>media</code></td><td>official</td><td><code>ai</code>, <code>files</code></td><td>Media library: images, video, audio and documents in nested folders, with tags, alt text and resized copies.</td></tr>
+<tr><td><code>content</code></td><td>official</td><td><code>ai</code>, <code>media</code></td><td>Posts and pages of a website in several languages: drafts, revisions, scheduling, categories, tags, authors and redirects.</td></tr>
+<tr><td><code>forms</code></td><td>official</td><td><code>mail</code>, <code>files</code></td><td>Forms with typed fields, public submissions behind spam protection, an inbox, CSV export and retention.</td></tr>
+<tr><td><code>menus</code></td><td>official</td><td><code>media</code></td><td>Website menus (top bar, mega menu, footer) whose items point to addresses or to records of any module.</td></tr>
+<tr><td><code>catalog</code></td><td>official</td><td>—</td><td>Products, variants, category tree, price lists with history and price floors: the product catalog every commerce module reads.</td></tr>
+<tr><td><code>inventory</code></td><td>official</td><td><code>catalog</code></td><td>Stock per variant and warehouse with an append-only movement ledger, reservations that never oversell, transfers, stock counts, lots, serials and purchasing.</td></tr>
+<tr><td><code>shipping</code></td><td>official</td><td>—</td><td>Shipping: buyer address books, shipping rates set by each shop (zones by province, weight tiers, free shipping, store pickup), carriers plugged in as connectors, shipments with parcels and tracking, and cash-on-delivery reconciliation.</td></tr>
+<tr><td><code>promotions</code></td><td>official</td><td><code>catalog</code></td><td>Promotions as rules: automatic discounts, coupons and vouchers, flash sales, tiers, bundles and gifts, stacking in three classes, usage holds for orders and legal limits as dated data.</td></tr>
+<tr><td><code>orders</code></td><td>official</td><td><code>catalog</code></td><td>Orders: carts for buyers and guests, checkout with time-limited holds of stock and promotions, orders with sequential numbers and a lifecycle, payments through licensed partners, returns and refunds, electronic invoices, point of sale, product reviews.</td></tr>
+<tr><td><code>customers</code></td><td>official</td><td>—</td><td>Customer profiles keyed by buyer account or phone number, purchase history from orders, masked contact details with audited reveal, and manual or rule-based customer groups for price lists and promotions.</td></tr>
+<tr><td><code>sepay</code></td><td>experimental</td><td>—</td><td>Confirms VietQR bank transfers from SePay’s bank transaction notifications, with one SePay account per tenant (experimental: written from the provider’s public documentation; not yet verified against the live service).</td></tr>
+<tr><td><code>momo</code></td><td>experimental</td><td>—</td><td>MoMo payment gateway (Vietnam) with one MoMo account per tenant: payment links, payment notifications, status checks and refunds. Written from the provider’s public documentation; not yet verified against the live service. See the <a href="guides/providers/momo.html">MoMo guide</a>.</td></tr>
+<tr><td><code>einvoice_sepay</code></td><td>experimental</td><td>—</td><td>Sends e-invoices to the Vietnamese tax authority through SePay eInvoice, with one SePay eInvoice account per tenant (experimental: written from the provider’s public documentation; not yet verified against the live service).</td></tr>
+<tr><td><code>esms</code></td><td>experimental</td><td>—</td><td>SMS through eSMS (Vietnam): one-time codes and customer-care messages under each tenant’s own eSMS account and brandname. Written from the provider’s public documentation; not yet verified against the live service.</td></tr>
+<tr><td><code>ghn</code></td><td>experimental</td><td><code>shipping</code></td><td>Giao Hang Nhanh (GHN) carrier connector for shipping: quotes, shipments, labels, cancellation, tracking and status webhooks, with each tenant’s own GHN account. Written from the provider’s public documentation; not yet verified against the live service.</td></tr>
+<tr><td><code>bookings</code></td><td>experimental</td><td>—</td><td>Bookable services with staff, rooms and equipment, weekly schedules, public availability, bookings that never overlap, deposits through a licensed partner, cancellation policies and reminders.</td></tr>
+<tr><td><code>newsletter</code></td><td>experimental</td><td><code>mail</code></td><td>Newsletter lists, double opt-in subscribers, one-click unsubscribe and campaigns sent in rate-limited batches.</td></tr>
+<tr><td><code>comments</code></td><td>experimental</td><td><code>mail</code></td><td>Comments and questions on any record (posts, products…), with threads, moderation, reports, bans and answers.</td></tr>
+<tr><td><code>support</code></td><td>experimental</td><td>—</td><td>Customer support tickets: messages, internal notes, guest access by ticket token, staff scope by organization unit, and hand-over to consumer complaints.</td></tr>
+<tr><td><code>conversations</code></td><td>experimental</td><td>—</td><td>Customer chat with a shop or a marketplace store: shared inbox, assignment, read cursors, real-time events, notices for people offline, hand-over to support tickets and automatic answers from approved replies.</td></tr>
+<tr><td><code>analytics</code></td><td>experimental</td><td>—</td><td>Cookieless website analytics kept in your own database: pages, sources, UTM campaigns, most viewed objects and funnels; per-person tracking only with consent.</td></tr>
+<tr><td><code>reporting</code></td><td>experimental</td><td>—</td><td>Reports across a customer tree: figures from every tenant (also on other databases), summed per day, tenant, unit and currency.</td></tr>
+<tr><td><code>automations</code></td><td>experimental</td><td>—</td><td>Automation rules: when an event, a schedule, a manual call or an unusual figure happens and the conditions hold, run MCP tools with the permissions of the rule’s author.</td></tr>
+</tbody>
+</table>
+</div>
+<!-- modules:end -->
+<p><code>GET /api/v1/kernel/modules</code> lists the modules that run on a server, with <code>stability</code> for each.
+In the OpenAPI document every operation of an experimental module carries
+<code>"x-stability": "experimental"</code> (an operation without it belongs to an official module), and
+<code>docs/mcp-tools.json</code> has <code>stability</code> for every tool; both also say so in the description.</p>
+<h2 id="choosing-autoxide_modules"><a class="header" href="#choosing-autoxide_modules">Choosing: <code>AUTOXIDE_MODULES</code></a></h2>
+<p>A comma-separated list. Each entry adds to the set; core modules are always in it.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Entry</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>core</code></td><td>Only the core modules.</td></tr>
+<tr><td><code>official</code></td><td>Every core and official module. <strong>The default.</strong></td></tr>
+<tr><td><code>all</code></td><td>Every module, experimental ones included.</td></tr>
+<tr><td><code>name</code></td><td>That module, and the modules it needs.</td></tr>
+<tr><td><code>-name</code></td><td>Leave that module out of the set chosen by the other entries.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Examples:</p>
+<pre><code class="language-sh"># The default, written out.
+AUTOXIDE_MODULES=official
+
+# Official modules plus two experimental ones.
+AUTOXIDE_MODULES=official,bookings,support
+
+# A website backend: sign-in, pages and posts, media, forms, menus. `media`, `files`, `ai`
+# and `mail` come along because `content`, `forms` and `menus` need them.
+AUTOXIDE_MODULES=content,forms,menus
+
+# Everything official except plans and the commerce modules that are not needed here.
+AUTOXIDE_MODULES=official,-plans,-customers,-orders
+</code></pre>
+<p>Mistakes are reported at startup, by every command, with what to write instead:</p>
+<ul>
+<li>a name that is not a module lists the valid names;</li>
+<li><code>-name</code> for a module that an enabled module needs names the modules to leave out too
+(<code>official,-catalog</code> answers: leave out <code>-inventory,-orders,-promotions</code> as well, or remove
+<code>-catalog</code>);</li>
+<li><code>-auth</code> or another core module is refused.</li>
+</ul>
+<p><code>autoxide doctor</code> prints the modules that run and those that are turned off (the first line of
+<code>autoxide serve</code>’s log says the same), and <code>autoxide config</code> shows the value in use.
+<code>autoxide modules</code> lists every module of the program — also modules a binary of your own added —
+with its tier, whether it is on, what it depends on and, for a module that is off, whether the
+database still holds its data; <code>autoxide modules --json</code> prints the same for programs and agents.</p>
+<p>Settings of a module that is turned off are not read: a leftover <code>AUTOXIDE_NEWSLETTER_…</code> line in
+<code>.env</code> is ignored. A task in <code>AUTOXIDE_STARTUP_TASKS</code> whose module is off is skipped with a warning
+in the log; a task name that does not exist in a module that is on is still an error.</p>
+<h2 id="what-turned-off-means"><a class="header" href="#what-turned-off-means">What “turned off” means</a></h2>
+<p>A module that is turned off:</p>
+<ul>
+<li>serves no routes: its paths answer <code>404</code>;</li>
+<li>is absent from the OpenAPI document served at <code>/api/v1/openapi.json</code>, from <code>/llms.txt</code> and
+from <code>GET /api/v1/kernel/modules</code>;</li>
+<li>offers no MCP tools, resources or prompts;</li>
+<li>runs no jobs and no schedules, and receives no events;</li>
+<li>has no migrations applied: on a new database its tables are never created.</li>
+</ul>
+<p>The files <code>docs/openapi.json</code> and <code>docs/mcp-tools.json</code> in the repository, and the SDKs built from
+them, always describe <strong>every</strong> module. <code>autoxide openapi</code> and <code>autoxide mcp-manifest</code> print that
+full contract whatever <code>AUTOXIDE_MODULES</code> says. A client can ask a server which modules it runs
+through <code>GET /api/v1/kernel/modules</code>.</p>
+<h3 id="data-of-a-module-that-is-turned-off"><a class="header" href="#data-of-a-module-that-is-turned-off">Data of a module that is turned off</a></h3>
+<p>Turning a module off <strong>never deletes anything</strong>. If the database already has its tables, they
+stay, <code>autoxide migrate up</code> keeps applying the module’s new migrations to them, and turning the module
+on again continues from there.</p>
+<p>While it is off, the module still takes part in personal data and in the tenant lifecycle
+(“dormant mode”) — it serves no routes, MCP tools, jobs or other events, but:</p>
+<ul>
+<li>a person’s data export (<code>GET /api/v1/auth/me/export</code>, subject access requests) includes its part,
+and deleting an account deletes or anonymizes that person’s data in it, as when it is on;</li>
+<li>deleting a tenant for good deletes its rows of the tenant (except tables kept by law), a tenant data
+export includes them, and moving, splitting or merging a tenant takes them along (the module’s own
+migrations are applied to its tables on both databases first, and only where it already has tables);</li>
+<li><code>files</code> still reads its own configuration while off and opens its storage, so deleting an account
+deletes the stored content too, and <code>conversations</code> deletes call recordings through that storage and the
+enabled voice connector; when the storage cannot be opened, the deletion is retried (nothing is reported
+done while content remains).</li>
+</ul>
+<p>This is an obligation of personal data protection law (Vietnam: Law 91/2025/QH15, Decree
+356/2025/ND-CP), so it does not depend on whether you use the module any more. What it still does not
+do while off:</p>
+<ul>
+<li>retention clean-up of its data does not run (the module’s jobs do not run);</li>
+<li>tenants created in the meantime do not get the module’s starting data;</li>
+<li>events other modules publish in the meantime are not delivered to it later.</li>
+</ul>
+<p>So that data is not lost by accident:</p>
+<ul>
+<li><code>autoxide serve</code> logs a warning at startup, and <code>autoxide doctor</code> reports
+<code>modules_turned_off</code>, when the database holds rows of a module that is off — with the exact
+<code>AUTOXIDE_MODULES=…</code> line that turns it back on. (When you set <code>AUTOXIDE_MODULES</code> yourself the
+message is informational: you chose.)</li>
+<li><code>autoxide copy</code>, <code>autoxide backup</code> and <code>autoxide restore</code> refuse to run while
+such data exists, because they only handle the modules that are on. Run them with the module
+turned on, or with <code>AUTOXIDE_MODULES=all</code>.</li>
+</ul>
+<p>The check for such data looks at the main database and at the database of every placement.</p>
+<p>To remove the data of a module for good, run <code>autoxide migrate down &lt;module&gt; --steps 1000</code> — it works
+while the module is off (this drops its tables — back up first). <code>autoxide migrate up</code> keeps the tables
+of a turned-off module up to date where they exist, and never creates them elsewhere. <code>migrate down</code> has
+no <code>--all</code>: it acts on the main database only, so the module’s tables in the database of a placement stay
+(and <code>migrate up --all</code> keeps updating them) until you run it against that database too.</p>
+<h2 id="upgrading-from-017-or-earlier"><a class="header" href="#upgrading-from-017-or-earlier">Upgrading from 0.17 or earlier</a></h2>
+<p>Up to 0.17 every module ran. From this release, with <code>AUTOXIDE_MODULES</code> not set, the eight
+experimental modules (<code>bookings</code>, <code>newsletter</code>, <code>comments</code>, <code>support</code>, <code>conversations</code>,
+<code>analytics</code>, <code>reporting</code>, <code>automations</code>) are <strong>off</strong>.</p>
+<ol>
+<li>Before updating, decide which of them you use. If unsure, update and run <code>autoxide doctor</code>:
+<code>modules_turned_off</code> lists the ones whose tables hold rows, and gives the line to add.</li>
+<li>Add that line to <code>.env</code> (or the environment of the container), for example
+<code>AUTOXIDE_MODULES=official,newsletter,comments</code>, and restart. To keep exactly the behavior of
+0.17, use <code>AUTOXIDE_MODULES=all</code>.</li>
+<li>Roles keep the permissions of modules that are off, plans keep their features, and stored data
+stays; they take effect again when the module is turned on.</li>
+</ol>
+<p>Nothing is deleted in either case, and the choice can be changed at any time.</p>
+<h2 id="for-module-authors"><a class="header" href="#for-module-authors">For module authors</a></h2>
+<p>A module declares its tier and what it needs in its <code>Module</code> implementation; all three have
+defaults, so a module that declares nothing is official, optional and independent:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn stability(&amp;self) -&gt; Stability { Stability::Experimental }
+fn essential(&amp;self) -&gt; bool { false }
+fn depends_on(&amp;self) -&gt; Vec&lt;&amp;'static str&gt; { vec!["mail", "files"] }
+<span class="boring">}</span></code></pre>
+<p>List in <code>depends_on</code> every module whose contract you take with <code>context.require::&lt;…&gt;()?</code> in
+<code>start</code>. Contracts you take with <code>.ok()</code> are optional and stay out of it. A test in the binary
+starts each module with only the modules it declares, so a missing name fails the gate, not an
+installation. See <a href="MODULE_GUIDE.html">MODULE_GUIDE.md</a> for the rest of the contract.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/MENUS.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/MODULE_ECOSYSTEM.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/MENUS.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/MODULE_ECOSYSTEM.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

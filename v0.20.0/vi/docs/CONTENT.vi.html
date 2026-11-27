@@ -1,0 +1,669 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Nội dung - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="nội-dung"><a class="header" href="#nội-dung">Nội dung</a></h1>
+<p><em>English: <a href="CONTENT.html">CONTENT.md</a></em></p>
+<p>Module <code>content</code> giữ bài viết và trang của một website, nhiều ngôn ngữ, có bản nháp, lịch sử,
+hẹn giờ, danh mục, thẻ, tác giả, menu và chuyển hướng. Module chỉ có API: trang quản trị và
+chính website là các dự án riêng gọi vào nó. Module nằm dưới <code>/api/v1/content</code>. Hợp đồng đầy
+đủ, với mọi tham số và mã lỗi, ở <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>openapi.json</code></a> (và ở <code>/api/docs</code> khi
+<code>AUTOXIDE_HTTP_API_DOCS=true</code>).</p>
+<p>Ảnh là item của thư viện media (<a href="MEDIA.vi.html"><code>MEDIA.vi.md</code></a>): một mục chỉ giữ ID của ảnh, và
+ảnh phải công khai thì mục mới đăng được.</p>
+<h2 id="permission"><a class="header" href="#permission">Permission</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Permission</th><th>Cho phép</th></tr>
+</thead>
+<tbody>
+<tr><td><code>content.read</code></td><td>Đọc bản nháp, revision và lịch</td></tr>
+<tr><td><code>content.write</code></td><td>Tạo và sửa bản nháp, bản dịch, khôi phục revision, tạo link xem trước, xin duyệt</td></tr>
+<tr><td><code>content.write_own</code></td><td>Như <code>content.write</code>, nhưng chỉ trên mục do chính bên gọi tạo (cùng người dùng <strong>và</strong> cùng API key)</td></tr>
+<tr><td><code>content.publish</code></td><td>Đăng, gỡ, lưu trữ, chuyển trang, hẹn giờ; danh mục và tác giả của mục đang công khai</td></tr>
+<tr><td><code>content.publish_own</code></td><td>Chỉ đăng và gỡ mục do chính bên gọi tạo; không lưu trữ, hẹn giờ hay chuyển trang đang công khai</td></tr>
+<tr><td><code>content.delete</code></td><td>Xoá hẳn mục</td></tr>
+<tr><td><code>content.manage</code></td><td>Danh mục, thẻ, tác giả, menu, chuyển hướng, vị trí hiển thị</td></tr>
+<tr><td><code>content.banners</code></td><td>Banner của vị trí hiển thị, theo nút</td></tr>
+</tbody>
+</table>
+</div>
+<p>Gán cho một role bằng <code>PUT /api/v1/auth/roles/{id}</code>. Role <code>admin</code> có đủ. Người đọc website
+không cần permission nào: mọi thứ dưới <code>/api/v1/content/public/</code> đều mở.</p>
+<h2 id="mô-hình"><a class="header" href="#mô-hình">Mô hình</a></h2>
+<p>Một <strong>mục</strong> (entry) là bài viết (<code>kind: post</code>) hoặc trang (<code>kind: page</code>, có thể có trang cha).
+Mỗi mục có một <strong>bản nháp</strong> — luôn có, là bản người biên tập sửa — và, khi đang công khai, một
+<strong>bản công khai</strong> riêng mà người đọc thấy. Sửa bản nháp không đổi thứ người đọc thấy cho tới khi
+đăng lại (<code>has_unpublished_changes</code> cho biết).</p>
+<ul>
+<li><code>status</code> là <code>draft</code>, <code>published</code> hoặc <code>archived</code>.</li>
+<li><code>slug</code> là phần cuối của địa chỉ: tự tạo từ tiêu đề khi không gửi (<code>"Đường đến Đà Lạt"</code> →
+<code>duong-den-da-lat</code>; thêm <code>-2</code>, <code>-3</code>… khi trùng), chữ thường và số nối bằng <code>-</code>, không trùng
+giữa các mục cùng loại, cùng ngôn ngữ, cùng trang cha.</li>
+<li><code>body</code> là một tài liệu JSON của <a href="https://prosemirror.net">ProseMirror</a> /
+<a href="https://tiptap.dev">Tiptap</a>. Máy chủ kiểm theo danh sách node, mark và thuộc tính được phép
+(đoạn văn, tiêu đề cấp 2–4, danh sách, trích dẫn, code, bảng, ảnh, nhúng video từ
+<code>AUTOXIDE_CONTENT_EMBED_HOSTS</code>; đậm, nghiêng, gạch dưới, gạch ngang, code, link), từ chối link
+<code>javascript:</code> và link không an toàn khác, ảnh chỉ giữ ID media, và báo mọi lỗi một lần kèm vị
+trí (<code>body.content[2].attrs.href</code>). Máy chủ không lưu HTML: website tự dựng từ JSON.</li>
+<li>Máy chủ tính <code>word_count</code>, <code>reading_time_minutes</code> và một bản chữ thuần để tìm kiếm (không phân
+biệt hoa thường và dấu: <code>da lat</code> tìm ra <code>Đà Lạt</code>).</li>
+<li>Trường SEO: <code>meta_title</code>, <code>meta_description</code>, <code>og_media_id</code> (ảnh chia sẻ), <code>canonical_url</code>,
+<code>noindex</code>.</li>
+</ul>
+<h2 id="viết-và-đăng"><a class="header" href="#viết-và-đăng">Viết và đăng</a></h2>
+<pre><code class="language-bash"># Tạo bản nháp
+curl -X POST http://localhost:8080/api/v1/content/entries \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"kind": "post", "locale": "en", "title": "Hello",
+       "body": {"type": "doc", "content": [{"type": "paragraph",
+                "content": [{"type": "text", "text": "First post."}]}]}}'
+
+# Đọc lại: để ý header ETag
+curl -i http://localhost:8080/api/v1/content/entries/$ID -H "Authorization: Bearer $TOKEN"
+
+# Sửa bản nháp: bắt buộc If-Match
+curl -X PATCH http://localhost:8080/api/v1/content/entries/$ID \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H 'If-Match: "1731400000000000"' -d '{"excerpt": "A short summary."}'
+
+# Đăng
+curl -X POST http://localhost:8080/api/v1/content/entries/$ID/publish \
+  -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1731400000000001"'
+</code></pre>
+<ul>
+<li><strong>Bắt buộc <code>If-Match</code></strong> khi sửa hay xoá mục, khi đổi trạng thái mục (đăng, gỡ, lưu trữ,
+chuyển, khôi phục, hẹn giờ), khi sửa danh mục / thẻ, tác giả, chuyển hướng, và khi thay menu:
+gửi <code>ETag</code> vừa đọc (<code>*</code> để sửa bất kể phiên bản). Thiếu: <code>428 precondition_required</code>; có người
+sửa trước: <code>412 precondition_failed</code> — đọc lại rồi sửa lại. Nhờ vậy hai người biên tập (hay hai
+AI agent) không ghi đè lên nhau. Xoá danh mục / thẻ, tác giả, chuyển hướng và gắn danh mục / tác
+giả cho mục thì không cần: không có gì bị ghi đè.</li>
+<li><code>POST …/unpublish</code> gỡ mục (về lại bản nháp, địa chỉ trả 404); <code>POST …/archive</code> gỡ hẳn (địa
+chỉ trả 410); <code>DELETE</code> xoá mục (mục đang công khai được gỡ trước, địa chỉ trả 410).</li>
+<li>Không đăng được trang trước trang cha của nó; không gỡ hay xoá được trang còn trang con đang
+công khai.</li>
+</ul>
+<h2 id="lịch-sử-và-hẹn-giờ"><a class="header" href="#lịch-sử-và-hẹn-giờ">Lịch sử và hẹn giờ</a></h2>
+<ul>
+<li>Một <strong>revision</strong> là bản chép đầy đủ các trường sửa được. Máy chủ giữ một bản khi tạo, mỗi lần
+đăng và gỡ, khi khôi phục, khi được yêu cầu (<code>"save_revision": true</code>), và tự động khi bản gần
+nhất đã cũ hơn 10 phút. <code>GET …/revisions</code> liệt kê,
+<code>POST …/revisions/{revision_id}/restore</code> chép một bản về bản nháp (không tự đăng). Mỗi mục giữ
+<code>AUTOXIDE_CONTENT_MAX_REVISIONS</code> (mặc định 50) bản mới nhất, cộng bản đang công khai và bản
+của các lịch đang chờ; một job chạy mỗi ngày dọn phần còn lại.</li>
+<li><strong>Hẹn giờ</strong>: <code>POST …/schedules</code> với <code>{"action": "publish" | "unpublish", "run_at": …}</code>. Lịch
+đăng ghim bản nháp lúc đặt thành một revision: sửa sau đó không bị lịch này đăng. Nếu mục đã
+được đăng tay sau khi đặt lịch, lịch thất bại (<code>content.schedule_outdated</code>) thay vì ghi đè.
+Lịch thất bại giữ mã lỗi (<code>status: failed</code>) và phát event <code>content.schedule_failed</code>. Gỡ mục
+thì huỷ lịch đăng đang chờ của nó, lưu trữ thì huỷ mọi lịch đang chờ của mục (mỗi lịch phát
+<code>content.schedule_canceled</code>): lịch đặt từ trước không bao giờ đăng lại mục đã bị gỡ.</li>
+</ul>
+<h2 id="trang-và-địa-chỉ"><a class="header" href="#trang-và-địa-chỉ">Trang và địa chỉ</a></h2>
+<p>Máy chủ tính địa chỉ (<code>path</code>) của mọi mục đang công khai:</p>
+<ul>
+<li>bài viết: <code>/&lt;AUTOXIDE_CONTENT_POST_PATH_PREFIX&gt;/&lt;slug&gt;</code> (mặc định <code>/blog/hello</code>);</li>
+<li>trang: slug của các trang cha, rồi slug của chính nó (<code>/about/team</code>); tối đa 5 cấp.</li>
+</ul>
+<p>Website chỉ ghép tên miền và, nếu dùng, tiền tố ngôn ngữ (<code>/vi/…</code>).</p>
+<ul>
+<li><code>POST …/move</code> chuyển một trang sang trang cha khác (hoặc lên gốc). Có hiệu lực ngay, cho bản
+nháp lẫn bản công khai, và cho mọi trang con. Không chuyển được một trang vào dưới chính nó
+hay trang con của nó (<code>content.tree_cycle</code>).</li>
+<li><strong>Khi địa chỉ công khai đổi</strong> (đổi slug, chuyển trang), máy chủ ghi chuyển hướng <code>301</code> từ địa
+chỉ cũ tới mục — cho mục đó và mọi trang con — nên link cũ vẫn chạy. Lưu trữ hay xoá thì ghi
+<code>410 Gone</code>.</li>
+<li>Chuyển hướng cũng làm tay được (<code>/api/v1/content/redirects</code>, permission <code>content.manage</code>):
+<code>301</code>, <code>302</code>, <code>307</code>, <code>308</code> tới một mục hay một địa chỉ, hoặc <code>410</code>. Vòng lặp bị từ chối
+(<code>content.redirect_loop</code>). Địa chỉ trong site bắt đầu bằng đúng một <code>/</code>: <code>//host</code> (trình duyệt
+hiểu là site khác) bị từ chối, ở đây và trong menu.</li>
+</ul>
+<h2 id="ngôn-ngữ"><a class="header" href="#ngôn-ngữ">Ngôn ngữ</a></h2>
+<p>Ngôn ngữ đặt bằng <code>AUTOXIDE_CONTENT_LOCALES</code> (mặc định <code>en,vi</code>, mã BCP 47) và
+<code>AUTOXIDE_CONTENT_DEFAULT_LOCALE</code> (mặc định <code>en</code>).</p>
+<p>Khi có nhiều khách hàng (tenant), hai biến này là mặc định của mọi khách: mỗi khách có thể đặt
+<code>content.locales</code> và <code>content.default_locale</code> của mình (quản trị của khách gọi
+<code>PUT /api/v1/kernel/settings/{name}</code>, permission <code>kernel.settings.manage</code>; nhân sự nền tảng gọi
+<code>PUT /api/v1/kernel/tenants/{id}/settings/{name}</code>). Ngôn ngữ của khách áp cho mọi thứ của khách đó:
+mục, term, menu, chuyển hướng nhận ngôn ngữ nào, <code>locale</code> của route công khai, và phần <code>content</code> của
+<code>GET /api/v1/kernel/client-config</code> cho request nêu khách. Ngôn ngữ mặc định của khách không nằm
+trong danh sách ngôn ngữ của khách thì dùng mặc định của máy chủ nếu nó nằm trong danh sách, không
+thì ngôn ngữ đầu tiên. Mục đã viết bằng ngôn ngữ mà khách bỏ đi vẫn giữ nguyên. Mã sai bị từ chối
+ngay lúc đặt; gọi <code>DELETE</code> cấu hình đó để về giá trị của máy chủ.</p>
+<ul>
+<li>Mỗi bản dịch là một mục riêng, có slug, trạng thái và lịch sử riêng, nối với nhau bằng
+<code>translation_group_id</code>. Tạo bằng <code>POST …/entries/{id}/translations</code>
+(<code>{"locale": "vi", "title": …}</code>). Trang con chỉ dịch được khi trang cha đã có bản dịch.</li>
+<li><strong>Bài và trang không bao giờ lấy ngôn ngữ khác thay thế</strong>: thiếu bản dịch là <code>404</code>, để
+canonical và <code>hreflang</code> luôn đúng. Mục công khai liệt kê các bản dịch của nó (<code>translations</code>,
+dùng cho <code>hreflang</code>).</li>
+<li>Tên danh mục, thẻ và menu thì lấy ngôn ngữ mặc định khi thiếu; câu trả lời ghi ngôn ngữ thật
+đã dùng (<code>locale</code>).</li>
+</ul>
+<h2 id="danh-mục-thẻ-tác-giả-menu"><a class="header" href="#danh-mục-thẻ-tác-giả-menu">Danh mục, thẻ, tác giả, menu</a></h2>
+<p>Permission <code>content.manage</code>.</p>
+<ul>
+<li><strong>Term</strong> (<code>/api/v1/content/terms</code>): <code>category</code> (có thể có cha) hoặc <code>tag</code>, có tên, slug, mô tả
+và chữ SEO theo từng ngôn ngữ. Gắn vào mục bằng <code>PUT /api/v1/content/entries/{id}/terms</code>
+(<code>{"term_ids": [...]}</code>, danh mục đầu tiên là danh mục chính). Có hiệu lực ngay, cả với bản
+công khai — nên với mục đang công khai cần thêm <code>content.publish</code> ngoài <code>content.write</code> (gắn
+tác giả cũng vậy).</li>
+<li><strong>Tác giả</strong> (<code>/api/v1/content/authors</code>): hồ sơ của module content — tên hiển thị, slug, giới
+thiệu, ảnh đại diện (ID media), website — có thể gắn với một tài khoản (<code>user_id</code>). Một mục có
+thể có nhiều tác giả, theo thứ tự: <code>PUT /api/v1/content/entries/{id}/authors</code>. Gắn term hay
+tác giả cho mục cần quyền sửa mục đó, không cần <code>content.read</code>.</li>
+<li><strong>Menu</strong> (<code>/api/v1/content/menus/{key}?locale=</code>): một cây mục (tối đa 4 cấp, 200 mục), mỗi
+mục trỏ tới một bài / trang, một term, hoặc một địa chỉ. <code>PUT</code> thay cả cây (<code>If-Match: *</code> để
+tạo mới). <strong>Đã deprecated</strong> (sunset 14/05/2027): menu của website chuyển sang module <code>menus</code>, mục
+trỏ được tới đối tượng của module bất kỳ; chép menu sang bằng
+<code>autoxide task menus.import_content_menus</code> (<a href="MENUS.vi.html"><code>MENUS.vi.md</code></a>).</li>
+</ul>
+<h2 id="cửa-hàng-và-website"><a class="header" href="#cửa-hàng-và-website">Cửa hàng và website</a></h2>
+<p>Ở khách có cây tổ chức (module <code>organizations</code>), mỗi mục thuộc một nút: <code>org_id</code> khi tạo (bỏ
+trống: nút duy nhất của bạn, hay nút gốc khi role của bạn phủ cả khách). Các permission trên áp
+theo độ sâu của role: người có <code>content.write</code> ở một cửa hàng (<code>subtree</code>) chỉ viết mục của cửa hàng
+đó và các nút bên dưới; mục ngoài phạm vi trả 404. Lọc danh sách quản trị bằng <code>owner_org</code> (một
+nút) hay <code>site</code> (những gì một website hiện).</p>
+<p>Mỗi nút có thể có website: tên miền gắn với nút (<code>PATCH /api/v1/kernel/domains/{id}</code> với
+<code>org_id</code>), hay <code>?site=&lt;id của nút&gt;</code> ở các endpoint công khai. Website hiện mục của nút đó và của mọi
+nút cấp trên — bài của trụ sở hiện trên website của mọi cửa hàng, bài của một cửa hàng không bao
+giờ hiện trên website của cửa hàng khác.</p>
+<p>Mỗi website có bộ đường dẫn và slug riêng: hai cửa hàng cùng có <code>/about</code> được. Khi một nút và một nút
+cấp trên cùng đăng một đường dẫn, website hiện bài của nút gần nó nhất (<code>/about</code> của cửa hàng che
+<code>/about</code> của trụ sở trên website của cửa hàng; sitemap chỉ liệt kê một lần). Ngôn ngữ một website
+đưa ra là cài đặt <code>organizations.languages</code> của nút đó
+(<code>PUT /api/v1/organizations/units/{id}/settings/organizations.languages</code> với <code>["vi", "en"]</code>; ngôn
+ngữ đầu là mặc định), chỉ giữ ngôn ngữ của khách; không đặt thì dùng ngôn ngữ của khách. Đọc công
+khai, sitemap, feed và tìm kiếm công khai theo ngôn ngữ của website và chỉ hiện những gì website đó
+hiện.</p>
+<h2 id="website-endpoint-công-khai"><a class="header" href="#website-endpoint-công-khai">Website: endpoint công khai</a></h2>
+<p>Không cần đăng nhập. Chỉ trả bản đã đăng — không bao giờ trả bản nháp.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Endpoint</th><th>Trả</th></tr>
+</thead>
+<tbody>
+<tr><td><code>GET /public/resolve?locale=&amp;path=</code></td><td>Thứ ở một địa chỉ: <code>entry</code>, <code>redirect</code> hoặc <code>gone</code></td></tr>
+<tr><td><code>GET /public/posts?locale=&amp;term_id=&amp;author_id=&amp;q=</code></td><td>Bài đã đăng, mới nhất trước, có pagination (<code>q</code>: tối đa 200 ký tự)</td></tr>
+<tr><td><code>GET /public/menus/{key}?locale=</code></td><td>Menu kèm <code>href</code> đã tính; đã deprecated, dùng <code>GET /api/v1/menus/public/{key}</code></td></tr>
+<tr><td><code>GET /public/terms/{taxonomy}/{slug}?locale=</code></td><td>Trang của một danh mục hay thẻ</td></tr>
+<tr><td><code>GET /public/authors/{slug}</code></td><td>Trang của một tác giả</td></tr>
+<tr><td><code>GET /public/sitemap?locale=</code></td><td>Mọi địa chỉ đang công khai, kèm bản dịch cho <code>hreflang</code>, có pagination</td></tr>
+<tr><td><code>GET /public/feed?locale=&amp;limit=</code></td><td>Các bài mới nhất kèm thân bài, cho RSS, Atom hay JSON Feed</td></tr>
+</tbody>
+</table>
+</div>
+<p>(Tất cả dưới <code>/api/v1/content</code>.)</p>
+<p>Danh mục hay thẻ chỉ công khai khi đã có bài đang hiện trên website mang nó: trước đó trang của term trả
+<code>404 content.term_not_found</code> và danh sách term không có nó. Đây là có chủ ý — term đang soạn không bị lộ — nên mục
+menu trỏ tới danh mục rỗng sẽ ra trang 404 cho tới khi có bài mang danh mục đó.</p>
+<p><strong>Nhiều site trên một máy chủ.</strong> Máy chủ có nhiều khách thì mỗi khách là một site riêng: endpoint
+công khai trả lời cho khách của request — tên miền riêng của khách, hay header <code>Autoxide-Tenant</code>
+(tên rút gọn của khách). Hai khách được dùng cùng slug, cùng địa chỉ, cùng slug tác giả và term,
+cùng menu và chuyển hướng; khách này không bao giờ thấy bài của khách kia. <code>ETag</code> của khách này
+không bao giờ khớp ở khách khác.</p>
+<p><strong>Hiển thị một địa chỉ.</strong> Với mỗi request, website gọi <code>resolve</code> với ngôn ngữ và đường dẫn, rồi
+làm theo <code>type</code>:</p>
+<ul>
+<li><code>entry</code> → hiển thị <code>data.entry</code> (tiêu đề, JSON thân bài, ảnh kèm URL, SEO, term, tác giả, bản
+dịch);</li>
+<li><code>redirect</code> → trả <code>data.status</code> với <code>Location: data.location</code>;</li>
+<li><code>gone</code> → trả <code>410</code>;</li>
+<li>nhận <code>404</code> → trả <code>404</code>.</li>
+</ul>
+<p><strong>Cache.</strong> Câu trả lời công khai có <code>Cache-Control: public, no-cache</code> và, khi hợp lý, <code>ETag</code>:
+cache được nhưng phải hỏi lại; gửi lại <code>ETag</code> trong <code>If-None-Match</code> nhận về <code>304 Not Modified</code>
+rất rẻ.</p>
+<p><strong>Làm mới cache khi nội dung đổi.</strong> Đăng ký webhook (<code>POST /api/v1/webhooks</code>, xem phần webhook
+trong <a href="../README.vi.html">README</a>) cho <code>content.entry_published</code>, <code>content.entry_unpublished</code>,
+<code>content.entry_archived</code>, <code>content.entry_deleted</code> và <code>content.entry_moved</code>. Trường
+<code>data.payload.published</code> cho biết cần xoá cache gì:</p>
+<pre><code class="language-json">{
+  "entry_id": "…", "kind": "page", "locale": "en", "translation_group_id": "…",
+  "path": "/company/team",
+  "stale_paths": ["/about/team", "/about/team/jobs"],
+  "moved_subpages": [{"entry_id": "…", "old_path": "/about/team/jobs", "path": "/company/team/jobs"}]
+}
+</code></pre>
+<p><code>path</code> là địa chỉ mới (<code>null</code> khi không còn công khai), <code>stale_paths</code> là mọi địa chỉ đã đổi, kể
+cả của trang con. Menu, term và tác giả phát <code>content.menu_changed</code>, <code>content.term_changed</code> và
+<code>content.author_changed</code>; các event này không kèm danh sách trang bị ảnh hưởng (một thẻ có thể
+nằm trên hàng nghìn bài). Hãy gắn cho mỗi trang đã cache tag theo ID term và tác giả của nó (ví dụ
+<code>term:&lt;id&gt;</code>, <code>author:&lt;id&gt;</code>) rồi làm mới các tag đó khi nhận event — đổi tên hay xoá thẻ, tác
+giả (kể cả khi xoá tài khoản) sẽ làm mới mọi trang đang hiện nó.</p>
+<p><strong>Sitemap và feed.</strong> Dựng <code>sitemap.xml</code> từ <code>/public/sitemap</code> (đi theo <code>next_cursor</code>; bỏ mục có
+<code>noindex: true</code>; <code>content_modified_at</code> là <code>lastmod</code>; <code>translations</code> cho các <code>hreflang</code>). Dựng
+RSS, Atom hay JSON Feed từ <code>/public/feed</code>, dùng <code>id</code> của bài (không bao giờ đổi) làm ID của mục
+trong feed.</p>
+<h3 id="bị-ẩn-vì-vụ-việc-451"><a class="header" href="#bị-ẩn-vì-vụ-việc-451">Bị ẩn vì vụ việc (451)</a></h3>
+<p>Khi module <code>compliance</code> xử lý một báo vi phạm (hàng giả, sở hữu trí tuệ…) về một mục và ẩn nó, <code>content</code>
+nhận event <code>compliance.target_restricted</code>: mục đã đăng trả <strong>451</strong> <code>content.restricted</code> ở
+<code>GET /public/resolve</code> (trả 451 cho người đọc), và vắng khỏi <code>/public/posts</code>, sitemap, feed, tìm kiếm và
+module khác (sổ đối tượng). Đăng lại vẫn giữ ẩn. <code>compliance.target_restored</code> hiện lại như cũ. Xem
+<a href="COMPLIANCE.vi.html#báo-vi-phạm-và-khiếu-nại-của-người-tiêu-dùng"><code>COMPLIANCE.vi.md</code></a>.</p>
+<h2 id="banner-và-vị-trí-hiển-thị"><a class="header" href="#banner-và-vị-trí-hiển-thị">Banner và vị trí hiển thị</a></h2>
+<p><strong>Vị trí</strong> là một chỗ có tên trên website (<code>home_hero</code>, <code>top_strip</code>…), cho website biết <strong>vẽ thế
+nào</strong> và cho người soạn biết <strong>ảnh cỡ nào</strong>, để đổi banner không bao giờ làm vỡ giao diện. <strong>Banner</strong>
+là nội dung hiện ở đó, có khung giờ và thứ tự. Đổi banner là đổi dữ liệu (REST hay MCP), không sửa
+code của website.</p>
+<h3 id="vị-trí-contentmanage"><a class="header" href="#vị-trí-contentmanage">Vị trí (<code>content.manage</code>)</a></h3>
+<p><code>GET/POST /placements</code>, <code>GET/PUT/DELETE /placements/{key}</code> (<code>PUT</code> cần <code>If-Match</code>; xoá vị trí còn
+banner trả 409 <code>content.placement_in_use</code>). Mỗi vị trí có:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Trường</th><th>Nghĩa</th></tr>
+</thead>
+<tbody>
+<tr><td><code>display</code></td><td><code>single</code>, <code>carousel</code>, <code>grid</code> (2–4 ô), <code>stack</code> (xếp dọc, cho cột bên), <code>strip</code> (dải chữ mỏng), <code>popup</code></td></tr>
+<tr><td><code>display_settings</code></td><td><code>carousel</code>: <code>autoplay_seconds</code> (0 = tắt, còn lại ≥ 4); <code>grid</code>: <code>columns</code> (2–4); <code>popup</code>: <code>frequency</code> (<code>once_per_session</code>, <code>once_per_day</code>, <code>once_per_week</code>), <code>delay_seconds</code> (0–60)</td></tr>
+<tr><td><code>accepts</code></td><td><code>image</code>, <code>text</code> hay <code>any</code>; <code>strip</code> chỉ nhận <code>text</code></td></tr>
+<tr><td><code>ratio</code>, <code>mobile_ratio</code>, <code>min_width</code>, <code>min_height</code></td><td>luật ảnh, kiểm khi lưu banner (sai lệch tỉ lệ ≤ 2%), theo kích thước thư viện media đã lưu</td></tr>
+<tr><td><code>devices</code></td><td><code>all</code>, <code>desktop</code>, <code>mobile</code>: chỉ gọi vị trí trên các thiết bị này</td></tr>
+<tr><td><code>page_kinds</code></td><td>loại trang dùng vị trí: <code>home</code>, <code>category</code>, <code>collection</code>, <code>product</code>, <code>search</code>, <code>cart</code>, <code>content_entry</code>, <code>content_type</code>, <code>landing</code>, hay <code>any</code></td></tr>
+<tr><td><code>max_items</code></td><td>số banner tối đa cùng lúc (1–50) mỗi cửa hàng và ngôn ngữ</td></tr>
+</tbody>
+</table>
+</div>
+<p>Khách mới có sẵn <strong>bộ vị trí chuẩn</strong>: <code>top_strip</code> (dải chữ), <code>home_hero</code> (trượt, 3:1, tối thiểu
+1800×600; điện thoại 4:5), <code>home_middle</code> (lưới 3, 1:1), <code>category_top</code> (4:1), <code>sidebar_left</code> và
+<code>sidebar_right</code> (xếp dọc, 1:2), <code>inline</code> (4:1, ảnh hay chữ), <code>above_footer</code> (4:1), <code>popup</code> (mỗi ngày một
+lần, sau 5 giây, 4:5). Sửa, tắt hay xoá như vị trí tự tạo. Khách có từ trước tính năng này thêm phần
+còn thiếu bằng <code>POST /placements/presets</code> (không bao giờ tự thêm lại vị trí đã xoá nếu bạn không gọi).</p>
+<h3 id="banner-contentbanners"><a class="header" href="#banner-contentbanners">Banner (<code>content.banners</code>)</a></h3>
+<p><code>GET/POST /banners</code>, <code>GET/PATCH/DELETE /banners/{id}</code> (<code>PATCH</code> cần <code>If-Match</code>), và
+<code>PUT /placements/{key}/order</code> với <code>{"banner_ids": [...]}</code> cùng <code>ETag</code> của vị trí trong <code>If-Match</code> để
+sắp cả vị trí một lần. <code>content.banners</code> cấp theo nút: nhân viên một cửa hàng chỉ quản banner của cửa
+hàng đó; không gửi <code>org_id</code> nghĩa là mọi cửa hàng của khách.</p>
+<ul>
+<li><code>kind</code>: <code>image</code> (cần <code>media_id</code>, ảnh <strong>công khai</strong>; tuỳ chọn <code>mobile_media_id</code>) hay <code>text</code> (bắt
+buộc <code>title</code>, <code>tone</code> = <code>primary</code>, <code>secondary</code>, <code>accent</code> hay <code>neutral</code> — không nhận mã màu, đổi theme
+là đổi màu theo).</li>
+<li><code>link</code>: <code>{"url": "https://…"}</code> hay đường dẫn <code>/…</code>, hoặc <code>{"kind": "catalog.product", "id": "…"}</code> — loại
+bất kỳ của sổ đối tượng (<code>GET /api/v1/kernel/resources</code>). Khi lưu kiểm đối tượng có thật; đọc công
+khai bỏ banner khi đối tượng không còn công khai (sản phẩm ngừng bán, khuyến mại hết). Banner trỏ
+tới <code>promotions.promotion</code> <strong>tự lưu trữ</strong> khi chương trình kết thúc hay bị huỷ: quảng cáo không được
+hứa ưu đãi đã hết (Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15, Luật Quảng cáo — cần đối
+chiếu văn bản gốc).</li>
+<li><code>page_kinds</code> (trong số loại trang của vị trí) và <code>page_targets</code> (<code>[{"kind": "catalog.category", "id": "…"}]</code>,
+tối đa 50): chỉ hiện banner ở các trang đó. Ví dụ: banner cột trái chỉ ở danh mục “Điện thoại”.</li>
+<li><code>starts_at</code> / <code>ends_at</code>, <code>status</code> (<code>draft</code>, <code>active</code>, <code>archived</code>), <code>ai_assisted</code>.</li>
+</ul>
+<h3 id="đọc-trên-website-công-khai"><a class="header" href="#đọc-trên-website-công-khai">Đọc trên website (công khai)</a></h3>
+<p>Một lời gọi cho mọi vị trí của một trang:</p>
+<pre><code class="language-http">GET /api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&amp;locale=vi&amp;page_kind=home
+GET /api/v1/content/public/placements?keys=category_top,sidebar_left&amp;page_kind=category&amp;page_ref=catalog.category:0190…
+</code></pre>
+<p>Mỗi vị trí kèm <code>display</code>, <code>display_settings</code>, <code>accepts</code>, tỉ lệ, <code>devices</code> và <code>banners</code>: đang bật, trong
+khung giờ lúc gọi, của website (<code>site</code>, hay tên miền) và các nút cấp trên, đúng ngôn ngữ của trang,
+theo <strong>thứ tự cố định</strong> (<code>position</code>). Ảnh có <code>variants</code> và <code>webp_url</code> cho <code>srcset</code> / <code>&lt;picture&gt;</code>; link
+dựng sẵn ở <code>href</code>. Banner không giới hạn trang luôn hiện; không gửi <code>page_kind</code> thì chỉ chúng hiện.
+<code>Cache-Control: public, max-age=…</code> chỉ tới mốc bắt đầu / kết thúc gần nhất (tối đa 60 giây), nên CDN
+không giữ banner đã hết giờ; <code>ETag</code> cho 304. <code>GET /public/placements/{key}</code> đọc một vị trí.</p>
+<p><strong>Luật cho website</strong> (thuộc hợp đồng):</p>
+<ul>
+<li>Vẽ banner đúng thứ tự trả về; không đảo ngẫu nhiên (phá cache, trang nhảy khi tải lại).</li>
+<li><code>popup</code> luôn có nút đóng thấy rõ, theo <code>frequency</code>, không bao giờ hiện ở trang giỏ hàng, thanh toán,
+đăng nhập hay tài khoản.</li>
+<li><code>carousel</code> không tự trượt khi người xem bật giảm chuyển động (<code>prefers-reduced-motion</code>), và có nút
+dừng, chuyển.</li>
+<li>Banner có <code>ai_assisted: true</code> thì ghi nhãn viết với trợ giúp của AI.</li>
+</ul>
+<p>Ví dụ trang chủ:</p>
+<pre><code class="language-js">const res = await fetch(`/api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&amp;page_kind=home&amp;locale=${lang}`);
+const { data } = await res.json();
+for (const p of data.placements) render(p.key, p.display, p.display_settings, p.banners);
+</code></pre>
+<h3 id="thông-tin-cửa-hàng-đầu-và-chân-trang"><a class="header" href="#thông-tin-cửa-hàng-đầu-và-chân-trang">Thông tin cửa hàng (đầu và chân trang)</a></h3>
+<p><code>GET /api/v1/organizations/public/storefront</code> (công khai; website theo <code>site</code> hay tên miền) trả <strong>thương hiệu</strong> —
+tên, logo và biểu tượng trang (ID ảnh công khai của media: <code>/api/v1/media/{id}/content</code>), điện thoại, email, mạng
+xã hội — kế thừa theo cây tổ chức (chuỗi đặt, cửa hàng ghi đè phần muốn đổi), <strong>địa điểm</strong> (địa chỉ, giờ mở cửa,
+ngày đặc biệt, nhận hàng tại quầy, ảnh bìa trong hồ sơ công khai của nút), múi giờ của nút và <code>open_now</code>. Quản lý
+thương hiệu bằng cài đặt của nút <code>organizations.brand_name</code>, <code>organizations.brand_logo</code>,
+<code>organizations.brand_icon</code>, <code>organizations.contact_phone</code>, <code>organizations.contact_email</code>,
+<code>organizations.social_links</code> (<code>PUT /api/v1/organizations/units/{id}/settings/{key}</code>). Chân trang pháp lý của
+cửa hàng ở Việt Nam hiện thêm <code>GET /api/v1/compliance/public/owner</code> và logo của <code>GET /api/v1/compliance/public/badge</code>.</p>
+<h3 id="tool-mcp"><a class="header" href="#tool-mcp">Tool MCP</a></h3>
+<p><code>content.list_banners</code>, <code>content.save_banner</code> (chỉ bản nháp: người dùng bật banner <code>active</code>; chữ từ
+tool mang dấu <code>ai_assisted</code> trừ khi nói khác), <code>content.order_placement</code>.</p>
+<h2 id="xem-trước-bản-nháp"><a class="header" href="#xem-trước-bản-nháp">Xem trước bản nháp</a></h2>
+<p>Người biên tập có thể cho một người không có tài khoản xem bản nháp:</p>
+<ol>
+<li>Đặt <code>AUTOXIDE_CONTENT_PREVIEW_SECRET</code> (chuỗi ngẫu nhiên ít nhất 32 ký tự). Không đặt thì tính
+năng tắt (<code>503</code>, mã <code>content.preview_disabled</code>).</li>
+<li><code>POST /api/v1/content/entries/{id}/preview-token</code> (permission <code>content.write</code>) trả một
+<code>token</code> đã ký và <code>expires_at</code> (<code>AUTOXIDE_CONTENT_PREVIEW_TTL_SECONDS</code>, mặc định 10 phút).</li>
+<li>Trang xem trước của website gọi <code>GET /api/v1/content/public/preview?token=…</code> rồi hiển thị bản
+nháp. Câu trả lời có <code>Cache-Control: no-store</code>, luôn là bản nháp mới nhất, và chỉ có nội dung
+— không có ai tạo hay ai xin duyệt. Token sai hay hết hạn trả <code>404</code>
+(<code>content.preview_token_invalid</code>). Đổi secret là thu hồi mọi token.</li>
+</ol>
+<p>Máy chủ có nhiều khách thì token chỉ mở bản nháp của khách đã tạo ra nó: token ghi khách của nó,
+nên trang xem trước chạy được trên tên miền chính không cần header khách, còn cùng token gửi tới
+khách khác (qua tên miền hay header) trả <code>404</code> như token sai.</p>
+<h2 id="ai-agent"><a class="header" href="#ai-agent">AI agent</a></h2>
+<p><strong>Công cụ AI</strong> (hướng dẫn: <a href="AI.vi.html"><code>AI.vi.md</code></a>): <code>GET /entries/{id}/seo-check</code> (không AI),
+<code>POST /entries/{id}/seo-suggestions</code>, <code>POST /entries/{id}/translate</code> (vào bản nháp của bản dịch,
+không bao giờ tự đăng; theo dõi bằng <code>GET /translation-requests/{id}</code>), và <code>GET /search</code> /
+<code>GET /public/search</code> (theo ý nghĩa và theo chữ). Mục do máy chủ dịch mang
+<code>translated_from_revision_id</code>, và <code>translation_outdated</code> khi bản gốc đổi.</p>
+<p><strong>Tool MCP.</strong> <code>content.list</code>, <code>content.get</code>, <code>content.create_draft</code>, <code>content.update</code>,
+<code>content.publish</code>, <code>content.unpublish</code>, <code>content.list_revisions</code>, <code>content.restore_revision</code>,
+<code>content.request_review</code>, <code>content.seo_check</code>, <code>content.suggest_seo</code>, <code>content.translate</code>,
+<code>content.get_translation_request</code>, <code>content.search</code> và <code>content.resolve</code>, cùng permission với
+endpoint REST. Kết quả có
+mục thì kèm <code>version</code> của mục; tool thay đổi mục bắt buộc gửi lại giá trị đó trong tham số
+<code>version</code>, y như <code>If-Match</code>.</p>
+<p><strong>Cấp cho agent một API key riêng</strong> (<code>POST /api/v1/auth/api-keys</code>), <code>expires_at</code> ngắn và chỉ
+những permission nó cần:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Agent được…</th><th>Permission</th></tr>
+</thead>
+<tbody>
+<tr><td>viết nháp, người đăng</td><td><code>content.read</code>, <code>content.write_own</code></td></tr>
+<tr><td>viết và tự đăng bài của mình</td><td><code>content.read</code>, <code>content.write_own</code>, <code>content.publish_own</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Với các permission <code>_own</code>, agent chỉ đụng tới mục nó tạo bằng chính key đó: key khác — kể cả
+của cùng người dùng — nhận <code>403 content.not_owner</code>. Agent không bao giờ lưu trữ, hẹn giờ hay xoá
+được (xoá cần <code>content.delete</code>), cũng không chuyển được trang đang công khai; nó chuyển được trang
+chưa đăng của mình, vào dưới trang do nó tạo. Thêm vài giới hạn để agent không đi vòng qua người
+biên tập:</p>
+<ul>
+<li><code>content.write_own</code> mà không có <code>content.write</code>: trang mới, trang được chuyển hay bản dịch của
+trang con chỉ nằm dưới trang cha do chính agent tạo (<code>403 content.not_owner</code>), để nó không
+chặn được việc gỡ hay xoá trang của người khác; mục luôn mang <code>ai_generated: true</code>, dù gửi gì;
+ở <code>PUT …/authors</code> chỉ thêm được hồ sơ tác giả gắn với chính tài khoản của nó (<code>user_id</code>) — hồ
+sơ đã có trên mục thì giữ được.</li>
+<li><code>content.publish_own</code> mà không có <code>content.publish</code>: không đăng lại được mục người biên tập đã
+lưu trữ (<code>403 content.archived</code>); không tự đặt <code>published_at</code> (422, <code>not_allowed</code>; máy chủ
+dùng giờ hiện tại, hoặc giữ ngày của lần đăng trước); không đăng vào địa chỉ đang có chuyển
+hướng do người biên tập đặt (<code>409 content.path_has_redirect</code>), vì bản công khai sẽ che mất nó.</li>
+</ul>
+<p>Mọi thay đổi nằm trong audit log kèm API key đã làm, và request bằng API key bị rate limiting
+theo từng key (<code>AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE</code>, mặc định 120).</p>
+<p><strong>Xin duyệt.</strong> Viết xong, agent gọi <code>POST /entries/{id}/request-review</code> (tool
+<code>content.request_review</code>): bản nháp có <code>review_requested_at</code> và event
+<code>content.review_requested</code> được phát — đăng ký webhook để báo người biên tập.
+<code>DELETE /entries/{id}/request-review</code> rút lại; đăng mục thì cờ tự xoá.</p>
+<p><strong>Nội dung do AI tạo.</strong> Gửi <code>"ai_generated": true</code> khi tạo hay sửa nội dung do AI viết (agent
+nên luôn gửi; chỉ có <code>content.write_own</code> thì máy chủ tự đặt). Khi <strong>một người</strong> — đăng nhập, không phải API key — đăng mục đó sau khi đã duyệt,
+họ gửi <code>{"ai_reviewed": true}</code> tới <code>POST /entries/{id}/publish</code>; bản công khai ghi ai duyệt và
+lúc nào. Endpoint công khai trả <code>ai_generated</code> và <code>ai_reviewed</code>, để website hiện thông báo cho
+người đọc khi luật yêu cầu (ví dụ Điều 50 của EU AI Act, áp dụng từ 2/8/2026; ngoại lệ “đã qua
+người duyệt” được hiểu hẹp). Autoxide chỉ ghi lại sự thật, không đưa ra lời khuyên pháp lý. API
+quản trị cũng cho biết mục được tạo thế nào: <code>created_via</code> là <code>session</code> hoặc <code>api_key</code>.</p>
+<p><strong>Nội dung viết với gợi ý của AI.</strong> Khi một người viết hay sửa nội dung từ gợi ý của AI (áp
+<code>seo-suggestions</code>, viết lại từ bản nháp AI), gửi <code>"ai_assisted": true</code> ở <code>POST /entries</code> hay
+<code>PATCH /entries/{id}</code> (MCP: <code>create_draft</code>, <code>update_draft</code>). Cờ được chép sang bản công khai khi
+đăng; endpoint quản trị, xem trước và công khai trả <code>ai_assisted</code>, để website gắn nhãn nội dung
+(Luật Trí tuệ nhân tạo 134/2025/QH15, từ 1/3/2026 — hình thức nhãn và phạm vi “sửa” còn cần đối
+chiếu nghị định hướng dẫn). Ai được viết thì đặt được; bỏ nhãn (<code>false</code> khi đang <code>true</code>) cần
+<code>content.publish</code> (không thì 403 <code>content.ai_label_requires_publish</code>), và khôi phục revision cũ không
+bao giờ bỏ nhãn. <code>ai_generated</code> (AI viết cả bài) giữ nguyên. Ảnh: <code>alt_ai_assisted</code> của thư viện
+media (<a href="MEDIA.vi.html"><code>MEDIA.vi.md</code></a>) đi kèm mỗi ảnh công khai dưới tên <code>alt_ai_assisted</code>.</p>
+<h2 id="khi-một-tài-khoản-bị-xoá"><a class="header" href="#khi-một-tài-khoản-bị-xoá">Khi một tài khoản bị xoá</a></h2>
+<p>Bài và trang thuộc về site, không thuộc người viết: chúng được giữ. Hồ sơ tác giả gắn với tài
+khoản bị xoá (và gỡ khỏi các mục), lịch người đó đặt bị huỷ, <code>created_by</code> thành <code>null</code>, cùng
+<code>review_requested_by</code> (ai xin duyệt) và ghi nhận ai đã xác nhận duyệt nội dung AI — thời điểm xác
+nhận vẫn giữ, nên người đọc vẫn thấy <code>ai_reviewed</code>. Bản xuất dữ liệu cá nhân liệt kê hồ sơ tác giả
+của người đó và các mục họ tạo.</p>
+<h2 id="cấu-hình"><a class="header" href="#cấu-hình">Cấu hình</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Biến</th><th>Mặc định</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_CONTENT_LOCALES</code></td><td><code>en,vi</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_DEFAULT_LOCALE</code></td><td><code>en</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_POST_PATH_PREFIX</code></td><td><code>blog</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_MAX_REVISIONS</code></td><td><code>50</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_MAX_BODY_BYTES</code></td><td><code>524288</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_WORDS_PER_MINUTE</code></td><td><code>238</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_EMBED_HOSTS</code></td><td><code>youtube.com,youtu.be,youtube-nocookie.com,vimeo.com</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_PREVIEW_SECRET</code></td><td>không có (xem trước tắt)</td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_PREVIEW_TTL_SECONDS</code></td><td><code>600</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Mọi biến được mô tả trong <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/COMPLIANCE.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/CONVERSATIONS.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/COMPLIANCE.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/CONVERSATIONS.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

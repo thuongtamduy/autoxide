@@ -1,0 +1,1690 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>REST API reference - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="rest-api-reference"><a class="header" href="#rest-api-reference">REST API reference</a></h1>
+<p>Generated from <code>docs/openapi.json</code> (OpenAPI 3.1.0, version 0.20.0). The full machine-readable contract is served at <code>/api/v1/openapi.json</code>.</p>
+<h2 id="address"><a class="header" href="#address">address</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/address/provinces</code></strong>: List the provinces.</li>
+<li><strong><code>GET /api/v1/address/provinces/{code}/communes</code></strong>: List the communes, wards and special zones of a province.</li>
+<li><strong><code>GET /api/v1/address/units</code></strong>: Search administrative units by name.</li>
+<li><strong><code>GET /api/v1/address/units/{code}</code></strong>: Get an administrative unit by code.</li>
+<li><strong><code>POST /api/v1/address/validate</code></strong>: Check an address and fill in the names.</li>
+</ul>
+<h2 id="ai"><a class="header" href="#ai">ai</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/ai/status</code></strong>: See what the AI features can do.</li>
+</ul>
+<h2 id="analytics"><a class="header" href="#analytics">analytics</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/analytics/campaigns</code></strong>: List the UTM campaigns.</li>
+<li><strong><code>GET /api/v1/analytics/event-types</code></strong>: List the event types (public).</li>
+<li><strong><code>GET /api/v1/analytics/funnels</code></strong>: List the funnels.</li>
+<li><strong><code>GET /api/v1/analytics/funnels/{key}</code></strong>: Get a funnel.</li>
+<li><strong><code>GET /api/v1/analytics/objects</code></strong>: List the most viewed objects.</li>
+<li><strong><code>GET /api/v1/analytics/overview</code></strong>: Get the visit overview of a website.</li>
+<li><strong><code>GET /api/v1/analytics/pages</code></strong>: List the most viewed pages.</li>
+<li><strong><code>POST /api/v1/analytics/public/events</code></strong>: Send visit events (public).</li>
+<li><strong><code>GET /api/v1/analytics/sources</code></strong>: List the traffic sources.</li>
+<li><strong><code>GET /api/v1/analytics/types</code></strong>: List the event types by count.</li>
+</ul>
+<h2 id="antispam"><a class="header" href="#antispam">antispam</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/antispam/token</code></strong>: Get a form token (public).</li>
+</ul>
+<h2 id="audit"><a class="header" href="#audit">audit</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/audit</code></strong>: List the audit log.</li>
+<li><strong><code>GET /api/v1/audit/activity</code></strong>: List recent activity.</li>
+<li><strong><code>GET /api/v1/audit/{id}</code></strong>: Get one audit entry.</li>
+</ul>
+<h2 id="auth"><a class="header" href="#auth">auth</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/auth/all-api-keys</code></strong>: List the API keys of every user.</li>
+<li><strong><code>DELETE /api/v1/auth/all-api-keys/{id}</code></strong>: Revoke an API key of any user.</li>
+<li><strong><code>POST /api/v1/auth/all-api-keys/{id}/approve</code></strong>: Approve an API key that waits for approval.</li>
+<li><strong><code>GET /api/v1/auth/api-keys</code></strong>: List your API keys.</li>
+<li><strong><code>POST /api/v1/auth/api-keys</code></strong>: Create an API key for a program or an AI agent.</li>
+<li><strong><code>DELETE /api/v1/auth/api-keys/{id}</code></strong>: Revoke one of your API keys.</li>
+<li><strong><code>POST /api/v1/auth/api-keys/{id}/rotate</code></strong>: Replace one of your API keys with a new one.</li>
+<li><strong><code>GET /api/v1/auth/customers</code></strong>: List or search the customer accounts of the shop.</li>
+<li><strong><code>GET /api/v1/auth/customers/{id}</code></strong>: Get a customer account.</li>
+<li><strong><code>PATCH /api/v1/auth/customers/{id}</code></strong>: Rename, disable or enable a customer account.</li>
+<li><strong><code>GET /api/v1/auth/delegations</code></strong>: List the delegations of this tenant.</li>
+<li><strong><code>POST /api/v1/auth/delegations</code></strong>: Let holders of a role work in a child tenant.</li>
+<li><strong><code>GET /api/v1/auth/delegations/tenants</code></strong>: List the tenants below this one, to choose where a delegation goes.</li>
+<li><strong><code>DELETE /api/v1/auth/delegations/{id}</code></strong>: Revoke a delegation.</li>
+<li><strong><code>POST /api/v1/auth/email-change/report</code></strong>: Report an email change you did not make.</li>
+<li><strong><code>POST /api/v1/auth/email-verification/confirm</code></strong>: Confirm an email address with the token from a verification mail.</li>
+<li><strong><code>GET /api/v1/auth/guardrails</code></strong>: List the guardrails this tenant set for tenants below it.</li>
+<li><strong><code>GET /api/v1/auth/guardrails/applied</code></strong>: See the guardrails that limit this tenant.</li>
+<li><strong><code>DELETE /api/v1/auth/guardrails/{tenant_id}</code></strong>: Remove the guardrail this tenant set for a tenant below it.</li>
+<li><strong><code>PUT /api/v1/auth/guardrails/{tenant_id}</code></strong>: Set the most permissions a tenant below this one can use.</li>
+<li><strong><code>GET /api/v1/auth/invitations</code></strong>: List invitations.</li>
+<li><strong><code>POST /api/v1/auth/invitations</code></strong>: Invite someone by email.</li>
+<li><strong><code>POST /api/v1/auth/invitations/accept</code></strong>: Accept an invitation with the token from its mail.</li>
+<li><strong><code>DELETE /api/v1/auth/invitations/{id}</code></strong>: Revoke an invitation.</li>
+<li><strong><code>POST /api/v1/auth/invitations/{id}/resend</code></strong>: Send an invitation again.</li>
+<li><strong><code>POST /api/v1/auth/login</code></strong>: Sign in with email and password.</li>
+<li><strong><code>POST /api/v1/auth/login/link</code></strong>: Send a sign-in link by email.</li>
+<li><strong><code>POST /api/v1/auth/login/link/confirm</code></strong>: Sign in with the token from a sign-in link.</li>
+<li><strong><code>POST /api/v1/auth/login/mfa</code></strong>: Finish signing in with a code from the authenticator app or a recovery code.</li>
+<li><strong><code>POST /api/v1/auth/login/passkey</code></strong>: Sign in with a passkey: finish the ceremony from <code>POST /api/v1/auth/login/passkey/options</code>.</li>
+<li><strong><code>POST /api/v1/auth/login/passkey/options</code></strong>: Start signing in with a passkey.</li>
+<li><strong><code>POST /api/v1/auth/logout</code></strong>: Sign out: end the session of a refresh token.</li>
+<li><strong><code>DELETE /api/v1/auth/me</code></strong>: Delete your own account and everything it owns.</li>
+<li><strong><code>GET /api/v1/auth/me</code></strong>: Get the signed-in user and their permissions.</li>
+<li><strong><code>PATCH /api/v1/auth/me</code></strong>: Change your display name, preferred language or time zone.</li>
+<li><strong><code>DELETE /api/v1/auth/me/email</code></strong>: Cancel a pending email change.</li>
+<li><strong><code>POST /api/v1/auth/me/email</code></strong>: Change your email address.</li>
+<li><strong><code>POST /api/v1/auth/me/email/verification</code></strong>: Send the verification mail for your email address again.</li>
+<li><strong><code>GET /api/v1/auth/me/export</code></strong>: Download everything the server keeps about you.</li>
+<li><strong><code>GET /api/v1/auth/me/identities</code></strong>: List the outside sign-ins linked to your account.</li>
+<li><strong><code>DELETE /api/v1/auth/me/identities/{id}</code></strong>: Remove an outside sign-in from your account.</li>
+<li><strong><code>POST /api/v1/auth/me/identities/{slug}/callback</code></strong>: Finish linking a provider to your account.</li>
+<li><strong><code>POST /api/v1/auth/me/identities/{slug}/start</code></strong>: Start linking a provider to your account.</li>
+<li><strong><code>GET /api/v1/auth/me/memberships</code></strong>: List the organization units you work in, with your roles there.</li>
+<li><strong><code>GET /api/v1/auth/me/mfa</code></strong>: Get your two-step sign-in settings.</li>
+<li><strong><code>POST /api/v1/auth/me/mfa/recovery-codes</code></strong>: Replace your recovery codes with ten new ones.</li>
+<li><strong><code>POST /api/v1/auth/me/mfa/totp</code></strong>: Start turning on two-step sign-in with an authenticator app.</li>
+<li><strong><code>POST /api/v1/auth/me/mfa/totp/confirm</code></strong>: Confirm two-step sign-in with the first code from the app.</li>
+<li><strong><code>POST /api/v1/auth/me/mfa/totp/disable</code></strong>: Turn off two-step sign-in.</li>
+<li><strong><code>GET /api/v1/auth/me/oauth-grants</code></strong>: List the MCP / OAuth clients you approved.</li>
+<li><strong><code>DELETE /api/v1/auth/me/oauth-grants/{id}</code></strong>: Revoke a client you approved.</li>
+<li><strong><code>GET /api/v1/auth/me/passkeys</code></strong>: List your passkeys.</li>
+<li><strong><code>POST /api/v1/auth/me/passkeys</code></strong>: Add a passkey: finish the ceremony started with <code>POST /api/v1/auth/me/passkeys/registration</code>.</li>
+<li><strong><code>POST /api/v1/auth/me/passkeys/registration</code></strong>: Start adding a passkey to your account.</li>
+<li><strong><code>DELETE /api/v1/auth/me/passkeys/{id}</code></strong>: Remove one of your passkeys.</li>
+<li><strong><code>POST /api/v1/auth/me/password</code></strong>: Change your own password.</li>
+<li><strong><code>POST /api/v1/auth/me/reauth</code></strong>: Confirm it is you, for a sensitive change.</li>
+<li><strong><code>DELETE /api/v1/auth/me/sessions</code></strong>: Sign out all your sessions, or all but one.</li>
+<li><strong><code>GET /api/v1/auth/me/sessions</code></strong>: List your signed-in sessions.</li>
+<li><strong><code>DELETE /api/v1/auth/me/sessions/{id}</code></strong>: Sign out one of your sessions, e.g. a lost device.</li>
+<li><strong><code>GET /api/v1/auth/me/tenants</code></strong>: List the tenants you can work in.</li>
+<li><strong><code>GET /api/v1/auth/memberships</code></strong>: List who works in which organization unit, with which role.</li>
+<li><strong><code>GET /api/v1/auth/memberships/counts</code></strong>: Count the people of every organization unit.</li>
+<li><strong><code>GET /api/v1/auth/oauth-grants</code></strong>: List every approval people gave to MCP / OAuth clients.</li>
+<li><strong><code>DELETE /api/v1/auth/oauth-grants/{id}</code></strong>: Revoke any approval of an MCP / OAuth client.</li>
+<li><strong><code>GET /api/v1/auth/oauth/authorize</code></strong>: Start connecting an MCP / OAuth client (OAuth 2.1 authorization endpoint).</li>
+<li><strong><code>POST /api/v1/auth/oauth/register</code></strong>: Register an MCP / OAuth client (RFC 7591, deprecated).</li>
+<li><strong><code>GET /api/v1/auth/oauth/requests/{token}</code></strong>: Read an authorization request waiting for your decision.</li>
+<li><strong><code>POST /api/v1/auth/oauth/requests/{token}/approve</code></strong>: Approve a client: grant it the permissions you choose.</li>
+<li><strong><code>POST /api/v1/auth/oauth/requests/{token}/deny</code></strong>: Decline a client.</li>
+<li><strong><code>POST /api/v1/auth/oauth/revoke</code></strong>: Revoke a token (RFC 7009).</li>
+<li><strong><code>POST /api/v1/auth/oauth/token</code></strong>: Exchange a code or a refresh token for tokens (OAuth 2.1 token endpoint).</li>
+<li><strong><code>GET /api/v1/auth/oidc-providers</code></strong>: List the sign-in providers of this tenant, for administrators.</li>
+<li><strong><code>POST /api/v1/auth/oidc-providers</code></strong>: Add a sign-in provider to this tenant.</li>
+<li><strong><code>DELETE /api/v1/auth/oidc-providers/{id}</code></strong>: Remove a sign-in provider from this tenant.</li>
+<li><strong><code>GET /api/v1/auth/oidc-providers/{id}</code></strong>: Get a sign-in provider of this tenant.</li>
+<li><strong><code>PATCH /api/v1/auth/oidc-providers/{id}</code></strong>: Change a sign-in provider of this tenant.</li>
+<li><strong><code>GET /api/v1/auth/oidc/providers</code></strong>: List the sign-in providers of this tenant.</li>
+<li><strong><code>POST /api/v1/auth/oidc/{slug}/callback</code></strong>: Finish signing in with a provider.</li>
+<li><strong><code>POST /api/v1/auth/oidc/{slug}/start</code></strong>: Start signing in with a provider.</li>
+<li><strong><code>POST /api/v1/auth/password-reset</code></strong>: Ask for a password-reset mail.</li>
+<li><strong><code>POST /api/v1/auth/password-reset/confirm</code></strong>: Choose a new password with the token from the reset mail.</li>
+<li><strong><code>GET /api/v1/auth/permissions</code></strong>: List every permission that roles can grant.</li>
+<li><strong><code>POST /api/v1/auth/phone-signups</code></strong>: Create a buyer account from a verified order lookup.</li>
+<li><strong><code>POST /api/v1/auth/phone/codes</code></strong>: Send a sign-in code to a phone number.</li>
+<li><strong><code>POST /api/v1/auth/phone/login</code></strong>: Sign in, or create a buyer account, with a code sent by SMS.</li>
+<li><strong><code>POST /api/v1/auth/refresh</code></strong>: Exchange a refresh token for a new pair of tokens.</li>
+<li><strong><code>POST /api/v1/auth/register</code></strong> (deprecated): Create your own account (deprecated: use <code>POST /api/v1/auth/registrations</code>).</li>
+<li><strong><code>POST /api/v1/auth/registrations</code></strong>: Create your own account, without telling whether the email already has one.</li>
+<li><strong><code>GET /api/v1/auth/roles</code></strong>: List roles.</li>
+<li><strong><code>POST /api/v1/auth/roles</code></strong>: Create a role.</li>
+<li><strong><code>GET /api/v1/auth/roles/counts</code></strong>: Count the people holding each role.</li>
+<li><strong><code>DELETE /api/v1/auth/roles/{id}</code></strong>: Delete a role.</li>
+<li><strong><code>GET /api/v1/auth/roles/{id}</code></strong>: Get a role.</li>
+<li><strong><code>PUT /api/v1/auth/roles/{id}</code></strong>: Replace a role: its name, description and permissions.</li>
+<li><strong><code>GET /api/v1/auth/scim/group-mappings</code></strong>: List the mapping rules from SCIM groups to roles.</li>
+<li><strong><code>POST /api/v1/auth/scim/group-mappings</code></strong>: Map a SCIM group to a role at a unit.</li>
+<li><strong><code>DELETE /api/v1/auth/scim/group-mappings/{id}</code></strong>: Remove a mapping rule.</li>
+<li><strong><code>GET /api/v1/auth/scim/groups</code></strong>: List the groups the identity provider pushed.</li>
+<li><strong><code>GET /api/v1/auth/scim/tokens</code></strong>: List the SCIM tokens of the tenant.</li>
+<li><strong><code>POST /api/v1/auth/scim/tokens</code></strong>: Create a SCIM token for the tenant’s identity provider.</li>
+<li><strong><code>DELETE /api/v1/auth/scim/tokens/{id}</code></strong>: Revoke a SCIM token.</li>
+<li><strong><code>GET /api/v1/auth/scim/v2/Groups</code></strong>: List or find SCIM Groups.</li>
+<li><strong><code>POST /api/v1/auth/scim/v2/Groups</code></strong>: Create a SCIM Group.</li>
+<li><strong><code>DELETE /api/v1/auth/scim/v2/Groups/{id}</code></strong>: Delete a SCIM Group.</li>
+<li><strong><code>GET /api/v1/auth/scim/v2/Groups/{id}</code></strong>: Get a SCIM Group.</li>
+<li><strong><code>PATCH /api/v1/auth/scim/v2/Groups/{id}</code></strong>: Change a SCIM Group with PATCH operations.</li>
+<li><strong><code>PUT /api/v1/auth/scim/v2/Groups/{id}</code></strong>: Replace a SCIM Group.</li>
+<li><strong><code>GET /api/v1/auth/scim/v2/ResourceTypes</code></strong>: List the SCIM resource types (<code>User</code>, <code>Group</code>).</li>
+<li><strong><code>GET /api/v1/auth/scim/v2/Schemas</code></strong>: List the SCIM schemas, with the attributes Autoxide keeps.</li>
+<li><strong><code>GET /api/v1/auth/scim/v2/ServiceProviderConfig</code></strong>: Describe what this SCIM server supports.</li>
+<li><strong><code>GET /api/v1/auth/scim/v2/Users</code></strong>: List or find SCIM Users.</li>
+<li><strong><code>POST /api/v1/auth/scim/v2/Users</code></strong>: Create a SCIM User (provision a staff account).</li>
+<li><strong><code>DELETE /api/v1/auth/scim/v2/Users/{id}</code></strong>: Delete a SCIM User.</li>
+<li><strong><code>GET /api/v1/auth/scim/v2/Users/{id}</code></strong>: Get a SCIM User.</li>
+<li><strong><code>PATCH /api/v1/auth/scim/v2/Users/{id}</code></strong>: Change a SCIM User with PATCH operations.</li>
+<li><strong><code>PUT /api/v1/auth/scim/v2/Users/{id}</code></strong>: Replace a SCIM User.</li>
+<li><strong><code>GET /api/v1/auth/support-access</code></strong>: List platform staff access to this tenant’s data.</li>
+<li><strong><code>DELETE /api/v1/auth/support-access/{id}</code></strong>: Revoke a platform staff access to this tenant.</li>
+<li><strong><code>GET /api/v1/auth/support-grants</code></strong>: List the support access grants (platform).</li>
+<li><strong><code>POST /api/v1/auth/support-grants</code></strong>: Grant platform staff time-limited access to a tenant’s data (platform).</li>
+<li><strong><code>GET /api/v1/auth/support-grants/allowed</code></strong>: Tell whether a tenant lets platform staff in for support (platform).</li>
+<li><strong><code>DELETE /api/v1/auth/support-grants/{id}</code></strong>: Revoke a support access grant (platform).</li>
+<li><strong><code>GET /api/v1/auth/users</code></strong>: List or search user accounts.</li>
+<li><strong><code>POST /api/v1/auth/users</code></strong>: Create a user account.</li>
+<li><strong><code>DELETE /api/v1/auth/users/{id}</code></strong>: Delete a user account and everything it owns.</li>
+<li><strong><code>GET /api/v1/auth/users/{id}</code></strong>: Get a user account.</li>
+<li><strong><code>PATCH /api/v1/auth/users/{id}</code></strong>: Rename, disable or enable a user account.</li>
+<li><strong><code>POST /api/v1/auth/users/{id}/email/verification</code></strong>: Send the verification mail of a user again.</li>
+<li><strong><code>GET /api/v1/auth/users/{id}/memberships</code></strong>: List the organization units a user works in, with the roles there.</li>
+<li><strong><code>PUT /api/v1/auth/users/{id}/memberships</code></strong>: Replace every organization unit a user works in, and the roles there.</li>
+<li><strong><code>DELETE /api/v1/auth/users/{id}/mfa</code></strong>: Turn off two-step sign-in for a user who lost their device.</li>
+<li><strong><code>DELETE /api/v1/auth/users/{id}/passkeys</code></strong>: Remove every passkey of a user who lost their devices.</li>
+<li><strong><code>GET /api/v1/auth/users/{id}/passkeys</code></strong>: List the passkeys of a user.</li>
+<li><strong><code>DELETE /api/v1/auth/users/{id}/passkeys/{passkey_id}</code></strong>: Remove one passkey of a user who lost the device.</li>
+<li><strong><code>PUT /api/v1/auth/users/{id}/password</code></strong>: Set the password of an account created without one.</li>
+<li><strong><code>GET /api/v1/auth/users/{id}/roles</code></strong>: List the roles of a user.</li>
+<li><strong><code>PUT /api/v1/auth/users/{id}/roles</code></strong>: Replace the roles of a user.</li>
+<li><strong><code>DELETE /api/v1/auth/users/{id}/sessions</code></strong>: Sign a user out everywhere.</li>
+</ul>
+<h2 id="automations"><a class="header" href="#automations">automations</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/automations/catalog</code></strong>: List the triggers and actions you may use in automation rules.</li>
+<li><strong><code>GET /api/v1/automations/rules</code></strong>: List the automation rules in your scope.</li>
+<li><strong><code>POST /api/v1/automations/rules</code></strong>: Create an automation rule.</li>
+<li><strong><code>DELETE /api/v1/automations/rules/{id}</code></strong>: Delete an automation rule.</li>
+<li><strong><code>GET /api/v1/automations/rules/{id}</code></strong>: Get an automation rule.</li>
+<li><strong><code>PATCH /api/v1/automations/rules/{id}</code></strong>: Change an automation rule.</li>
+<li><strong><code>POST /api/v1/automations/rules/{id}/disable</code></strong>: Disable an automation rule.</li>
+<li><strong><code>POST /api/v1/automations/rules/{id}/enable</code></strong>: Enable an automation rule.</li>
+<li><strong><code>POST /api/v1/automations/rules/{id}/run</code></strong>: Run an automation rule now.</li>
+<li><strong><code>POST /api/v1/automations/rules/{id}/test</code></strong>: Dry-run an automation rule.</li>
+<li><strong><code>GET /api/v1/automations/runs</code></strong>: List the runs of automation rules in your scope.</li>
+<li><strong><code>GET /api/v1/automations/runs/{id}</code></strong>: Get a run of an automation rule, with the log of each step.</li>
+<li><strong><code>POST /api/v1/automations/runs/{id}/approve</code></strong>: Approve the risky step a run waits on.</li>
+<li><strong><code>POST /api/v1/automations/runs/{id}/reject</code></strong>: Reject the risky step a run waits on: the run ends as <code>failed</code>.</li>
+<li><strong><code>POST /api/v1/automations/runs/{id}/retry</code></strong>: Retry a failed run from the step that failed.</li>
+<li><strong><code>GET /api/v1/automations/templates</code></strong>: List the ready-made rule templates you can use.</li>
+</ul>
+<h2 id="bookings"><a class="header" href="#bookings">bookings</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/bookings/bookings</code></strong>: List bookings.</li>
+<li><strong><code>POST /api/v1/bookings/bookings</code></strong>: Book for a customer.</li>
+<li><strong><code>GET /api/v1/bookings/bookings/{id}</code></strong>: Get a booking.</li>
+<li><strong><code>GET /api/v1/bookings/bookings/{id}/calendar.ics</code></strong>: Download a booking as a calendar file.</li>
+<li><strong><code>POST /api/v1/bookings/bookings/{id}/cancel</code></strong>: Cancel a booking.</li>
+<li><strong><code>POST /api/v1/bookings/bookings/{id}/check-in</code></strong>: Check the customer in.</li>
+<li><strong><code>POST /api/v1/bookings/bookings/{id}/complete</code></strong>: Mark a booking done.</li>
+<li><strong><code>POST /api/v1/bookings/bookings/{id}/confirm</code></strong>: Confirm a pending booking.</li>
+<li><strong><code>POST /api/v1/bookings/bookings/{id}/no-show</code></strong>: Mark a no-show.</li>
+<li><strong><code>POST /api/v1/bookings/bookings/{id}/reschedule</code></strong>: Move a booking.</li>
+<li><strong><code>GET /api/v1/bookings/exceptions</code></strong>: List time off and extra hours of a resource.</li>
+<li><strong><code>POST /api/v1/bookings/exceptions</code></strong>: Add time off or extra hours.</li>
+<li><strong><code>DELETE /api/v1/bookings/exceptions/{id}</code></strong>: Remove time off or extra hours.</li>
+<li><strong><code>GET /api/v1/bookings/me/bookings</code></strong>: List my bookings.</li>
+<li><strong><code>GET /api/v1/bookings/me/bookings/{id}/calendar.ics</code></strong>: Download one of my bookings as a calendar file.</li>
+<li><strong><code>GET /api/v1/bookings/public/availability</code></strong>: Find free times (public).</li>
+<li><strong><code>POST /api/v1/bookings/public/bookings</code></strong>: Book a service (customer).</li>
+<li><strong><code>POST /api/v1/bookings/public/bookings/{id}/cancel</code></strong>: Cancel a guest booking (public).</li>
+<li><strong><code>POST /api/v1/bookings/public/phone-codes</code></strong>: Send a booking code by SMS (public).</li>
+<li><strong><code>GET /api/v1/bookings/public/services</code></strong>: List bookable services (public).</li>
+<li><strong><code>GET /api/v1/bookings/resources</code></strong>: List staff, rooms and equipment.</li>
+<li><strong><code>POST /api/v1/bookings/resources</code></strong>: Add a staff member, room or equipment.</li>
+<li><strong><code>GET /api/v1/bookings/resources/{id}</code></strong>: Get a staff member, room or equipment.</li>
+<li><strong><code>PATCH /api/v1/bookings/resources/{id}</code></strong>: Change a staff member, room or equipment.</li>
+<li><strong><code>GET /api/v1/bookings/resources/{id}/schedule</code></strong>: Get the weekly schedule of a resource.</li>
+<li><strong><code>PUT /api/v1/bookings/resources/{id}/schedule</code></strong>: Replace the weekly schedule of a resource.</li>
+<li><strong><code>GET /api/v1/bookings/services</code></strong>: List bookable services.</li>
+<li><strong><code>POST /api/v1/bookings/services</code></strong>: Create a bookable service.</li>
+<li><strong><code>GET /api/v1/bookings/services/{id}</code></strong>: Get a bookable service.</li>
+<li><strong><code>PATCH /api/v1/bookings/services/{id}</code></strong>: Change a bookable service.</li>
+</ul>
+<h2 id="catalog"><a class="header" href="#catalog">catalog</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/catalog/attributes</code></strong>: List every attribute of the tenant.</li>
+<li><strong><code>POST /api/v1/catalog/attributes</code></strong>: Create an attribute.</li>
+<li><strong><code>PATCH /api/v1/catalog/attributes/{id}</code></strong>: Change an attribute.</li>
+<li><strong><code>PUT /api/v1/catalog/attributes/{id}/options</code></strong>: Replace the options of an <code>option</code> / <code>options</code> attribute.</li>
+<li><strong><code>GET /api/v1/catalog/categories</code></strong>: List every category of the tenant.</li>
+<li><strong><code>POST /api/v1/catalog/categories</code></strong>: Create a category.</li>
+<li><strong><code>DELETE /api/v1/catalog/categories/{id}</code></strong>: Delete an empty category.</li>
+<li><strong><code>PATCH /api/v1/catalog/categories/{id}</code></strong>: Change a category.</li>
+<li><strong><code>GET /api/v1/catalog/categories/{id}/attributes</code></strong>: List the attributes of a category.</li>
+<li><strong><code>PUT /api/v1/catalog/categories/{id}/attributes</code></strong>: Replace the attributes of a category.</li>
+<li><strong><code>POST /api/v1/catalog/categories/{id}/move</code></strong>: Move a category with everything below it.</li>
+<li><strong><code>GET /api/v1/catalog/categories/{id}/restrictions</code></strong>: List the restricted-goods rules of a category.</li>
+<li><strong><code>PUT /api/v1/catalog/categories/{id}/restrictions</code></strong>: Link restricted-goods rules to a category.</li>
+<li><strong><code>GET /api/v1/catalog/collections</code></strong>: List product collections.</li>
+<li><strong><code>POST /api/v1/catalog/collections</code></strong>: Create a product collection.</li>
+<li><strong><code>DELETE /api/v1/catalog/collections/{id}</code></strong>: Delete a product collection.</li>
+<li><strong><code>GET /api/v1/catalog/collections/{id}</code></strong>: Get a product collection.</li>
+<li><strong><code>PATCH /api/v1/catalog/collections/{id}</code></strong>: Change a product collection.</li>
+<li><strong><code>GET /api/v1/catalog/collections/{id}/items</code></strong>: Get the chosen products of a collection.</li>
+<li><strong><code>PUT /api/v1/catalog/collections/{id}/items</code></strong>: Replace the chosen products of a collection.</li>
+<li><strong><code>DELETE /api/v1/catalog/digital-assets/{id}</code></strong>: Remove a file from a digital variant.</li>
+<li><strong><code>GET /api/v1/catalog/downloads</code></strong>: List your download rights.</li>
+<li><strong><code>POST /api/v1/catalog/downloads/{id}</code></strong>: Spend one download of one of your rights.</li>
+<li><strong><code>POST /api/v1/catalog/exports</code></strong>: Export products to a CSV file.</li>
+<li><strong><code>GET /api/v1/catalog/exports/{id}</code></strong>: Get an export you started.</li>
+<li><strong><code>GET /api/v1/catalog/exports/{id}/content</code></strong>: Download the CSV file of a finished export.</li>
+<li><strong><code>POST /api/v1/catalog/imports</code></strong>: Import products from a CSV file.</li>
+<li><strong><code>GET /api/v1/catalog/imports/{id}</code></strong>: Get an import you started: status, counts and errors by row.</li>
+<li><strong><code>GET /api/v1/catalog/orders/{id}/downloads</code></strong>: List the download rights of an order.</li>
+<li><strong><code>POST /api/v1/catalog/orders/{id}/downloads/reissue</code></strong>: Give new download tokens for an order.</li>
+<li><strong><code>POST /api/v1/catalog/orders/{id}/downloads/revoke</code></strong>: Revoke the download rights of an order.</li>
+<li><strong><code>GET /api/v1/catalog/price-guards</code></strong>: List the price floors in your scope.</li>
+<li><strong><code>POST /api/v1/catalog/price-guards</code></strong>: Create a price floor.</li>
+<li><strong><code>DELETE /api/v1/catalog/price-guards/{id}</code></strong>: Delete a price floor.</li>
+<li><strong><code>GET /api/v1/catalog/price-lists</code></strong>: List the price lists in your scope.</li>
+<li><strong><code>POST /api/v1/catalog/price-lists</code></strong>: Create a price list.</li>
+<li><strong><code>PATCH /api/v1/catalog/price-lists/{id}</code></strong>: Change a price list.</li>
+<li><strong><code>POST /api/v1/catalog/price-lists/{id}/changes</code></strong>: Create a bulk price change for a price list, as a draft.</li>
+<li><strong><code>GET /api/v1/catalog/price-lists/{id}/changes/{change_id}</code></strong>: Get a bulk price change.</li>
+<li><strong><code>POST /api/v1/catalog/price-lists/{id}/changes/{change_id}/approve</code></strong>: Approve a previewed bulk price change; a job writes the prices.</li>
+<li><strong><code>POST /api/v1/catalog/price-lists/{id}/changes/{change_id}/preview</code></strong>: Preview a bulk price change.</li>
+<li><strong><code>GET /api/v1/catalog/price-lists/{id}/prices</code></strong>: List the price rows of a price list, newest first.</li>
+<li><strong><code>POST /api/v1/catalog/price-lists/{id}/prices</code></strong>: Add prices to a price list.</li>
+<li><strong><code>GET /api/v1/catalog/products</code></strong>: List the products in your scope.</li>
+<li><strong><code>POST /api/v1/catalog/products</code></strong>: Create a product.</li>
+<li><strong><code>GET /api/v1/catalog/products/counts</code></strong>: Count the products in your scope by status or readiness.</li>
+<li><strong><code>POST /api/v1/catalog/products/from-images</code></strong>: Draft a product from photos with AI.</li>
+<li><strong><code>GET /api/v1/catalog/products/from-images/{id}</code></strong>: Get a request to draft a product from photos.</li>
+<li><strong><code>DELETE /api/v1/catalog/products/{id}</code></strong>: Delete a product that was never on sale.</li>
+<li><strong><code>GET /api/v1/catalog/products/{id}</code></strong>: Get a product with its texts, options, variants, categories and images.</li>
+<li><strong><code>PATCH /api/v1/catalog/products/{id}</code></strong>: Change the general details of a product.</li>
+<li><strong><code>GET /api/v1/catalog/products/{id}/attributes</code></strong>: List the attribute values of a product.</li>
+<li><strong><code>PUT /api/v1/catalog/products/{id}/attributes</code></strong>: Replace the attribute values of a product.</li>
+<li><strong><code>PUT /api/v1/catalog/products/{id}/categories</code></strong>: Replace the categories of a product.</li>
+<li><strong><code>GET /api/v1/catalog/products/{id}/documents</code></strong>: List the documents of a product.</li>
+<li><strong><code>POST /api/v1/catalog/products/{id}/documents</code></strong>: Add a document to a product.</li>
+<li><strong><code>DELETE /api/v1/catalog/products/{id}/documents/{document_id}</code></strong>: Remove a document from a product.</li>
+<li><strong><code>PUT /api/v1/catalog/products/{id}/media</code></strong>: Replace the images of a product.</li>
+<li><strong><code>DELETE /api/v1/catalog/products/{id}/media/{media_id}/alts/{locale}</code></strong>: Remove the alternative text of a product image in one language.</li>
+<li><strong><code>PUT /api/v1/catalog/products/{id}/media/{media_id}/alts/{locale}</code></strong>: Set the alternative text of a product image in one language.</li>
+<li><strong><code>PUT /api/v1/catalog/products/{id}/options</code></strong>: Replace the options of a product (colour, size…).</li>
+<li><strong><code>POST /api/v1/catalog/products/{id}/status</code></strong>: Change the sale status of a product.</li>
+<li><strong><code>POST /api/v1/catalog/products/{id}/suggestions</code></strong>: Ask AI for a draft description and SEO texts of a product.</li>
+<li><strong><code>DELETE /api/v1/catalog/products/{id}/translations/{locale}</code></strong>: Remove the texts of a product in one language.</li>
+<li><strong><code>PUT /api/v1/catalog/products/{id}/translations/{locale}</code></strong>: Set the texts of a product in one language.</li>
+<li><strong><code>POST /api/v1/catalog/products/{id}/variants</code></strong>: Add a variant to a product.</li>
+<li><strong><code>GET /api/v1/catalog/public/categories</code></strong>: List the category tree (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/categories/{slug}</code></strong>: Get a category by its address (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/collections/{slug}</code></strong>: Get a collection page (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/downloads/{id}/file</code></strong>: Download the file of a signed address (public).</li>
+<li><strong><code>POST /api/v1/catalog/public/downloads/{token}</code></strong>: Spend one download with a token (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/products</code></strong>: List products on sale (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/products/by-slug/{slug}</code></strong>: Get a product page by its address (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/products/facets</code></strong>: Count products per filter value (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/products/{id}/frequently-bought-together</code></strong>: List products frequently bought together with a product (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/products/{id}/similar</code></strong>: List products similar to a product (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/search/suggest</code></strong>: Suggest as the shopper types (public).</li>
+<li><strong><code>GET /api/v1/catalog/public/sitemap</code></strong>: List product addresses for the sitemap (public).</li>
+<li><strong><code>GET /api/v1/catalog/restriction-rules</code></strong>: List the rules of prohibited and conditional goods.</li>
+<li><strong><code>GET /api/v1/catalog/rounding-rules</code></strong>: List the rounding rules of the tenant.</li>
+<li><strong><code>POST /api/v1/catalog/rounding-rules</code></strong>: Create a rounding rule.</li>
+<li><strong><code>PUT /api/v1/catalog/stores/{org_id}/overrides/{product_id}</code></strong>: Hide or show a product on a store’s website.</li>
+<li><strong><code>POST /api/v1/catalog/suggestions/{id}/apply</code></strong>: Apply an AI draft to the product.</li>
+<li><strong><code>POST /api/v1/catalog/suggestions/{id}/discard</code></strong>: Discard an AI draft.</li>
+<li><strong><code>GET /api/v1/catalog/synonyms</code></strong>: List search synonyms.</li>
+<li><strong><code>PUT /api/v1/catalog/synonyms</code></strong>: Replace search synonyms.</li>
+<li><strong><code>GET /api/v1/catalog/variants</code></strong>: Find variants by SKU or barcode.</li>
+<li><strong><code>DELETE /api/v1/catalog/variants/{id}</code></strong>: Delete a variant.</li>
+<li><strong><code>PATCH /api/v1/catalog/variants/{id}</code></strong>: Change a variant.</li>
+<li><strong><code>GET /api/v1/catalog/variants/{id}/attributes</code></strong>: List the attribute values of a variant.</li>
+<li><strong><code>PUT /api/v1/catalog/variants/{id}/attributes</code></strong>: Replace the attribute values of a variant.</li>
+<li><strong><code>PUT /api/v1/catalog/variants/{id}/components</code></strong>: Replace the components of a bundle variant.</li>
+<li><strong><code>GET /api/v1/catalog/variants/{id}/digital-assets</code></strong>: List the files of a digital variant.</li>
+<li><strong><code>POST /api/v1/catalog/variants/{id}/digital-assets</code></strong>: Attach a file to a variant of a digital product.</li>
+<li><strong><code>GET /api/v1/catalog/variants/{id}/price</code></strong>: Resolve the price of a variant at a store, and show which list won.</li>
+</ul>
+<h2 id="comments"><a class="header" href="#comments">comments</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/comments</code></strong>: List comments for moderation.</li>
+<li><strong><code>GET /api/v1/comments/bans</code></strong>: List bans.</li>
+<li><strong><code>POST /api/v1/comments/bans</code></strong>: Ban someone from commenting.</li>
+<li><strong><code>DELETE /api/v1/comments/bans/{id}</code></strong>: Lift a ban.</li>
+<li><strong><code>DELETE /api/v1/comments/data</code></strong>: Erase the data of an email address.</li>
+<li><strong><code>GET /api/v1/comments/data</code></strong>: Export the data of an email address.</li>
+<li><strong><code>GET /api/v1/comments/profile</code></strong>: Get one’s display name.</li>
+<li><strong><code>PUT /api/v1/comments/profile</code></strong>: Set one’s display name.</li>
+<li><strong><code>POST /api/v1/comments/public/comments</code></strong>: Post a comment (public).</li>
+<li><strong><code>GET /api/v1/comments/public/comments/{id}</code></strong>: Get a comment (public).</li>
+<li><strong><code>PATCH /api/v1/comments/public/comments/{id}</code></strong>: Change one’s comment (public).</li>
+<li><strong><code>POST /api/v1/comments/public/comments/{id}/delete</code></strong>: Delete one’s comment (public).</li>
+<li><strong><code>GET /api/v1/comments/public/comments/{id}/replies</code></strong>: List the replies of a comment (public).</li>
+<li><strong><code>POST /api/v1/comments/public/comments/{id}/reports</code></strong>: Report a comment (public).</li>
+<li><strong><code>GET /api/v1/comments/public/counts</code></strong>: Count the comments of many targets (public).</li>
+<li><strong><code>GET /api/v1/comments/public/settings</code></strong>: Get the comment settings (public).</li>
+<li><strong><code>GET /api/v1/comments/public/targets/{target_type}/{target_id}</code></strong>: Get the comment state of a target (public).</li>
+<li><strong><code>GET /api/v1/comments/public/threads</code></strong>: List the comments of a target (public).</li>
+<li><strong><code>POST /api/v1/comments/public/unsubscribe</code></strong>: Stop reply mails (public).</li>
+<li><strong><code>POST /api/v1/comments/public/verify</code></strong>: Confirm an address for reply mails (public).</li>
+<li><strong><code>GET /api/v1/comments/targets</code></strong>: List the targets that have comments.</li>
+<li><strong><code>GET /api/v1/comments/targets/{target_type}/{target_id}</code></strong>: Get the comment state of a target, with its pending count.</li>
+<li><strong><code>PUT /api/v1/comments/targets/{target_type}/{target_id}</code></strong>: Open, close or hide the comments of a target.</li>
+<li><strong><code>DELETE /api/v1/comments/{id}</code></strong>: Delete a comment for good.</li>
+<li><strong><code>GET /api/v1/comments/{id}</code></strong>: Get a comment with its moderation details.</li>
+<li><strong><code>PATCH /api/v1/comments/{id}</code></strong>: Approve, reject, mark as spam or hold a comment.</li>
+<li><strong><code>GET /api/v1/comments/{id}/reports</code></strong>: List the reports of a comment.</li>
+</ul>
+<h2 id="compliance"><a class="header" href="#compliance">compliance</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/compliance/cases</code></strong>: List cases.</li>
+<li><strong><code>POST /api/v1/compliance/cases</code></strong>: Record a case received outside the public forms.</li>
+<li><strong><code>GET /api/v1/compliance/cases/{id}</code></strong>: Get a case with its log.</li>
+<li><strong><code>POST /api/v1/compliance/cases/{id}/close</code></strong>: Close a case (spam, duplicate, withdrawn, or done after the decision).</li>
+<li><strong><code>POST /api/v1/compliance/cases/{id}/decision</code></strong>: Decide a case.</li>
+<li><strong><code>POST /api/v1/compliance/cases/{id}/entries</code></strong>: Add a note or evidence to a case.</li>
+<li><strong><code>POST /api/v1/compliance/cases/{id}/responses</code></strong>: Answer a case about you or your unit.</li>
+<li><strong><code>POST /api/v1/compliance/cases/{id}/restore</code></strong>: Show the target of a case again before the decision.</li>
+<li><strong><code>POST /api/v1/compliance/cases/{id}/restrict</code></strong>: Hide the target of a case while it is handled.</li>
+<li><strong><code>GET /api/v1/compliance/cookie-consents/stats</code></strong>: Get cookie consent counts of a website.</li>
+<li><strong><code>GET /api/v1/compliance/cookie-settings/{org_id}</code></strong>: Get the cookie banner settings of a website.</li>
+<li><strong><code>PUT /api/v1/compliance/cookie-settings/{org_id}</code></strong>: Set the cookie banner of a website.</li>
+<li><strong><code>GET /api/v1/compliance/disclosures</code></strong>: List disclosures to authorities.</li>
+<li><strong><code>POST /api/v1/compliance/disclosures</code></strong>: Give a competent authority information about a seller, and record it.</li>
+<li><strong><code>GET /api/v1/compliance/documents</code></strong>: List the legal documents of the tenant.</li>
+<li><strong><code>POST /api/v1/compliance/documents</code></strong>: Create a legal document.</li>
+<li><strong><code>GET /api/v1/compliance/documents/{id}</code></strong>: Get a legal document with its versions.</li>
+<li><strong><code>GET /api/v1/compliance/documents/{id}/acceptance-stats</code></strong>: Count acceptances per version of a document.</li>
+<li><strong><code>GET /api/v1/compliance/documents/{id}/acceptances</code></strong>: List who accepted a document.</li>
+<li><strong><code>POST /api/v1/compliance/documents/{id}/versions</code></strong>: Publish a new version (or a translation) of a legal document.</li>
+<li><strong><code>GET /api/v1/compliance/incidents</code></strong>: List personal data breaches.</li>
+<li><strong><code>POST /api/v1/compliance/incidents</code></strong>: Record a personal data breach.</li>
+<li><strong><code>GET /api/v1/compliance/incidents/{id}</code></strong>: Get a personal data breach with its log.</li>
+<li><strong><code>PATCH /api/v1/compliance/incidents/{id}</code></strong>: Change a personal data breach.</li>
+<li><strong><code>GET /api/v1/compliance/incidents/{id}/draft</code></strong>: Get a draft notification of a personal data breach.</li>
+<li><strong><code>POST /api/v1/compliance/incidents/{id}/entries</code></strong>: Add a line to the log of a personal data breach.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/callbacks/{provider}</code></strong>: Receive a result from the identity provider.</li>
+<li><strong><code>GET /api/v1/compliance/kyc/profiles</code></strong>: List identity verification profiles.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/profiles</code></strong>: Open the identity verification profile of a unit (a seller).</li>
+<li><strong><code>GET /api/v1/compliance/kyc/profiles/{id}</code></strong>: Get an identity verification profile.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/profiles/{id}/approve</code></strong>: Approve a profile.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/profiles/{id}/documents</code></strong>: Send documents for a manual review.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/profiles/{id}/reject</code></strong>: Refuse a profile.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/profiles/{id}/request-info</code></strong>: Ask for more information.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/profiles/{id}/revoke</code></strong>: Revoke a verified profile.</li>
+<li><strong><code>POST /api/v1/compliance/kyc/profiles/{id}/sessions</code></strong>: Start a verification of a unit’s profile with the provider.</li>
+<li><strong><code>GET /api/v1/compliance/legal-profiles</code></strong>: List the legal profiles you can see.</li>
+<li><strong><code>POST /api/v1/compliance/legal-profiles</code></strong>: Create the legal profile of the tenant or of a unit.</li>
+<li><strong><code>GET /api/v1/compliance/legal-profiles/{id}</code></strong>: Get a legal profile.</li>
+<li><strong><code>PATCH /api/v1/compliance/legal-profiles/{id}</code></strong>: Change a legal profile.</li>
+<li><strong><code>GET /api/v1/compliance/legal-profiles/{id}/template-variables</code></strong>: Get the template variables of a legal profile.</li>
+<li><strong><code>POST /api/v1/compliance/me/acceptances</code></strong>: Accept a version of a legal document.</li>
+<li><strong><code>GET /api/v1/compliance/me/consents</code></strong>: List your consents.</li>
+<li><strong><code>PUT /api/v1/compliance/me/consents</code></strong>: Give or withdraw a consent.</li>
+<li><strong><code>GET /api/v1/compliance/me/kyc</code></strong>: Get your identity verification.</li>
+<li><strong><code>POST /api/v1/compliance/me/kyc</code></strong>: Open your identity verification profile.</li>
+<li><strong><code>POST /api/v1/compliance/me/kyc/documents</code></strong>: Send your documents for a manual review.</li>
+<li><strong><code>POST /api/v1/compliance/me/kyc/sessions</code></strong>: Start verifying your identity with the provider.</li>
+<li><strong><code>GET /api/v1/compliance/me/pending-acceptances</code></strong>: List the legal documents you must accept (again).</li>
+<li><strong><code>DELETE /api/v1/compliance/me/phone</code></strong>: Remove your verified phone number.</li>
+<li><strong><code>POST /api/v1/compliance/me/phone-verifications</code></strong>: Send a code to verify a phone number.</li>
+<li><strong><code>GET /api/v1/compliance/me/phone-verifications/{id}</code></strong>: Get one of your phone verifications.</li>
+<li><strong><code>POST /api/v1/compliance/me/phone-verifications/{id}/confirm</code></strong>: Confirm a phone number with the code.</li>
+<li><strong><code>GET /api/v1/compliance/me/verification</code></strong>: Get your account verification level.</li>
+<li><strong><code>GET /api/v1/compliance/overview</code></strong>: Work waiting in each compliance area.</li>
+<li><strong><code>POST /api/v1/compliance/phone-locks/unlock</code></strong>: Unlock sign-in codes for a phone number.</li>
+<li><strong><code>GET /api/v1/compliance/policies</code></strong>: List the compliance policies set by the tenant.</li>
+<li><strong><code>PUT /api/v1/compliance/policies/{key}</code></strong>: Set a compliance policy.</li>
+<li><strong><code>GET /api/v1/compliance/processing-register</code></strong>: Get the register of processing activities.</li>
+<li><strong><code>GET /api/v1/compliance/public/badge</code></strong>: Get the Ministry of Industry and Trade logo of a website.</li>
+<li><strong><code>GET /api/v1/compliance/public/cases/{id}</code></strong>: Follow a report or complaint you sent.</li>
+<li><strong><code>GET /api/v1/compliance/public/complaints</code></strong>: Get the consumer complaint channel.</li>
+<li><strong><code>POST /api/v1/compliance/public/complaints</code></strong>: Send a consumer complaint.</li>
+<li><strong><code>GET /api/v1/compliance/public/consent-config</code></strong>: Get the cookie banner and the tags to load, for a website.</li>
+<li><strong><code>POST /api/v1/compliance/public/cookie-consents</code></strong>: Record a visitor’s cookie choice (anonymous proof of consent).</li>
+<li><strong><code>GET /api/v1/compliance/public/documents/{kind}</code></strong>: Get the current text of a legal document.</li>
+<li><strong><code>GET /api/v1/compliance/public/moderation-reasons</code></strong>: List the reasons for which reviews and other content of consumers may be hidden.</li>
+<li><strong><code>GET /api/v1/compliance/public/owner</code></strong>: Get the owner of the website being viewed.</li>
+<li><strong><code>GET /api/v1/compliance/public/purposes</code></strong>: List the processing purposes, for the public privacy notice.</li>
+<li><strong><code>POST /api/v1/compliance/public/reports</code></strong>: Send a report of an infringement (intellectual property, counterfeit, prohibited goods).</li>
+<li><strong><code>GET /api/v1/compliance/purposes</code></strong>: List the processing purposes of the tenant.</li>
+<li><strong><code>POST /api/v1/compliance/purposes</code></strong>: Add a processing purpose.</li>
+<li><strong><code>PATCH /api/v1/compliance/purposes/{key}</code></strong>: Change a processing purpose.</li>
+<li><strong><code>GET /api/v1/compliance/residency</code></strong>: Get where the tenant’s data is kept.</li>
+<li><strong><code>PUT /api/v1/compliance/residency</code></strong>: Set where a tenant must keep its data.</li>
+<li><strong><code>GET /api/v1/compliance/respondent/cases</code></strong>: List the cases about you or your unit.</li>
+<li><strong><code>GET /api/v1/compliance/retention</code></strong>: List how long each kind of personal data is kept.</li>
+<li><strong><code>GET /api/v1/compliance/rules</code></strong>: List the legal rules: every version, or those in effect at a time.</li>
+<li><strong><code>POST /api/v1/compliance/rules</code></strong>: Import legal rules.</li>
+<li><strong><code>GET /api/v1/compliance/subject-requests</code></strong>: List the requests of data subjects received through other channels.</li>
+<li><strong><code>POST /api/v1/compliance/subject-requests</code></strong>: Record a request of a data subject received by email, post, phone or from an authority.</li>
+<li><strong><code>GET /api/v1/compliance/subject-requests/{id}</code></strong>: Get a request of a data subject.</li>
+<li><strong><code>PATCH /api/v1/compliance/subject-requests/{id}</code></strong>: Change the status of a request of a data subject, or add notes.</li>
+<li><strong><code>POST /api/v1/compliance/subject-requests/{id}/fulfil</code></strong>: Fulfil a request of a data subject.</li>
+<li><strong><code>GET /api/v1/compliance/tracking-providers</code></strong>: List the built-in tracking providers.</li>
+<li><strong><code>GET /api/v1/compliance/tracking-tags</code></strong>: List the tracking tags of websites.</li>
+<li><strong><code>POST /api/v1/compliance/tracking-tags</code></strong>: Add a tracking tag to a website.</li>
+<li><strong><code>DELETE /api/v1/compliance/tracking-tags/{id}</code></strong>: Remove a tracking tag.</li>
+<li><strong><code>GET /api/v1/compliance/tracking-tags/{id}</code></strong>: Get a tracking tag.</li>
+<li><strong><code>PATCH /api/v1/compliance/tracking-tags/{id}</code></strong>: Pause, resume or change the ID of a tracking tag.</li>
+<li><strong><code>GET /api/v1/compliance/websites</code></strong>: List the websites you can see.</li>
+<li><strong><code>POST /api/v1/compliance/websites</code></strong>: Add a website for the Ministry of Industry and Trade procedure.</li>
+<li><strong><code>GET /api/v1/compliance/websites/{id}</code></strong>: Get a website with its linked pages.</li>
+<li><strong><code>PATCH /api/v1/compliance/websites/{id}</code></strong>: Change a website.</li>
+<li><strong><code>GET /api/v1/compliance/websites/{id}/checklist</code></strong>: Get what a website still lacks for the Ministry of Industry and Trade.</li>
+<li><strong><code>GET /api/v1/compliance/websites/{id}/dossier</code></strong>: Export the draft dossier of a website for the Ministry of Industry and Trade.</li>
+<li><strong><code>DELETE /api/v1/compliance/websites/{id}/pages/{page_kind}</code></strong>: Unlink a mandatory page from a website.</li>
+<li><strong><code>PUT /api/v1/compliance/websites/{id}/pages/{page_kind}</code></strong>: Link a mandatory page to a website.</li>
+<li><strong><code>POST /api/v1/compliance/websites/{id}/status</code></strong>: Record the status of a website with the Ministry of Industry and Trade.</li>
+</ul>
+<h2 id="content"><a class="header" href="#content">content</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/content/authors</code></strong>: List author profiles.</li>
+<li><strong><code>POST /api/v1/content/authors</code></strong>: Create an author profile.</li>
+<li><strong><code>DELETE /api/v1/content/authors/{id}</code></strong>: Delete an author profile.</li>
+<li><strong><code>GET /api/v1/content/authors/{id}</code></strong>: Get an author profile.</li>
+<li><strong><code>PATCH /api/v1/content/authors/{id}</code></strong>: Change an author profile.</li>
+<li><strong><code>GET /api/v1/content/banners</code></strong>: List banners.</li>
+<li><strong><code>POST /api/v1/content/banners</code></strong>: Create a banner.</li>
+<li><strong><code>DELETE /api/v1/content/banners/{id}</code></strong>: Delete a banner.</li>
+<li><strong><code>GET /api/v1/content/banners/{id}</code></strong>: Get a banner.</li>
+<li><strong><code>PATCH /api/v1/content/banners/{id}</code></strong>: Change a banner.</li>
+<li><strong><code>POST /api/v1/content/campaign-drafts</code></strong>: Draft a campaign from a promotion.</li>
+<li><strong><code>GET /api/v1/content/campaign-drafts/{id}</code></strong>: Get a set of campaign drafts.</li>
+<li><strong><code>GET /api/v1/content/entries</code></strong>: List posts and pages (drafts included).</li>
+<li><strong><code>POST /api/v1/content/entries</code></strong>: Create a post or page as a draft.</li>
+<li><strong><code>POST /api/v1/content/entries/from-template</code></strong>: Create a page from a template.</li>
+<li><strong><code>DELETE /api/v1/content/entries/{id}</code></strong>: Delete a post or page.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}</code></strong>: Get a post or page (its draft).</li>
+<li><strong><code>PATCH /api/v1/content/entries/{id}</code></strong>: Change the draft of a post or page.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/ai/compose</code></strong>: Ask the AI to build the page’s block layout.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/ai/edit</code></strong>: Ask the AI to change the page’s block layout.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}/ai/thread</code></strong>: List the AI conversation of a page.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/archive</code></strong>: Archive a post or page.</li>
+<li><strong><code>PUT /api/v1/content/entries/{id}/authors</code></strong>: Set the authors of an entry.</li>
+<li><strong><code>DELETE /api/v1/content/entries/{id}/edit-lock</code></strong>: Release your edit lock of an entry.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}/edit-lock</code></strong>: See who is editing an entry.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/edit-lock</code></strong>: Take or renew the edit lock of an entry.</li>
+<li><strong><code>PATCH /api/v1/content/entries/{id}/layout</code></strong>: Change part of the block layout of a page with JSON Patch.</li>
+<li><strong><code>PUT /api/v1/content/entries/{id}/layout</code></strong>: Replace the block layout of a page.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/move</code></strong>: Move a page under another parent.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/preview-token</code></strong>: Make a preview link for the draft of an entry.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/publish</code></strong>: Publish a post or page.</li>
+<li><strong><code>DELETE /api/v1/content/entries/{id}/request-review</code></strong>: Withdraw a review request.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/request-review</code></strong>: Ask for a review of the draft.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}/revisions</code></strong>: List the revisions of an entry.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}/revisions/{revision_id}</code></strong>: Get one revision of an entry, with its fields.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/revisions/{revision_id}/restore</code></strong>: Copy a revision back into the draft.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}/schedules</code></strong>: List the schedules of an entry.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/schedules</code></strong>: Schedule a publish or take-down.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}/seo-check</code></strong>: Check the SEO of a draft.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/seo-suggestions</code></strong>: Suggest SEO fields with AI.</li>
+<li><strong><code>PUT /api/v1/content/entries/{id}/terms</code></strong>: Set the categories and tags of an entry.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/translate</code></strong>: Translate an entry with AI.</li>
+<li><strong><code>GET /api/v1/content/entries/{id}/translation-requests</code></strong>: List the AI translation requests of an entry.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/translations</code></strong>: Translate a post or page.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/unarchive</code></strong>: Bring an archived post or page back.</li>
+<li><strong><code>POST /api/v1/content/entries/{id}/unpublish</code></strong>: Take a post or page down.</li>
+<li><strong><code>GET /api/v1/content/menus</code></strong> (deprecated): List menus.</li>
+<li><strong><code>GET /api/v1/content/menus/{key}</code></strong> (deprecated): Get a menu.</li>
+<li><strong><code>PUT /api/v1/content/menus/{key}</code></strong> (deprecated): Create or replace a menu.</li>
+<li><strong><code>GET /api/v1/content/page-templates</code></strong>: List page templates.</li>
+<li><strong><code>POST /api/v1/content/page-templates</code></strong>: Save a page as a template.</li>
+<li><strong><code>POST /api/v1/content/page-templates/presets</code></strong>: Install the page templates shipped with the server.</li>
+<li><strong><code>DELETE /api/v1/content/page-templates/{id}</code></strong>: Delete a page template.</li>
+<li><strong><code>GET /api/v1/content/placements</code></strong>: List display placements.</li>
+<li><strong><code>POST /api/v1/content/placements</code></strong>: Create a display placement.</li>
+<li><strong><code>POST /api/v1/content/placements/presets</code></strong>: Add the standard placements.</li>
+<li><strong><code>DELETE /api/v1/content/placements/{key}</code></strong>: Delete a display placement.</li>
+<li><strong><code>GET /api/v1/content/placements/{key}</code></strong>: Get a display placement.</li>
+<li><strong><code>PUT /api/v1/content/placements/{key}</code></strong>: Replace a display placement.</li>
+<li><strong><code>PUT /api/v1/content/placements/{key}/order</code></strong>: Order the banners of a placement.</li>
+<li><strong><code>GET /api/v1/content/public/authors/{slug}</code></strong>: Get an author by slug (public).</li>
+<li><strong><code>GET /api/v1/content/public/feed</code></strong>: The newest posts of a language, for RSS, Atom or JSON Feed (public).</li>
+<li><strong><code>GET /api/v1/content/public/menus/{key}</code></strong> (deprecated): Get a navigation menu (public).</li>
+<li><strong><code>GET /api/v1/content/public/placements</code></strong>: Read several placements of a page (public).</li>
+<li><strong><code>GET /api/v1/content/public/placements/{key}</code></strong>: Read one placement (public).</li>
+<li><strong><code>GET /api/v1/content/public/posts</code></strong>: List published posts (public).</li>
+<li><strong><code>GET /api/v1/content/public/preview</code></strong>: Read a draft through a preview link (public).</li>
+<li><strong><code>GET /api/v1/content/public/resolve</code></strong>: Look up an address (public).</li>
+<li><strong><code>GET /api/v1/content/public/search</code></strong>: Search published posts and pages by meaning and words (public).</li>
+<li><strong><code>GET /api/v1/content/public/site</code></strong>: Get the frame of the website (public).</li>
+<li><strong><code>GET /api/v1/content/public/sitemap</code></strong>: List every published address, for a sitemap (public).</li>
+<li><strong><code>GET /api/v1/content/public/terms</code></strong>: List categories and tags that have published posts (public).</li>
+<li><strong><code>GET /api/v1/content/public/terms/{taxonomy}/{slug}</code></strong>: Get a category or tag by slug (public).</li>
+<li><strong><code>GET /api/v1/content/public/types/{key}/entries</code></strong>: List the published entries of a content type (public).</li>
+<li><strong><code>GET /api/v1/content/redirects</code></strong>: List redirects.</li>
+<li><strong><code>POST /api/v1/content/redirects</code></strong>: Create a redirect.</li>
+<li><strong><code>DELETE /api/v1/content/redirects/{id}</code></strong>: Delete a redirect.</li>
+<li><strong><code>GET /api/v1/content/redirects/{id}</code></strong>: Get a redirect.</li>
+<li><strong><code>PATCH /api/v1/content/redirects/{id}</code></strong>: Change a redirect.</li>
+<li><strong><code>GET /api/v1/content/schedules</code></strong>: List the schedules of every entry.</li>
+<li><strong><code>DELETE /api/v1/content/schedules/{id}</code></strong>: Cancel a pending schedule.</li>
+<li><strong><code>GET /api/v1/content/search</code></strong>: Search posts and pages by meaning and words.</li>
+<li><strong><code>GET /api/v1/content/shared-sections</code></strong>: List shared sections.</li>
+<li><strong><code>POST /api/v1/content/shared-sections</code></strong>: Create a shared section.</li>
+<li><strong><code>DELETE /api/v1/content/shared-sections/{id}</code></strong>: Delete a shared section.</li>
+<li><strong><code>GET /api/v1/content/shared-sections/{id}</code></strong>: Get a shared section.</li>
+<li><strong><code>PUT /api/v1/content/shared-sections/{id}</code></strong>: Replace a shared section.</li>
+<li><strong><code>GET /api/v1/content/site-health</code></strong>: Get the last health check of a website.</li>
+<li><strong><code>POST /api/v1/content/site-health/{org_id}/run</code></strong>: Check the health of a website now.</li>
+<li><strong><code>GET /api/v1/content/site-regions</code></strong>: Get a website header or footer.</li>
+<li><strong><code>PUT /api/v1/content/site-regions</code></strong>: Save a draft of a website header or footer.</li>
+<li><strong><code>POST /api/v1/content/site-regions/{id}/publish</code></strong>: Publish the draft of a website header or footer.</li>
+<li><strong><code>GET /api/v1/content/site/{org_id}/preview</code></strong>: Preview the look of a website at a moment.</li>
+<li><strong><code>GET /api/v1/content/templates</code></strong>: List the mandatory page templates (Vietnam).</li>
+<li><strong><code>POST /api/v1/content/templates/{key}/drafts</code></strong>: Make a draft page from a mandatory page template.</li>
+<li><strong><code>GET /api/v1/content/terms</code></strong>: List categories and tags.</li>
+<li><strong><code>POST /api/v1/content/terms</code></strong>: Create a category or tag.</li>
+<li><strong><code>DELETE /api/v1/content/terms/{id}</code></strong>: Delete a category or tag.</li>
+<li><strong><code>GET /api/v1/content/terms/{id}</code></strong>: Get a category or tag.</li>
+<li><strong><code>PATCH /api/v1/content/terms/{id}</code></strong>: Change a category or tag.</li>
+<li><strong><code>GET /api/v1/content/theme-presets</code></strong>: List the theme presets shipped with the server.</li>
+<li><strong><code>GET /api/v1/content/theme-variants</code></strong>: List the theme variants of a website.</li>
+<li><strong><code>POST /api/v1/content/theme-variants</code></strong>: Create a theme variant (as a draft).</li>
+<li><strong><code>DELETE /api/v1/content/theme-variants/{id}</code></strong>: Delete a theme variant.</li>
+<li><strong><code>GET /api/v1/content/theme-variants/{id}</code></strong>: Get a theme variant.</li>
+<li><strong><code>PUT /api/v1/content/theme-variants/{id}</code></strong>: Replace a theme variant.</li>
+<li><strong><code>POST /api/v1/content/theme-variants/{id}/activate</code></strong>: Turn a theme variant on: it shows whenever its schedule runs.</li>
+<li><strong><code>POST /api/v1/content/theme-variants/{id}/copy</code></strong>: Copy a theme variant with a new schedule (e.g. to next year).</li>
+<li><strong><code>POST /api/v1/content/theme-variants/{id}/pause</code></strong>: Pause a theme variant: it no longer shows until turned on again.</li>
+<li><strong><code>GET /api/v1/content/themes/{org_id}</code></strong>: Get the theme of a website.</li>
+<li><strong><code>PUT /api/v1/content/themes/{org_id}</code></strong>: Replace the theme tokens of a website.</li>
+<li><strong><code>GET /api/v1/content/translation-requests/{id}</code></strong>: Get an AI translation request.</li>
+<li><strong><code>GET /api/v1/content/types</code></strong>: List custom content types.</li>
+<li><strong><code>POST /api/v1/content/types</code></strong>: Create a custom content type.</li>
+<li><strong><code>POST /api/v1/content/types/ai/suggest</code></strong>: Suggest a content type with AI.</li>
+<li><strong><code>DELETE /api/v1/content/types/{key}</code></strong>: Delete a custom content type.</li>
+<li><strong><code>GET /api/v1/content/types/{key}</code></strong>: Get a custom content type.</li>
+<li><strong><code>PATCH /api/v1/content/types/{key}</code></strong>: Change a custom content type.</li>
+</ul>
+<h2 id="conversations"><a class="header" href="#conversations">conversations</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/conversations/callbacks</code></strong>: List call-back requests in your scope.</li>
+<li><strong><code>POST /api/v1/conversations/callbacks/{id}/call</code></strong>: Call a customer back.</li>
+<li><strong><code>POST /api/v1/conversations/callbacks/{id}/close</code></strong>: Close a call-back request.</li>
+<li><strong><code>DELETE /api/v1/conversations/calls/{id}/recording</code></strong>: Delete a call recording.</li>
+<li><strong><code>GET /api/v1/conversations/calls/{id}/recording</code></strong>: Listen to a call recording.</li>
+<li><strong><code>GET /api/v1/conversations/me/threads</code></strong>: List your conversations.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads</code></strong>: Start a conversation with a shop.</li>
+<li><strong><code>GET /api/v1/conversations/me/threads/{id}</code></strong>: Get one of your conversations.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/callbacks</code></strong>: Ask the shop to call you back.</li>
+<li><strong><code>DELETE /api/v1/conversations/me/threads/{id}/callbacks/{callback_id}</code></strong>: Cancel your call-back request.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/calls</code></strong>: Call the shop from the browser.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/close</code></strong>: Close one of your conversations.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/handoff</code></strong>: Talk to a person.</li>
+<li><strong><code>GET /api/v1/conversations/me/threads/{id}/messages</code></strong>: List the messages of one of your conversations.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/messages</code></strong>: Write in one of your conversations.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/messages/{message_id}/recall</code></strong>: Recall a message you sent.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/read</code></strong>: Mark one of your conversations as read.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/reports</code></strong>: Report one of your conversations, or a message in it, as abusive.</li>
+<li><strong><code>POST /api/v1/conversations/me/threads/{id}/typing</code></strong>: Tell the shop you are typing.</li>
+<li><strong><code>GET /api/v1/conversations/me/threads/{id}/voice</code></strong>: Get what is needed before calling the shop.</li>
+<li><strong><code>GET /api/v1/conversations/reports</code></strong>: List reports of abuse in your scope.</li>
+<li><strong><code>POST /api/v1/conversations/reports/{id}/resolve</code></strong>: Mark a report as reviewed.</li>
+<li><strong><code>GET /api/v1/conversations/threads</code></strong>: List the customer conversations in your scope (shared inbox).</li>
+<li><strong><code>GET /api/v1/conversations/threads/{id}</code></strong>: Get one customer conversation in your scope.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/assign</code></strong>: Assign a conversation.</li>
+<li><strong><code>DELETE /api/v1/conversations/threads/{id}/block</code></strong>: Lift the block of the customer of a conversation.</li>
+<li><strong><code>PUT /api/v1/conversations/threads/{id}/block</code></strong>: Block the customer of a conversation.</li>
+<li><strong><code>GET /api/v1/conversations/threads/{id}/calls</code></strong>: List the calls of a conversation.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/close</code></strong>: Close a conversation.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/escalate</code></strong>: Hand a conversation over as a support ticket.</li>
+<li><strong><code>GET /api/v1/conversations/threads/{id}/messages</code></strong>: List the messages of a customer conversation in your scope.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/messages</code></strong>: Answer the customer of a conversation.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/messages/{message_id}/recall</code></strong>: Recall a message you sent.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/read</code></strong>: Mark a conversation as read.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/reports</code></strong>: Report a conversation or a message as abusive.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/suggest-reply</code></strong>: Ask the AI for a draft answer.</li>
+<li><strong><code>POST /api/v1/conversations/threads/{id}/typing</code></strong>: Tell the customer you are typing.</li>
+<li><strong><code>GET /api/v1/conversations/voice/agent-session</code></strong>: Get a WebRTC session to answer calls.</li>
+<li><strong><code>GET /api/v1/conversations/voice/lines/{org_id}</code></strong>: Get the phone line of a unit.</li>
+<li><strong><code>PUT /api/v1/conversations/voice/lines/{org_id}</code></strong>: Set the phone line of a unit.</li>
+<li><strong><code>POST /api/v1/conversations/voice/webhooks/{provider}/{line_token}</code></strong>: Receive a call status notification from the voice provider.</li>
+</ul>
+<h2 id="customers"><a class="header" href="#customers">customers</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/customers</code></strong>: List the customers in your scope.</li>
+<li><strong><code>POST /api/v1/customers</code></strong>: Register a customer at the counter by phone number.</li>
+<li><strong><code>POST /api/v1/customers/gift-cards</code></strong>: Issue a gift card.</li>
+<li><strong><code>POST /api/v1/customers/gift-cards/lookup</code></strong>: Look up a gift card by its code.</li>
+<li><strong><code>GET /api/v1/customers/gift-cards/{id}</code></strong>: Get a gift card.</li>
+<li><strong><code>POST /api/v1/customers/gift-cards/{id}/void</code></strong>: Void a gift card (lost, fraud).</li>
+<li><strong><code>GET /api/v1/customers/groups</code></strong>: List customer groups.</li>
+<li><strong><code>POST /api/v1/customers/groups</code></strong>: Create a customer group.</li>
+<li><strong><code>DELETE /api/v1/customers/groups/{id}</code></strong>: Delete a customer group and its memberships.</li>
+<li><strong><code>GET /api/v1/customers/groups/{id}</code></strong>: Get a customer group with its number of members.</li>
+<li><strong><code>PUT /api/v1/customers/groups/{id}</code></strong>: Change a customer group.</li>
+<li><strong><code>DELETE /api/v1/customers/groups/{id}/members/{profile_id}</code></strong>: Remove a customer from a manual group.</li>
+<li><strong><code>POST /api/v1/customers/groups/{id}/members/{profile_id}</code></strong>: Add a customer to a manual group.</li>
+<li><strong><code>GET /api/v1/customers/groups/{id}/preview</code></strong>: Count the customers a group matches now.</li>
+<li><strong><code>GET /api/v1/customers/loyalty/rules</code></strong>: List loyalty rules (all versions).</li>
+<li><strong><code>POST /api/v1/customers/loyalty/rules</code></strong>: Add a loyalty rule version.</li>
+<li><strong><code>GET /api/v1/customers/loyalty/tiers</code></strong>: List membership tiers (all versions).</li>
+<li><strong><code>POST /api/v1/customers/loyalty/tiers</code></strong>: Add a membership tier, or a new version of one.</li>
+<li><strong><code>GET /api/v1/customers/loyalty/voucher-rewards</code></strong>: List voucher rewards.</li>
+<li><strong><code>POST /api/v1/customers/loyalty/voucher-rewards</code></strong>: Add a voucher reward.</li>
+<li><strong><code>PUT /api/v1/customers/loyalty/voucher-rewards/{id}</code></strong>: Turn a voucher reward on or off.</li>
+<li><strong><code>GET /api/v1/customers/me</code></strong>: Get your customer profile (created on first visit).</li>
+<li><strong><code>PUT /api/v1/customers/me</code></strong>: Change your customer profile.</li>
+<li><strong><code>GET /api/v1/customers/me/gift-cards</code></strong>: List your gift cards.</li>
+<li><strong><code>POST /api/v1/customers/me/gift-cards/attach</code></strong>: Attach a gift card to your account.</li>
+<li><strong><code>GET /api/v1/customers/me/orders</code></strong>: List your orders as the shop’s customer history sees them.</li>
+<li><strong><code>GET /api/v1/customers/me/points</code></strong>: Get your loyalty points and the program rules.</li>
+<li><strong><code>GET /api/v1/customers/me/points/rewards</code></strong>: List the voucher rewards you can get for points.</li>
+<li><strong><code>POST /api/v1/customers/me/points/vouchers</code></strong>: Exchange your points for a voucher.</li>
+<li><strong><code>GET /api/v1/customers/me/recently-viewed</code></strong>: List the products you looked at recently, newest first.</li>
+<li><strong><code>POST /api/v1/customers/me/recently-viewed</code></strong>: Record that you looked at a product.</li>
+<li><strong><code>GET /api/v1/customers/me/referral</code></strong>: Get your referral code.</li>
+<li><strong><code>POST /api/v1/customers/me/referral/apply</code></strong>: Enter the referral code of the friend who invited you.</li>
+<li><strong><code>GET /api/v1/customers/me/store-credit</code></strong>: Get your store credit.</li>
+<li><strong><code>GET /api/v1/customers/me/wishlist</code></strong>: List your wishlist, newest first.</li>
+<li><strong><code>POST /api/v1/customers/me/wishlist</code></strong>: Add a product to your wishlist.</li>
+<li><strong><code>GET /api/v1/customers/me/wishlist/alerts</code></strong>: Get your wishlist alert settings.</li>
+<li><strong><code>PUT /api/v1/customers/me/wishlist/alerts</code></strong>: Turn wishlist alerts on or off.</li>
+<li><strong><code>POST /api/v1/customers/me/wishlist/merge</code></strong>: Merge the wishlist kept in the browser into your account.</li>
+<li><strong><code>DELETE /api/v1/customers/me/wishlist/{product_id}</code></strong>: Remove a product (all its variants) from your wishlist.</li>
+<li><strong><code>GET /api/v1/customers/referral-rules</code></strong>: List referral reward rules, newest first.</li>
+<li><strong><code>POST /api/v1/customers/referral-rules</code></strong>: Set referral rewards.</li>
+<li><strong><code>GET /api/v1/customers/reminder-rules</code></strong>: List abandoned cart reminder rules, newest first.</li>
+<li><strong><code>POST /api/v1/customers/reminder-rules</code></strong>: Set abandoned cart reminders.</li>
+<li><strong><code>GET /api/v1/customers/{id}</code></strong>: Get a customer.</li>
+<li><strong><code>PUT /api/v1/customers/{id}</code></strong>: Change a customer.</li>
+<li><strong><code>GET /api/v1/customers/{id}/contact</code></strong>: Show the full phone number and email of a customer.</li>
+<li><strong><code>GET /api/v1/customers/{id}/orders</code></strong>: List the orders of a customer.</li>
+<li><strong><code>GET /api/v1/customers/{id}/points</code></strong>: Get the loyalty points of a customer.</li>
+<li><strong><code>POST /api/v1/customers/{id}/points/adjustments</code></strong>: Add or remove points of a customer by hand.</li>
+<li><strong><code>GET /api/v1/customers/{id}/points/entries</code></strong>: List the points history of a customer.</li>
+<li><strong><code>POST /api/v1/customers/{id}/store-credit/adjustments</code></strong>: Add or remove store credit of a customer.</li>
+</ul>
+<h2 id="files"><a class="header" href="#files">files</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/files</code></strong>: List your files.</li>
+<li><strong><code>POST /api/v1/files</code></strong>: Upload a file.</li>
+<li><strong><code>POST /api/v1/files/uploads</code></strong>: Start an upload straight to storage.</li>
+<li><strong><code>POST /api/v1/files/uploads/{id}/complete</code></strong>: Complete an upload straight to storage.</li>
+<li><strong><code>DELETE /api/v1/files/{id}</code></strong>: Delete a file.</li>
+<li><strong><code>GET /api/v1/files/{id}</code></strong>: Get the details of a file.</li>
+<li><strong><code>GET /api/v1/files/{id}/content</code></strong>: Download the content of a file.</li>
+</ul>
+<h2 id="forms"><a class="header" href="#forms">forms</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/forms</code></strong>: List forms.</li>
+<li><strong><code>POST /api/v1/forms</code></strong>: Create a form.</li>
+<li><strong><code>DELETE /api/v1/forms/data</code></strong>: Erase the data of an email address.</li>
+<li><strong><code>GET /api/v1/forms/data</code></strong>: Export the data of an email address.</li>
+<li><strong><code>GET /api/v1/forms/exports/{export_id}</code></strong>: Get a CSV export made in the background.</li>
+<li><strong><code>GET /api/v1/forms/exports/{export_id}/file</code></strong>: Download the file of a CSV export.</li>
+<li><strong><code>GET /api/v1/forms/public/{key}</code></strong>: Get a form to show (public).</li>
+<li><strong><code>POST /api/v1/forms/public/{key}/submissions</code></strong>: Send a form (public).</li>
+<li><strong><code>DELETE /api/v1/forms/submissions/{id}</code></strong>: Delete a submission.</li>
+<li><strong><code>GET /api/v1/forms/submissions/{id}</code></strong>: Get a submission.</li>
+<li><strong><code>PATCH /api/v1/forms/submissions/{id}</code></strong>: Change the status of a submission.</li>
+<li><strong><code>DELETE /api/v1/forms/{id}</code></strong>: Delete a form.</li>
+<li><strong><code>GET /api/v1/forms/{id}</code></strong>: Get a form.</li>
+<li><strong><code>PATCH /api/v1/forms/{id}</code></strong>: Change a form.</li>
+<li><strong><code>POST /api/v1/forms/{id}/duplicate</code></strong>: Duplicate a form.</li>
+<li><strong><code>GET /api/v1/forms/{id}/submissions</code></strong>: List the submissions of a form.</li>
+<li><strong><code>GET /api/v1/forms/{id}/submissions/export</code></strong>: Export the submissions of a form as CSV.</li>
+<li><strong><code>POST /api/v1/forms/{id}/submissions/exports</code></strong>: Export the submissions of a form as CSV, in the background.</li>
+</ul>
+<h2 id="health"><a class="header" href="#health">health</a></h2>
+<ul>
+<li><strong><code>GET /</code></strong>: Where to start: name, version and links to the API description.</li>
+<li><strong><code>GET /.well-known/oauth-authorization-server</code></strong>: Authorization server metadata.</li>
+<li><strong><code>GET /.well-known/oauth-protected-resource/api/v1</code></strong>: Protected resource metadata of the REST API.</li>
+<li><strong><code>GET /.well-known/oauth-protected-resource/mcp</code></strong>: Protected resource metadata of the MCP endpoint.</li>
+<li><strong><code>GET /.well-known/oauth-protected-resource/mcp/{module}</code></strong>: Protected resource metadata of one module’s MCP endpoint.</li>
+<li><strong><code>GET /api/v1/openapi/{file}</code></strong>: OpenAPI document of one module.</li>
+<li><strong><code>GET /health/live</code></strong>: Liveness probe: is the process running?</li>
+<li><strong><code>GET /health/ready</code></strong>: Readiness probe: can the service handle requests?</li>
+<li><strong><code>GET /llms.txt</code></strong>: Overview of this server for AI agents.</li>
+</ul>
+<h2 id="inventory"><a class="header" href="#inventory">inventory</a></h2>
+<ul>
+<li><strong><code>POST /api/v1/inventory/adjustments</code></strong>: Adjust stock in one warehouse, each line with a reason.</li>
+<li><strong><code>GET /api/v1/inventory/adjustments/{id}</code></strong>: Get a stock adjustment with the ledger lines it wrote.</li>
+<li><strong><code>GET /api/v1/inventory/counts</code></strong>: List stock counts in your scope.</li>
+<li><strong><code>POST /api/v1/inventory/counts</code></strong>: Open a stock count in one warehouse.</li>
+<li><strong><code>GET /api/v1/inventory/counts/{id}</code></strong>: Get a stock count with its lines.</li>
+<li><strong><code>POST /api/v1/inventory/counts/{id}/apply</code></strong>: Apply a stock count: each difference becomes a <code>count</code> ledger line with its reason.</li>
+<li><strong><code>POST /api/v1/inventory/counts/{id}/cancel</code></strong>: Cancel an open stock count.</li>
+<li><strong><code>POST /api/v1/inventory/counts/{id}/import</code></strong>: Record counted quantities from a CSV file.</li>
+<li><strong><code>PUT /api/v1/inventory/counts/{id}/lines</code></strong>: Record counted quantities.</li>
+<li><strong><code>GET /api/v1/inventory/levels</code></strong>: List stock levels (variant × warehouse) in your scope.</li>
+<li><strong><code>GET /api/v1/inventory/levels/{id}</code></strong>: Get one stock level.</li>
+<li><strong><code>PATCH /api/v1/inventory/levels/{id}</code></strong>: Change the reorder point of a stock level.</li>
+<li><strong><code>GET /api/v1/inventory/lots</code></strong>: List lots (with expiry dates) in your scope.</li>
+<li><strong><code>GET /api/v1/inventory/movements</code></strong>: List the stock movement ledger in your scope.</li>
+<li><strong><code>GET /api/v1/inventory/public/availability</code></strong>: Public availability of variants at stores.</li>
+<li><strong><code>POST /api/v1/inventory/public/restock-alerts</code></strong>: Ask for a back-in-stock alert (public).</li>
+<li><strong><code>POST /api/v1/inventory/public/restock-alerts/confirm</code></strong>: Confirm a back-in-stock alert (public).</li>
+<li><strong><code>POST /api/v1/inventory/public/restock-alerts/stop</code></strong>: Stop a back-in-stock alert (public).</li>
+<li><strong><code>GET /api/v1/inventory/purchase-orders</code></strong>: List purchase orders in your scope.</li>
+<li><strong><code>POST /api/v1/inventory/purchase-orders</code></strong>: Create a purchase order as a draft.</li>
+<li><strong><code>GET /api/v1/inventory/purchase-orders/{id}</code></strong>: Get a purchase order.</li>
+<li><strong><code>PATCH /api/v1/inventory/purchase-orders/{id}</code></strong>: Change a draft purchase order (its lines are replaced).</li>
+<li><strong><code>POST /api/v1/inventory/purchase-orders/{id}/cancel</code></strong>: Cancel a purchase order that is a draft, or ordered with nothing received.</li>
+<li><strong><code>POST /api/v1/inventory/purchase-orders/{id}/close</code></strong>: Close a purchase order: what has not arrived stops counting as <code>incoming</code>.</li>
+<li><strong><code>POST /api/v1/inventory/purchase-orders/{id}/order</code></strong>: Send a draft purchase order to the supplier: its units count as <code>incoming</code>.</li>
+<li><strong><code>GET /api/v1/inventory/receipts</code></strong>: List goods receipts in your scope.</li>
+<li><strong><code>POST /api/v1/inventory/receipts</code></strong>: Receive goods into a warehouse, against a purchase order or directly.</li>
+<li><strong><code>GET /api/v1/inventory/receipts/{id}</code></strong>: Get a goods receipt.</li>
+<li><strong><code>POST /api/v1/inventory/receipts/{id}/retry-ledger</code></strong>: Post a receipt whose ledger posting failed again.</li>
+<li><strong><code>GET /api/v1/inventory/reports/valuation</code></strong>: Value of the stock now: on hand × weighted average cost, per warehouse and currency.</li>
+<li><strong><code>GET /api/v1/inventory/reservations</code></strong>: List stock reservations of orders sold by units in your scope.</li>
+<li><strong><code>POST /api/v1/inventory/reservations/{id}/release</code></strong>: Release a stuck reservation by hand.</li>
+<li><strong><code>GET /api/v1/inventory/settings/{org_id}</code></strong>: Get how a store picks warehouses.</li>
+<li><strong><code>PUT /api/v1/inventory/settings/{org_id}</code></strong>: Change how a store picks warehouses.</li>
+<li><strong><code>GET /api/v1/inventory/sources/{selling_org_id}</code></strong>: List the warehouses serving a store or channel, in the order they are tried.</li>
+<li><strong><code>PUT /api/v1/inventory/sources/{selling_org_id}</code></strong>: Replace the warehouses serving a store or channel.</li>
+<li><strong><code>GET /api/v1/inventory/supplier-returns</code></strong>: List supplier returns in your scope.</li>
+<li><strong><code>POST /api/v1/inventory/supplier-returns</code></strong>: Return goods to a supplier.</li>
+<li><strong><code>GET /api/v1/inventory/supplier-returns/{id}</code></strong>: Get a supplier return.</li>
+<li><strong><code>GET /api/v1/inventory/suppliers</code></strong>: List suppliers in your scope with what you owe each one.</li>
+<li><strong><code>POST /api/v1/inventory/suppliers</code></strong>: Create a supplier.</li>
+<li><strong><code>GET /api/v1/inventory/suppliers/{id}</code></strong>: Get a supplier with what you owe it.</li>
+<li><strong><code>PATCH /api/v1/inventory/suppliers/{id}</code></strong>: Change a supplier.</li>
+<li><strong><code>GET /api/v1/inventory/transfers</code></strong>: List stock transfers from or to warehouses in your scope.</li>
+<li><strong><code>POST /api/v1/inventory/transfers</code></strong>: Create a stock transfer as a draft.</li>
+<li><strong><code>GET /api/v1/inventory/transfers/{id}</code></strong>: Get a stock transfer.</li>
+<li><strong><code>POST /api/v1/inventory/transfers/{id}/cancel</code></strong>: Cancel a draft transfer.</li>
+<li><strong><code>POST /api/v1/inventory/transfers/{id}/close</code></strong>: Close a transfer in transit: what has not arrived is written off from <code>incoming</code>.</li>
+<li><strong><code>POST /api/v1/inventory/transfers/{id}/receive</code></strong>: Receive goods of a transfer in transit, all or part.</li>
+<li><strong><code>POST /api/v1/inventory/transfers/{id}/ship</code></strong>: Ship a draft transfer: the goods leave the source and are in transit.</li>
+</ul>
+<h2 id="invoices"><a class="header" href="#invoices">invoices</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/invoices/archives</code></strong>: List archive copies of the accounting records.</li>
+<li><strong><code>POST /api/v1/invoices/archives</code></strong>: Make an archive copy of the accounting records.</li>
+<li><strong><code>GET /api/v1/invoices/documents</code></strong>: List documents in your scope.</li>
+<li><strong><code>POST /api/v1/invoices/documents</code></strong>: Write a draft document.</li>
+<li><strong><code>DELETE /api/v1/invoices/documents/{id}</code></strong>: Delete a draft.</li>
+<li><strong><code>GET /api/v1/invoices/documents/{id}</code></strong>: Get a document with its lines.</li>
+<li><strong><code>PATCH /api/v1/invoices/documents/{id}</code></strong>: Change a draft.</li>
+<li><strong><code>POST /api/v1/invoices/documents/{id}/adjust</code></strong>: Write an adjustment of an issued document.</li>
+<li><strong><code>POST /api/v1/invoices/documents/{id}/cancel</code></strong>: Cancel an issued document.</li>
+<li><strong><code>GET /api/v1/invoices/documents/{id}/einvoice</code></strong>: Download the e-invoice file from the provider.</li>
+<li><strong><code>POST /api/v1/invoices/documents/{id}/issue</code></strong>: Issue a document.</li>
+<li><strong><code>POST /api/v1/invoices/documents/{id}/refresh</code></strong>: Ask the e-invoice provider about a document now.</li>
+<li><strong><code>GET /api/v1/invoices/documents/{id}/render</code></strong>: Print a document as HTML or PDF.</li>
+<li><strong><code>POST /api/v1/invoices/documents/{id}/replace</code></strong>: Write a replacement of an issued document.</li>
+<li><strong><code>GET /api/v1/invoices/export-profiles</code></strong>: List the export profiles.</li>
+<li><strong><code>GET /api/v1/invoices/exports</code></strong>: List accounting exports.</li>
+<li><strong><code>POST /api/v1/invoices/exports</code></strong>: Export the general journal or the documents of a period.</li>
+<li><strong><code>GET /api/v1/invoices/exports/{id}</code></strong>: Get an accounting export.</li>
+<li><strong><code>GET /api/v1/invoices/exports/{id}/download</code></strong>: Download the file of an accounting export.</li>
+<li><strong><code>POST /api/v1/invoices/exports/{id}/retry</code></strong>: Make a failed accounting export again.</li>
+<li><strong><code>GET /api/v1/invoices/mandates</code></strong>: List the mandates of sellers in your scope.</li>
+<li><strong><code>POST /api/v1/invoices/mandates</code></strong>: Record a mandate to issue invoices on behalf of a seller.</li>
+<li><strong><code>POST /api/v1/invoices/mandates/{id}/revoke</code></strong>: Revoke a mandate.</li>
+<li><strong><code>GET /api/v1/invoices/series</code></strong>: List the series in your scope.</li>
+<li><strong><code>POST /api/v1/invoices/series</code></strong>: Create a series.</li>
+<li><strong><code>PATCH /api/v1/invoices/series/{id}</code></strong>: Retire or reuse a series.</li>
+<li><strong><code>GET /api/v1/invoices/template-defaults</code></strong>: Get the built-in print template and the variables templates may use.</li>
+<li><strong><code>GET /api/v1/invoices/templates</code></strong>: List the print templates of the tenant.</li>
+<li><strong><code>POST /api/v1/invoices/templates</code></strong>: Save a print template.</li>
+<li><strong><code>POST /api/v1/invoices/templates/preview</code></strong>: Try a print template without saving it.</li>
+<li><strong><code>DELETE /api/v1/invoices/templates/{id}</code></strong>: Delete a print template.</li>
+<li><strong><code>GET /api/v1/invoices/templates/{id}</code></strong>: Get a print template.</li>
+<li><strong><code>PUT /api/v1/invoices/templates/{id}</code></strong>: Change a print template.</li>
+<li><strong><code>GET /api/v1/invoices/vat-summary</code></strong>: Output VAT of a period by kind of document and VAT rate.</li>
+</ul>
+<h2 id="kernel"><a class="header" href="#kernel">kernel</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/kernel/approvals</code></strong>: List approval requests.</li>
+<li><strong><code>GET /api/v1/kernel/approvals/{id}</code></strong>: Get an approval request.</li>
+<li><strong><code>POST /api/v1/kernel/approvals/{id}/approve</code></strong>: Approve an agent’s command.</li>
+<li><strong><code>POST /api/v1/kernel/approvals/{id}/reject</code></strong>: Reject an agent’s command.</li>
+<li><strong><code>GET /api/v1/kernel/blocks</code></strong>: List the block types this tenant can use.</li>
+<li><strong><code>POST /api/v1/kernel/bulk/{resource}/{action}</code></strong>: Run an action on many records.</li>
+<li><strong><code>GET /api/v1/kernel/client-config</code></strong>: Get the settings an interface needs.</li>
+<li><strong><code>GET /api/v1/kernel/connections/webhooks</code></strong>: List the webhook addresses of this tenant.</li>
+<li><strong><code>GET /api/v1/kernel/custom-fields</code></strong>: List custom fields.</li>
+<li><strong><code>POST /api/v1/kernel/custom-fields</code></strong>: Define a custom field.</li>
+<li><strong><code>DELETE /api/v1/kernel/custom-fields/{id}</code></strong>: Turn a custom field off.</li>
+<li><strong><code>GET /api/v1/kernel/custom-fields/{id}</code></strong>: Get a custom field.</li>
+<li><strong><code>PATCH /api/v1/kernel/custom-fields/{id}</code></strong>: Change a custom field.</li>
+<li><strong><code>GET /api/v1/kernel/devtools/events</code></strong>: List the events of a record.</li>
+<li><strong><code>GET /api/v1/kernel/devtools/requests</code></strong>: List the calls made in this tenant.</li>
+<li><strong><code>GET /api/v1/kernel/domains</code></strong>: List this tenant’s domains.</li>
+<li><strong><code>POST /api/v1/kernel/domains</code></strong>: Add a domain to this tenant.</li>
+<li><strong><code>GET /api/v1/kernel/domains/allowed</code></strong>: Tell whether a domain may get a TLS certificate.</li>
+<li><strong><code>DELETE /api/v1/kernel/domains/{id}</code></strong>: Remove a domain from this tenant.</li>
+<li><strong><code>PATCH /api/v1/kernel/domains/{id}</code></strong>: Attach a domain to a node of the organization tree.</li>
+<li><strong><code>POST /api/v1/kernel/domains/{id}/verify</code></strong>: Verify a domain now.</li>
+<li><strong><code>GET /api/v1/kernel/events/stream</code></strong>: Stream events in real time (Server-Sent Events).</li>
+<li><strong><code>GET /api/v1/kernel/events/ws</code></strong>: Receive events and send live signals over a WebSocket.</li>
+<li><strong><code>POST /api/v1/kernel/exports</code></strong>: Export a list.</li>
+<li><strong><code>GET /api/v1/kernel/exports/download</code></strong>: Download a data export with a link.</li>
+<li><strong><code>POST /api/v1/kernel/filters/parse</code></strong>: Turn a sentence into the filters of a list.</li>
+<li><strong><code>GET /api/v1/kernel/find</code></strong>: Find records across modules.</li>
+<li><strong><code>GET /api/v1/kernel/jobs</code></strong>: List background jobs.</li>
+<li><strong><code>GET /api/v1/kernel/jobs/{id}</code></strong>: Get a background job.</li>
+<li><strong><code>GET /api/v1/kernel/jobs/{id}/file</code></strong>: Download the file of a job.</li>
+<li><strong><code>POST /api/v1/kernel/jobs/{id}/retry</code></strong>: Run a failed background job again.</li>
+<li><strong><code>GET /api/v1/kernel/modules</code></strong>: List the installed modules.</li>
+<li><strong><code>GET /api/v1/kernel/modules/{name}</code></strong>: Get one installed module.</li>
+<li><strong><code>GET /api/v1/kernel/navigation</code></strong>: Get the navigation of the admin interface.</li>
+<li><strong><code>GET /api/v1/kernel/ops/alerts</code></strong>: List what needs attention on the server.</li>
+<li><strong><code>GET /api/v1/kernel/ops/backlog</code></strong>: See the job and event backlogs of every database.</li>
+<li><strong><code>GET /api/v1/kernel/placements</code></strong>: List the placements.</li>
+<li><strong><code>GET /api/v1/kernel/placements/migrations</code></strong>: List the recent migration runs.</li>
+<li><strong><code>POST /api/v1/kernel/placements/migrations</code></strong>: Migrate the tenant databases (placements), or see what would run.</li>
+<li><strong><code>GET /api/v1/kernel/placements/migrations/{id}</code></strong>: Get a migration run.</li>
+<li><strong><code>GET /api/v1/kernel/public/texts</code></strong>: Get the tenant’s wording.</li>
+<li><strong><code>GET /api/v1/kernel/reasons/{list}</code></strong>: List the reasons of a list.</li>
+<li><strong><code>PUT /api/v1/kernel/reasons/{list}/{code}</code></strong>: Change or add a reason.</li>
+<li><strong><code>GET /api/v1/kernel/records/types</code></strong>: List the types of record that menus, embeds and notes can point to.</li>
+<li><strong><code>GET /api/v1/kernel/records/{kind}/{id}/activity</code></strong>: Get the activity of a record.</li>
+<li><strong><code>GET /api/v1/kernel/records/{kind}/{id}/notes</code></strong>: List the notes of a record.</li>
+<li><strong><code>POST /api/v1/kernel/records/{kind}/{id}/notes</code></strong>: Write a note on a record.</li>
+<li><strong><code>DELETE /api/v1/kernel/records/{kind}/{id}/notes/{note_id}</code></strong>: Delete your note on a record.</li>
+<li><strong><code>PUT /api/v1/kernel/records/{kind}/{id}/tags</code></strong>: Set the tags of a record.</li>
+<li><strong><code>GET /api/v1/kernel/records/{kind}/{id}/usages</code></strong>: Get where a record is used.</li>
+<li><strong><code>POST /api/v1/kernel/relocations</code></strong>: Split a tenant or merge tenants.</li>
+<li><strong><code>GET /api/v1/kernel/relocations/{id}</code></strong>: Get a split or merge of tenants.</li>
+<li><strong><code>GET /api/v1/kernel/resolve</code></strong>: Open a record by its code.</li>
+<li><strong><code>GET /api/v1/kernel/sandbox/messages</code></strong>: List what this sandbox kept instead of sending out.</li>
+<li><strong><code>GET /api/v1/kernel/sandboxes/promotable</code></strong>: List the kinds of records that can be promoted from a sandbox.</li>
+<li><strong><code>DELETE /api/v1/kernel/sandboxes/{id}</code></strong>: Delete a sandbox.</li>
+<li><strong><code>POST /api/v1/kernel/sandboxes/{id}/extend</code></strong>: Extend a sandbox.</li>
+<li><strong><code>POST /api/v1/kernel/sandboxes/{id}/promote</code></strong>: Promote records tried in a sandbox to the real tenant, as drafts.</li>
+<li><strong><code>GET /api/v1/kernel/settings</code></strong>: List this tenant’s settings.</li>
+<li><strong><code>DELETE /api/v1/kernel/settings/{name}</code></strong>: Remove one of this tenant’s settings.</li>
+<li><strong><code>PUT /api/v1/kernel/settings/{name}</code></strong>: Set one of this tenant’s settings.</li>
+<li><strong><code>POST /api/v1/kernel/settings/{name}/test</code></strong>: Test a connection.</li>
+<li><strong><code>GET /api/v1/kernel/setup</code></strong>: Get the setup checklist.</li>
+<li><strong><code>GET /api/v1/kernel/summary</code></strong>: Get the summary figures.</li>
+<li><strong><code>POST /api/v1/kernel/sync/batch</code></strong>: Send writes queued while offline.</li>
+<li><strong><code>GET /api/v1/kernel/sync/resources</code></strong>: List what an offline app can keep in sync.</li>
+<li><strong><code>GET /api/v1/kernel/tags</code></strong>: List the tags.</li>
+<li><strong><code>POST /api/v1/kernel/tags</code></strong>: Create a tag.</li>
+<li><strong><code>DELETE /api/v1/kernel/tags/{id}</code></strong>: Delete a tag.</li>
+<li><strong><code>PATCH /api/v1/kernel/tags/{id}</code></strong>: Change a tag.</li>
+<li><strong><code>POST /api/v1/kernel/tags/{id}/apply</code></strong>: Tag or untag many records at once.</li>
+<li><strong><code>POST /api/v1/kernel/tags/{id}/merge</code></strong>: Merge a tag into another.</li>
+<li><strong><code>GET /api/v1/kernel/tenant</code></strong>: Get my tenant.</li>
+<li><strong><code>POST /api/v1/kernel/tenant/relocation-requests</code></strong>: Ask for a split or merge of your tenant.</li>
+<li><strong><code>GET /api/v1/kernel/tenant/relocation-requests/{id}</code></strong>: Get a request of your tenant.</li>
+<li><strong><code>GET /api/v1/kernel/tenants</code></strong>: List the tenants of the platform.</li>
+<li><strong><code>POST /api/v1/kernel/tenants</code></strong>: Create a tenant.</li>
+<li><strong><code>GET /api/v1/kernel/tenants/{id}</code></strong>: Get a tenant.</li>
+<li><strong><code>PATCH /api/v1/kernel/tenants/{id}</code></strong>: Rename, suspend or resume a tenant.</li>
+<li><strong><code>POST /api/v1/kernel/tenants/{id}/erase</code></strong>: Delete a tenant and its data for good.</li>
+<li><strong><code>GET /api/v1/kernel/tenants/{id}/exports</code></strong>: List the data exports of a tenant.</li>
+<li><strong><code>POST /api/v1/kernel/tenants/{id}/exports</code></strong>: Export all the data of a tenant.</li>
+<li><strong><code>GET /api/v1/kernel/tenants/{id}/exports/{export_id}</code></strong>: Get a data export of a tenant.</li>
+<li><strong><code>GET /api/v1/kernel/tenants/{id}/exports/{export_id}/content</code></strong>: Download a data export of a tenant.</li>
+<li><strong><code>POST /api/v1/kernel/tenants/{id}/exports/{export_id}/link</code></strong>: Create a download link for a data export.</li>
+<li><strong><code>POST /api/v1/kernel/tenants/{id}/move</code></strong>: Move a tenant to another placement.</li>
+<li><strong><code>GET /api/v1/kernel/tenants/{id}/moves/{move_id}</code></strong>: Get a move of a tenant.</li>
+<li><strong><code>GET /api/v1/kernel/tenants/{id}/sandboxes</code></strong>: List the sandboxes of a tenant.</li>
+<li><strong><code>POST /api/v1/kernel/tenants/{id}/sandboxes</code></strong>: Create a sandbox of a tenant.</li>
+<li><strong><code>GET /api/v1/kernel/tenants/{id}/settings</code></strong>: List a tenant’s settings (platform staff).</li>
+<li><strong><code>DELETE /api/v1/kernel/tenants/{id}/settings/{name}</code></strong>: Remove a setting of a tenant (platform staff).</li>
+<li><strong><code>PUT /api/v1/kernel/tenants/{id}/settings/{name}</code></strong>: Set a setting of a tenant (platform staff).</li>
+<li><strong><code>GET /api/v1/kernel/texts</code></strong>: List the texts a tenant may replace.</li>
+<li><strong><code>DELETE /api/v1/kernel/texts/{locale}/{key}</code></strong>: Go back to the default text.</li>
+<li><strong><code>PUT /api/v1/kernel/texts/{locale}/{key}</code></strong>: Replace a text.</li>
+<li><strong><code>GET /api/v1/kernel/whats-new</code></strong>: List what is new in this server.</li>
+<li><strong><code>GET /api/v1/kernel/work</code></strong>: List the work waiting for you.</li>
+<li><strong><code>GET /api/v1/kernel/work/counts</code></strong>: Count the work waiting for you, by source.</li>
+</ul>
+<h2 id="ledger"><a class="header" href="#ledger">ledger</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/ledger/accounts</code></strong>: List the accounts of a book.</li>
+<li><strong><code>POST /api/v1/ledger/accounts</code></strong>: Open an account.</li>
+<li><strong><code>GET /api/v1/ledger/accounts/{id}</code></strong>: Get an account with its balance.</li>
+<li><strong><code>PATCH /api/v1/ledger/accounts/{id}</code></strong>: Change an account: name, floor, external code, status.</li>
+<li><strong><code>GET /api/v1/ledger/accounts/{id}/balance</code></strong>: Get the balance of an account, now or at the end of a day.</li>
+<li><strong><code>GET /api/v1/ledger/accounts/{id}/lines</code></strong>: List the entry lines on an account.</li>
+<li><strong><code>GET /api/v1/ledger/bank-accounts</code></strong>: List the bank accounts in your scope.</li>
+<li><strong><code>POST /api/v1/ledger/bank-accounts</code></strong>: Register a bank account for VietQR transfers.</li>
+<li><strong><code>PATCH /api/v1/ledger/bank-accounts/{id}</code></strong>: Change a bank account: name, bank feed, status.</li>
+<li><strong><code>POST /api/v1/ledger/bank-accounts/{id}/vietqr-preview</code></strong>: Make a sample VietQR code for a bank account, without creating a payment.</li>
+<li><strong><code>POST /api/v1/ledger/bank-feeds/{provider}</code></strong>: Receive bank account transactions from a bank feed.</li>
+<li><strong><code>POST /api/v1/ledger/bank-feeds/{provider}/{hook}</code></strong>: Receive bank account transactions from a bank feed at a tenant’s own address.</li>
+<li><strong><code>GET /api/v1/ledger/books</code></strong>: List the books in your scope.</li>
+<li><strong><code>POST /api/v1/ledger/books</code></strong>: Open the book of a unit.</li>
+<li><strong><code>GET /api/v1/ledger/books/{id}</code></strong>: Get a book.</li>
+<li><strong><code>GET /api/v1/ledger/books/{id}/integrity</code></strong>: Check a book’s hash chain now.</li>
+<li><strong><code>GET /api/v1/ledger/books/{id}/seal-status</code></strong>: Get the seal status of a book.</li>
+<li><strong><code>GET /api/v1/ledger/entries</code></strong>: List entries in your scope.</li>
+<li><strong><code>POST /api/v1/ledger/entries</code></strong>: Post a manual entry.</li>
+<li><strong><code>GET /api/v1/ledger/entries/{id}</code></strong>: Get an entry with its lines.</li>
+<li><strong><code>POST /api/v1/ledger/entries/{id}/reverse</code></strong>: Reverse an entry.</li>
+<li><strong><code>GET /api/v1/ledger/exceptions</code></strong>: List the differences waiting for a person.</li>
+<li><strong><code>POST /api/v1/ledger/exceptions/{id}/resolve</code></strong>: Resolve a difference.</li>
+<li><strong><code>GET /api/v1/ledger/exchange-rates</code></strong>: List recorded exchange rates.</li>
+<li><strong><code>POST /api/v1/ledger/exchange-rates</code></strong>: Record an exchange rate by hand.</li>
+<li><strong><code>GET /api/v1/ledger/exchange-rates/effective</code></strong>: Get the exchange rate in force on a day.</li>
+<li><strong><code>POST /api/v1/ledger/exchange-rates/fetch</code></strong>: Fetch exchange rates from a rate source.</li>
+<li><strong><code>GET /api/v1/ledger/flow-settings/{org_id}</code></strong>: Get the money-flow settings in force for a unit.</li>
+<li><strong><code>PUT /api/v1/ledger/flow-settings/{org_id}</code></strong>: Set the money-flow mode of a unit.</li>
+<li><strong><code>GET /api/v1/ledger/holds</code></strong>: List seller money held until the return window ends.</li>
+<li><strong><code>POST /api/v1/ledger/holds/{id}/release</code></strong>: Release held seller money now.</li>
+<li><strong><code>GET /api/v1/ledger/payments</code></strong>: List payments in your scope.</li>
+<li><strong><code>POST /api/v1/ledger/payments</code></strong>: Create a payment through a payment partner.</li>
+<li><strong><code>POST /api/v1/ledger/payments/vietqr</code></strong>: Create a VietQR bank transfer payment.</li>
+<li><strong><code>GET /api/v1/ledger/payments/{id}</code></strong>: Get a payment with its refunds.</li>
+<li><strong><code>POST /api/v1/ledger/payments/{id}/refunds</code></strong>: Refund (part of) a payment.</li>
+<li><strong><code>POST /api/v1/ledger/payments/{id}/simulate</code></strong>: Simulate the partner’s answer for a sandbox payment.</li>
+<li><strong><code>GET /api/v1/ledger/payouts</code></strong>: List payouts in your scope.</li>
+<li><strong><code>POST /api/v1/ledger/payouts</code></strong>: Pay a seller its available balance.</li>
+<li><strong><code>GET /api/v1/ledger/payouts/{id}</code></strong>: Get a payout.</li>
+<li><strong><code>GET /api/v1/ledger/periods</code></strong>: List the periods of a book.</li>
+<li><strong><code>POST /api/v1/ledger/periods/{id}/close</code></strong>: Close a period.</li>
+<li><strong><code>GET /api/v1/ledger/reconciliations</code></strong>: List reconciliation runs.</li>
+<li><strong><code>POST /api/v1/ledger/reconciliations</code></strong>: Reconcile a day now.</li>
+<li><strong><code>GET /api/v1/ledger/trial-balance</code></strong>: Get the trial balance of a book for a range of days.</li>
+<li><strong><code>POST /api/v1/ledger/webhooks/{provider}</code></strong>: Receive a notification from a payment partner.</li>
+<li><strong><code>POST /api/v1/ledger/webhooks/{provider}/{hook}</code></strong>: Receive a notification from a payment partner at a tenant’s own address.</li>
+</ul>
+<h2 id="mail"><a class="header" href="#mail">mail</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/mail/bounces</code></strong>: List the mail addresses of this tenant that bounced.</li>
+<li><strong><code>GET /api/v1/mail/bounces/stats</code></strong>: Get bounce figures of this tenant.</li>
+<li><strong><code>DELETE /api/v1/mail/bounces/{id}</code></strong>: Delete a bounce record.</li>
+<li><strong><code>GET /api/v1/mail/bounces/{id}</code></strong>: Get one bounce record.</li>
+<li><strong><code>POST /api/v1/mail/bounces/{id}/release</code></strong>: Take an address off the suppression list.</li>
+</ul>
+<h2 id="me"><a class="header" href="#me">me</a></h2>
+<ul>
+<li><strong><code>POST /api/v1/me/can</code></strong>: Ask what you may do, and why not.</li>
+<li><strong><code>GET /api/v1/me/flags</code></strong>: List my interface flags.</li>
+<li><strong><code>DELETE /api/v1/me/flags/{key}</code></strong>: Delete one of my interface flags.</li>
+<li><strong><code>PUT /api/v1/me/flags/{key}</code></strong>: Set one of my interface flags.</li>
+<li><strong><code>GET /api/v1/me/permissions</code></strong>: List your own permissions.</li>
+<li><strong><code>GET /api/v1/me/pins</code></strong>: List my pins.</li>
+<li><strong><code>POST /api/v1/me/pins</code></strong>: Pin a screen or a record.</li>
+<li><strong><code>PUT /api/v1/me/pins/order</code></strong>: Reorder my pins.</li>
+<li><strong><code>DELETE /api/v1/me/pins/{id}</code></strong>: Unpin.</li>
+<li><strong><code>GET /api/v1/me/views</code></strong>: List my saved views.</li>
+<li><strong><code>POST /api/v1/me/views</code></strong>: Save a list view.</li>
+<li><strong><code>DELETE /api/v1/me/views/{id}</code></strong>: Delete a saved view.</li>
+<li><strong><code>PATCH /api/v1/me/views/{id}</code></strong>: Change a saved view.</li>
+<li><strong><code>POST /api/v1/me/work/{key}/assign</code></strong>: Assign a piece of work.</li>
+<li><strong><code>DELETE /api/v1/me/work/{key}/snooze</code></strong>: Stop snoozing a piece of work.</li>
+<li><strong><code>POST /api/v1/me/work/{key}/snooze</code></strong>: Snooze a piece of work.</li>
+</ul>
+<h2 id="media"><a class="header" href="#media">media</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/media</code></strong>: List media items.</li>
+<li><strong><code>POST /api/v1/media</code></strong>: Upload a media item.</li>
+<li><strong><code>GET /api/v1/media/folders</code></strong>: List media folders.</li>
+<li><strong><code>POST /api/v1/media/folders</code></strong>: Create a media folder.</li>
+<li><strong><code>DELETE /api/v1/media/folders/{id}</code></strong>: Delete an empty media folder.</li>
+<li><strong><code>GET /api/v1/media/folders/{id}</code></strong>: Get a media folder.</li>
+<li><strong><code>PATCH /api/v1/media/folders/{id}</code></strong>: Rename or move a media folder.</li>
+<li><strong><code>GET /api/v1/media/summary</code></strong>: Get the totals of the media library.</li>
+<li><strong><code>GET /api/v1/media/tags</code></strong>: List media tags.</li>
+<li><strong><code>DELETE /api/v1/media/tags/{id}</code></strong>: Delete a media tag.</li>
+<li><strong><code>GET /api/v1/media/tags/{id}</code></strong>: Get a media tag.</li>
+<li><strong><code>PATCH /api/v1/media/tags/{id}</code></strong>: Rename a media tag.</li>
+<li><strong><code>POST /api/v1/media/uploads</code></strong>: Start uploading a media item straight to storage.</li>
+<li><strong><code>POST /api/v1/media/uploads/{id}/complete</code></strong>: Complete an upload of a media item straight to storage.</li>
+<li><strong><code>DELETE /api/v1/media/{id}</code></strong>: Move a media item to the trash.</li>
+<li><strong><code>GET /api/v1/media/{id}</code></strong>: Get a media item.</li>
+<li><strong><code>PATCH /api/v1/media/{id}</code></strong>: Change the details of a media item.</li>
+<li><strong><code>POST /api/v1/media/{id}/alt-suggestions</code></strong>: Suggest alt text with AI.</li>
+<li><strong><code>DELETE /api/v1/media/{id}/alts/{locale}</code></strong>: Remove the text alternative of a media item in one language.</li>
+<li><strong><code>PUT /api/v1/media/{id}/alts/{locale}</code></strong>: Set the text alternative of a media item in one language.</li>
+<li><strong><code>GET /api/v1/media/{id}/content</code></strong>: Download the content of a media item.</li>
+<li><strong><code>HEAD /api/v1/media/{id}/content</code></strong>: Check the content of a media item without downloading it.</li>
+<li><strong><code>PUT /api/v1/media/{id}/content</code></strong>: Replace the content of a media item, keeping its id.</li>
+<li><strong><code>POST /api/v1/media/{id}/purge</code></strong>: Delete a media item in the trash for good.</li>
+<li><strong><code>POST /api/v1/media/{id}/restore</code></strong>: Restore a media item from the trash.</li>
+</ul>
+<h2 id="menus"><a class="header" href="#menus">menus</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/menus</code></strong>: List website menus.</li>
+<li><strong><code>POST /api/v1/menus</code></strong>: Create a website menu.</li>
+<li><strong><code>POST /api/v1/menus/import-content</code></strong>: Import the old menus of module <code>content</code>.</li>
+<li><strong><code>GET /api/v1/menus/public/{key}</code></strong>: Get a website menu, ready to show (public).</li>
+<li><strong><code>DELETE /api/v1/menus/{id}</code></strong>: Delete a website menu.</li>
+<li><strong><code>GET /api/v1/menus/{id}</code></strong>: Get a website menu.</li>
+<li><strong><code>PUT /api/v1/menus/{id}</code></strong>: Replace the items of a website menu.</li>
+</ul>
+<h2 id="newsletter"><a class="header" href="#newsletter">newsletter</a></h2>
+<ul>
+<li><strong><code>POST /api/v1/newsletter/bounces</code></strong>: Report a bounce or complaint.</li>
+<li><strong><code>GET /api/v1/newsletter/campaigns</code></strong>: List campaigns.</li>
+<li><strong><code>POST /api/v1/newsletter/campaigns</code></strong>: Create a draft campaign.</li>
+<li><strong><code>DELETE /api/v1/newsletter/campaigns/{id}</code></strong>: Delete a campaign.</li>
+<li><strong><code>GET /api/v1/newsletter/campaigns/{id}</code></strong>: Get a campaign, with its progress.</li>
+<li><strong><code>PATCH /api/v1/newsletter/campaigns/{id}</code></strong>: Change a campaign.</li>
+<li><strong><code>POST /api/v1/newsletter/campaigns/{id}/cancel</code></strong>: Cancel a campaign.</li>
+<li><strong><code>POST /api/v1/newsletter/campaigns/{id}/pause</code></strong>: Pause a campaign.</li>
+<li><strong><code>GET /api/v1/newsletter/campaigns/{id}/preview</code></strong>: Preview a campaign mail.</li>
+<li><strong><code>POST /api/v1/newsletter/campaigns/{id}/resume</code></strong>: Resume a paused campaign.</li>
+<li><strong><code>POST /api/v1/newsletter/campaigns/{id}/schedule</code></strong>: Schedule a campaign.</li>
+<li><strong><code>POST /api/v1/newsletter/campaigns/{id}/send</code></strong>: Send a campaign now.</li>
+<li><strong><code>POST /api/v1/newsletter/campaigns/{id}/test</code></strong>: Send a test mail of a campaign.</li>
+<li><strong><code>DELETE /api/v1/newsletter/data</code></strong>: Erase the data of an email address.</li>
+<li><strong><code>GET /api/v1/newsletter/data</code></strong>: Export the data of an email address.</li>
+<li><strong><code>GET /api/v1/newsletter/lists</code></strong>: List the newsletter lists.</li>
+<li><strong><code>POST /api/v1/newsletter/lists</code></strong>: Create a list.</li>
+<li><strong><code>DELETE /api/v1/newsletter/lists/{id}</code></strong>: Delete a list.</li>
+<li><strong><code>GET /api/v1/newsletter/lists/{id}</code></strong>: Get a list.</li>
+<li><strong><code>PATCH /api/v1/newsletter/lists/{id}</code></strong>: Change a list.</li>
+<li><strong><code>POST /api/v1/newsletter/public/confirm</code></strong>: Confirm a subscription (public).</li>
+<li><strong><code>GET /api/v1/newsletter/public/lists</code></strong>: List the lists open to sign-up (public).</li>
+<li><strong><code>GET /api/v1/newsletter/public/preferences</code></strong>: Get the preferences of a subscriber (public).</li>
+<li><strong><code>PUT /api/v1/newsletter/public/preferences</code></strong>: Change the preferences of a subscriber (public).</li>
+<li><strong><code>POST /api/v1/newsletter/public/subscribe</code></strong>: Subscribe to lists (public).</li>
+<li><strong><code>POST /api/v1/newsletter/public/unsubscribe</code></strong>: Unsubscribe with one click (public).</li>
+<li><strong><code>GET /api/v1/newsletter/settings</code></strong>: Get the newsletter settings in use.</li>
+<li><strong><code>GET /api/v1/newsletter/subscribers</code></strong>: List subscribers.</li>
+<li><strong><code>POST /api/v1/newsletter/subscribers/import</code></strong>: Import subscribers.</li>
+<li><strong><code>DELETE /api/v1/newsletter/subscribers/{id}</code></strong>: Delete a subscriber.</li>
+<li><strong><code>GET /api/v1/newsletter/subscribers/{id}</code></strong>: Get a subscriber.</li>
+<li><strong><code>PATCH /api/v1/newsletter/subscribers/{id}</code></strong>: Change a subscriber.</li>
+<li><strong><code>GET /api/v1/newsletter/suppressions</code></strong>: List the suppressed addresses.</li>
+<li><strong><code>POST /api/v1/newsletter/suppressions</code></strong>: Suppress an address.</li>
+<li><strong><code>DELETE /api/v1/newsletter/suppressions/{id}</code></strong>: Take an address off the suppression list.</li>
+</ul>
+<h2 id="notifications"><a class="header" href="#notifications">notifications</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/notifications/branding</code></strong>: Show the branding of the tenant’s HTML emails.</li>
+<li><strong><code>PUT /api/v1/notifications/branding</code></strong>: Change the branding of the tenant’s HTML emails.</li>
+<li><strong><code>GET /api/v1/notifications/kinds</code></strong>: List the notification kinds.</li>
+<li><strong><code>GET /api/v1/notifications/kinds/{kind}/schema</code></strong>: Show the template variables of a notification kind.</li>
+<li><strong><code>GET /api/v1/notifications/me/device-tokens</code></strong>: List your registered mobile devices.</li>
+<li><strong><code>POST /api/v1/notifications/me/device-tokens</code></strong>: Register this mobile device for push notifications.</li>
+<li><strong><code>DELETE /api/v1/notifications/me/device-tokens/{id}</code></strong>: Stop push notifications to a mobile device.</li>
+<li><strong><code>GET /api/v1/notifications/me/inbox</code></strong>: List your in-app notifications.</li>
+<li><strong><code>POST /api/v1/notifications/me/inbox/read-all</code></strong>: Mark all your notifications as read.</li>
+<li><strong><code>GET /api/v1/notifications/me/inbox/unread-count</code></strong>: Count your unread notifications.</li>
+<li><strong><code>POST /api/v1/notifications/me/inbox/{id}/read</code></strong>: Mark one of your notifications as read.</li>
+<li><strong><code>GET /api/v1/notifications/me/preferences</code></strong>: List which notifications you get.</li>
+<li><strong><code>PUT /api/v1/notifications/me/preferences</code></strong>: Choose which notifications you get.</li>
+<li><strong><code>POST /api/v1/notifications/me/push-subscriptions</code></strong>: Register this browser for push notifications.</li>
+<li><strong><code>DELETE /api/v1/notifications/me/push-subscriptions/{id}</code></strong>: Stop push notifications to a browser.</li>
+<li><strong><code>GET /api/v1/notifications/messages</code></strong>: List the send log.</li>
+<li><strong><code>POST /api/v1/notifications/messages</code></strong>: Send a notification.</li>
+<li><strong><code>GET /api/v1/notifications/messages/{id}</code></strong>: Get one message of the send log.</li>
+<li><strong><code>POST /api/v1/notifications/platform-notices</code></strong>: Send a notice to the admins of every tenant.</li>
+<li><strong><code>POST /api/v1/notifications/public/unsubscribe</code></strong>: Stop advertising with the link of an email.</li>
+<li><strong><code>GET /api/v1/notifications/public/web-push-key</code></strong>: Get the web push public key.</li>
+<li><strong><code>GET /api/v1/notifications/templates</code></strong>: List the replaced texts of the tenant.</li>
+<li><strong><code>DELETE /api/v1/notifications/templates/{kind}/{channel}/{locale}</code></strong>: Go back to the default text of a kind on one channel and language.</li>
+<li><strong><code>PUT /api/v1/notifications/templates/{kind}/{channel}/{locale}</code></strong>: Replace the text of a kind on one channel and language.</li>
+<li><strong><code>DELETE /api/v1/notifications/templates/{kind}/{channel}/{locale}/draft</code></strong>: Throw the draft of a template away.</li>
+<li><strong><code>GET /api/v1/notifications/templates/{kind}/{channel}/{locale}/draft</code></strong>: Show the draft of a template.</li>
+<li><strong><code>PUT /api/v1/notifications/templates/{kind}/{channel}/{locale}/draft</code></strong>: Save the draft of a template.</li>
+<li><strong><code>POST /api/v1/notifications/templates/{kind}/{channel}/{locale}/preview</code></strong>: Preview a template.</li>
+<li><strong><code>POST /api/v1/notifications/templates/{kind}/{channel}/{locale}/publish</code></strong>: Publish the draft of a template.</li>
+<li><strong><code>DELETE /api/v1/notifications/templates/{kind}/{channel}/{locale}/published</code></strong>: Stop using the published template.</li>
+<li><strong><code>POST /api/v1/notifications/templates/{kind}/{channel}/{locale}/rollback</code></strong>: Use an older published version of a template again.</li>
+<li><strong><code>POST /api/v1/notifications/templates/{kind}/{channel}/{locale}/test-send</code></strong>: Send a template to yourself as a test.</li>
+<li><strong><code>GET /api/v1/notifications/templates/{kind}/{channel}/{locale}/versions</code></strong>: List the published versions of a template, newest first.</li>
+</ul>
+<h2 id="orders"><a class="header" href="#orders">orders</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/orders</code></strong>: List orders.</li>
+<li><strong><code>GET /api/v1/orders/carts</code></strong>: List carts, like abandoned carts.</li>
+<li><strong><code>POST /api/v1/orders/carts</code></strong>: Create a cart.</li>
+<li><strong><code>GET /api/v1/orders/carts/{id}</code></strong>: Read a cart with its quote.</li>
+<li><strong><code>PUT /api/v1/orders/carts/{id}/attribution</code></strong>: Record who referred the buyer to the cart.</li>
+<li><strong><code>PUT /api/v1/orders/carts/{id}/codes</code></strong>: Set the coupon codes of the cart.</li>
+<li><strong><code>PUT /api/v1/orders/carts/{id}/delivery</code></strong>: Set where and how the cart is delivered.</li>
+<li><strong><code>PUT /api/v1/orders/carts/{id}/lines/{variant_id}</code></strong>: Set the quantity of a product in the cart.</li>
+<li><strong><code>POST /api/v1/orders/carts/{id}/merge</code></strong>: Merge a guest cart into your cart.</li>
+<li><strong><code>PUT /api/v1/orders/carts/{id}/payment-method</code></strong>: Choose the payment method of the cart.</li>
+<li><strong><code>GET /api/v1/orders/carts/{id}/promotions</code></strong>: Codes and vouchers usable for the cart.</li>
+<li><strong><code>PUT /api/v1/orders/carts/{id}/vouchers</code></strong>: Use vouchers of your wallet for the cart.</li>
+<li><strong><code>POST /api/v1/orders/checkout</code></strong>: Place an order from a cart.</li>
+<li><strong><code>GET /api/v1/orders/me/orders</code></strong>: Your orders.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/claim</code></strong>: Attach your guest orders to your account.</li>
+<li><strong><code>GET /api/v1/orders/me/orders/{id}</code></strong>: One of your orders.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/cancel</code></strong>: Cancel one of your orders.</li>
+<li><strong><code>GET /api/v1/orders/me/orders/{id}/documents</code></strong>: Documents of one of your orders.</li>
+<li><strong><code>GET /api/v1/orders/me/orders/{id}/documents/{document_id}</code></strong>: Print a document of one of your orders.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/invoice</code></strong>: Ask for the invoice of one of your orders.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/lines/{line_id}/review</code></strong>: Review an item you received.</li>
+<li><strong><code>PUT /api/v1/orders/me/orders/{id}/lines/{line_id}/review</code></strong>: Edit your review of an item.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/payment-link</code></strong>: Start the payment of your order again.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/payments</code></strong>: Pay the balance of your order.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/returns</code></strong>: Ask to return items.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/returns/preview</code></strong>: Preview a return.</li>
+<li><strong><code>POST /api/v1/orders/me/orders/{id}/support</code></strong>: Open a support ticket about one of your orders.</li>
+<li><strong><code>GET /api/v1/orders/me/returns/{id}</code></strong>: One of your returns.</li>
+<li><strong><code>GET /api/v1/orders/me/warranties</code></strong>: Your warranties.</li>
+<li><strong><code>GET /api/v1/orders/pos/catalog</code></strong>: Look up a product by barcode at the counter.</li>
+<li><strong><code>POST /api/v1/orders/pos/quote</code></strong>: Price a cart at the counter.</li>
+<li><strong><code>POST /api/v1/orders/pos/sales</code></strong>: Sell at the counter.</li>
+<li><strong><code>POST /api/v1/orders/pos/shifts</code></strong>: Open a cash register shift.</li>
+<li><strong><code>POST /api/v1/orders/pos/shifts/{id}/approve</code></strong>: Approve the cash difference of a shift.</li>
+<li><strong><code>POST /api/v1/orders/pos/shifts/{id}/close</code></strong>: Close a cash register shift.</li>
+<li><strong><code>POST /api/v1/orders/products/{product_id}/review-summaries</code></strong>: Write an AI summary draft of a product’s reviews.</li>
+<li><strong><code>POST /api/v1/orders/public/orders/lookup</code></strong>: Look up a guest order by number and phone.</li>
+<li><strong><code>POST /api/v1/orders/public/orders/lookup/{id}/confirm</code></strong>: Confirm a guest order lookup with the code.</li>
+<li><strong><code>GET /api/v1/orders/public/orders/{id}</code></strong>: See a guest order.</li>
+<li><strong><code>POST /api/v1/orders/public/orders/{id}/address</code></strong>: Change the delivery address of a guest order.</li>
+<li><strong><code>POST /api/v1/orders/public/orders/{id}/address/otp</code></strong>: Ask for a code to change the delivery address.</li>
+<li><strong><code>POST /api/v1/orders/public/orders/{id}/cancel</code></strong>: Cancel a guest order.</li>
+<li><strong><code>GET /api/v1/orders/public/orders/{id}/documents</code></strong>: Documents of a guest order.</li>
+<li><strong><code>GET /api/v1/orders/public/orders/{id}/documents/{document_id}</code></strong>: Print a document of a guest order.</li>
+<li><strong><code>POST /api/v1/orders/public/orders/{id}/payment-link</code></strong>: Start the payment of a guest order again.</li>
+<li><strong><code>POST /api/v1/orders/public/orders/{id}/support</code></strong>: Open a support ticket about a guest order.</li>
+<li><strong><code>GET /api/v1/orders/public/payments/{token}</code></strong>: Status of a payment, for the QR code screen.</li>
+<li><strong><code>GET /api/v1/orders/public/products/{product_id}/reviews</code></strong>: List reviews of a product.</li>
+<li><strong><code>GET /api/v1/orders/public/products/{product_id}/reviews/stats</code></strong>: Star counts of a product’s reviews.</li>
+<li><strong><code>DELETE /api/v1/orders/public/reviews/{id}/helpful</code></strong>: Take back a “helpful” vote.</li>
+<li><strong><code>PUT /api/v1/orders/public/reviews/{id}/helpful</code></strong>: Vote a review “helpful”.</li>
+<li><strong><code>GET /api/v1/orders/reports/sales</code></strong>: Sales report.</li>
+<li><strong><code>GET /api/v1/orders/returns</code></strong>: List returns.</li>
+<li><strong><code>GET /api/v1/orders/returns/{id}</code></strong>: Read a return.</li>
+<li><strong><code>POST /api/v1/orders/returns/{id}/transitions</code></strong>: Move a return forward.</li>
+<li><strong><code>POST /api/v1/orders/review-summaries/{id}/approve</code></strong>: Approve an AI summary draft.</li>
+<li><strong><code>POST /api/v1/orders/review-summaries/{id}/reject</code></strong>: Reject an AI summary draft.</li>
+<li><strong><code>GET /api/v1/orders/reviews</code></strong>: List reviews to moderate.</li>
+<li><strong><code>GET /api/v1/orders/reviews/count</code></strong>: Count reviews to moderate.</li>
+<li><strong><code>POST /api/v1/orders/reviews/{id}/moderation</code></strong>: Hide or reopen a review.</li>
+<li><strong><code>POST /api/v1/orders/reviews/{id}/reply</code></strong>: Answer a review publicly.</li>
+<li><strong><code>GET /api/v1/orders/risk/buyers</code></strong>: Delivery statistics of a buyer.</li>
+<li><strong><code>GET /api/v1/orders/risk/cod-blocks</code></strong>: List active cash-on-delivery blocks.</li>
+<li><strong><code>POST /api/v1/orders/risk/cod-blocks</code></strong>: Block a buyer from paying on delivery.</li>
+<li><strong><code>DELETE /api/v1/orders/risk/cod-blocks/{id}</code></strong>: Lift a cash-on-delivery block.</li>
+<li><strong><code>GET /api/v1/orders/risk/cod-rules</code></strong>: List cash-on-delivery rules.</li>
+<li><strong><code>POST /api/v1/orders/risk/cod-rules</code></strong>: Add a cash-on-delivery rule.</li>
+<li><strong><code>DELETE /api/v1/orders/risk/cod-rules/{id}</code></strong>: End a cash-on-delivery rule.</li>
+<li><strong><code>GET /api/v1/orders/warranties</code></strong>: Look up warranties.</li>
+<li><strong><code>POST /api/v1/orders/warranty-claims</code></strong>: Receive a product for warranty.</li>
+<li><strong><code>POST /api/v1/orders/warranty-claims/{id}/transitions</code></strong>: Move a warranty claim on.</li>
+<li><strong><code>GET /api/v1/orders/{id}</code></strong>: Read an order.</li>
+<li><strong><code>POST /api/v1/orders/{id}/invoice</code></strong>: Ask for the invoice of an order (staff).</li>
+<li><strong><code>POST /api/v1/orders/{id}/lines/{line_id}/serials</code></strong>: Record serial numbers of an order line.</li>
+<li><strong><code>POST /api/v1/orders/{id}/payment-link</code></strong>: Resend the payment of an order.</li>
+<li><strong><code>POST /api/v1/orders/{id}/pickup/handover</code></strong>: Hand an order over at the counter.</li>
+<li><strong><code>POST /api/v1/orders/{id}/pickup/ready</code></strong>: Mark an order ready for collection.</li>
+<li><strong><code>GET /api/v1/orders/{id}/refunds</code></strong>: Refunds of an order.</li>
+<li><strong><code>POST /api/v1/orders/{id}/refunds</code></strong>: Refund an order.</li>
+<li><strong><code>POST /api/v1/orders/{id}/shipments</code></strong>: Request a shipment for an order.</li>
+<li><strong><code>POST /api/v1/orders/{id}/transitions</code></strong>: Move an order through its lifecycle.</li>
+</ul>
+<h2 id="organizations"><a class="header" href="#organizations">organizations</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/organizations/groups</code></strong>: List the unit groups of the tenant.</li>
+<li><strong><code>POST /api/v1/organizations/groups</code></strong>: Create a unit group.</li>
+<li><strong><code>DELETE /api/v1/organizations/groups/{id}</code></strong>: Delete a unit group.</li>
+<li><strong><code>GET /api/v1/organizations/groups/{id}</code></strong>: Get a unit group.</li>
+<li><strong><code>PATCH /api/v1/organizations/groups/{id}</code></strong>: Rename a unit group or change its description.</li>
+<li><strong><code>GET /api/v1/organizations/groups/{id}/members</code></strong>: List the units of a group that are within your scope.</li>
+<li><strong><code>POST /api/v1/organizations/groups/{id}/members</code></strong>: Add units to a group.</li>
+<li><strong><code>DELETE /api/v1/organizations/groups/{id}/members/{org_id}</code></strong>: Remove a unit from a group.</li>
+<li><strong><code>GET /api/v1/organizations/public/site</code></strong>: Get the profile of the website being visited.</li>
+<li><strong><code>GET /api/v1/organizations/public/storefront</code></strong>: Get the store information of a website (public).</li>
+<li><strong><code>GET /api/v1/organizations/public/stores</code></strong>: List the stores of this tenant shown on its websites.</li>
+<li><strong><code>GET /api/v1/organizations/settings</code></strong>: List the settings units can set.</li>
+<li><strong><code>GET /api/v1/organizations/unit-types</code></strong>: List the unit types of the tenant.</li>
+<li><strong><code>POST /api/v1/organizations/unit-types</code></strong>: Create a unit type.</li>
+<li><strong><code>DELETE /api/v1/organizations/unit-types/{code}</code></strong>: Delete a unit type.</li>
+<li><strong><code>PUT /api/v1/organizations/unit-types/{code}</code></strong>: Rename a unit type or change its description.</li>
+<li><strong><code>GET /api/v1/organizations/units</code></strong>: List the organization units in your scope.</li>
+<li><strong><code>POST /api/v1/organizations/units</code></strong>: Create an organization unit.</li>
+<li><strong><code>GET /api/v1/organizations/units/{id}</code></strong>: Get an organization unit.</li>
+<li><strong><code>PATCH /api/v1/organizations/units/{id}</code></strong>: Rename an organization unit or change its code.</li>
+<li><strong><code>GET /api/v1/organizations/units/{id}/ancestors</code></strong>: List the units above an organization unit.</li>
+<li><strong><code>POST /api/v1/organizations/units/{id}/move</code></strong>: Move an organization unit, with everything below it, under another parent.</li>
+<li><strong><code>GET /api/v1/organizations/units/{id}/public-profile</code></strong>: Get the public profile of an organization unit.</li>
+<li><strong><code>PATCH /api/v1/organizations/units/{id}/public-profile</code></strong>: Change the public profile of an organization unit.</li>
+<li><strong><code>GET /api/v1/organizations/units/{id}/settings</code></strong>: Get the settings in force at an organization unit.</li>
+<li><strong><code>DELETE /api/v1/organizations/units/{id}/settings/{key}</code></strong>: Clear a setting of an organization unit, so it inherits again.</li>
+<li><strong><code>PUT /api/v1/organizations/units/{id}/settings/{key}</code></strong>: Set a setting of an organization unit.</li>
+<li><strong><code>POST /api/v1/organizations/units/{id}/status</code></strong>: Approve, suspend, archive or reactivate an organization unit.</li>
+</ul>
+<h2 id="plans"><a class="header" href="#plans">plans</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/plans/billing-periods</code></strong>: List your tenant’s billing periods.</li>
+<li><strong><code>GET /api/v1/plans/billing-periods/{id}</code></strong>: Get one of your tenant’s billing periods.</li>
+<li><strong><code>POST /api/v1/plans/billing-periods/{id}/mark-paid</code></strong>: Record that a billing period was paid.</li>
+<li><strong><code>POST /api/v1/plans/billing-periods/{id}/pay</code></strong>: Pay a billing period of your tenant online.</li>
+<li><strong><code>POST /api/v1/plans/billing-periods/{id}/void</code></strong>: Void an unpaid billing period.</li>
+<li><strong><code>GET /api/v1/plans/billing-profile</code></strong>: Get your tenant’s billing profile.</li>
+<li><strong><code>PUT /api/v1/plans/billing-profile</code></strong>: Set your tenant’s billing profile.</li>
+<li><strong><code>GET /api/v1/plans/catalog</code></strong>: List the plans on sale, with their prices.</li>
+<li><strong><code>GET /api/v1/plans/entitlements</code></strong>: Get what your tenant may use now.</li>
+<li><strong><code>GET /api/v1/plans/overrides</code></strong>: List the overrides of every tenant.</li>
+<li><strong><code>GET /api/v1/plans/plans</code></strong>: List every plan, including drafts and retired plans.</li>
+<li><strong><code>POST /api/v1/plans/plans</code></strong>: Create a plan.</li>
+<li><strong><code>GET /api/v1/plans/plans/{id}</code></strong>: Get a plan.</li>
+<li><strong><code>PUT /api/v1/plans/plans/{id}</code></strong>: Replace a plan.</li>
+<li><strong><code>POST /api/v1/plans/plans/{id}/prices</code></strong>: Add a price to a plan.</li>
+<li><strong><code>POST /api/v1/plans/plans/{id}/retire</code></strong>: Retire a plan.</li>
+<li><strong><code>POST /api/v1/plans/prices/{id}/deactivate</code></strong>: Deactivate a price.</li>
+<li><strong><code>GET /api/v1/plans/provisionings</code></strong>: List tenant provisionings.</li>
+<li><strong><code>POST /api/v1/plans/provisionings</code></strong>: Create a tenant on a plan.</li>
+<li><strong><code>GET /api/v1/plans/provisionings/{id}</code></strong>: Get a tenant provisioning.</li>
+<li><strong><code>POST /api/v1/plans/provisionings/{id}/retry</code></strong>: Run a failed tenant provisioning again.</li>
+<li><strong><code>GET /api/v1/plans/signups</code></strong>: List tenant sign-ups.</li>
+<li><strong><code>POST /api/v1/plans/signups</code></strong>: Sign up a new tenant (public).</li>
+<li><strong><code>POST /api/v1/plans/signups/confirm</code></strong>: Confirm a tenant sign-up with the token from the mail (public).</li>
+<li><strong><code>GET /api/v1/plans/signups/{id}</code></strong>: Get a tenant sign-up with the token from the mail (public).</li>
+<li><strong><code>POST /api/v1/plans/store/notifications/{store}</code></strong>: Receive a server notification from an app store.</li>
+<li><strong><code>GET /api/v1/plans/store/products</code></strong>: List the app store products linked to plans.</li>
+<li><strong><code>DELETE /api/v1/plans/store/products/{store}/{product_id}</code></strong>: Unlink an app store product.</li>
+<li><strong><code>PUT /api/v1/plans/store/products/{store}/{product_id}</code></strong>: Link an app store product to a plan.</li>
+<li><strong><code>GET /api/v1/plans/store/purchases</code></strong>: List the app store purchases of your tenant.</li>
+<li><strong><code>POST /api/v1/plans/store/purchases</code></strong>: Pay your subscription with an in-app purchase.</li>
+<li><strong><code>GET /api/v1/plans/subscription</code></strong>: Get your tenant’s subscription.</li>
+<li><strong><code>POST /api/v1/plans/subscription/cancel</code></strong>: Cancel your tenant’s subscription.</li>
+<li><strong><code>POST /api/v1/plans/subscription/change</code></strong>: Move your tenant to another plan.</li>
+<li><strong><code>POST /api/v1/plans/subscription/resume</code></strong>: Resume your tenant’s subscription.</li>
+<li><strong><code>GET /api/v1/plans/subscriptions</code></strong>: List the subscriptions of every tenant.</li>
+<li><strong><code>GET /api/v1/plans/tenants/{tenant_id}/billing-periods</code></strong>: List a tenant’s billing periods.</li>
+<li><strong><code>GET /api/v1/plans/tenants/{tenant_id}/billing-profile</code></strong>: Get a tenant’s billing profile.</li>
+<li><strong><code>GET /api/v1/plans/tenants/{tenant_id}/entitlements</code></strong>: Get what a tenant may use now.</li>
+<li><strong><code>GET /api/v1/plans/tenants/{tenant_id}/overrides</code></strong>: List a tenant’s overrides.</li>
+<li><strong><code>POST /api/v1/plans/tenants/{tenant_id}/overrides</code></strong>: Set an override for a tenant.</li>
+<li><strong><code>DELETE /api/v1/plans/tenants/{tenant_id}/overrides/{id}</code></strong>: Remove an override of a tenant.</li>
+<li><strong><code>GET /api/v1/plans/tenants/{tenant_id}/subscription</code></strong>: Get a tenant’s subscription.</li>
+<li><strong><code>PUT /api/v1/plans/tenants/{tenant_id}/subscription</code></strong>: Put a tenant on a plan.</li>
+<li><strong><code>POST /api/v1/plans/tenants/{tenant_id}/subscription/cancel</code></strong>: Cancel a tenant’s subscription now.</li>
+<li><strong><code>POST /api/v1/plans/tenants/{tenant_id}/subscription/suspend</code></strong>: Suspend a tenant completely.</li>
+<li><strong><code>GET /api/v1/plans/tenants/{tenant_id}/usage</code></strong>: Get a tenant’s use of every limit.</li>
+<li><strong><code>GET /api/v1/plans/usage</code></strong>: Get your tenant’s use of every limit.</li>
+</ul>
+<h2 id="promotions"><a class="header" href="#promotions">promotions</a></h2>
+<ul>
+<li><strong><code>POST /api/v1/promotions/evaluate</code></strong>: Compute the promotions of a cart, without holding or changing anything.</li>
+<li><strong><code>GET /api/v1/promotions/legal-limits</code></strong>: List the legal promotion limits in force on a day.</li>
+<li><strong><code>GET /api/v1/promotions/me/vouchers</code></strong>: List the vouchers in your wallet, soonest to expire first.</li>
+<li><strong><code>POST /api/v1/promotions/me/vouchers/claim-code</code></strong>: Enter a claim code to put its voucher into your wallet.</li>
+<li><strong><code>GET /api/v1/promotions/notice-rules</code></strong>: List the promotion notice rules in force on a day.</li>
+<li><strong><code>GET /api/v1/promotions/promotions</code></strong>: List the promotions in your scope.</li>
+<li><strong><code>POST /api/v1/promotions/promotions</code></strong>: Create a promotion as a draft.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/calendar</code></strong>: List the promotions running on some days (calendar).</li>
+<li><strong><code>DELETE /api/v1/promotions/promotions/{id}</code></strong>: Delete a draft promotion.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}</code></strong>: Get a promotion with its rule, texts, targets and counters.</li>
+<li><strong><code>PATCH /api/v1/promotions/promotions/{id}</code></strong>: Change a promotion.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/activate</code></strong>: Turn a draft promotion on.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/activation-check</code></strong>: Check a promotion before turning it on, without changing anything.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/cancel</code></strong>: Cancel a promotion.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}/codes</code></strong>: List the codes of a promotion.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/codes</code></strong>: Add codes to a promotion: one code you choose, or a batch of random codes.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}/codes/export</code></strong>: Download every code of a promotion as CSV.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}/conflicts</code></strong>: List the promotions that may clash with this one.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/end</code></strong>: End a promotion now.</li>
+<li><strong><code>PUT /api/v1/promotions/promotions/{id}/flash-items</code></strong>: Replace the flash-sale prices of a draft promotion.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}/notice-export</code></strong>: Export the data of a promotion notice, one entry per authority.</li>
+<li><strong><code>PATCH /api/v1/promotions/promotions/{id}/notices/{authority_code}</code></strong>: Record that a promotion notice was submitted to an authority.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}/participations</code></strong>: List the applications to a platform promotion.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/participations</code></strong>: Apply to join a platform flash sale with your products.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/participations/{participation_id}/approve</code></strong>: Approve a seller’s application.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/participations/{participation_id}/reject</code></strong>: Reject a seller’s application.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/pause</code></strong>: Pause a running or scheduled promotion.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/resume</code></strong>: Resume a paused promotion.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/simulate</code></strong>: Try a promotion on sample carts.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}/stats</code></strong>: Get the daily counts of a promotion.</li>
+<li><strong><code>PUT /api/v1/promotions/promotions/{id}/targets</code></strong>: Replace the targets (products, variants, categories) of a draft promotion.</li>
+<li><strong><code>PUT /api/v1/promotions/promotions/{id}/translations/{locale}</code></strong>: Set the title and terms of a promotion in one language.</li>
+<li><strong><code>GET /api/v1/promotions/promotions/{id}/versions</code></strong>: Get the audit trail of a promotion: one entry per change after it was turned on.</li>
+<li><strong><code>POST /api/v1/promotions/promotions/{id}/vouchers</code></strong>: Put a voucher of a <code>voucher</code> promotion into a user’s wallet by hand.</li>
+<li><strong><code>GET /api/v1/promotions/public/promotions</code></strong>: List the promotions running now on this website (public).</li>
+<li><strong><code>GET /api/v1/promotions/public/promotions/flash-sales</code></strong>: List the public flash sales running now or starting within a day (public).</li>
+<li><strong><code>GET /api/v1/promotions/public/promotions/for-product/{product_id}</code></strong>: List the public coupons that lower the price of a product (public).</li>
+<li><strong><code>POST /api/v1/promotions/public/promotions/{id}/claim</code></strong>: Save the voucher of a public promotion into your wallet (“Save” button).</li>
+<li><strong><code>DELETE /api/v1/promotions/public/promotions/{id}/reminders</code></strong>: Cancel your reminder of a flash sale.</li>
+<li><strong><code>POST /api/v1/promotions/public/promotions/{id}/reminders</code></strong>: Ask to be reminded when a flash sale starts.</li>
+<li><strong><code>GET /api/v1/promotions/redemptions</code></strong>: List the promotion usage held for orders.</li>
+<li><strong><code>POST /api/v1/promotions/redemptions/{id}/release</code></strong>: Give back the promotion usage held for an order by hand (unstick it).</li>
+</ul>
+<h2 id="reporting"><a class="header" href="#reporting">reporting</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/reporting/facts</code></strong>: List report facts.</li>
+<li><strong><code>GET /api/v1/reporting/kinds</code></strong>: List the kinds of report figures.</li>
+<li><strong><code>GET /api/v1/reporting/lag</code></strong>: See how far behind the report store is.</li>
+<li><strong><code>POST /api/v1/reporting/rebuild</code></strong>: Push the facts of a tenant to the report store again.</li>
+<li><strong><code>GET /api/v1/reporting/summary</code></strong>: Sum a report figure over a period.</li>
+</ul>
+<h2 id="shipping"><a class="header" href="#shipping">shipping</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/shipping/buyers/{buyer_id}/addresses</code></strong>: List the saved addresses of a buyer.</li>
+<li><strong><code>GET /api/v1/shipping/calendars</code></strong>: List delivery calendars.</li>
+<li><strong><code>POST /api/v1/shipping/calendars</code></strong>: Create a delivery calendar.</li>
+<li><strong><code>GET /api/v1/shipping/calendars/{id}</code></strong>: Get a delivery calendar with its special days.</li>
+<li><strong><code>PATCH /api/v1/shipping/calendars/{id}</code></strong>: Change a delivery calendar.</li>
+<li><strong><code>DELETE /api/v1/shipping/calendars/{id}/days/{day}</code></strong>: Remove a special day of a delivery calendar.</li>
+<li><strong><code>PUT /api/v1/shipping/calendars/{id}/days/{day}</code></strong>: Set a special day of a delivery calendar (holiday, other cut-off).</li>
+<li><strong><code>GET /api/v1/shipping/carrier-accounts</code></strong>: List carrier accounts.</li>
+<li><strong><code>POST /api/v1/shipping/carrier-accounts</code></strong>: Connect a carrier account.</li>
+<li><strong><code>PATCH /api/v1/shipping/carrier-accounts/{id}</code></strong>: Change a carrier account.</li>
+<li><strong><code>POST /api/v1/shipping/carrier-accounts/{id}/test</code></strong>: Test a carrier account.</li>
+<li><strong><code>GET /api/v1/shipping/cod/discrepancies</code></strong>: List cash-on-delivery discrepancies.</li>
+<li><strong><code>POST /api/v1/shipping/cod/discrepancies/{id}/refresh-tracking</code></strong>: Ask the carrier again for the tracking history of a discrepancy’s shipment.</li>
+<li><strong><code>POST /api/v1/shipping/cod/discrepancies/{id}/resolve</code></strong>: Resolve a cash-on-delivery discrepancy.</li>
+<li><strong><code>GET /api/v1/shipping/cod/statements</code></strong>: List imported cash-on-delivery statements.</li>
+<li><strong><code>POST /api/v1/shipping/cod/statements</code></strong>: Import a cash-on-delivery statement of a carrier.</li>
+<li><strong><code>GET /api/v1/shipping/cod/statements/{id}</code></strong>: Get a cash-on-delivery statement with its lines.</li>
+<li><strong><code>GET /api/v1/shipping/me/addresses</code></strong>: List your saved delivery addresses.</li>
+<li><strong><code>POST /api/v1/shipping/me/addresses</code></strong>: Save a delivery address.</li>
+<li><strong><code>DELETE /api/v1/shipping/me/addresses/{id}</code></strong>: Delete one of your saved addresses.</li>
+<li><strong><code>GET /api/v1/shipping/me/addresses/{id}</code></strong>: Get one of your saved addresses.</li>
+<li><strong><code>PATCH /api/v1/shipping/me/addresses/{id}</code></strong>: Change one of your saved addresses.</li>
+<li><strong><code>POST /api/v1/shipping/me/addresses/{id}/default</code></strong>: Make one of your saved addresses the default.</li>
+<li><strong><code>GET /api/v1/shipping/methods</code></strong>: List shipping methods.</li>
+<li><strong><code>POST /api/v1/shipping/methods</code></strong>: Create a shipping method.</li>
+<li><strong><code>DELETE /api/v1/shipping/methods/{id}</code></strong>: Delete a shipping method with its tiers and pickup points.</li>
+<li><strong><code>GET /api/v1/shipping/methods/{id}</code></strong>: Get a shipping method with its tiers and pickup points.</li>
+<li><strong><code>PATCH /api/v1/shipping/methods/{id}</code></strong>: Change a shipping method.</li>
+<li><strong><code>PUT /api/v1/shipping/methods/{id}/pickup-points</code></strong>: Replace the pickup points of a <code>pickup</code> shipping method.</li>
+<li><strong><code>PUT /api/v1/shipping/methods/{id}/rates</code></strong>: Replace the weight tiers of a shipping method.</li>
+<li><strong><code>GET /api/v1/shipping/public/estimate</code></strong>: Estimate shipping for a product page.</li>
+<li><strong><code>POST /api/v1/shipping/quote</code></strong>: Quote shipping options for a cart.</li>
+<li><strong><code>GET /api/v1/shipping/shipments</code></strong>: List shipments.</li>
+<li><strong><code>POST /api/v1/shipping/shipments</code></strong>: Create a shipment by hand.</li>
+<li><strong><code>GET /api/v1/shipping/shipments/{id}</code></strong>: Get a shipment with its parcels, items and tracking history.</li>
+<li><strong><code>POST /api/v1/shipping/shipments/{id}/book</code></strong>: Book a shipment with its carrier.</li>
+<li><strong><code>POST /api/v1/shipping/shipments/{id}/cancel</code></strong>: Cancel a shipment.</li>
+<li><strong><code>GET /api/v1/shipping/shipments/{id}/label</code></strong>: Download the carrier label of a shipment.</li>
+<li><strong><code>PUT /api/v1/shipping/shipments/{id}/parcels</code></strong>: Replace the parcels of a shipment.</li>
+<li><strong><code>POST /api/v1/shipping/shipments/{id}/split</code></strong>: Split a shipment (partial delivery).</li>
+<li><strong><code>POST /api/v1/shipping/shipments/{id}/status</code></strong>: Set the status of a shipment by hand.</li>
+<li><strong><code>POST /api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}</code></strong>: Receive a status webhook from a carrier at the address that names the tenant.</li>
+<li><strong><code>POST /api/v1/shipping/webhooks/{carrier_code}/{token}</code></strong>: Receive a status webhook from a carrier.</li>
+<li><strong><code>GET /api/v1/shipping/zones</code></strong>: List shipping zones.</li>
+<li><strong><code>POST /api/v1/shipping/zones</code></strong>: Create a shipping zone.</li>
+<li><strong><code>DELETE /api/v1/shipping/zones/{id}</code></strong>: Delete a shipping zone.</li>
+<li><strong><code>GET /api/v1/shipping/zones/{id}</code></strong>: Get a shipping zone.</li>
+<li><strong><code>PATCH /api/v1/shipping/zones/{id}</code></strong>: Rename a shipping zone.</li>
+<li><strong><code>PUT /api/v1/shipping/zones/{id}/regions</code></strong>: Replace the regions of a shipping zone.</li>
+</ul>
+<h2 id="support"><a class="header" href="#support">support</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/support/auto-replies</code></strong>: List automatic answers in your scope, with the customers’ feedback.</li>
+<li><strong><code>POST /api/v1/support/auto-reply/preview</code></strong>: Try the automatic answer without sending anything.</li>
+<li><strong><code>GET /api/v1/support/macros</code></strong>: List the saved replies usable at a unit.</li>
+<li><strong><code>POST /api/v1/support/macros</code></strong>: Create a saved reply.</li>
+<li><strong><code>DELETE /api/v1/support/macros/{id}</code></strong>: Delete a saved reply.</li>
+<li><strong><code>PUT /api/v1/support/macros/{id}</code></strong>: Replace a saved reply.</li>
+<li><strong><code>PUT /api/v1/support/macros/{id}/auto-reply</code></strong>: Approve a saved reply for automatic answers, or stop using it.</li>
+<li><strong><code>POST /api/v1/support/me/claim</code></strong>: Attach your guest tickets to your account.</li>
+<li><strong><code>GET /api/v1/support/me/tickets</code></strong>: List your own support tickets.</li>
+<li><strong><code>GET /api/v1/support/me/tickets/{id}</code></strong>: Get one of your support tickets with its messages.</li>
+<li><strong><code>POST /api/v1/support/me/tickets/{id}/auto-replies/{reply_id}/feedback</code></strong>: Tell whether an automatic answer on your ticket helped.</li>
+<li><strong><code>POST /api/v1/support/me/tickets/{id}/handoff</code></strong>: Ask for a person on your ticket.</li>
+<li><strong><code>POST /api/v1/support/me/tickets/{id}/messages</code></strong>: Write on one of your support tickets.</li>
+<li><strong><code>POST /api/v1/support/me/tickets/{id}/satisfaction</code></strong>: Rate the support of your ticket.</li>
+<li><strong><code>DELETE /api/v1/support/policies/{org_id}</code></strong>: Remove the own support policy of a unit.</li>
+<li><strong><code>GET /api/v1/support/policies/{org_id}</code></strong>: Get the support policy in force at a unit.</li>
+<li><strong><code>PUT /api/v1/support/policies/{org_id}</code></strong>: Set the support policy of a unit.</li>
+<li><strong><code>POST /api/v1/support/public/tickets</code></strong>: Open a support ticket from the website.</li>
+<li><strong><code>GET /api/v1/support/public/tickets/{id}</code></strong>: See a guest ticket.</li>
+<li><strong><code>POST /api/v1/support/public/tickets/{id}/auto-replies/{reply_id}/feedback</code></strong>: Tell whether an automatic answer on a guest ticket helped.</li>
+<li><strong><code>POST /api/v1/support/public/tickets/{id}/handoff</code></strong>: Ask for a person on a guest ticket.</li>
+<li><strong><code>POST /api/v1/support/public/tickets/{id}/messages</code></strong>: Write on a guest ticket.</li>
+<li><strong><code>POST /api/v1/support/public/tickets/{id}/satisfaction</code></strong>: Rate the support of a guest ticket.</li>
+<li><strong><code>POST /api/v1/support/public/tickets/{id}/verify</code></strong>: Confirm the email or phone number of a guest ticket.</li>
+<li><strong><code>GET /api/v1/support/reports/summary</code></strong>: Support figures for a period.</li>
+<li><strong><code>GET /api/v1/support/routing-rules</code></strong>: List the routing rules of a unit.</li>
+<li><strong><code>POST /api/v1/support/routing-rules</code></strong>: Add a routing rule.</li>
+<li><strong><code>DELETE /api/v1/support/routing-rules/{id}</code></strong>: Delete a routing rule.</li>
+<li><strong><code>GET /api/v1/support/teams</code></strong>: List support teams in your scope.</li>
+<li><strong><code>POST /api/v1/support/teams</code></strong>: Create a support team.</li>
+<li><strong><code>DELETE /api/v1/support/teams/{id}</code></strong>: Delete a support team.</li>
+<li><strong><code>GET /api/v1/support/teams/{id}</code></strong>: Get a support team with its members.</li>
+<li><strong><code>DELETE /api/v1/support/teams/{id}/members/{user_id}</code></strong>: Remove a member from a support team.</li>
+<li><strong><code>PUT /api/v1/support/teams/{id}/members/{user_id}</code></strong>: Add a member to a support team, or change whether they take new tickets.</li>
+<li><strong><code>GET /api/v1/support/tickets</code></strong>: List the support tickets in your scope.</li>
+<li><strong><code>POST /api/v1/support/tickets</code></strong>: Open a ticket for a customer.</li>
+<li><strong><code>GET /api/v1/support/tickets/{id}</code></strong>: Get a support ticket with all its messages and internal notes.</li>
+<li><strong><code>PATCH /api/v1/support/tickets/{id}</code></strong>: Change status, priority, category or assignee of a ticket.</li>
+<li><strong><code>POST /api/v1/support/tickets/{id}/escalate</code></strong>: Hand a ticket over as a consumer complaint or to the marketplace.</li>
+<li><strong><code>POST /api/v1/support/tickets/{id}/links</code></strong>: Link a ticket to a record (an order, a product…).</li>
+<li><strong><code>DELETE /api/v1/support/tickets/{id}/links/{target}</code></strong>: Remove a link from a ticket.</li>
+<li><strong><code>POST /api/v1/support/tickets/{id}/macros/{macro_id}/render</code></strong>: Fill a saved reply in for a ticket.</li>
+<li><strong><code>POST /api/v1/support/tickets/{id}/messages</code></strong>: Answer a ticket, or add an internal note.</li>
+<li><strong><code>POST /api/v1/support/tickets/{id}/messages/{message_id}/hide</code></strong>: Hide a message of a ticket.</li>
+<li><strong><code>GET /api/v1/support/tickets/{id}/reply-drafts</code></strong>: List the drafts of a ticket.</li>
+<li><strong><code>POST /api/v1/support/tickets/{id}/reply-suggestions</code></strong>: Draft an answer with AI.</li>
+</ul>
+<h2 id="tax"><a class="header" href="#tax">tax</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/tax/categories</code></strong>: List the tax categories.</li>
+<li><strong><code>GET /api/v1/tax/jurisdictions</code></strong>: List the tax jurisdictions.</li>
+<li><strong><code>GET /api/v1/tax/packs</code></strong>: List the imported tax data packs.</li>
+<li><strong><code>POST /api/v1/tax/packs</code></strong>: Import a tax data pack.</li>
+<li><strong><code>GET /api/v1/tax/profiles</code></strong>: List the tax profiles in your scope.</li>
+<li><strong><code>GET /api/v1/tax/profiles/{org_id}</code></strong>: Get the tax profile that applies to a unit.</li>
+<li><strong><code>PUT /api/v1/tax/profiles/{org_id}</code></strong>: Set the tax profile of a unit.</li>
+<li><strong><code>POST /api/v1/tax/quote</code></strong>: Compute the taxes of a document.</li>
+<li><strong><code>GET /api/v1/tax/rates</code></strong>: List the tax rates with their dates.</li>
+<li><strong><code>GET /api/v1/tax/rules</code></strong>: List the tax rules with their dates.</li>
+<li><strong><code>POST /api/v1/tax/withholding</code></strong>: Compute the taxes a platform withholds from a payment.</li>
+<li><strong><code>GET /api/v1/tax/withholding-rates</code></strong>: List the withholding rates for platforms.</li>
+</ul>
+<h2 id="webhooks"><a class="header" href="#webhooks">webhooks</a></h2>
+<ul>
+<li><strong><code>GET /api/v1/webhooks</code></strong>: List webhook endpoints.</li>
+<li><strong><code>POST /api/v1/webhooks</code></strong>: Create a webhook endpoint.</li>
+<li><strong><code>GET /api/v1/webhooks/deliveries</code></strong>: List the deliveries of every endpoint, e.g. the failed ones.</li>
+<li><strong><code>POST /api/v1/webhooks/deliveries/{id}/redeliver</code></strong>: Send a delivery again.</li>
+<li><strong><code>GET /api/v1/webhooks/events</code></strong>: List the kinds of events endpoints can receive.</li>
+<li><strong><code>DELETE /api/v1/webhooks/{id}</code></strong>: Delete a webhook endpoint and its delivery history.</li>
+<li><strong><code>GET /api/v1/webhooks/{id}</code></strong>: Get a webhook endpoint.</li>
+<li><strong><code>PATCH /api/v1/webhooks/{id}</code></strong>: Change a webhook endpoint, or turn it off and on.</li>
+<li><strong><code>GET /api/v1/webhooks/{id}/deliveries</code></strong>: List the deliveries of an endpoint, to see what was sent and what failed.</li>
+<li><strong><code>POST /api/v1/webhooks/{id}/secret</code></strong>: Replace the signing secret of an endpoint.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/trials/rc-trial-r1/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../reference/mcp-tools.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/trials/rc-trial-r1/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../reference/mcp-tools.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

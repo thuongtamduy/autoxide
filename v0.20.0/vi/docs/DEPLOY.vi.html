@@ -1,0 +1,1422 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Cài đặt và deploy Autoxide - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="cài-đặt-và-deploy-autoxide"><a class="header" href="#cài-đặt-và-deploy-autoxide">Cài đặt và deploy Autoxide</a></h1>
+<p><a href="DEPLOY.html">English</a></p>
+<p>Hướng dẫn này đưa bạn từ con số không tới một máy chủ đang chạy, cập nhật được và có
+backup. Chọn một trong hai cách chạy (cách thứ ba, một container với SQLite và không cần build,
+ở <a href="#c-một-container-với-sqlite">mục C</a>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>Docker Compose với PostgreSQL</th><th>Một binary với SQLite</th></tr>
+</thead>
+<tbody>
+<tr><td>Hợp với</td><td>Production, nhiều người ghi cùng lúc, nhiều máy chủ</td><td>Bản cài nhỏ trên một máy, dùng thử Autoxide</td></tr>
+<tr><td>Cần có</td><td>Docker kèm plugin Compose</td><td>Rust (để build) hoặc một binary đã build; không cần gì khác</td></tr>
+<tr><td>Database</td><td>PostgreSQL 16 trở lên, trong container</td><td>Một file, <code>data/autoxide.sqlite</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Bạn có thể bắt đầu với SQLite rồi chuyển sang PostgreSQL về sau mà không mất dữ liệu
+(xem <a href="#chuyển-từ-sqlite-sang-postgresql">Chuyển từ SQLite sang PostgreSQL</a>).</p>
+<h2 id="a-docker-compose-với-postgresql"><a class="header" href="#a-docker-compose-với-postgresql">A. Docker Compose với PostgreSQL</a></h2>
+<h3 id="1-lấy-mã-nguồn-và-đặt-secret"><a class="header" href="#1-lấy-mã-nguồn-và-đặt-secret">1. Lấy mã nguồn và đặt secret</a></h3>
+<pre><code class="language-bash">git clone https://github.com/thuongtamduy/autoxide.git autoxide
+cd autoxide
+</code></pre>
+<p>Tạo file <code>.env</code> cạnh <code>compose.yml</code> chứa ba secret. Không bao giờ commit file này.</p>
+<pre><code class="language-bash">printf 'POSTGRES_PASSWORD=%s\nAUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -hex 24)" "$(openssl rand -base64 48 | tr -d '\n')" \
+  "$(openssl rand -base64 48 | tr -d '\n')" &gt; .env
+chmod 600 .env
+</code></pre>
+<ul>
+<li><code>POSTGRES_PASSWORD</code> bảo vệ database.</li>
+<li><code>AUTOXIDE_AUTH_TOKEN_SECRET</code> ký access token. Muốn đổi mà không đăng xuất ai (định kỳ, vài
+tháng một lần): đặt giá trị mới vào nó và giá trị cũ vào <code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code> trên
+mọi máy chủ, khởi động lại, rồi bỏ <code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code> sau
+<code>AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS</code> (mặc định 15 phút): token ký bằng khoá cũ vẫn được nhận tới khi
+hết hạn. Đổi mà không giữ khoá cũ thì mọi access token hết hiệu lực.</li>
+<li><code>AUTOXIDE_SECRET_KEY</code> ký các token sống ngắn (biểu mẫu, chống spam), làm khoá băm địa chỉ
+IP của người lạ và mã hoá các secret máy chủ giữ (đăng nhập hai bước, secret ký webhook). Để
+ngoài database thì bản sao database (bản backup) không làm lộ các địa chỉ đó, cũng không làm
+lộ các secret đó.</li>
+<li>Muốn đổi <code>AUTOXIDE_SECRET_KEY</code> về sau: đặt giá trị mới vào nó, giá trị cũ vào
+<code>AUTOXIDE_SECRET_KEY_PREVIOUS</code>, khởi động lại, chạy <code>autoxide secrets reseal</code>, rồi bỏ
+<code>AUTOXIDE_SECRET_KEY_PREVIOUS</code>. Lần đầu đặt biến này trên máy chủ đã chạy mà chưa có nó thì
+không cần làm gì thêm: khoá máy chủ đã giữ trong database vẫn mở được thứ nó đã mã hoá.</li>
+</ul>
+<h3 id="2-khởi-động"><a class="header" href="#2-khởi-động">2. Khởi động</a></h3>
+<pre><code class="language-bash">docker compose up -d --build
+</code></pre>
+<p>Lần build đầu biên dịch mọi thứ từ mã nguồn: tính khoảng 20 phút tới hơn một giờ, và ít nhất 4 GB bộ nhớ
+cho Docker. Sau proxy của công ty thì cấu hình proxy cho Docker trước (xem
+<a href="../README.vi.html#yêu-cầu">Yêu cầu trong README</a>).</p>
+<p>Hoặc khỏi build, dùng image đã phát hành (xem các bản phát hành trên GitHub của dự án):</p>
+<pre><code class="language-bash">echo 'AUTOXIDE_IMAGE=ghcr.io/&lt;owner&gt;/autoxide:&lt;version&gt;' &gt;&gt; .env
+docker compose up -d --no-build
+</code></pre>
+<p>Image đã phát hành chạy trên <code>linux/amd64</code> và <code>linux/arm64</code> (vd AWS Graviton hay Raspberry
+Pi 4 trở lên). <code>&lt;version&gt;</code> là một bản phát hành như <code>0.12.0</code>, hoặc <code>0.12</code> để nhận theo các bản
+sửa lỗi của nó. Mỗi image do workflow <code>Release</code> của dự án trên GitHub build, kèm chứng thực
+nguồn gốc build đã ký và danh sách thành phần (SBOM) đã ký. Trước khi chạy một image, kiểm nó
+được build từ đúng repo này bằng <a href="https://cli.github.com/">GitHub CLI</a>:</p>
+<pre><code class="language-bash">gh attestation verify oci://ghcr.io/&lt;owner&gt;/autoxide:&lt;version&gt; --owner &lt;owner&gt;
+</code></pre>
+<p>Lệnh in ra workflow, commit và tag đã build image, và báo lỗi nếu image không do repo này
+build. SBOM (SPDX) được đính vào mỗi bản phát hành trên GitHub với tên <code>sbom.spdx.json</code>; kiểm
+nó thuộc đúng image và đọc nó bằng:</p>
+<pre><code class="language-bash">gh attestation verify oci://ghcr.io/&lt;owner&gt;/autoxide:&lt;version&gt; --owner &lt;owner&gt; \
+  --predicate-type https://spdx.dev/Document/v2.3 --format json \
+  | jq '.[0].verificationResult.statement.predicate.packages[].name'
+</code></pre>
+<p>Compose khởi động PostgreSQL, áp dụng mọi migration một lần (service <code>migrate</code>), rồi
+khởi động máy chủ ở <code>127.0.0.1:8080</code>. Kiểm tra:</p>
+<pre><code class="language-bash">curl http://127.0.0.1:8080/health/ready
+</code></pre>
+<p><code>{"data":{"status":"ok"}}</code> nghĩa là máy chủ và database đã sẵn sàng.</p>
+<p>Image là distroless: không có shell, <code>curl</code> hay trình quản lý gói (bề mặt tấn công và số thứ cần vá nhỏ hơn), và chạy bằng user
+<code>10001</code>. Nó tự kiểm bằng chính binary: <code>autoxide healthcheck</code> hỏi máy chủ trên máy này ở <code>/health/ready</code> (<code>--live</code> cho
+<code>/health/live</code>) và thoát <code>0</code> khi nhận 200. <code>HEALTHCHECK</code> của image và service <code>app</code> trong <code>compose.yml</code> dùng lệnh này, nên
+<code>docker compose ps</code> hiện <code>healthy</code>. Muốn xem bên trong container đang chạy, dùng <code>docker debug</code> hay <code>kubectl debug</code>
+(container tạm có công cụ), không dùng <code>docker exec … sh</code>: không có <code>sh</code>.</p>
+<h3 id="3-tạo-quản-trị-viên-đầu-tiên"><a class="header" href="#3-tạo-quản-trị-viên-đầu-tiên">3. Tạo quản trị viên đầu tiên</a></h3>
+<pre><code class="language-bash">docker compose run --rm app user create --email you@example.com --name "Tên của bạn" --admin
+</code></pre>
+<p>Một mật khẩu mạnh được in ra đúng một lần; hãy lưu vào trình quản lý mật khẩu. Đăng
+nhập bằng <code>POST /api/v1/auth/login</code>; toàn bộ API được mô tả ở
+<code>http://127.0.0.1:8080/api/v1/openapi.json</code>.</p>
+<h3 id="4-đưa-lên-internet"><a class="header" href="#4-đưa-lên-internet">4. Đưa lên internet</a></h3>
+<p>Máy chủ chỉ nói HTTP thường ở <code>127.0.0.1:8080</code>. Đặt một reverse proxy phía trước để lo
+TLS. Với <a href="https://caddyserver.com">Caddy</a> (tự lấy chứng chỉ), toàn bộ cấu hình
+(<code>/etc/caddy/Caddyfile</code>) là:</p>
+<pre><code class="language-text">api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+</code></pre>
+<p>Autoxide tự nén response JSON và chữ (gzip hay brotli, tuỳ client nhận cách nào; ảnh và file
+khác gửi nguyên), nên proxy không cần chỉ thị <code>encode</code>. Nếu proxy hay CDN đã nén, đặt
+<code>AUTOXIDE_HTTP_COMPRESSION=false</code> để khỏi nén hai lần.</p>
+<p>Rồi cho Autoxide biết header nào chứa địa chỉ thật của client, để rate limiting đếm theo
+client chứ không theo proxy. Thêm vào <code>.env</code> rồi khởi động lại:</p>
+<pre><code class="language-bash">echo 'AUTOXIDE_HTTP_CLIENT_IP_HEADER=X-Forwarded-For' &gt;&gt; .env
+docker compose up -d
+</code></pre>
+<p><strong>Nhiều hơn một proxy.</strong> Mỗi proxy thêm địa chỉ của bên kết nối tới nó vào cuối
+<code>X-Forwarded-For</code>; phần đứng trước là do client gửi và giả được. Đặt
+<code>AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT</code> bằng số proxy của bạn mà một request đi qua (mặc định
+<code>1</code>). Trường hợp hay gặp là máy chủ website (như Next.js) gọi API thay cho khách, đứng sau
+CDN:</p>
+<pre><code class="language-text">trình duyệt ──▶ CDN ──▶ máy chủ website ──▶ Caddy ──▶ Autoxide
+                thêm     thêm địa chỉ        thêm địa chỉ
+                trình    CDN                 máy chủ website
+                duyệt
+X-Forwarded-For:  trình-duyệt, CDN, máy-chủ-website
+                  ▲ thứ 3 từ cuối → AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT=3
+</code></pre>
+<p>Máy chủ website phải chuyển tiếp <code>X-Forwarded-For</code> nó nhận được (và thêm địa chỉ CDN, như
+proxy vẫn làm); không thì mọi khách trông như một client. Khi đếm proxy, không proxy nào của
+bạn được để internet gọi thẳng, không thì client tự chọn được địa chỉ của mình.</p>
+<p><strong>Proxy mà internet gọi thẳng được.</strong> Khi khách có thể bỏ qua CDN mà gọi thẳng máy chủ
+website, hoặc request đi theo nhiều đường khác nhau, đếm proxy sẽ sai với một số request. Khi
+đó hãy liệt kê địa chỉ các proxy của bạn, từng địa chỉ hoặc theo dải:</p>
+<pre><code class="language-bash">echo 'AUTOXIDE_HTTP_TRUSTED_PROXIES=10.0.0.0/8, 198.51.100.0/24' &gt;&gt; .env
+</code></pre>
+<p>Biến này thay cho <code>AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT</code>. Autoxide chỉ đọc header khi kết nối đến
+từ một trong các địa chỉ đó, và lấy địa chỉ cuối cùng trong header không thuộc danh sách. CDN
+công bố dải địa chỉ của họ; nhớ cập nhật danh sách khi dải đổi.</p>
+<p>Log lúc khởi động cũng cảnh báo khi chưa đặt <code>AUTOXIDE_SECRET_KEY</code> (xem bảng dưới): hãy đặt nó
+trước khi chạy thật.</p>
+<p>Các biến cấu hình khác thêm cùng cách: mọi biến được liệt kê kèm giá trị mặc định trong
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a>. Biến nào <code>compose.yml</code> chưa chuyển vào thì thêm dưới
+<code>environment:</code> của khối <code>x-autoxide</code>.</p>
+<h3 id="5-cập-nhật"><a class="header" href="#5-cập-nhật">5. Cập nhật</a></h3>
+<pre><code class="language-bash">git pull
+docker compose up -d --build
+</code></pre>
+<p>Service <code>migrate</code> áp dụng migration mới trước khi máy chủ mới khởi động.</p>
+<p><strong>Cập nhật từ 0.17 trở về trước:</strong> module thử nghiệm (bookings, newsletter, comments, support,
+conversations, analytics, reporting, automations) không còn chạy nếu <code>AUTOXIDE_MODULES</code> không nêu
+tên. Không gì bị xoá, và log khởi động lẫn <code>autoxide doctor</code> báo khi database còn dữ liệu của một
+module đang tắt, kèm dòng cần thêm — xem
+<a href="MODULES.vi.html#nâng-cấp-từ-017-trở-về-trước">MODULES.vi.md</a>. Điều này áp dụng cả cho cách B và C.</p>
+<p><strong>Cập nhật lên bản có chỉ mục từ của content</strong> (migration <code>content.m0036_word_index</code>): migration điền từ
+của mọi bài đã đăng vào bảng mới <code>content_published_words</code> theo từng lô, rồi dựng index của bảng và thêm một index trên <code>content_published</code>. Website lớn
+thì lâu hơn và giữ lock của migration trong lúc đó: hãy cập nhật vào giờ vắng. Điều này áp dụng cả cho cách B
+và C.</p>
+<h3 id="6-backup-và-khôi-phục"><a class="header" href="#6-backup-và-khôi-phục">6. Backup và khôi phục</a></h3>
+<pre><code class="language-bash">mkdir -p backups &amp;&amp; sudo chown 10001 backups
+docker compose run --rm -v "$PWD/backups:/backups" app backup "/backups/$(date +%F)"
+</code></pre>
+<p>Bản backup là một thư mục chứa bản sao của database (dạng file SQLite) và của mọi file
+đã lưu; tạo được trong lúc máy chủ đang chạy. Hãy chép nó đi nơi khác — một máy khác hay
+object storage. Để khôi phục vào một bản cài mới, chỉ khởi động PostgreSQL, khôi phục
+(<code>--no-deps</code> để Compose không chạy migration trước: restore cần một database trống), rồi
+khởi động tất cả:</p>
+<pre><code class="language-bash">docker compose up -d --wait postgres
+docker compose run --rm --no-deps -v "$PWD/backups:/backups" app restore /backups/2026-11-11
+docker compose up -d
+</code></pre>
+<p>Chỉ khôi phục bản backup do chính bạn tạo.</p>
+<h2 id="b-một-binary-với-sqlite"><a class="header" href="#b-một-binary-với-sqlite">B. Một binary với SQLite</a></h2>
+<h3 id="1-build"><a class="header" href="#1-build">1. Build</a></h3>
+<p>Cài Rust từ <a href="https://rustup.rs">rustup.rs</a> (đúng phiên bản được chọn theo
+<code>rust-toolchain.toml</code>) và một trình biên dịch C — SQLite và libwebp được biên dịch vào binary
+(trên Debian hay Ubuntu: <code>sudo apt install build-essential</code>) — rồi:</p>
+<pre><code class="language-bash">cargo build --release --locked -p autoxide
+sudo install -m 755 target/release/autoxide /usr/local/bin/autoxide
+</code></pre>
+<h3 id="2-chuẩn-bị-thư-mục"><a class="header" href="#2-chuẩn-bị-thư-mục">2. Chuẩn bị thư mục</a></h3>
+<pre><code class="language-bash">sudo useradd --system --home-dir /var/lib/autoxide --create-home autoxide
+sudo -u autoxide sh -c 'cd /var/lib/autoxide &amp;&amp; printf "AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n" "$(openssl rand -base64 48 | tr -d "\n")" "$(openssl rand -base64 48 | tr -d "\n")" &gt; .env &amp;&amp; chmod 600 .env'
+</code></pre>
+<p>Autoxide đọc <code>.env</code> trong thư mục nó chạy và giữ mọi thứ nó ghi trong <code>data/</code> ở đó:
+database <code>data/autoxide.sqlite</code>, file tải lên <code>data/files</code>, và mail <code>data/mail</code> cho tới
+khi cấu hình SMTP.</p>
+<h3 id="3-migration-và-quản-trị-viên-đầu-tiên"><a class="header" href="#3-migration-và-quản-trị-viên-đầu-tiên">3. Migration và quản trị viên đầu tiên</a></h3>
+<pre><code class="language-bash">cd /var/lib/autoxide
+sudo -u autoxide autoxide migrate up
+sudo -u autoxide autoxide user create --email you@example.com --name "Tên của bạn" --admin
+</code></pre>
+<p>Mất thiết bị của tài khoản quản trị duy nhất đang bật xác thực hai bước? Tắt nó ngay trên máy
+chủ, rồi đăng nhập bằng mật khẩu và bật lại:</p>
+<pre><code class="language-bash">sudo -u autoxide autoxide user reset-mfa --email you@example.com
+</code></pre>
+<p>Mất các thiết bị giữ passkey của tài khoản đó? Gỡ chúng ngay trên máy chủ, rồi đăng nhập bằng
+mật khẩu và thêm passkey mới. Quản trị viên khác làm được điều tương tự qua API với permission
+<code>auth.passkeys.manage</code> (<code>DELETE /api/v1/auth/users/{id}/passkeys</code>).</p>
+<pre><code class="language-bash">sudo -u autoxide autoxide user remove-passkeys --email you@example.com
+</code></pre>
+<p>Ba lệnh này làm việc với khách mặc định. Khi có nhiều khách (<code>AUTOXIDE_TENANCY_MODE=multi</code>), thêm
+<code>--tenant &lt;slug&gt;</code> để làm với tài khoản của khách khác, ví dụ quản trị viên đầu tiên của khách đó:</p>
+<pre><code class="language-bash">sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
+</code></pre>
+<h3 id="3b-chạy-thử-bằng-tay"><a class="header" href="#3b-chạy-thử-bằng-tay">3b. Chạy thử bằng tay</a></h3>
+<p>Trước khi dựng service, chạy ở foreground và đọc lại một thứ gì đó. Thứ tự quan trọng: <code>migrate up</code> (bước 3) tạo bảng,
+và <code>serve</code> từ chối khởi động khi còn migration chưa áp dụng (lần đầu có khoảng bốn trăm migration, chừng hai mươi giây).</p>
+<pre><code class="language-bash">cd /var/lib/autoxide
+sudo -u autoxide autoxide task address.import        # dữ liệu tham chiếu: đơn vị hành chính Việt Nam
+sudo -u autoxide autoxide serve                      # nghe ở 127.0.0.1:8080
+</code></pre>
+<p>Ở terminal khác:</p>
+<pre><code class="language-bash">curl http://127.0.0.1:8080/health/ready
+curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # dữ liệu thật, không cần đăng nhập
+</code></pre>
+<p>Đổi cổng hay địa chỉ: <code>AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000</code> trong <code>.env</code> (tên đúng là vậy: không có
+<code>AUTOXIDE_PORT</code>). Biến <code>AUTOXIDE_…</code> gõ sai tên bị bỏ qua, nhưng <code>autoxide config</code> và log khởi động giờ nêu tên
+nó và gợi ý tên đúng.</p>
+<p>Giá trị có dấu cách hay ký tự đặc biệt trong <code>.env</code> phải nằm trong dấu nháy kép (<code>NAME="giá trị"</code>); khi một dòng
+không đọc được, thông báo lỗi nêu tên biến.</p>
+<h3 id="4-chạy-như-một-service"><a class="header" href="#4-chạy-như-một-service">4. Chạy như một service</a></h3>
+<p><code>/etc/systemd/system/autoxide.service</code>:</p>
+<pre><code class="language-ini">[Unit]
+Description=Autoxide
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=autoxide
+WorkingDirectory=/var/lib/autoxide
+ExecStart=/usr/local/bin/autoxide serve
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/autoxide
+# Cao hơn AUTOXIDE_HTTP_MAX_CONNECTIONS (4096) cộng chỗ cho file và kết nối database.
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<pre><code class="language-bash">sudo systemctl daemon-reload
+sudo systemctl enable --now autoxide
+curl http://127.0.0.1:8080/health/ready
+</code></pre>
+<p>Đặt reverse proxy phía trước như ở <a href="#4-đưa-lên-internet">A.4</a> và đặt
+<code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> trong <code>.env</code>.</p>
+<h3 id="5-cập-nhật-1"><a class="header" href="#5-cập-nhật-1">5. Cập nhật</a></h3>
+<p>Build phiên bản mới, dừng service, chạy migration, khởi động:</p>
+<pre><code class="language-bash">sudo systemctl stop autoxide
+sudo install -m 755 target/release/autoxide /usr/local/bin/autoxide
+(cd /var/lib/autoxide &amp;&amp; sudo -u autoxide autoxide migrate up)
+sudo systemctl start autoxide
+</code></pre>
+<h3 id="6-backup-và-khôi-phục-1"><a class="header" href="#6-backup-và-khôi-phục-1">6. Backup và khôi phục</a></h3>
+<pre><code class="language-bash">cd /var/lib/autoxide
+sudo -u autoxide autoxide backup "backups/$(date +%F)"
+</code></pre>
+<p>Để khôi phục trên một máy mới, chuẩn bị thư mục (bước 1–2), rồi chạy
+<code>autoxide restore &lt;thư mục backup&gt;</code> ở đó trước khi khởi động service.</p>
+<p>Với <code>AUTOXIDE_TENANCY_MODE=multi</code>, bản backup có database chính (sổ khách và mọi khách trên đó) và
+mọi file ở nơi lưu file chung. Thêm <code>--all</code> để backup cả mọi placement khác, kèm nơi lưu file riêng của
+nó, vào <code>placements/&lt;tên&gt;/</code> của thư mục; không có thì lệnh in cảnh báo nêu tên chúng. Với <code>--all</code>,
+<code>backup.json</code> của database chính được ghi sau cùng: một placement lỗi thì lệnh dừng và báo lỗi, thư
+mục không phải bản backup trọn (xoá nó rồi chạy lại). Để lấy lại một placement đã mất: restore database
+chính trước nếu nó cũng mất, tạo một database mới, trống ở đúng địa chỉ của placement, rồi chạy
+<code>autoxide restore &lt;thư mục backup&gt; --placement &lt;tên&gt;</code>: lệnh restore vào chính placement đó (cùng tên,
+cùng id), không phải vào một placement mới. Dừng service trước, như với database chính; trong lúc lệnh
+chạy, placement ở trạng thái <code>migrating</code> và khách của nó nhận 503.</p>
+<p><code>restore</code> kiểm toàn bộ bản backup (phiên bản, module đang tắt hay không có, file) trước khi chạm đích,
+nên restore bị từ chối thì đích vẫn trống: sửa cấu hình được nêu rồi chạy lại. Nếu lệnh dừng giữa chừng
+sau đó (đầy đĩa, mất kết nối), đích có một phần dữ liệu: xoá và tạo lại database đó rồi chạy lại.</p>
+<p>Bản backup giữ nguyên schema của nguồn: lệnh không đòi database đã migrate, nên backup được ngay trước
+khi nâng cấp, và bản đang chạy trước khi nâng restore được bản backup đó (<code>backup.json</code> liệt kê các
+migration nó có). Bản mới hơn cũng restore được. Từ bản này trở đi, bản cũ hơn nguồn từ chối với
+thông báo rõ (các bản trước đó báo lỗi migration). Bản backup làm trước 0.20 không có danh sách
+migration, nên <code>restore</code> không biết nó có dữ liệu của module mà bản build này thiếu hay không: restore
+chúng bằng bản build có đủ mọi module của nguồn. Đừng thêm file vào thư mục backup (<code>restore</code> đếm file
+trong <code>files/</code>, một file <code>.DS_Store</code> cũng làm nó từ chối). Bản backup chứa các
+module đang bật: module đang tắt mà còn dữ liệu thì lệnh dừng và nói cấu hình nào bật nó.
+Cất
+<code>AUTOXIDE_SECRET_KEY</code> ở nơi an toàn, tách khỏi bản
+backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.</p>
+<h2 id="b-một-binary-với-postgresql-từ-đầu"><a class="header" href="#b-một-binary-với-postgresql-từ-đầu">B+. Một binary với PostgreSQL, từ đầu</a></h2>
+<p>Như B, với một máy chủ PostgreSQL bạn đã có (gói cài, database trên cloud; không cần Docker). Tạo database và
+người dùng, rồi đặt URL vào <code>.env</code> thay cho file SQLite:</p>
+<pre><code class="language-bash">sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'chon-mat-khau-dai'" \
+  -c "CREATE DATABASE autoxide OWNER autoxide"
+printf 'DATABASE_URL=postgres://autoxide:chon-mat-khau-dai@127.0.0.1:5432/autoxide\n' &gt;&gt; /var/lib/autoxide/.env
+</code></pre>
+<p>Rồi làm các bước 3, 3b và 4 của B như đã viết (<code>migrate up</code>, tạo quản trị viên, <code>serve</code>). Nếu máy chủ không kết nối
+được, lỗi giờ nói lý do (ví dụ “connection refused” khi sai cổng) cạnh thông báo của pool; <code>autoxide doctor</code> kiểm
+kết nối và nói cần sửa gì.</p>
+<h2 id="c-một-container-với-sqlite"><a class="header" href="#c-một-container-với-sqlite">C. Một container với SQLite</a></h2>
+<p>Để dùng thử Autoxide hoặc một bản cài nhỏ trên một máy, không phải build gì. Các bước tới lần
+chạy đầu nằm ở README, mục <a href="../README.vi.html#chạy-thử-bằng-docker-không-cần-build">Chạy thử bằng Docker</a>.
+Những luật cần nhớ sau đó, với <code>IMAGE</code> và <code>RUN</code> như định nghĩa ở đó:</p>
+<ul>
+<li>Mặc định máy chủ không tự áp dụng migration. Chạy <code>serve</code> trên database trống hay cũ hơn sẽ dừng
+ngay với <code>N migration(s) have not been applied to the database (first: …); run autoxide migrate up first</code> (chỉ nêu số lượng và vài tên đầu; <code>autoxide migrate status</code> liệt kê đủ; mã lỗi
+<code>kernel.migrations_pending</code>): chạy
+<code>$RUN $IMAGE migrate up</code> rồi mới khởi động.
+Với một máy chủ, có thể đặt <code>AUTOXIDE_MIGRATE_ON_START=true</code> thay vào đó: <code>serve</code> tự áp dụng
+migration lúc khởi động (database chính trước khi mở port; rồi mọi database riêng của khách chạy
+nền, thành một lượt migrate mà <code>GET /api/v1/kernel/placements/migrations</code> cho xem; khách trên
+database chưa xong nhận 503 cho tới khi xong), dưới một khoá để hai máy chủ khởi động cùng lúc
+không cùng migrate. Kèm
+<code>AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL</code> thì tạo luôn quản trị viên đầu tiên, kèm <code>AUTOXIDE_STARTUP_TASKS</code>
+thì nạp dữ liệu nền — đúng những gì <code>compose.quickstart.yml</code> làm. Nhiều máy chủ thì vẫn chạy
+<code>migrate up</code> một lần mỗi lần deploy: thấy rõ cái gì đổi, và migration hỏng thì deploy dừng trước
+khi bản mới nhận request.</li>
+<li>Mọi thứ máy chủ ghi ra nằm trong volume <code>autoxide-data</code> (<code>/var/lib/autoxide/data</code>): database,
+file tải lên, và mail cho tới khi cấu hình SMTP. Container chạy không gắn volume đó chỉ giữ dữ
+liệu cho tới khi bị xoá.</li>
+<li><code>docker run -p 8080:8080</code> mở cổng trên mọi giao diện mạng của máy; hãy dùng
+<code>-p 127.0.0.1:8080:8080</code> và một reverse proxy (<a href="#4-đưa-lên-internet">A.4</a>). Thêm cấu hình vào
+<code>autoxide.env</code> (mỗi dòng một <code>TÊN=giá trị</code>, không có dấu nháy).</li>
+<li>Cập nhật: kéo image mới, áp dụng migration của nó, thay container. <code>--all</code> nâng thêm mọi
+database riêng của khách (placement) ở chế độ nhiều khách, ngoài chế độ đó không đổi gì; một
+placement hỏng không chặn các placement khác, lệnh nêu tên nó và thoát với mã 1.</li>
+</ul>
+<pre><code class="language-bash">IMAGE=ghcr.io/thuongtamduy/autoxide:&lt;phiên bản mới&gt;
+docker pull $IMAGE
+$RUN $IMAGE migrate up --all
+docker rm -f autoxide
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+</code></pre>
+<ul>
+<li>Backup vào một thư mục bạn gắn vào (image chạy bằng user 10001, user đó phải ghi được vào
+đó), và restore vào volume mới trước khi khởi động máy chủ:</li>
+</ul>
+<pre><code class="language-bash">mkdir -p backups &amp;&amp; sudo chown 10001 backups
+$RUN -v "$PWD/backups:/backups" $IMAGE backup "/backups/$(date +%F)"
+# trên máy mới, hoặc sau khi xoá volume:
+$RUN -v "$PWD/backups:/backups" $IMAGE restore /backups/2026-11-11
+</code></pre>
+<p>Thiếu <code>chown</code>, backup dừng với <code>permission denied</code> và nói rõ thư mục nào cần giao cho uid 10001.
+Xong, lệnh in đường dẫn tuyệt đối của bản backup. Backup ghi vào đường dẫn không được gắn vào sẽ
+biến mất cùng container: trong container, <code>backup</code> cảnh báo ở stderr khi đích không nằm trên
+volume hay bind mount (vẫn chạy tiếp).</p>
+<h2 id="chuyển-từ-sqlite-sang-postgresql"><a class="header" href="#chuyển-từ-sqlite-sang-postgresql">Chuyển từ SQLite sang PostgreSQL</a></h2>
+<p>Tạo một database PostgreSQL trống, dừng máy chủ, rồi chép. Database đích được áp dụng
+mọi migration trước, rồi nhận toàn bộ dữ liệu trong một transaction:</p>
+<pre><code class="language-bash">sudo systemctl stop autoxide
+cd /var/lib/autoxide
+printf '%s' 'postgres://autoxide:&lt;mật khẩu&gt;@db.example.com:5432/autoxide' \
+  | sudo -u autoxide autoxide copy --to-stdin
+</code></pre>
+<p>Rồi đặt <code>DATABASE_URL</code> trong <code>.env</code> bằng URL đó và khởi động máy chủ. File vẫn nằm chỗ
+cũ; muốn chuyển cả file lên S3 thì tạo backup, đặt cấu hình S3, rồi khôi phục vào một
+database mới.</p>
+<h2 id="những-biến-cấu-hình-nên-biết"><a class="header" href="#những-biến-cấu-hình-nên-biết">Những biến cấu hình nên biết</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Biến</th><th>Dùng để</th></tr>
+</thead>
+<tbody>
+<tr><td><code>DATABASE_URL</code></td><td><code>sqlite://data/autoxide.sqlite</code> (mặc định) hoặc <code>postgres://user:password@host:5432/db</code></td></tr>
+<tr><td><code>AUTOXIDE_MODULES</code></td><td>Module nào chạy: <code>official</code> (mặc định), <code>core</code>, <code>all</code>, tên để thêm, <code>-tên</code> để bỏ. Module thử nghiệm phải nêu tên. Xem <a href="MODULES.vi.html">MODULES.vi.md</a></td></tr>
+<tr><td><code>AUTOXIDE_AUTH_TOKEN_SECRET</code></td><td>Ký access token; nên đặt ở production (không đặt thì mỗi lần khởi động tạo khoá ngẫu nhiên và token hết hiệu lực khi khởi động lại), giống nhau trên mọi máy chủ</td></tr>
+<tr><td><code>AUTOXIDE_SECRET_KEY</code></td><td>Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu</td></tr>
+<tr><td><code>AUTOXIDE_SECRET_KEY_PREVIOUS</code></td><td>Các giá trị cũ của <code>AUTOXIDE_SECRET_KEY</code>, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy <code>autoxide secrets reseal</code></td></tr>
+<tr><td><code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code></td><td>Các giá trị cũ của <code>AUTOXIDE_AUTH_TOKEN_SECRET</code>, cách nhau dấu phẩy, trong lúc xoay khoá; chỉ dùng để kiểm token, bỏ đi sau thời gian sống của access token</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code></td><td>Sau reverse proxy: header chứa địa chỉ client</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT</code></td><td>Số proxy của bạn mà một request đi qua (mặc định <code>1</code>)</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_TRUSTED_PROXIES</code></td><td>Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd <code>10.0.0.0/8, 192.0.2.7</code></td></tr>
+<tr><td><code>AUTOXIDE_HTTP_MAX_CONNECTIONS</code></td><td>Số kết nối mở cùng lúc tối đa, tính cả WebSocket (mặc định <code>4096</code>, <code>0</code>: không giới hạn); quá số này thì kết nối mới phải chờ. Đặt thấp hơn giới hạn file mở (<code>ulimit -n</code>, thường 1024; systemd <code>LimitNOFILE</code>, <code>docker run --ulimit nofile=…</code>) và chừa chỗ cho kết nối database và file — máy chủ cảnh báo lúc khởi động khi không như vậy. Reverse proxy vẫn nên giới hạn số kết nối theo từng client</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_PUBLIC_URL</code></td><td>Địa chỉ internet dùng để gọi API, vd <code>https://api.example.com</code>; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin)</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_CORS_ORIGINS</code></td><td>Trang web ở origin khác được gọi API; tên miền đã xác minh của khách được gọi cho chính khách đó mà không cần liệt kê, xem <a href="#tên-miền-riêng-của-khách-hàng">Tên miền riêng của khách hàng</a></td></tr>
+<tr><td><code>AUTOXIDE_HTTP_HSTS_SECONDS</code></td><td><code>Strict-Transport-Security</code> <strong>bật sẵn ở production</strong>: khi <code>AUTOXIDE_HTTP_PUBLIC_URL</code> bắt đầu bằng <code>https://</code>, mọi response có <code>max-age=31536000</code> (một năm) nếu bạn không đặt biến này. Đặt số giây để đổi, hoặc <code>0</code> để tắt HSTS (vd khi còn client gọi host này bằng HTTP thường); <code>autoxide doctor</code> cảnh báo khi URL công khai là <code>https://</code> mà HSTS tắt. Không đặt URL công khai, hay URL <code>http://</code> (máy phát triển), thì không gửi HSTS. Trình duyệt bỏ qua header này trên HTTP thường, nên hãy dựng TLS phía trước API trước khi đặt URL công khai <code>https://</code>. Mọi response đã có sẵn <code>nosniff</code>, <code>Referrer-Policy</code>, <code>X-Frame-Options</code> và <code>Content-Security-Policy</code> chặt (<code>AUTOXIDE_HTTP_SECURITY_HEADERS</code>, <code>AUTOXIDE_HTTP_REFERRER_POLICY</code>)</td></tr>
+<tr><td><code>AUTOXIDE_MAIL_SMTP_URL</code>, <code>AUTOXIDE_MAIL_FROM</code></td><td>Gửi mail (đặt lại mật khẩu, xác minh email)</td></tr>
+<tr><td><code>AUTOXIDE_FILES_S3_BUCKET</code> và <code>AWS_…</code></td><td>Lưu file trên S3 hay dịch vụ tương thích S3; nên đặt thêm lifecycle rule cho bucket để huỷ multipart upload dở sau một ngày</td></tr>
+<tr><td><code>AUTOXIDE_AUTH_PASSWORD_RESET_URL</code>, <code>AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL</code></td><td>Mail dẫn tới trang của bạn</td></tr>
+<tr><td><code>AUTOXIDE_AUTH_PASSKEY_RP_ID</code>, <code>AUTOXIDE_AUTH_PASSKEY_ORIGINS</code></td><td>Bật đăng nhập bằng passkey cho tên miền của bạn</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_DRAIN_SECONDS</code></td><td>Sau bộ cân bằng tải: lúc tắt, phục vụ thêm bao lâu trong khi <code>/health/ready</code> trả <code>503</code>, xem <a href="#cập-nhật-không-làm-rơi-request">bên dưới</a></td></tr>
+<tr><td><code>AUTOXIDE_PROCESS_ROLE</code></td><td><code>api</code> / <code>worker</code> để chạy API và việc nền ở tiến trình riêng</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_COMPRESSION</code></td><td><code>true</code> (mặc định): nén JSON và chữ bằng gzip hay brotli; <code>false</code> khi reverse proxy hay CDN phía trước đã nén</td></tr>
+<tr><td><code>AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS</code></td><td>CDN được giữ một lượt đọc công khai bao lâu (mặc định <code>60</code>), xem <a href="#cdn-phía-trước-autoxide">CDN phía trước Autoxide</a></td></tr>
+<tr><td><code>AUTOXIDE_HTTP_RATE_LIMIT_TENANT_PER_MINUTE</code></td><td>Nhiều khách: số request một khách gửi được mỗi phút, mọi người dùng và API key của khách cộng lại (mặc định <code>0</code>, tắt), để một khách ồn ào không làm chậm khách khác; vượt thì 429 <code>tenant_rate_limited</code> kèm <code>Retry-After</code>. Hạn mức <code>kernel.api_rate_per_minute</code> của gói thay giá trị này cho khách đó (trong gói <code>0</code> là chặn mọi request; ở biến này <code>0</code> là tắt). Chỉ tính người gọi đã đăng nhập, vào khách họ đang làm việc (khách của chính họ, hay khách đã uỷ quyền cho họ): request không có thông tin xác thực hợp lệ (trang công khai, webhook gửi đến), nhân sự nền tảng thao tác trong khách và quyền hỗ trợ chỉ chịu giới hạn theo địa chỉ, nên người ngoài không làm cạn hạn mức của khách được. Một lô ghi tính một lần. Với <code>AUTOXIDE_HTTP_RATE_LIMIT_STORE=database</code>, burst nhỏ nghĩa là gần như mỗi request một lần ghi database: mức thấp trên một máy chủ thì nên dùng <code>memory</code></td></tr>
+<tr><td><code>AUTOXIDE_HTTP_METRICS</code></td><td>Metrics Prometheus ở <code>/metrics</code>, không có xác thực. Thêm <code>AUTOXIDE_HTTP_METRICS_ADDRESS</code> (vd <code>127.0.0.1:9090</code>) để phục vụ nó ở port riêng, tách khỏi API; không có biến đó thì <code>/metrics</code> nằm cùng port với API: hãy chặn nó ở reverse proxy (Caddy: <code>respond /metrics 404</code>) và lấy số đo ngay trên máy chủ</td></tr>
+<tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td>Gửi trace tới một OpenTelemetry collector</td></tr>
+</tbody>
+</table>
+</div>
+<p>Kiểm cấu hình mà không khởi động gì: <code>autoxide config</code>. Lệnh liệt kê mọi biến kèm giá
+trị (secret được giấu) và báo mọi vấn đề cùng một lượt.</p>
+<h2 id="thư-bị-dội"><a class="header" href="#thư-bị-dội">Thư bị dội</a></h2>
+<p>Khi máy chủ nhận từ chối hẳn chính địa chỉ người nhận lúc gửi — SMTP <code>5xx</code> với mã mở rộng <code>5.1.1</code>
+(không có hộp thư), <code>5.1.2</code> (không có tên miền), <code>5.1.3</code> (địa chỉ sai), <code>5.1.6</code> (hộp thư đã chuyển) hay
+<code>5.1.10</code> (tên miền không nhận thư) — địa chỉ có một bản ghi thư bị dội ở khách của nó. Lỗi của bên gửi
+(<code>5.1.7</code>, <code>5.1.8</code>, địa chỉ người gửi sai hay tài khoản SMTP bị khoá), hộp thư bị khoá (<code>5.2.1</code>), hộp thư đầy
+(<code>5.2.2</code>), thư quá cỡ (<code>5.2.3</code>), hay câu trả lời không có mã mở rộng không được tính, nên cấu hình gửi sai không bao giờ làm chặn người nhận. Mỗi 24
+giờ tính tối đa một lần: sau <code>AUTOXIDE_MAIL_HARD_BOUNCE_LIMIT</code> (mặc định 3) lần được tính, địa chỉ bị
+<strong>chặn</strong> ở riêng khách đó: thư mới tới nó — kể cả thư đặt lại mật khẩu — không được gửi, và mỗi thư bị bỏ được đếm trên
+bản ghi kèm nguồn (vd <code>auth.password_reset</code>), nên câu hỏi “vì sao người này không nhận được thư” có câu
+trả lời. API vẫn trả lời như đã gửi, để không ai biết địa chỉ nào bị chặn.</p>
+<p>Quản trị của khách (hay nhân sự nền tảng vào khách):</p>
+<ul>
+<li><code>GET /api/v1/mail/bounces?email=ada@example.com</code> — thư tới địa chỉ này có bị dội không, bao nhiêu
+lần, mã SMTP cuối, có đang bị chặn không (<code>mail.bounces.read</code>);</li>
+<li><code>GET /api/v1/mail/bounces/stats</code> — số địa chỉ, đang chặn, bị dội và bị bỏ thư trong 30 ngày;</li>
+<li><code>POST /api/v1/mail/bounces/{id}/release</code> — gửi lại khi địa chỉ đã dùng được (<code>mail.bounces.manage</code>);
+người dùng đổi sang địa chỉ khác thì nhận thư ngay;</li>
+<li><code>DELETE /api/v1/mail/bounces/{id}</code> — xoá bản ghi (yêu cầu của chủ dữ liệu).</li>
+</ul>
+<p>Bản ghi bị xoá sau <code>AUTOXIDE_MAIL_BOUNCE_RETENTION_DAYS</code> (mặc định 365) ngày kể từ lần dội hay lần bỏ thư
+cuối. Số đo: <code>mail_bounces_total{kind}</code>, <code>mail_suppressed_total</code>, <code>mail_skipped_suppressed_total</code>. Thư dội
+báo về sau dạng báo cáo giao thư (DSN) và webhook báo dội của nhà cung cấp mail chưa được đọc; newsletter
+giữ danh sách chặn riêng của nó (<code>POST /api/v1/newsletter/bounces</code>).</p>
+<h2 id="cdn-phía-trước-autoxide"><a class="header" href="#cdn-phía-trước-autoxide">CDN phía trước Autoxide</a></h2>
+<p>Đọc công khai của website (<code>/api/v1/content/public/…</code>, <code>/api/v1/catalog/public/…</code>) trả
+<code>Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300</code>, một <code>ETag</code> và
+<code>Vary: Accept-Language, Accept-Encoding, Origin, autoxide-tenant</code>. CDN (Cloudflare, CloudFront, Fastly…) giữ
+response đó <code>AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS</code> giây (mặc định <code>60</code>; <code>0</code> thì lần nào cũng hỏi lại); trình duyệt
+luôn hỏi lại và nhận <code>304 Not Modified</code> khi không có gì đổi. Bài vừa sửa tới người đọc trong chừng đó giây. File
+media có <code>?v=</code> trong địa chỉ không bao giờ đổi nên được giữ một năm (<code>immutable</code>).</p>
+<p>Autoxide không bao giờ để cache dùng chung giữ thứ gì riêng tư: request có <code>Authorization</code> hay cookie nhận
+<code>private</code> (hay <code>no-store</code>), bản xem trước nhận <code>no-store</code>; lệnh ghi không bao giờ được cache. Cấu hình CDN để:</p>
+<ul>
+<li><strong>tôn trọng header cache của máy chủ gốc</strong> (Cloudflare: Cache Rules → “Use cache-control header if present”;
+CloudFront: cache policy có minimum TTL <code>0</code>, theo <code>Cache-Control</code>);</li>
+<li><strong>không bao giờ cache request có <code>Authorization</code></strong> — Cloudflare và CloudFront mặc định bỏ qua khi máy chủ gốc
+trả <code>private</code>; kiểm tra không có luật nào ghi đè;</li>
+<li>đưa <strong>host</strong> vào khoá cache (host chọn khách) và chuyển tiếp <code>Accept-Language</code>, <code>Origin</code> và header
+<code>autoxide-tenant</code> nếu website của bạn gửi nó;</li>
+<li>không nén thêm lần nữa nếu CDN đã nén — khi đó đặt <code>AUTOXIDE_HTTP_COMPRESSION=false</code>.</li>
+</ul>
+<h2 id="cấu-hình-và-trạng-thái-của-từng-khách"><a class="header" href="#cấu-hình-và-trạng-thái-của-từng-khách">Cấu hình và trạng thái của từng khách</a></h2>
+<p>Khi chạy nhiều khách hàng (<code>AUTOXIDE_TENANCY_MODE=multi</code>), các biến trên áp cho mọi khách. Một số
+hành vi của module còn đặt được theo từng khách, thay giá trị của máy chủ cho riêng khách đó:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Cấu hình của khách</th><th>Thay cho</th></tr>
+</thead>
+<tbody>
+<tr><td><code>kernel.public_url</code></td><td><code>AUTOXIDE_HTTP_PUBLIC_URL</code> trong link gửi qua mail</td></tr>
+<tr><td><code>mail.connection.smtp.url</code>, <code>mail.connection.smtp.from</code></td><td><code>AUTOXIDE_MAIL_SMTP_URL</code>, <code>AUTOXIDE_MAIL_FROM</code></td></tr>
+<tr><td><code>ai.connection.text.api_key</code>, <code>ai.connection.text.model</code></td><td>khoá và mô hình của nhà cung cấp AI của máy chủ (<code>AUTOXIDE_AI_API_KEY</code>, <code>AUTOXIDE_AI_MODEL</code>)</td></tr>
+<tr><td><code>comments.banned_words</code>, <code>comments.suspect_words</code>, <code>comments.max_links</code>, <code>comments.guest_moderation</code>, <code>comments.user_moderation</code></td><td>các biến <code>AUTOXIDE_COMMENTS_…</code> tương ứng (<a href="COMMENTS.vi.html#theo-từng-khách">bình luận</a>)</td></tr>
+<tr><td><code>forms.retention_days</code></td><td><code>AUTOXIDE_FORMS_RETENTION_DAYS</code> (<a href="FORMS.vi.html">form</a>)</td></tr>
+<tr><td><code>content.locales</code>, <code>content.default_locale</code></td><td><code>AUTOXIDE_CONTENT_LOCALES</code>, <code>AUTOXIDE_CONTENT_DEFAULT_LOCALE</code> (<a href="CONTENT.vi.html#ngôn-ngữ">nội dung</a>)</td></tr>
+<tr><td><code>media.alt_locales</code></td><td><code>AUTOXIDE_MEDIA_ALT_LOCALES</code> (<a href="MEDIA.vi.html">media</a>)</td></tr>
+<tr><td><code>content.embed_hosts</code></td><td><code>AUTOXIDE_CONTENT_EMBED_HOSTS</code></td></tr>
+<tr><td><code>analytics.allowed_hosts</code></td><td><code>AUTOXIDE_ANALYTICS_ALLOWED_HOSTS</code> (tên miền đã xác minh của khách luôn được nhận)</td></tr>
+<tr><td><code>catalog.locales</code></td><td><code>AUTOXIDE_CATALOG_LOCALES</code></td></tr>
+<tr><td><code>menus.locales</code>, <code>menus.default_locale</code></td><td><code>AUTOXIDE_MENUS_LOCALES</code>, <code>AUTOXIDE_MENUS_DEFAULT_LOCALE</code></td></tr>
+<tr><td><code>auth.passkey_rp_id</code></td><td><code>AUTOXIDE_AUTH_PASSKEY_RP_ID</code> (chỉ là một tên miền khách này đã xác minh; kiểm lúc đặt và mỗi lần dùng — tên miền mất xác minh hay chuyển sang khách khác thì cấu hình của máy chủ áp lại và passkey đăng ký trên tên miền đó hết dùng được)</td></tr>
+<tr><td><code>newsletter.postal_address</code></td><td><code>AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS</code>; chưa đặt thì tên và địa chỉ chủ sở hữu trong hồ sơ pháp lý của khách (module <code>compliance</code>) được dùng trước</td></tr>
+<tr><td><code>&lt;module&gt;.link.&lt;trang&gt;</code> (nhóm <code>link</code>, xem dưới)</td><td>địa chỉ trang <code>AUTOXIDE_…_URL</code> trong mail: <code>auth.link.password_reset</code>, <code>auth.link.email_verification</code>, <code>auth.link.invitation</code>, <code>auth.link.login</code>, <code>auth.link.email_change_report</code>, <code>support.link.guest_ticket</code>, <code>compliance.link.case_tracking</code>, <code>inventory.link.restock_confirm</code>, <code>notifications.link.unsubscribe</code>, <code>comments.link.verify</code>, <code>comments.link.unsubscribe</code>, <code>newsletter.link.confirm</code>, <code>newsletter.link.preferences</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>GET /api/v1/kernel/settings</code> liệt kê chúng kèm giá trị khách hiện tại đã đặt. Quản trị của khách
+(permission <code>kernel.settings.manage</code>) đặt một cấu hình bằng <code>PUT /api/v1/kernel/settings/{name}</code> với
+<code>{"value": "…"}</code>, và bỏ (về giá trị của máy chủ) bằng <code>DELETE</code>. Nhân sự nền tảng làm như vậy cho khách
+bất kỳ dưới <code>/api/v1/kernel/tenants/{id}/settings</code> (<code>kernel.tenants.read</code> để xem,
+<code>kernel.tenants.manage</code> để đổi). Giá trị được kiểm ngay lúc đặt; giá trị secret lưu mã hoá và không
+bao giờ hiện lại. Máy chủ khác dùng giá trị mới trong vòng <code>AUTOXIDE_TENANCY_CACHE_SECONDS</code>.</p>
+<p>Cấu hình nối khách với một dịch vụ của đối tác (máy chủ mail của khách, tài khoản nhà cung cấp AI
+của khách…) thuộc nhóm <code>connection</code> và mang tên dạng <code>&lt;module&gt;.connection.&lt;loại&gt;.&lt;trường&gt;</code>:
+<code>GET /api/v1/kernel/settings?group=connection</code> chỉ liệt kê các cấu hình đó — đúng thứ màn “Kết nối
+đối tác” cần. Mỗi cấu hình trong danh sách mang <code>group</code> của nó (<code>null</code> khi không thuộc nhóm nào).</p>
+<h3 id="link-trong-mail-theo-từng-khách"><a class="header" href="#link-trong-mail-theo-từng-khách">Link trong mail, theo từng khách</a></h3>
+<p>Mail gửi cho một khách có link tới trang của website hay app của khách đó. Hai lớp, lớp sau thắng:</p>
+<ol>
+<li><code>kernel.public_url</code> (vd <code>https://shop.example</code>) thay scheme và host của mọi địa chỉ trang mà máy
+chủ có (<code>AUTOXIDE_AUTH_PASSWORD_RESET_URL</code>…), giữ đường dẫn.</li>
+<li>Một cấu hình link (nhóm <code>link</code>, <code>GET /api/v1/kernel/settings?group=link</code>) cho cả địa chỉ trang của
+một link, kể cả đường dẫn, cho website có trang ở chỗ khác với máy chủ — vd
+<code>auth.link.password_reset</code> = <code>https://shop.example/dat-lai-mat-khau?token={token}</code>. Khách cũng bật
+được một link mà máy chủ chưa có địa chỉ.</li>
+</ol>
+<p>Cả <code>kernel.public_url</code> lẫn cấu hình link đều đưa mail tới một host, nên host được kiểm
+(D-20261125-tenant-site-verified):</p>
+<ul>
+<li><strong>Nhiều khách</strong> (<code>AUTOXIDE_TENANCY_MODE=multi</code>): địa chỉ phải là <code>https://</code>, port mặc định, trên một tên
+miền khách <strong>đang xác minh</strong> (xem “Tên miền riêng của khách hàng”) hay trên host của chính nền tảng
+(<code>AUTOXIDE_HTTP_PUBLIC_URL</code>). Tên miền đang chờ (kể cả sau khi xác minh lại thất bại hay khai lại tên miền
+đã thu hồi), hỏng bản ghi DNS, bị thu hồi, chưa từng khai, hay do khách khác xác minh đều bị từ chối: <code>PUT</code>
+trả <code>422</code> (<code>kernel.public_url_not_allowed</code>, <code>kernel.link_host_not_allowed</code>). <strong>Hãy xác minh tên miền trước
+khi đặt <code>kernel.public_url</code>.</strong></li>
+<li><strong>Một khách</strong> (chế độ mặc định, không có danh sách tên miền): cấu hình link phải trên host của nền tảng hay
+địa chỉ của <code>kernel.public_url</code>; <code>kernel.public_url</code> mới phải là <code>https://</code> trừ <code>localhost</code> hay <code>127.0.0.1</code>.</li>
+</ul>
+<p>Cấu hình link còn phải có đủ mọi placeholder mà mô tả của nó nêu (<code>{token}</code>, <code>{id}</code>…), không có tên người
+dùng, không có placeholder trong phần host (<code>kernel.link_placeholder_missing</code>,
+<code>kernel.link_template_invalid</code>). Host được kiểm lại mỗi lần gửi mail: tên miền bị thu hồi, hỏng bản ghi DNS
+hay chuyển sang khách khác thì mail quay về địa chỉ của máy chủ (ghi cảnh báo vào log) — ngay trên máy chủ
+thấy thay đổi, trong vòng <code>AUTOXIDE_TENANCY_CACHE_SECONDS</code> (mặc định 10 giây) trên máy chủ khác. Giá trị đã
+lưu trước các luật này mà không thoả thì được giữ nhưng không dùng; <code>GET /api/v1/kernel/settings</code> hiện nó kèm
+<code>problem: kernel.public_url_unverified</code> hay <code>kernel.link_unverified</code>, và nó chạy lại khi tên miền được xác
+minh.</p>
+<p>Cấu hình kết nối của mail và AI đã đổi tên theo dạng này. Tên cũ (<code>mail.smtp_url</code>, <code>mail.from</code>,
+<code>ai.api_key</code>, <code>ai.model</code>) vẫn dùng được: giá trị khách đã đặt dưới tên cũ tiếp tục có hiệu lực, và
+<code>PUT</code> / <code>DELETE</code> vẫn nhận tên cũ. Danh sách chỉ hiện tên hiện tại.</p>
+<p>Có hai cách dừng một khách, độc lập với nhau:</p>
+<ul>
+<li><strong>Tạm khoá</strong> — <code>autoxide tenant suspend &lt;khách&gt;</code> (mở lại bằng <code>resume</code>), hoặc <code>PATCH /api/v1/kernel/tenants/{id}</code> với <code>{"status": "suspended"}</code>: mọi request tới khách, kể cả đọc, nhận
+<code>403 tenant_suspended</code>, và tên miền của khách không được cấp chứng chỉ mới.</li>
+<li><strong>Chỉ đọc</strong> — <code>autoxide tenant read-only &lt;khách&gt;</code> (gỡ bằng <code>writable</code>), hoặc <code>{"read_only": true}</code>: đọc được, người dùng của khách vẫn đăng nhập, đặt lại mật khẩu, xuất dữ liệu và dùng link
+trong mail (xác nhận địa chỉ, huỷ đăng ký); mọi thay đổi khác nhận <code>403 tenant_read_only</code>, tool MCP
+không chỉ đọc cũng vậy. Dùng khi, ví dụ, khách chưa thanh toán.</li>
+</ul>
+<p>Job nền và event của khách ở cả hai trạng thái vẫn chạy: chúng làm nốt việc đã nhận trước đó, và
+việc xoá theo thời hạn giữ vẫn diễn ra. Khách nền tảng không tạm khoá được, cũng không đặt chỉ đọc
+được.</p>
+<p><code>GET /api/v1/kernel/tenants</code> (nhân sự nền tảng) có bộ lọc cho mặt điều khiển — <code>status</code>,
+<code>read_only</code>, <code>placement_kind</code>, <code>schema_state</code>, và <code>subscription_status</code> / <code>near_limit</code> (chưa khớp
+khách nào tới khi cài module gói dịch vụ: thuê bao và hạn mức) — và <code>expand=placement</code> để lấy luôn
+placement của từng khách trong cùng câu trả lời.</p>
+<h2 id="tên-miền-riêng-của-khách-hàng"><a class="header" href="#tên-miền-riêng-của-khách-hàng">Tên miền riêng của khách hàng</a></h2>
+<p>Khi chạy nhiều khách hàng (<code>AUTOXIDE_TENANCY_MODE=multi</code>), mỗi khách có thể phục vụ trang của mình ở
+tên miền riêng, vd <code>shop.example</code>: request tới một tên miền đã xác minh vào thẳng khách đó, không
+cần header <code>Autoxide-Tenant</code>. Bản cài chỉ một khách thì không cần việc này: tên miền của nó là tên
+miền của nền tảng.</p>
+<ol>
+<li>
+<p>Quản trị viên của khách (permission <code>kernel.domains.manage</code>) thêm tên miền:</p>
+<pre><code class="language-bash">curl -X POST https://api.example.com/api/v1/kernel/domains \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"domain": "shop.example"}'
+</code></pre>
+<p>Câu trả lời có <code>"status": "pending"</code> và <code>record</code> cần tạo ở nhà cung cấp DNS của tên miền: một
+bản ghi TXT tên <code>_autoxide-challenge.shop.example</code> với giá trị <code>autoxide-verify=…</code>.</p>
+</li>
+<li>
+<p>Ở nhà cung cấp DNS, tạo bản ghi TXT đó và trỏ chính tên miền về máy chủ của bạn (bản ghi
+<code>A</code> / <code>AAAA</code>, hoặc <code>CNAME</code> tới tên miền của nền tảng).</p>
+</li>
+<li>
+<p>Xác minh: <code>POST /api/v1/kernel/domains/{id}/verify</code> tra bản ghi ngay và trả <code>verified</code>, hoặc vẫn
+<code>pending</code> kèm lý do trong <code>check_error</code>. Tên miền đang chờ cũng được tra lại mỗi 10 phút; quá 7
+ngày chưa xác minh được thì thành <code>failed</code> (sửa bản ghi rồi xác minh lại).
+<code>DELETE /api/v1/kernel/domains/{id}</code> gỡ một tên miền.</p>
+</li>
+<li>
+<p>Giữ nguyên bản ghi TXT. Tên miền đã xác minh được kiểm lại mỗi ngày một lần: 3 lần liên tiếp không
+thấy bản ghi thì tên miền thành <code>failed</code> (event <code>kernel.domain_failed</code>) và request tới nó không
+còn vào khách. <code>failed_checks</code> đếm số lần trượt; một lần kiểm thấy bản ghi (hay <code>POST …/verify</code>
+sau khi sửa) đưa nó về 0. Máy chủ DNS không trả lời thì không tính là trượt.</p>
+</li>
+</ol>
+<p>Tên miền của chính nền tảng (tên máy trong <code>AUTOXIDE_HTTP_PUBLIC_URL</code>), địa chỉ IP và <code>localhost</code>
+bị từ chối. Mỗi lúc một tên miền chỉ thuộc một khách: khách khác chỉ nhận được sau khi nó bị gỡ hay
+xác minh hỏng.</p>
+<p>Một tên miền có thể thuộc về một nút trong cây tổ chức của khách — vd một cửa hàng có trang riêng:
+<code>PATCH /api/v1/kernel/domains/{id}</code> với <code>{"org_id": "&lt;id của nút&gt;"}</code> gắn tên miền với nút đó,
+<code>{"org_id": null}</code> gỡ ra (tên miền khi đó là của cả khách). Nút phải là nút của chính khách; khi
+chưa module nào đã cài giữ cây tổ chức thì chỉ nhận <code>null</code>. Gắn nút không đổi trạng thái hay bản ghi
+DNS của tên miền; tên miền đã gỡ trả <code>409 tenant_domain_revoked</code>. Mỗi lần đổi ghi event
+<code>kernel.domain_updated</code>.</p>
+<p><strong>Gọi từ trình duyệt (CORS).</strong> Trang ở <code>https://&lt;tên miền&gt;</code> của một tên miền đã xác minh gọi được API
+từ trình duyệt mà không phải thêm vào <code>AUTOXIDE_HTTP_CORS_ORIGINS</code> hay khởi động lại — nhưng chỉ cho
+chính khách đó: request từ trang đó mà token, header <code>Autoxide-Tenant</code> hay <code>Host</code> trỏ tới khách khác
+nhận <code>403 tenant_origin_mismatch</code>, và refresh token hay link trong mail của khách khác bị coi là sai
+trong mọi request từ trang đó, dù request nêu khách bằng cách nào; ngoài các trang đó, token tự nêu
+khách như trước.
+Đây là lớp bảo vệ thêm trong trình duyệt, không phải ranh giới bảo mật: token gửi trong header, không
+bao giờ là cookie, nên trang chỉ dùng được bí mật nó đã có, còn chương trình ngoài trình duyệt gửi
+<code>Origin</code> tuỳ ý hay không gửi. Chỉ đúng origin <code>https://&lt;tên miền&gt;</code> được tính (không <code>http</code>, không
+port, không tên miền con khác); giao diện thứ hai, vd <code>admin.shop.example</code>, thì xác minh thành một tên
+miền riêng. Origin trong <code>AUTOXIDE_HTTP_CORS_ORIGINS</code> (giao diện của chính nền tảng,
+<code>http://localhost:5173</code> lúc phát triển) gọi được cho mọi khách: form đăng ký hay đăng nhập dùng chung của
+nền tảng mà bạn đặt trên tên miền của một khách thì cũng phải thêm origin đó vào danh sách này. Tên miền bị gỡ hay xác minh hỏng mất
+quyền ngay trên máy chủ đã đổi nó, và trong <code>AUTOXIDE_TENANCY_CACHE_SECONDS</code> (mặc định 10 giây) trên
+các máy khác.</p>
+<p><strong>Chứng chỉ TLS.</strong> Để Caddy lấy chứng chỉ khi người xem đầu tiên của một tên miền tới (on-demand
+TLS), sau khi hỏi Autoxide tên miền đó có được phép không:
+<code>GET /api/v1/kernel/domains/allowed?domain=…</code> chỉ trả <code>200</code> cho tên miền đã xác minh của khách đang
+hoạt động, nên không ai khiến máy chủ của bạn xin chứng chỉ cho tên bạn không phục vụ.</p>
+<pre><code class="language-text">{
+    on_demand_tls {
+        ask http://127.0.0.1:8080/api/v1/kernel/domains/allowed
+    }
+}
+
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+    reverse_proxy 127.0.0.1:8080
+}
+</code></pre>
+<p><code>reverse_proxy</code> của Caddy chuyển nguyên header <code>Host</code>, và Autoxide nhận ra khách nhờ header đó. Khi
+có proxy khác đứng trước và viết lại <code>Host</code>, proxy đó phải gửi tên miền người xem gõ trong
+<code>X-Forwarded-Host</code> (hoặc <code>Forwarded: host=…</code>), và địa chỉ của nó phải có trong
+<code>AUTOXIDE_HTTP_TRUSTED_PROXIES</code>: Autoxide chỉ đọc các header đó từ proxy tin cậy. Endpoint <code>ask</code>
+cũng bị tính vào rate limiting theo địa chỉ như mọi endpoint khác; Caddy chỉ hỏi một lần cho mỗi
+chứng chỉ mới. Xác minh, gỡ tên miền hay tạm khoá khách có hiệu lực trên mọi máy chủ sau tối đa
+<code>AUTOXIDE_TENANCY_CACHE_SECONDS</code> giây (mặc định <code>10</code>).</p>
+<h2 id="tài-khoản-của-một-khách-nhân-sự-người-mua-uỷ-quyền"><a class="header" href="#tài-khoản-của-một-khách-nhân-sự-người-mua-uỷ-quyền">Tài khoản của một khách: nhân sự, người mua, uỷ quyền</a></h2>
+<p>Mỗi khách có hai loại tài khoản. <strong>Nhân sự</strong> (<code>realm: staff</code>, mặc định) làm việc bằng role và
+permission. <strong>Người mua</strong> (<code>realm: customer</code>) là tài khoản của cửa hàng: đăng nhập được, không có
+permission nào, tách khỏi nhân sự dù trùng email. Người mua đăng ký bằng
+<code>POST /api/v1/auth/registrations</code> và đăng nhập bằng <code>POST /api/v1/auth/login</code>, cùng với
+<code>"realm": "customer"</code>; khách đóng đăng ký người mua bằng cài đặt theo cây tổ chức
+<code>auth.customer_registration</code> (<code>false</code>). Nhân sự quản lý người mua bằng <code>GET /api/v1/auth/customers</code>
+và <code>PATCH /api/v1/auth/customers/{id}</code> (permission <code>auth.customers.read</code>, <code>auth.customers.manage</code>).</p>
+<p><strong>Chính sách đăng nhập theo khách.</strong> Cài đặt tổ chức ở nút gốc của khách (<code>PUT /api/v1/organizations/units/{id}/settings/{key}</code>) cho khách tự quyết, trong giới hạn của máy chủ:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Cài đặt</th><th>Tác dụng</th></tr>
+</thead>
+<tbody>
+<tr><td><code>auth.staff_registration</code></td><td><code>true</code> / <code>false</code>: ai cũng tự tạo được tài khoản nhân sự (<code>POST /api/v1/auth/register</code>, hay đăng nhập lần đầu qua nhà cung cấp cho đăng ký). Chưa đặt: <code>AUTOXIDE_AUTH_SELF_REGISTRATION</code></td></tr>
+<tr><td><code>auth.password_min_length</code></td><td>15 tới 128: độ dài tối thiểu của mật khẩu mới. Chỉ nâng mức 15 của máy chủ</td></tr>
+<tr><td><code>auth.session_days</code></td><td>1 tới 365: thời hạn mỗi refresh token. Chỉ rút ngắn <code>AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS</code>; giá trị dài hơn bị bỏ qua</td></tr>
+<tr><td><code>auth.totp_issuer</code></td><td>Tên hiện trong app xác thực (không có <code>:</code>), thay <code>AUTOXIDE_AUTH_TOTP_ISSUER</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Luật mật khẩu</strong> (NIST SP 800-63B-4). Mật khẩu mới — lúc tự đăng ký, khi quản trị viên hay
+<code>autoxide user create</code> đặt, khi đổi, đặt lại và khi nhận lời mời — phải dài 15 đến 128 ký tự và không nằm
+trong danh sách mật khẩu phổ biến hoặc đã lộ đi kèm binary (khoảng 56.000 mục dài từ 15 ký tự; kiểm
+offline, không phân biệt hoa thường, không gửi gì ra ngoài máy chủ). Kể cả
+<code>AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD</code>: mật khẩu sai luật làm <code>autoxide serve</code> dừng lúc khởi động. Mật khẩu bị từ chối nhận <code>422</code> với mã trường
+<code>common_password</code>. Không có luật bắt buộc chữ số hay ký tự đặc biệt, và mật khẩu không hết hạn. Mật khẩu
+đang dùng vẫn đăng nhập được: luật chỉ áp khi đặt mật khẩu.</p>
+<p><strong>Mời nhân sự.</strong> Thay vì tạo tài khoản kèm mật khẩu, hãy mời: <code>POST /api/v1/auth/invitations</code> với
+<code>email</code>, các <code>role_ids</code> và nút (<code>org_id</code>) họ nhận (permission <code>auth.invitations.manage</code>; không mời kèm
+role có permission mà bạn không có), hoặc từ dòng lệnh:</p>
+<pre><code class="language-bash">autoxide user invite --email new.colleague@example.com --role editor
+</code></pre>
+<p>Mail mang link dùng một lần tới <code>AUTOXIDE_AUTH_INVITATION_URL</code> (trang của giao diện có <code>{token}</code>;
+không đặt thì mail chứa token), sống <code>AUTOXIDE_AUTH_INVITATION_DAYS</code> ngày (7). Chấp nhận thì tài
+khoản được tạo (hay, khi email đã có tài khoản, role được thêm sau khi người đó đăng nhập). <strong>Đăng
+nhập bằng link</strong> (không mật khẩu) tắt mặc định; bật bằng <code>AUTOXIDE_AUTH_LOGIN_LINK=true</code> và đặt
+<code>AUTOXIDE_AUTH_LOGIN_LINK_URL</code> là trang của giao diện. <strong>Đăng nhập bằng Google, Microsoft, GitHub
+hay OpenID Connect</strong> tắt mặc định; bật bằng <code>AUTOXIDE_AUTH_OIDC=true</code>. Mỗi khách đăng ký ứng dụng ở
+nhà cung cấp rồi thêm bằng <code>POST /api/v1/auth/oidc-providers</code> (<a href="guides/oidc.vi.html"><code>docs/guides/oidc.vi.md</code></a>);
+client secret lưu mã hoá bằng <code>AUTOXIDE_SECRET_KEY</code>. Máy chủ chỉ gọi nhà cung cấp ở địa chỉ public;
+giữ <code>AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=false</code> khi chạy thật, và cho máy chủ gọi ra ngoài qua
+HTTPS (cổng 443). Link và lời mời cần mail chạy được
+(<code>AUTOXIDE_MAIL_SMTP_URL</code>) và worker đang chạy. Cây tổ chức của một khách sâu tối đa
+<code>AUTOXIDE_ORGANIZATIONS_MAX_DEPTH</code> cấp (mặc định 8). Nhập danh mục đơn vị hành chính một lần để kiểm
+địa chỉ: <code>autoxide task address.import</code> (<a href="ADDRESS.vi.html"><code>docs/ADDRESS.vi.md</code></a>).</p>
+<p><strong>Nhân sự nền tảng và dữ liệu của khách.</strong> Nhân sự nền tảng (tài khoản của khách nền tảng) không bao
+giờ vào dữ liệu của khách chỉ nhờ role: người có <code>auth.support.grant</code> cấp cho một nhân sự quyền vào có
+thời hạn bằng <code>POST /api/v1/auth/support-grants</code> (<code>tenant_id</code>, <code>staff_user_id</code>, một <code>role_id</code> của nền
+tảng, <code>basis</code> là <code>support</code> hay <code>legal_request</code> kèm số văn bản, <code>reason</code>, tối đa
+<code>AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS</code> giờ, mặc định 8). Khách thấy mọi lần cấp, lần vào đầu và mọi
+thay đổi đã làm (<code>GET /api/v1/auth/support-access</code>), tự thu hồi lần cấp <code>support</code> còn hạn
+(<code>DELETE /api/v1/auth/support-access/{id}</code>), và tắt được quyền vào hỗ trợ bằng cài đặt
+<code>auth.support_access</code> (khi đó chỉ lần cấp <code>legal_request</code> còn hiệu lực).</p>
+<p>Trong chuỗi khách (khách có <code>parent_id</code>), khách cha cho người giữ một role của mình làm việc ở khách
+con: <code>POST /api/v1/auth/delegations</code> với <code>child_tenant_id</code>, <code>role_id</code>, <code>org_id</code> tuỳ chọn (một nút của
+khách con), <code>expires_at</code> tuỳ chọn và <code>reason</code> (permission <code>auth.delegations.manage</code>). Những người đó
+giữ cách đăng nhập của mình và thêm header <code>Autoxide-Tenant: &lt;id khách con&gt;</code>;
+<code>GET /api/v1/auth/me/tenants</code> liệt kê những nơi họ vào được. Mọi thay đổi họ làm ở khách con ghi kèm
+đường vào là uỷ quyền (<code>actor_access</code> trong event và audit log của khách con); thu hồi
+(<code>DELETE /api/v1/auth/delegations/{id}</code>) có hiệu lực từ request kế. Khách con xem những gì nhận được
+bằng <code>GET /api/v1/auth/delegations?direction=incoming</code>.</p>
+<h2 id="dời-khách-hàng-sang-database-khác"><a class="header" href="#dời-khách-hàng-sang-database-khác">Dời khách hàng sang database khác</a></h2>
+<p>Khi chạy nhiều khách hàng, dữ liệu của mỗi khách nằm ở một <em>placement</em> (vị trí dữ liệu): <code>main</code>
+(database của <code>DATABASE_URL</code>, nhiều khách dùng chung) hay một database khác thêm bằng
+<code>autoxide placement add</code>. Dời khách để cho một khách đang lớn database riêng, hay đưa khách về lại:</p>
+<ol>
+<li>
+<p>Thêm database đích và áp dụng migration cho nó:</p>
+<pre><code class="language-bash">printf '%s' 'postgres://autoxide:&lt;password&gt;@db2.example.com:5432/acme' \
+  | autoxide placement add acme-db --kind dedicated --url -
+autoxide migrate up --all
+</code></pre>
+<p>Nhân sự nền tảng cũng migrate được các placement qua API, không cần vào máy chủ:
+<code>POST /api/v1/kernel/placements/migrations</code> với <code>{"dry_run": true}</code> liệt kê những gì sẽ chạy;
+bỏ <code>dry_run</code> thì một lượt chạy bắt đầu ở nền (theo dõi bằng
+<code>GET /api/v1/kernel/placements/migrations/{id}</code>). <code>main</code> luôn được migrate bằng
+<code>autoxide migrate up</code> trước khi máy chủ chạy.</p>
+</li>
+<li>
+<p>Thử trước. Chạy thử (dry run) không đổi gì:</p>
+<pre><code class="language-bash">autoxide tenant move acme --to acme-db --dry-run
+</code></pre>
+<p>Lệnh liệt kê số dòng của khách sẽ được chép theo từng bảng, và mọi thứ đang chặn việc dời: một
+bên còn migration chưa áp dụng, đích là cùng database với nguồn, khách không ở trạng thái hoạt
+động, khách đang có một lượt dời khác. Khách nền tảng (<code>default</code>) luôn ở <code>main</code>.</p>
+</li>
+<li>
+<p>Dời, trong một khoảng bảo trì:</p>
+<pre><code class="language-bash">autoxide tenant move acme --to acme-db
+</code></pre>
+<p>Ngay từ đầu, khách trả <code>503 tenant_maintenance</code> kèm <code>Retry-After</code>; khách khác không bị ảnh
+hưởng. Lệnh chờ tới khi mọi máy chủ đã thấy việc dời (<code>AUTOXIDE_TENANCY_CACHE_SECONDS</code>) và
+request đang chạy đã xong (<code>AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS</code>), và tới khi job và event của
+khách đang được chạy đã xong. Rồi lệnh chép mọi dòng của khách, kể cả job đang chờ và event chưa
+giao, trong một transaction; so số dòng của từng bảng; chuyển khách sang placement mới (khách
+chạy lại từ đó); và xoá bản cũ. SQLite và PostgreSQL trộn được theo cả hai chiều. File (dưới
+<code>tenants/&lt;id&gt;/</code>) ở nguyên chỗ cũ khi hai placement dùng cùng nơi lưu file; khi đích có nơi lưu
+riêng (xem dưới), file được chép sang đó trước khi chép dòng và bị xoá ở nơi lưu cũ ở cuối. Chạy
+thử cho biết số file sẽ chép.</p>
+</li>
+</ol>
+<p><code>--keep-source</code> giữ bản cũ làm bản dự phòng thay vì xoá (job đang chờ và event của bản cũ bị xoá,
+để không gì chạy hai lần; file của bản cũ cũng được giữ). Không gì dùng bản đó; xoá nó khi đã yên
+tâm:</p>
+<pre><code class="language-bash">autoxide tenant purge-copy acme --placement main
+</code></pre>
+<p>Qua API, nhân sự nền tảng có <code>kernel.tenants.move</code> gọi <code>POST /api/v1/kernel/tenants/{id}/move</code>
+với <code>{"to": "acme-db"}</code>: đó là chạy thử. Thêm <code>"dry_run": false</code> để bắt đầu dời bằng một job nền, và
+theo dõi ở <code>Location</code> của câu trả lời (<code>GET /api/v1/kernel/tenants/{id}/moves/{move_id}</code>); tool MCP
+là <code>kernel.move_tenant</code>. Một job chạy được khoảng bốn phút: khách lớn (chạy thử cho biết số dòng)
+thì dời bằng lệnh, lệnh không giới hạn thời gian.</p>
+<p><strong>Nơi lưu file riêng của placement.</strong> Mặc định file của mọi khách nằm ở nơi lưu theo cấu hình của
+module <code>files</code> (<code>AUTOXIDE_FILES_DIR</code> hay <code>AUTOXIDE_FILES_S3_BUCKET</code>), dưới <code>tenants/&lt;id&gt;/</code>. Cho một
+placement — thường là placement <code>dedicated</code> — bucket hay thư mục riêng, để file của khách đó cũng
+nằm riêng:</p>
+<pre><code class="language-bash">printf '%s' "$SECRET_ACCESS_KEY" | autoxide placement storage acme-db \
+  --s3-bucket acme-files --s3-region eu-west-1 \
+  --s3-endpoint https://&lt;account&gt;.r2.cloudflarestorage.com \
+  --s3-access-key-id "$ACCESS_KEY_ID" --s3-secret-access-key -
+# hoặc một thư mục trên máy chủ:
+autoxide placement storage acme-db --dir /var/lib/autoxide/files-acme
+</code></pre>
+<p>Cấu hình được lưu mã hoá bằng <code>AUTOXIDE_SECRET_KEY</code>; <code>autoxide placement list</code> và
+<code>GET /api/v1/kernel/placements</code> cho thấy bucket hay thư mục, không bao giờ cho thấy khoá. Bucket
+phải có sẵn; khoá sai lộ ra ở lần tải lên đầu tiên. Đặt nơi lưu khi placement chưa có khách, rồi dời
+khách sang: việc dời chép file của họ. Đổi về sau bị từ chối (file của họ đang ở nơi lưu cũ), trừ khi
+thêm <code>--force</code> khi nơi lưu mới đã có đúng các file đó — ví dụ khoá truy cập mới cho cùng bucket.
+<code>--clear</code> đưa file tải lên mới về nơi lưu chung (cùng luật). Mọi máy chủ phải chạy module <code>files</code>.</p>
+<p><strong>Khi việc dời dừng giữa chừng</strong> (tiến trình chết, không kết nối được database, số dòng không
+khớp), không mất gì. Trước bước chuyển, khách vẫn trả <code>503</code> ở placement cũ; sau bước chuyển, khách
+chạy từ placement mới và chỉ còn bản cũ chờ xoá.</p>
+<ul>
+<li>Chạy lại đúng lệnh <code>autoxide tenant move acme --to acme-db</code>: lệnh chạy tiếp từ chỗ dừng (trước
+bước chuyển thì xoá các dòng đã chép sang đích rồi chép lại).</li>
+<li>Hoặc, trước bước chuyển, bỏ cuộc: <code>autoxide tenant move acme --abort</code> xoá những gì đã chép và cho
+khách hoạt động lại ở placement cũ.</li>
+<li><code>GET /api/v1/kernel/tenants/{id}/moves/{move_id}</code> cho biết <code>state</code> của lượt dời và <code>error</code> đã làm
+nó dừng. Lượt dời bắt đầu qua API được job của nó thử lại; bắt đầu một lượt khác khi một lượt
+đang chạy thì nhận <code>tenant_move_running</code>.</li>
+</ul>
+<p><strong>Nơi lưu dữ liệu.</strong> Ghi nước đặt máy chủ của từng placement bằng <code>autoxide placement country &lt;tên&gt; VN</code>
+(<code>-</code> khi chưa rõ; <code>autoxide placement list</code> cho xem). Khách buộc lưu dữ liệu ở một nước (nhân sự nền tảng đặt
+bằng <code>PUT /api/v1/compliance/residency</code>) không dời được sang placement ở nước khác hay chưa rõ nước: lượt dời
+trả <code>tenant_residency_violation</code>. Xem <a href="COMPLIANCE.vi.html#nơi-lưu-dữ-liệu">COMPLIANCE.vi.md</a>.</p>
+<h2 id="tách-một-nhánh-thành-khách-riêng-và-gộp-khách"><a class="header" href="#tách-một-nhánh-thành-khách-riêng-và-gộp-khách">Tách một nhánh thành khách riêng, và gộp khách</a></h2>
+<p>Cây tổ chức của một khách có thể lớn hơn khách đó: một vùng thành công ty riêng, hay một cửa hàng
+đang có khách riêng nhập vào chuỗi. Nhân sự nền tảng tách một nhánh thành khách mới ở database
+khác, hoặc gộp một khách vào khách khác dưới một nút của nó. Mọi dòng giữ nguyên ID, nên tách rồi
+gộp lại cho đúng dữ liệu ban đầu.</p>
+<pre><code class="language-bash"># Tách nút &lt;north&gt; của `acme` thành khách `acme-north` ở placement `acme-north-db`.
+autoxide tenant split acme --org &lt;north&gt; --slug acme-north --name "Acme North" \
+  --placement acme-north-db --reason "Hợp đồng 2026-11: vùng thành công ty riêng" --dry-run
+# Gộp `acme-north` trở lại `acme` dưới nút &lt;gốc-hay-nút-khác&gt;.
+autoxide tenant merge acme-north --into acme --under-org &lt;unit&gt; --reason "…" --dry-run
+</code></pre>
+<ul>
+<li><strong>Chạy thử trước.</strong> Kế hoạch liệt kê, cho từng bảng, số dòng đi, được chép, ở lại, hay phải chạy
+xong trước (event chưa giao, job đến hạn); những gì chặn (khách không hoạt động, một lần tách /
+gộp / dời khác đang dở, thiếu migration, đích là cùng database); và <strong>xung đột</strong>: dòng trỏ vắt qua
+ranh giới (dòng đi trỏ tới dòng ở lại, hay ngược lại) và giá trị unique khách nhận đã có (hai
+trang cùng slug). Sửa xong thì chạy lại đúng lệnh đó, bỏ <code>--dry-run</code>.</li>
+<li><strong>Hai database.</strong> Placement đích phải là database khác database của khách nguồn. Muốn tách vào
+database chung, hay gộp hai khách cùng database, hãy dời một khách trước (<code>autoxide tenant move</code>).</li>
+<li><strong>Chuyện gì xảy ra.</strong> Khách (cả hai khách khi gộp) trả <code>503 tenant_maintenance</code>; event chưa giao
+và job đến hạn của khách chạy hết trước (<code>AUTOXIDE_RELOCATION_DRAIN_SECONDS</code>, mặc định 300). Rồi
+các dòng được chép trong một transaction ở đích, giữ nguyên ID; khách mới mang ID của nút gốc
+nhánh, nút đó thành gốc của nó. Các dòng được kiểm, hai khách chuyển trong một transaction (tên
+miền gắn nút trong nhánh đi theo; khách bị gộp thành <code>merged</code>), rồi dòng đã đi bị xoá ở nguồn. File
+của thứ đi theo được chép sang tiền tố của khách mới. Audit log về thứ đi theo được ghi lại vào
+chuỗi băm của đích; nguồn giữ nguyên chuỗi của mình. Sổ cái đi theo nút của sổ và chuỗi niêm phong
+vẫn kiểm được. Kho báo cáo của cây đi theo (<code>reporting.rehome</code>).</li>
+<li><strong>Thứ ở lại.</strong> Mỗi module khai bảng của mình đi thế nào (<code>Module::relocation</code>): dữ liệu cá nhân
+của khách (người đăng ký, đồng ý, định danh, bình luận) ở lại khách nguồn khi tách và đi theo khi
+gộp; tài khoản nhân viên có role ở nút trong nhánh được chép (đăng nhập lại); role và cấu hình
+tương tự được chép; thuê bao, phiên đăng nhập, bộ đếm ở lại.</li>
+<li><strong>Căn cứ pháp lý.</strong> Chuyển dữ liệu giữa hai khách có thể là chuyển dữ liệu cá nhân giữa hai bên
+kiểm soát; <code>--reason</code> là bắt buộc, được lưu cùng lần chạy và vào audit log.</li>
+<li><strong>Chạy tiếp.</strong> Dừng giữa chừng thì chạy <code>autoxide tenant split --resume &lt;id&gt;</code> (hay <code>merge</code>); mọi
+bước chạy lại được. <code>autoxide tenant relocation-status &lt;id&gt;</code> cho biết trạng thái và lỗi.</li>
+</ul>
+<p>Qua API, nhân sự nền tảng có <code>kernel.tenants.relocate</code> gọi <code>POST /api/v1/kernel/relocations</code>
+(<code>{"kind": "split", "tenant": "acme", "org_id": "…", "slug": "…", "name": "…", "placement": "…", "reason": "…"}</code>): đó là chạy thử; thêm <code>"dry_run": false</code> để chạy bằng job nền và theo dõi ở
+<code>GET /api/v1/kernel/relocations/{id}</code>. Khách không tự tách / gộp: quản trị viên của khách
+(<code>kernel.relocations.request</code>) gửi yêu cầu bằng <code>POST /api/v1/kernel/tenant/relocation-requests</code>,
+yêu cầu vào hộp việc của nhân sự nền tảng, người chạy nó bằng <code>"request_id"</code>.</p>
+<h2 id="sự-cố-dữ-liệu-cá-nhân"><a class="header" href="#sự-cố-dữ-liệu-cá-nhân">Sự cố dữ liệu cá nhân</a></h2>
+<p>Khi dữ liệu cá nhân có thể đã lộ (mất bản backup, database bị mở ra ngoài, gửi nhầm mail), ở Việt Nam báo cáo
+gửi cơ quan có hạn <strong>72 giờ kể từ khi phát hiện</strong>. Ghi sự cố vào API ngay (<code>POST /api/v1/compliance/incidents</code>),
+đặt chính sách <code>incident.alert_emails</code> của khách để lời nhắc tới đúng người, và làm theo sổ tay ở
+<a href="COMPLIANCE.vi.html#sự-cố-dữ-liệu-cá-nhân-sổ-tay-72-giờ">COMPLIANCE.vi.md</a>. <code>autoxide doctor</code> cảnh báo khi sự cố
+đã quá hạn.</p>
+<h2 id="chạy-nhiều-máy-chủ"><a class="header" href="#chạy-nhiều-máy-chủ">Chạy nhiều máy chủ</a></h2>
+<p>Với PostgreSQL, chạy bao nhiêu tiến trình <code>app</code> cũng được sau reverse proxy: chúng chỉ
+dùng chung database (và S3 cho file), và job nền được nhận sao cho mỗi job chạy đúng một
+lần. Đặt cùng <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> ở mọi nơi. Muốn tăng API và việc nền riêng
+rẽ, chạy vài tiến trình với <code>AUTOXIDE_PROCESS_ROLE=api</code> và ít nhất một tiến trình
+<code>worker</code>. SQLite chỉ cho một tiến trình máy chủ.</p>
+<p>Mặc định giới hạn request đếm theo từng tiến trình: với N máy chủ, một địa chỉ hay một API key
+được tới N lần giới hạn. Muốn các máy chủ chia chung giới hạn theo API key, đặt
+<code>AUTOXIDE_HTTP_RATE_LIMIT_STORE=database</code>: mọi máy chủ đếm trong database, lấy lượt theo lô nhỏ
+(một phần tư <code>AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST</code>), nên mỗi phút một key được vượt giới hạn
+nhiều nhất một lô cho mỗi máy chủ. Giới hạn theo địa chỉ vẫn đếm theo từng tiến trình.</p>
+<h2 id="kubernetes"><a class="header" href="#kubernetes">Kubernetes</a></h2>
+<p><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/deploy/kubernetes/autoxide.yaml"><code>deploy/kubernetes/autoxide.yaml</code></a> là một ví dụ tối thiểu, có chú
+thích: một <code>Job</code> chạy migration, một <code>Deployment</code> hai pod, một <code>Service</code> và một <code>Ingress</code> có HTTPS. Nó theo
+đúng các luật ở <a href="#chạy-nhiều-máy-chủ">Chạy nhiều máy chủ</a>:</p>
+<ul>
+<li>PostgreSQL chạy bên ngoài file này (database có quản lý hay operator của bạn); SQLite chỉ cho một tiến
+trình nên không hợp ở đây.</li>
+<li>File lưu trên S3 (<code>AUTOXIDE_FILES_S3_BUCKET</code>), thư gửi qua SMTP (<code>AUTOXIDE_MAIL_SMTP_URL</code>): pod không giữ
+gì trên đĩa, nên pod nào cũng thay được.</li>
+<li>Secret (<code>DATABASE_URL</code>, <code>AUTOXIDE_AUTH_TOKEN_SECRET</code>, <code>AUTOXIDE_SECRET_KEY</code>, key S3, URL SMTP) nằm trong
+một <code>Secret</code> của Kubernetes bạn tạo bằng <code>kubectl create secret</code>, không bao giờ nằm trong file.</li>
+<li>Migration chạy một lần mỗi bản phát hành trong <code>Job</code>; pod từ chối khởi động khi còn migration chưa áp
+dụng, nên pod cũ vẫn phục vụ tới khi <code>Job</code> xong.</li>
+<li><code>readinessProbe</code> trỏ <code>/health/ready</code>, <code>livenessProbe</code> trỏ <code>/health/live</code>, khoảng rút 15 giây và
+<code>terminationGracePeriodSeconds: 50</code> cho phép cập nhật cuốn chiếu không rơi request (xem
+<a href="#cập-nhật-không-làm-rơi-request">Cập nhật không làm rơi request</a>).</li>
+<li><code>AUTOXIDE_HTTP_RATE_LIMIT_STORE=database</code> chia giới hạn theo key giữa các pod, và
+<code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> với một proxy tin cậy đọc địa chỉ client mà ingress controller chuyển
+tiếp.</li>
+<li>Pod chạy bằng người dùng không phải root của image (<code>10001</code>), không thêm đặc quyền.</li>
+</ul>
+<p>Lệnh tạo secret, áp file và cập nhật nằm ở đầu file. Muốn tách API khỏi việc nền thì chép <code>Deployment</code>
+thành một cái thứ hai với <code>AUTOXIDE_PROCESS_ROLE=worker</code> (không cần <code>Service</code>, ít nhất một pod) và đặt
+<code>AUTOXIDE_PROCESS_ROLE=api</code> cho cái thứ nhất.</p>
+<h2 id="tải-thẳng-lên-s3"><a class="header" href="#tải-thẳng-lên-s3">Tải thẳng lên S3</a></h2>
+<p>Khi file nằm trên S3, client tải được file lớn thẳng lên bucket (<code>POST /api/v1/files/uploads</code>,
+hướng dẫn: <a href="guides/direct-uploads.vi.html"><code>docs/guides/direct-uploads.vi.md</code></a>). Trình duyệt cần
+bucket cho phép (CORS). Ví dụ với Amazon S3:</p>
+<pre><code class="language-json">[{"AllowedOrigins": ["https://admin.example.com"], "AllowedMethods": ["PUT"],
+  "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"], "MaxAgeSeconds": 3600}]
+</code></pre>
+<p>Máy chủ kiểm mọi lượt được xác nhận bằng cách đọc lại file (cỡ và SHA-256), vì không phải dịch
+vụ tương thích S3 nào cũng kiểm checksum đã ký; tăng <code>AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS</code> nếu
+cho phép file rất lớn. Lượt bỏ dở bị một job chạy mỗi giờ xoá.</p>
+<h3 id="cập-nhật-không-làm-rơi-request"><a class="header" href="#cập-nhật-không-làm-rơi-request">Cập nhật không làm rơi request</a></h3>
+<p>Khi được bảo dừng (<code>SIGTERM</code>, tín hiệu Docker, systemd và Kubernetes gửi), máy chủ đi qua
+hai giai đoạn:</p>
+<ol>
+<li><strong>Rút</strong> trong <code>AUTOXIDE_HTTP_DRAIN_SECONDS</code> giây (mặc định <code>0</code>): vẫn xử lý mọi request,
+nhưng <code>/health/ready</code> trả <code>503</code> với mã <code>shutting_down</code>, để bộ cân bằng tải thôi gửi
+request mới tới. <code>/health/live</code> vẫn <code>200</code>: không được khởi động lại tiến trình.</li>
+<li><strong>Dừng</strong>: ngừng nhận kết nối và cho request đang chạy tối đa
+<code>AUTOXIDE_HTTP_SHUTDOWN_SECONDS</code> giây (mặc định <code>30</code>) để xong.</li>
+</ol>
+<p>Để cập nhật lần lượt từng máy chủ sau bộ cân bằng tải:</p>
+<ul>
+<li>Trỏ health check của bộ cân bằng tải (hay <code>readinessProbe</code> của Kubernetes) tới
+<code>/health/ready</code>, còn <code>livenessProbe</code> tới <code>/health/live</code>.</li>
+<li>Đặt <code>AUTOXIDE_HTTP_DRAIN_SECONDS</code> dài hơn thời gian bộ cân bằng tải cần để gỡ một máy
+chủ: khoảng giữa hai lần kiểm nhân với số lần hỏng nó chờ. Kiểm 5 giây một lần và bỏ sau
+2 lần hỏng thì cần hơn 10, vậy đặt <code>15</code>.</li>
+<li>Cho tiến trình đủ thời gian cho cả hai giai đoạn trước khi bị giết: <code>stop_grace_period</code>
+của Docker Compose, <code>terminationGracePeriodSeconds</code> của Kubernetes, <code>TimeoutStopSec</code> của
+systemd phải ít nhất bằng rút + dừng (<code>45s</code> cho <code>15</code> + <code>30</code>). Mặc định Docker chỉ chờ
+10 giây; <code>compose.yml</code> trong repo này đặt <code>40s</code>, đủ khi không rút — đặt khoảng rút thì
+tăng nó lên.</li>
+<li>Chạy máy chủ mới và chờ <code>/health/ready</code> của chúng trả <code>200</code> rồi mới dừng máy chủ cũ.</li>
+</ul>
+<p>Chỉ một máy chủ, không có bộ cân bằng tải thì để khoảng rút là <code>0</code>: không có nơi nào khác
+để gửi request, rút chỉ làm việc dừng chậm thêm.</p>
+<h2 id="backup-theo-lịch"><a class="header" href="#backup-theo-lịch">Backup theo lịch</a></h2>
+<p>Ngoài <code>autoxide backup</code> chạy tay, mọi tiến trình chạy việc nền backup mọi database nó lo, mỗi
+<code>AUTOXIDE_BACKUP_INTERVAL_HOURS</code> giờ (mặc định 24; <code>0</code> để tắt), cùng cách với <code>autoxide backup</code>, vào
+nơi lưu file của module <code>files</code> (thư mục hay bucket S3) dưới <code>kernel/backups/&lt;database&gt;/&lt;id&gt;/</code>. Mỗi
+database chỉ giữ <code>AUTOXIDE_BACKUP_KEEP</code> bản tốt mới nhất (mặc định 7). Mỗi bản gồm <code>backup.json</code>,
+<code>database.sqlite</code> và, khi đặt <code>AUTOXIDE_BACKUP_INCLUDE_FILES=true</code>, các file đã lưu trong <code>files/</code>.</p>
+<ul>
+<li>Bản backup nằm cùng nơi lưu với file tải lên, nên nó bảo vệ khi dữ liệu mất hay hỏng, không bảo vệ
+khi mất chính nơi lưu đó: chép bucket hay thư mục (cả backup lẫn file tải lên) sang nơi khác, vd
+bằng tính năng nhân bản của bucket hay một lệnh <code>rclone sync</code> hằng đêm. Đó cũng là lý do mặc định
+không chép file vào từng bản backup.</li>
+<li>Muốn khôi phục một bản thì chép thư mục của nó ra khỏi nơi lưu (S3:
+<code>aws s3 cp --recursive s3://&lt;bucket&gt;/kernel/backups/main/&lt;id&gt;/ ./restore/</code>; thư mục: <code>cp -r</code>), rồi khôi phục
+thư mục đó như mục “Khôi phục từng bước” bên dưới.</li>
+<li>Mỗi lượt được ghi vào bảng <code>kernel_backups</code> (trạng thái, cỡ, lỗi). <code>autoxide doctor</code> cảnh báo khi một
+database không có bản tốt nào trong hai chu kỳ gần nhất, và <code>/metrics</code> có
+<code>backup_last_success_timestamp_seconds</code>, <code>backup_runs_total</code>, <code>backup_duration_seconds</code> và
+<code>backup_size_bytes</code> (cảnh báo <code>AutoxideBackupTooOld</code>, <code>AutoxideBackupFailed</code>).</li>
+<li>Bản backup chứa dữ liệu cá nhân. Dữ liệu đã xoá theo yêu cầu của một người vẫn còn trong các bản
+backup làm trước đó, tới khi chúng bị xoay vòng (<code>AUTOXIDE_BACKUP_KEEP</code> × chu kỳ): ghi điều này vào
+thông báo xử lý dữ liệu. Giữ nơi lưu ở chế độ riêng tư, ở nước mà dữ liệu của khách phải ở, và giữ
+<code>AUTOXIDE_SECRET_KEY</code> tách khỏi nó. Chứng từ kế toán phải giữ 10 năm nằm ở module <code>invoices</code> và
+<code>ledger</code>, không nằm trong bản backup xoay vòng. (Chi tiết pháp lý: cần đối chiếu văn bản gốc / người
+có chuyên môn pháp lý.)</li>
+<li>Trong lúc backup một database SQLite, file <code>-wal</code> của nó lớn dần tới khi backup xong: chừa chỗ trống
+trên đĩa cho nó.</li>
+</ul>
+<h3 id="khôi-phục-từng-bước"><a class="header" href="#khôi-phục-từng-bước">Khôi phục từng bước</a></h3>
+<p>Tập trước khi cần: test <code>dien_tap_backup_restore_roi_khoi_dong</code> làm đúng các bước này ở mỗi lần chạy
+gate.</p>
+<ol>
+<li><strong>Lấy thư mục backup.</strong> Bản backup theo lịch: chép <code>kernel/backups/&lt;database&gt;/&lt;id&gt;/</code> ra khỏi nơi lưu
+file (S3: <code>aws s3 cp --recursive s3://&lt;bucket&gt;/kernel/backups/main/&lt;id&gt;/ ./restore/</code>; thư mục:
+<code>cp -r</code>). Lấy dòng <code>succeeded</code> mới nhất trong <code>kernel_backups</code>, hay thư mục mới nhất. Bản của
+<code>autoxide backup</code>: dùng nguyên thư mục đó. Chỉ khôi phục bản backup do chính bạn tạo.</li>
+<li><strong>Chuẩn bị đích trống</strong>: một database mới, trống (<code>createdb</code> trên PostgreSQL, hay đường dẫn tới một
+file SQLite chưa có) và một nơi lưu file trống. Dùng cùng <code>AUTOXIDE_SECRET_KEY</code> như lúc tạo bản
+backup, không thì secret đã mã hoá trong đó không đọc được. Bản backup lấy từ PostgreSQL khôi phục
+được vào SQLite và ngược lại.</li>
+<li><strong>Dừng các máy chủ</strong> trỏ vào đích, rồi chạy <code>autoxide restore &lt;thư mục&gt;</code> với <code>DATABASE_URL</code> và cấu
+hình nơi lưu file của đích. Lệnh áp dụng migration của phiên bản này, chép mọi bảng và file, và từ
+chối database đã có bảng của Autoxide.</li>
+<li><strong>Khởi động và kiểm</strong>: <code>autoxide doctor</code>, rồi <code>autoxide serve</code>; <code>/health/ready</code> phải trả <code>200</code> và quản
+trị viên phải đăng nhập được. Ở chế độ nhiều khách, chạy <code>autoxide migrate up --all</code> trước.</li>
+<li><strong>Chế độ nhiều khách</strong>: một bản backup chứa một database. Khôi phục database của từng placement theo
+cùng cách. Muốn lấy lại dữ liệu của riêng một khách: khôi phục bản backup vào một bản cài tạm rồi đọc
+hay xuất dữ liệu của khách đó từ đó; chưa có lệnh khôi phục một khách vào database đang chạy.</li>
+</ol>
+<h2 id="backup-mã-hoá-ở-nơi-khác-và-khôi-phục-về-một-thời-điểm"><a class="header" href="#backup-mã-hoá-ở-nơi-khác-và-khôi-phục-về-một-thời-điểm">Backup mã hoá ở nơi khác và khôi phục về một thời điểm</a></h2>
+<p><code>autoxide backup</code> và backup theo lịch là ảnh chụp nhất quán: khôi phục một bản đưa dữ liệu về đúng lúc
+chụp, còn những gì xảy ra sau đó thì mất. Hai phần dưới đây bù chỗ còn lại.</p>
+<h3 id="mã-hoá-backup-trước-khi-rời-máy"><a class="header" href="#mã-hoá-backup-trước-khi-rời-máy">Mã hoá backup trước khi rời máy</a></h3>
+<p>Một bản backup chứa dữ liệu của mọi module, kể cả dữ liệu cá nhân. Mã hoá nó trước khi chép sang máy khác
+hay lên bucket, ví dụ bằng <a href="https://age-encryption.org">age</a> với một cặp khoá mà nửa riêng tư cất ngoại
+tuyến:</p>
+<pre><code class="language-bash">age-keygen -o backup-key.txt            # một lần; cất backup-key.txt ngoại tuyến, tách khỏi backup
+age-keygen -y backup-key.txt            # in khoá công khai age1…, dùng ở dưới
+
+autoxide backup "backups/$(date +%F)"
+tar -C backups -c "$(date +%F)" | age -r age1… &gt; "autoxide-$(date +%F).tar.age"
+# chép autoxide-&lt;ngày&gt;.tar.age đi nơi khác, rồi xoá thư mục chưa mã hoá
+
+# khôi phục: giải mã, rồi khôi phục thư mục như ở "Khôi phục từng bước"
+age -d -i backup-key.txt autoxide-2026-11-21.tar.age | tar -x -C restore/
+</code></pre>
+<p>Cũng giữ <code>AUTOXIDE_SECRET_KEY</code> tách khỏi backup: thiếu nó thì secret đã mã hoá bên trong backup không đọc
+được, và đó chính là mục đích.</p>
+<h3 id="khôi-phục-về-một-thời-điểm-trên-postgresql"><a class="header" href="#khôi-phục-về-một-thời-điểm-trên-postgresql">Khôi phục về một thời điểm trên PostgreSQL</a></h3>
+<p>Muốn đưa database về đúng trạng thái ở một giây bất kỳ — ví dụ ngay trước một lần sửa hàng loạt sai —
+PostgreSQL phải giữ nhật ký ghi trước (WAL) bên cạnh các bản backup nền định kỳ. Autoxide không cần gì đặc
+biệt: đây là cách cài chuẩn của PostgreSQL.</p>
+<ul>
+<li>
+<p><strong>PostgreSQL có quản lý</strong> (Amazon RDS, Google Cloud SQL, Azure, …): bật backup tự động có khôi phục về
+thời điểm (point-in-time recovery) và mã hoá ổ lưu trong trang quản lý của nhà cung cấp; khôi phục tạo
+một database mới ở thời điểm bạn chọn. Trỏ <code>DATABASE_URL</code> tới nó.</p>
+</li>
+<li>
+<p><strong>Máy chủ của bạn</strong>: <a href="https://pgbackrest.org">pgBackRest</a> giữ backup nền và WAL trong một bucket, mã hoá
+ngay trên máy database trước khi gửi đi. Phác thảo (đối chiếu hướng dẫn của pgBackRest đúng phiên bản bạn
+dùng; trên Debian hay Ubuntu: <code>apt install pgbackrest</code>; với container PostgreSQL của <code>compose.yml</code> thì
+dùng một image có thêm nó):</p>
+<pre><code class="language-ini"># /etc/pgbackrest/pgbackrest.conf
+[global]
+repo1-type=s3
+repo1-s3-bucket=&lt;bucket&gt;
+repo1-s3-endpoint=s3.&lt;region&gt;.amazonaws.com
+repo1-s3-region=&lt;region&gt;
+repo1-path=/pgbackrest
+# mã hoá phía client: một giá trị ngẫu nhiên dài, cất tách khỏi bucket
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass=&lt;openssl rand -base64 48&gt;
+repo1-retention-full=2
+
+[autoxide]
+pg1-path=/var/lib/postgresql/16/main
+</code></pre>
+<pre><code class="language-ini"># postgresql.conf
+wal_level = replica
+archive_mode = on
+archive_command = 'pgbackrest --stanza=autoxide archive-push %p'
+</code></pre>
+<p>Key S3 đặt trong <code>PGBACKREST_REPO1_S3_KEY</code> và <code>PGBACKREST_REPO1_S3_KEY_SECRET</code> (hoặc <code>repo1-s3-key</code>,
+<code>repo1-s3-key-secret</code> trong một file chỉ <code>postgres</code> đọc được). Rồi, bằng người dùng <code>postgres</code>:</p>
+<pre><code class="language-bash">pgbackrest --stanza=autoxide stanza-create
+pgbackrest --stanza=autoxide check
+pgbackrest --stanza=autoxide --type=full backup   # hằng tuần, từ cron
+pgbackrest --stanza=autoxide --type=diff backup   # hằng ngày, từ cron
+</code></pre>
+<p>Muốn quay về một thời điểm: dừng các máy chủ Autoxide và PostgreSQL, rồi</p>
+<pre><code class="language-bash">pgbackrest --stanza=autoxide --delta --type=time --target-action=promote \
+  "--target=2026-11-21 09:59:00+00" restore
+</code></pre>
+<p>khởi động PostgreSQL, chạy <code>autoxide doctor</code>, rồi khởi động các máy chủ.</p>
+</li>
+</ul>
+<p>Khôi phục về thời điểm chỉ áp cho database. File trên S3 không quay lui theo: bật versioning của bucket để
+lấy lại file đã xoá hay bị ghi đè. Ở chế độ nhiều khách, mỗi placement là một database riêng và cần cài
+riêng. Tập khôi phục trước khi cần, như với ảnh chụp.</p>
+<h2 id="theo-dõi-monitoring"><a class="header" href="#theo-dõi-monitoring">Theo dõi (monitoring)</a></h2>
+<p>Bật <code>AUTOXIDE_HTTP_METRICS=true</code>. <code>/metrics</code> không có xác thực, nên cho nó port riêng bằng
+<code>AUTOXIDE_HTTP_METRICS_ADDRESS</code> — <code>127.0.0.1:9090</code> trên một máy, <code>0.0.0.0:9090</code> trong container hay pod
+Kubernetes (chỉ mở port đó cho Prometheus, không bao giờ ra internet) — rồi trỏ Prometheus vào đó;
+<code>/metrics</code> khi ấy rời port của API. Không có biến đó thì <code>/metrics</code> nằm cùng port với API: chặn nó ở
+reverse proxy và để Prometheus đọc ngay trên máy. Ngoài số đo request (<code>http_requests_total</code>, <code>http_request_duration_seconds</code>), mọi tiến
+trình chạy việc nền (<code>AUTOXIDE_PROCESS_ROLE</code> là <code>all</code> hay <code>worker</code>) cập nhật các gauge tồn đọng mỗi
+<code>AUTOXIDE_METRICS_BACKLOG_SECONDS</code> giây (mặc định 30), gắn nhãn <code>database</code> và <code>module</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Gauge</th><th>Nghĩa</th></tr>
+</thead>
+<tbody>
+<tr><td><code>jobs_pending</code></td><td>Job chưa xong, kể cả job hẹn giờ</td></tr>
+<tr><td><code>jobs_oldest_pending_seconds</code></td><td>Job tới hạn chờ lâu nhất đã chờ bao lâu (0 khi không có)</td></tr>
+<tr><td><code>jobs_dead</code></td><td>Job trong dead-letter queue (<code>autoxide jobs failed</code>)</td></tr>
+<tr><td><code>events_pending</code>, <code>events_oldest_pending_seconds</code>, <code>events_dead</code></td><td>Như trên, cho event đang chờ giao tới bên nhận</td></tr>
+<tr><td><code>database_connections{pool,state}</code>, <code>database_connections_max{pool}</code></td><td>Kết nối của pool <code>read</code> và <code>write</code>, <code>in_use</code> hay <code>idle</code>, và số tối đa</td></tr>
+</tbody>
+</table>
+</div>
+<p>Nhãn <code>database</code> là tên database (<code>main</code>, hay placement của khách có database riêng); quá
+<code>AUTOXIDE_METRICS_MAX_DATABASE_LABELS</code> (mặc định 50) database thì phần còn lại cộng chung dưới
+<code>database="other"</code>. Không có nhãn theo khách: tra một khách bằng log và trace.</p>
+<p><strong>Một khách.</strong> Số đo không có nhãn theo khách (mỗi khách một nhãn làm số chuỗi của Prometheus tăng
+không giới hạn). Để xem một khách:</p>
+<ul>
+<li><strong>Log và trace.</strong> Mỗi dòng log của request mang <code>tenant_id</code> khi đã biết khách (log JSON: ở
+<code>span.tenant_id</code>), span của job nền (<code>job</code>), lượt giao event (<code>event_delivery</code>) và tool MCP
+(<code>mcp_tool</code>) cũng vậy; khi đặt <code>OTEL_EXPORTER_OTLP_ENDPOINT</code>, trace mang cùng thuộc tính <code>tenant_id</code>.
+Lọc theo nó: <code>jq 'select(.span.tenant_id == "&lt;id&gt;")'</code>, hay <code>tenant_id="&lt;id&gt;"</code> trong công cụ tìm
+log / trace.</li>
+<li><strong>Lượng dùng.</strong> <code>GET /api/v1/plans/tenants/{tenant_id}/usage</code> (module <code>plans</code>) cho biết khách dùng
+mỗi hạn mức tới đâu.</li>
+<li><strong>Tồn đọng.</strong> <code>GET /api/v1/kernel/ops/backlog</code> (nhân sự nền tảng, <code>kernel.ops.read</code>) đếm job và event
+đang chờ của từng database và module; khách có database riêng là một dòng riêng.</li>
+</ul>
+<p>Repo có sẵn hai file:</p>
+<ul>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/deploy/prometheus/autoxide-alerts.yml"><code>deploy/prometheus/autoxide-alerts.yml</code></a>: luật cảnh báo —
+lỗi máy chủ trên 2%, p95 chậm, job chờ quá 10 phút, job vào dead-letter queue, event chưa giao quá 5
+phút, pool kết nối dùng 90%. Mỗi luật có chú thích <code>action</code> nói phải làm gì; các bước nằm trong sổ
+tay bên dưới. Thêm file vào <code>rule_files</code> trong <code>prometheus.yml</code> và chuyển cảnh báo qua Alertmanager.</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/deploy/grafana/autoxide-dashboard.json"><code>deploy/grafana/autoxide-dashboard.json</code></a>: dashboard
+Grafana (Dashboards › New › Import) có request, lỗi, p95 theo route, tồn đọng, dead-letter queue và kết
+nối, lọc theo database.</li>
+</ul>
+<p>Có nhiều tiến trình worker thì mỗi tiến trình đặt cùng gauge (mỗi <code>instance</code> một chuỗi); luật cảnh báo
+và dashboard lấy giá trị lớn nhất, không cộng.</p>
+<h2 id="sổ-tay-xử-lý-sự-cố"><a class="header" href="#sổ-tay-xử-lý-sự-cố">Sổ tay xử lý sự cố</a></h2>
+<p>Sự cố cần quyết định và nhiều bước (lộ key, thu hồi hàng loạt, khôi phục một khách, mất dữ liệu) ở <a href="RUNBOOK.vi.html"><code>RUNBOOK.vi.md</code></a>.</p>
+<p>Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.</p>
+<h3 id="lỗi-máy-chủ"><a class="header" href="#lỗi-máy-chủ">Lỗi máy chủ</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> cảnh báo <code>AutoxideHigh5xxRate</code>; client nhận lỗi <code>500</code>.</li>
+<li><strong>Kiểm:</strong> mọi response lỗi có <code>request_id</code>; tìm nó trong log. <code>autoxide doctor</code> kiểm một lượt cấu
+hình, database, migration, nơi lưu file và mail.</li>
+<li><strong>Sửa:</strong> theo log (database mất kết nối, đầy đĩa, dịch vụ ngoài hỏng). Lỗi bên trong code là bug: báo
+kèm dòng log, không kèm secret hay dữ liệu cá nhân.</li>
+</ul>
+<h3 id="request-chậm"><a class="header" href="#request-chậm">Request chậm</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> cảnh báo <code>AutoxideSlowP95</code> nêu tên route.</li>
+<li><strong>Kiểm:</strong> <code>database_connections</code> có gần mức tối đa không (request đứng chờ kết nối), và kế hoạch
+truy vấn của route đó (<code>EXPLAIN ANALYZE</code> trên PostgreSQL, <code>EXPLAIN QUERY PLAN</code> trên SQLite).</li>
+<li><strong>Sửa:</strong> thiếu index thì thêm bằng migration mới của module sở hữu bảng; pool quá nhỏ thì xem mục “Kết
+nối database”.</li>
+</ul>
+<h3 id="hàng-đợi-kẹt"><a class="header" href="#hàng-đợi-kẹt">Hàng đợi kẹt</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> cảnh báo <code>AutoxideJobsStuck</code> hay <code>AutoxideEventsBacklog</code>; mail, webhook, báo cáo tới
+muộn.</li>
+<li><strong>Kiểm:</strong> có ít nhất một tiến trình chạy với <code>AUTOXIDE_PROCESS_ROLE</code> là <code>all</code> hay <code>worker</code> không
+(<code>/health/ready</code> của tiến trình đó, log của nó); <code>jobs_pending</code> theo module cho thấy module nào đang
+chậm; ở chế độ nhiều khách, database còn đang migration (<code>503 tenant_maintenance</code>) thì chờ tới khi
+<code>autoxide migrate up --all</code> xong.</li>
+<li><strong>Sửa:</strong> chạy (hay khởi động lại) worker; tăng <code>AUTOXIDE_JOBS_CONCURRENCY</code> hay thêm tiến trình worker
+khi một module luôn có hàng đợi dài. Event đứng chờ một bên nhận cứ lỗi: lỗi của nó nằm trong log
+(<code>event delivery failed</code>).</li>
+</ul>
+<h3 id="dead-letter-queue"><a class="header" href="#dead-letter-queue">Dead-letter queue</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> cảnh báo <code>AutoxideDeadLetterGrowing</code>; <code>jobs_dead</code> tăng.</li>
+<li><strong>Kiểm:</strong> <code>autoxide jobs failed</code> liệt kê job đã bỏ cuộc, mới nhất trước, kèm lỗi cuối (<code>--module</code> để
+lọc).</li>
+<li><strong>Sửa:</strong> sửa nguyên nhân trước (sai mật khẩu SMTP, dịch vụ ngoài hỏng), rồi
+<code>autoxide jobs retry &lt;module&gt; &lt;id&gt;</code> cho từng job. Chạy lại trước khi sửa thì job chỉ vào hàng đợi để
+lỗi lần nữa.</li>
+</ul>
+<h3 id="quá-nhiều-kết-nối"><a class="header" href="#quá-nhiều-kết-nối">Quá nhiều kết nối</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> request phải chờ trước khi có byte trả lời nào; <code>/health/ready</code> chậm hay hết giờ, trong khi
+process vẫn khoẻ.</li>
+<li><strong>Kiểm:</strong> số kết nối đang mở (<code>ss -tn state established '( sport = :8080 )' | wc -l</code>) so với
+<code>AUTOXIDE_HTTP_MAX_CONNECTIONS</code>; chạm giới hạn thì kết nối mới — kể cả health check cùng port — chờ tới khi
+một kết nối đóng.</li>
+<li><strong>Sửa:</strong> giới hạn số kết nối theo từng client ở reverse proxy (phần lớn một đợt tràn đến từ ít client), rồi
+nâng setting cùng giới hạn file mở. Đặt timeout và ngưỡng lỗi của liveness probe đủ chịu một lúc quá tải ngắn
+(<code>/health/live</code>, vd 5 giây × 3): khởi động lại làm rơi mọi kết nối; readiness probe chậm chỉ đưa máy ra khỏi
+vòng phân tải, đúng điều mong muốn khi máy đang đầy.</li>
+</ul>
+<h3 id="kết-nối-database"><a class="header" href="#kết-nối-database">Kết nối database</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> cảnh báo <code>AutoxideDbPoolExhausted</code>; request chậm vì chờ kết nối.</li>
+<li><strong>Kiểm:</strong> <code>database_connections{state="in_use"}</code> theo pool; trên PostgreSQL, truy vấn chạy lâu trong
+<code>pg_stat_activity</code>.</li>
+<li><strong>Sửa:</strong> dừng thứ đang giữ kết nối (truy vấn chậm, job kẹt), rồi tăng
+<code>AUTOXIDE_DATABASE_READ_CONNECTIONS</code> / <code>AUTOXIDE_DATABASE_WRITE_CONNECTIONS</code> — mỗi tiến trình mở chừng
+ấy kết nối, nên giữ tổng dưới <code>max_connections</code> của máy chủ database. SQLite theo thiết kế chỉ có một
+kết nối ghi. Tìm chữ công khai (bài có <code>q</code>, <code>/public/search</code>, gợi ý) không bao giờ dùng quá pool đọc trừ 2
+trên mỗi database (<code>AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY</code>, tự hạ), và bỏ sau 2 giây, kể cả thời gian
+chờ kết nối.</li>
+</ul>
+<h3 id="database-đầy"><a class="header" href="#database-đầy">Database đầy</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> lệnh ghi lỗi, log có “disk full” hay “no space left on device”.</li>
+<li><strong>Kiểm:</strong> SQLite: cỡ file database và file <code>-wal</code> của nó (một lần đọc kéo dài, như backup, làm file
+<code>-wal</code> lớn dần tới khi xong). PostgreSQL: các bảng lớn nhất,
+<code>SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 10;</code>.</li>
+<li><strong>Sửa:</strong> giải phóng hay thêm dung lượng đĩa trước. Job đã xong và event đã giao tự bị xoá sau 7 ngày;
+trên PostgreSQL chạy <code>VACUUM</code> cho bảng lớn sau khi xoá nhiều dòng.</li>
+</ul>
+<h3 id="backup"><a class="header" href="#backup">Backup</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> cảnh báo <code>AutoxideBackupTooOld</code> hay <code>AutoxideBackupFailed</code>; <code>autoxide doctor</code> cảnh báo
+<code>kernel.backup_age</code>.</li>
+<li><strong>Kiểm:</strong> các dòng mới nhất của <code>kernel_backups</code> cho database đó (<code>status</code>, <code>error</code>), dòng log
+<code>backup failed</code>, chỗ trống trên máy chủ (bản backup được dựng trước trong thư mục tạm, cỡ bằng
+database) và trên nơi lưu file.</li>
+<li><strong>Sửa:</strong> theo lỗi (thiếu module <code>files</code>, đầy đĩa, thông tin đăng nhập nơi lưu). Dòng kẹt ở <code>running</code>
+do tiến trình đã chết được lượt sau đánh <code>failed</code> sau 15 phút. Backup tay bằng
+<code>autoxide backup &lt;thư mục&gt;</code> tới khi backup theo lịch chạy lại.</li>
+</ul>
+<h3 id="lộ-khoá"><a class="header" href="#lộ-khoá">Lộ khoá</a></h3>
+<ul>
+<li><code>AUTOXIDE_AUTH_TOKEN_SECRET</code>: đặt giá trị mới trên mọi máy chủ rồi khởi động lại, KHÔNG đưa khoá bị lộ
+vào <code>AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS</code>. Mọi access token hết dùng được; client lấy token mới bằng
+refresh token, vẫn còn hiệu lực. (Đổi định kỳ thì giữ khoá cũ ở đó một lúc để không ai nhận ra — xem
+“Lấy mã nguồn và đặt secret”.)</li>
+<li><code>AUTOXIDE_SECRET_KEY</code>: xoay như mục “Lấy mã nguồn và đặt secret” (giá trị mới, giá trị cũ vào
+<code>AUTOXIDE_SECRET_KEY_PREVIOUS</code>, <code>autoxide secrets reseal</code>). Bản backup lấy trước đó vẫn mở được bằng
+khoá cũ: xoá chúng, hay giữ chúng an toàn như chính khoá. Bộ đếm theo địa chỉ của người xem bắt đầu
+lại với khoá mới.</li>
+<li>API key hay secret của webhook: thu hồi key, xoay secret của webhook qua API.</li>
+</ul>
+<h3 id="mất-quản-trị-viên-cuối-cùng"><a class="header" href="#mất-quản-trị-viên-cuối-cùng">Mất quản trị viên cuối cùng</a></h3>
+<ul>
+<li><strong>Dấu hiệu:</strong> không ai đăng nhập được với role <code>admin</code> (tài khoản bị xoá, bị khoá, hay người đó đã
+nghỉ). <code>autoxide doctor</code> cảnh báo khi không còn quản trị viên nào đang hoạt động.</li>
+<li><strong>Sửa:</strong> trên máy chủ, <code>autoxide user create --email … --name … --admin</code> tạo quản trị viên mới và in
+mật khẩu. Quản trị viên chỉ mất bước xác thực thứ hai hay passkey:
+<code>autoxide user reset-mfa</code> / <code>autoxide user remove-passkeys</code>.</li>
+</ul>
+<h3 id="khoá-migration"><a class="header" href="#khoá-migration">Khoá migration</a></h3>
+<p>Mỗi lúc chỉ một tiến trình migrate. Có hai khoá: một cho database chính (<code>migrate up</code>, máy chủ khởi
+động với <code>AUTOXIDE_MIGRATE_ON_START</code>) và một cho database của khách (<code>migrate up --all</code> lấy nó sau khoá
+đầu, lượt migrate chạy nền và việc chuyển khách chỉ lấy khoá này), nên một lượt dài qua database của
+khách không bao giờ làm máy chủ đang khởi động phải chờ. Trên PostgreSQL mỗi khoá là một advisory lock
+trên kết nối riêng; proxy hay failover cắt kết nối đó thì khoá mất, và lượt dừng trước database của
+khách kế tiếp (chạy lại). Dùng PgBouncer ở chế độ session cho lệnh này, hoặc trỏ thẳng vào database.
+Trên SQLite khoá là các file cạnh database (<code>.migrate-lock</code>, <code>.placements-lock</code>); SQLite trong bộ nhớ
+không có khoá (chỉ một tiến trình). <code>migrate up --all</code> giữ khoá chính trong lúc chờ (tới 15 phút) khoá
+database của khách, nên trong lúc đó máy chủ khởi động có việc lúc khởi động (<code>AUTOXIDE_MIGRATE_ON_START</code>,
+quản trị viên đầu tiên, task khởi động) cũng phải chờ. Trong lúc cập nhật cuốn chiếu từ một bản cũ hơn khoá này, máy chủ
+bản cũ còn có thể chạy lượt migrate mà không giữ khoá: chờ cập nhật xong rồi mới chạy lượt từ API.</p>
+<h3 id="cập-nhật-khi-hai-phiên-bản-cùng-chạy"><a class="header" href="#cập-nhật-khi-hai-phiên-bản-cùng-chạy">Cập nhật khi hai phiên bản cùng chạy</a></h3>
+<p>Lúc cập nhật cuốn chiếu, máy chủ cũ và mới cùng chạy trên một database, nên một bản phát hành đổi
+database theo hai bước (“mở rộng trước, thu hẹp sau”):</p>
+<ol>
+<li><strong>Mở rộng:</strong> bản mới thêm thứ nó cần (cột mới cho phép trống hay có giá trị mặc định; bảng mới) và ghi
+cả dạng cũ lẫn dạng mới. Bản cũ vẫn chạy: nó không biết cột mới.</li>
+<li><strong>Thu hẹp:</strong> một bản phát hành sau, khi không còn máy chủ nào chạy bản cũ, thôi ghi dạng cũ và bỏ nó.</li>
+</ol>
+<p><code>autoxide serve</code> không khởi động khi còn thiếu migration, nên chạy <code>autoxide migrate up --all</code>
+(database chính rồi mọi database riêng của khách; ở chế độ một khách giống <code>migrate up</code>) trước khi
+bật máy chủ mới, rồi thay máy chủ cũ như mục “Cập nhật không làm rơi
+request”.</p>
+<h3 id="lùi-về-một-bản-trước"><a class="header" href="#lùi-về-một-bản-trước">Lùi về một bản trước</a></h3>
+<p><code>autoxide rollback --to X.Y.Z</code> đưa database chính và mọi database của khách về đúng các migration của
+bản <code>X.Y.Z</code> (từ 0.14.0 trở đi), để máy chủ của bản đó chạy lại được. Chạy bằng binary của bản đang rời
+đi: chỉ nó biết cách gỡ migration của chính nó.</p>
+<ol>
+<li><code>autoxide rollback --to X.Y.Z --dry-run</code> liệt kê từng database: migration sẽ gỡ, bảng và cột sẽ bị
+bỏ kèm số dòng hay giá trị đang có (cột chỉ chứa giá trị mặc định thì không mất gì), và số dòng một
+bước gỡ sẽ xoá. Không đổi gì. Trên SQLite nó làm trên bản sao của database, trong một thư mục riêng
+(<code>.autoxide-rollback-…</code>, chỉ user của máy chủ đọc được) cạnh file database, xoá khi xong: cần chỗ trống
+bằng kích thước database ở đó. Lần chạy thật, khi máy chủ đã dừng, đo mà không chép. Trên PostgreSQL nó chạy
+các bước gỡ trong một transaction rồi huỷ, nên trong lúc đó giữ lock trên các bảng nó đổi: chờ một
+bảng đang bận tối đa <code>--lock-timeout-seconds</code> (mặc định 2) rồi dừng và báo — chạy lúc ít tải, hoặc
+sau khi đã dừng máy chủ.</li>
+<li>Dừng mọi máy chủ và worker của bản hiện tại. Lần chạy thử cho thấy có dữ liệu sẽ mất thì backup
+trước (<code>autoxide backup</code>).</li>
+<li><code>autoxide rollback --to X.Y.Z --yes</code>, thêm <code>--accept-data-loss</code> khi có dữ liệu mất. Database của
+khách trước, database chính sau cùng; database của khách nào hỏng thì database chính giữ nguyên:
+sửa nguyên nhân rồi chạy lại đúng lệnh đó.</li>
+<li>Khởi động máy chủ của <code>X.Y.Z</code>.</li>
+</ol>
+<p>Module do binary của bạn tự ghép thêm (<code>.module(…)</code>) không có trong bảng phiên bản: lệnh lùi để nguyên
+migration của chúng và nói rõ; <code>--revert-untracked</code> gỡ cả chúng. Lần lùi được ghi thành một lượt migrate
+loại <code>rollback</code>; khi bản đích cũ hơn sổ ghi đó (0.19.0 trở về trước), lượt được đóng trước khi lùi
+database chính, và lỗi ở đó chỉ được in ra.</p>
+<p>Migration không trả lại được dữ liệu cho bản trước (bước thu hẹp của mở rộng–thu hẹp) làm lệnh từ
+chối; changelog liệt kê các migration như vậy ở mục ghi chú nâng cấp, và đường lùi qua chúng là bản
+backup lấy trước khi nâng.</p>
+<h2 id="kiểm-trước-khi-chạy-thật"><a class="header" href="#kiểm-trước-khi-chạy-thật">Kiểm trước khi chạy thật</a></h2>
+<ul>
+<li><input disabled="" type="checkbox"> <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> và <code>AUTOXIDE_SECRET_KEY</code> là chuỗi ngẫu nhiên dài, giữ bí mật
+(<code>autoxide doctor</code> cảnh báo khi thiếu)</li>
+<li><input disabled="" type="checkbox"> Có TLS phía trước (reverse proxy), port 8080 không mở ra internet</li>
+<li><input disabled="" type="checkbox"> <code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> đặt theo header của proxy</li>
+<li><input disabled="" type="checkbox"> Đã cấu hình SMTP, để đặt lại mật khẩu và xác minh email chạy được</li>
+<li><input disabled="" type="checkbox"> Backup theo lịch và chép sang máy khác; đã thử khôi phục một lần</li>
+<li><input disabled="" type="checkbox"> <code>/health/ready</code> được hệ thống giám sát theo dõi</li>
+<li><input disabled="" type="checkbox"> Đã ghi nước của placement (<code>autoxide placement country</code>) khi có khách buộc lưu dữ liệu tại Việt Nam, và
+đặt <code>incident.alert_emails</code> để nhận nhắc hạn 72 giờ của sự cố</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/CUSTOMERS.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/FORMS.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/CUSTOMERS.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/FORMS.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

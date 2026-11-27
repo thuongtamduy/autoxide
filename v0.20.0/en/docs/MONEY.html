@@ -1,0 +1,424 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Money, ledger and accounting documents - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="money-ledger-and-accounting-documents"><a class="header" href="#money-ledger-and-accounting-documents">Money, ledger and accounting documents</a></h1>
+<p><a href="MONEY.vi.html">Tiếng Việt</a></p>
+<p>Three modules handle money in Autoxide:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Module</th><th>What it does</th><th>Other modules use</th></tr>
+</thead>
+<tbody>
+<tr><td><code>tax</code></td><td>tax categories, rates with effective dates, tax profiles, the Vietnam data pack (<a href="TAX.html">TAX.md</a>)</td><td><code>dyn TaxEngine</code></td></tr>
+<tr><td><code>ledger</code></td><td>double-entry books, payments through licensed partners, money-flow modes, holds, payouts, VietQR transfers, exchange rates</td><td><code>dyn Ledger</code></td></tr>
+<tr><td><code>invoices</code></td><td>document series, gapless numbering, e-invoices, print templates, accounting exports, archives</td><td><code>dyn Invoices</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Autoxide never holds money itself.</strong> There is no wallet and no balance “of the buyer” kept by the
+platform: money goes from the buyer to a licensed payment partner or straight to the seller’s bank
+account. The ledger only records <strong>obligations</strong> (what is owed to whom) and checks them against the
+partners’ statements.</p>
+<blockquote>
+<p>Legal notes in this guide (accounting law, e-invoices, withholding, data protection) are a starting
+point, <strong>not legal advice</strong>: check them against the original documents with someone qualified before
+running a real business on them.</p>
+</blockquote>
+<p>All routes are under <code>/api/v1/&lt;module&gt;</code>, described in <code>docs/openapi.json</code> (served at
+<code>/api/v1/openapi.json</code>). Amounts are <code>{"amount": "1999", "currency": "USD"}</code> — an integer of the
+currency’s smallest unit, as a string. Rates and quantities are decimal strings such as <code>"25345.5"</code>,
+never JSON numbers.</p>
+<h2 id="the-ledger"><a class="header" href="#the-ledger">The ledger</a></h2>
+<ul>
+<li><strong>One book per organization unit</strong> (the tenant’s root, a subsidiary, a seller that keeps its own
+accounts), in a book currency (default: the unit’s currency, else VND).</li>
+<li><strong>Accounts are named by purpose</strong>: <code>cash.bank</code>, <code>receivable.customer</code>, <code>revenue.sales</code>,
+<code>tax.vat_output</code>, <code>payable.seller_held</code>… plus a counterparty (<code>org</code>, <code>customer</code>, <code>carrier</code>,
+<code>partner</code>, <code>supplier</code>) when needed. Other modules add purposes with their own prefix.</li>
+<li><strong>Entries are double-entry and append-only</strong>: debits equal credits, every line is positive, all
+lines in one currency. A mistake is corrected with a reversing entry (<code>POST /ledger/entries/{id}/reverse</code>); an entry can be reversed once.</li>
+<li><strong>Every write takes a <code>reference</code></strong>: sending the same reference with the same content returns the
+first result (200); with other content it is refused (<code>reference_reused</code>).</li>
+<li><strong>Monthly periods</strong> can be closed (<code>POST /ledger/periods/{id}/close</code>); a closed period takes no
+entry — post an adjustment in an open period. Closed periods do not reopen.</li>
+<li><strong>Tamper evidence</strong>: entries are sealed into a hash chain within seconds; <code>autoxide doctor</code> reports
+the first entry changed or removed outside the module (<code>ledger.chain</code>) and any balance that does not
+match its lines (<code>ledger.balances</code>).</li>
+</ul>
+<p>Reading: <code>GET /ledger/entries</code> (filter by <code>source_module</code> and <code>source_id</code> to see the entries of a
+document), <code>GET /ledger/accounts/{id}/balance?as_of=</code>, <code>GET /ledger/trial-balance</code>.</p>
+<h2 id="payments-flow-modes-holds-and-payouts"><a class="header" href="#payments-flow-modes-holds-and-payouts">Payments, flow modes, holds and payouts</a></h2>
+<p>A payment is created with <code>POST /ledger/payments</code> and paid through a <strong>payment partner</strong> (a connector
+module that implements the kernel trait <code>PaymentGateway</code>). The partner’s webhook
+(<code>POST /ledger/webhooks/{provider}</code>, signature checked on the raw body) marks it paid; a daily
+reconciliation compares the ledger with the partner’s statement and puts every difference in a queue
+for a person (<code>GET /ledger/exceptions</code>).</p>
+<p>Each unit has a <strong>money-flow mode</strong> (<code>PUT /ledger/flow-settings/{org_id}</code>, inherited down the tree):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Mode</th><th>Who receives the money</th><th>What the ledger records</th></tr>
+</thead>
+<tbody>
+<tr><td><code>self_collect</code> (default)</td><td>the seller, directly</td><td>the sale and VAT in the seller’s book</td></tr>
+<tr><td><code>partner_collect</code></td><td>a licensed partner collects for the marketplace</td><td>what is owed to the seller (<code>payable.seller_held</code>), held until the return period ends, then available for payout</td></tr>
+<tr><td><code>split_at_gateway</code></td><td>the partner splits the payment at once</td><td>only the marketplace’s share</td></tr>
+</tbody>
+</table>
+</div>
+<p>Holds are released by a job (every 5 minutes) or by hand (<code>POST /ledger/holds/{id}/release</code>). Payouts
+(<code>POST /ledger/payouts</code>) go through a <code>PayoutGateway</code> partner and never exceed the available balance,
+even when sent at the same time. Platform fees carry their own VAT; withholding for household
+businesses (Decree 117/2025/ND-CP — needs checking) only happens in the collect modes; core computes and
+books it, but does not yet withhold on each payout by itself, issue the withholding certificate or prepare
+the declaration (with the marketplace module, after 1.0 — see <code>TAX.md</code>).</p>
+<h2 id="vietqr-bank-transfers"><a class="header" href="#vietqr-bank-transfers">VietQR bank transfers</a></h2>
+<p><code>POST /ledger/payments/vietqr</code> returns a VietQR payload (NAPAS / EMVCo format) whose transfer note is a
+short code. Money goes <strong>straight to the unit’s bank account</strong>. A bank feed (<code>BankFeed</code>: a bank or a
+statement-reading service, by webhook or by polling) reports incoming transfers; a transfer with the
+right code and amount marks the payment paid, anything else (wrong amount, no code, paid twice, late)
+goes to the exceptions queue. Only a fake bank feed ships today: a real connector needs a contract
+with the bank or service.</p>
+<h2 id="accounting-documents"><a class="header" href="#accounting-documents">Accounting documents</a></h2>
+<p><code>invoices</code> keeps documents of these kinds: <code>vat_invoice</code>, <code>sales_invoice</code>, <code>cash_register_invoice</code>,
+<code>retail_receipt</code>, <code>delivery_note</code>, <code>goods_receipt</code>, <code>cash_receipt</code>, <code>cash_payment</code>,
+<code>withholding_certificate</code>.</p>
+<ul>
+<li>A <strong>draft</strong> has no number; taxes are computed from the tax categories of its lines.</li>
+<li><strong>Issuing</strong> (<code>POST /invoices/documents/{id}/issue</code>) gives the next number of the series with <strong>no
+gaps</strong>, even under concurrent issues; issuing again returns the same number. Sales documents are
+booked in the seller’s ledger (receivable, revenue, output VAT).</li>
+<li><strong>E-invoices</strong> go to a provider (<code>EInvoiceProvider</code>, including invoices from cash registers) in a
+background job; a refused invoice is fixed and sent again with the same number. Issued documents
+are corrected only by an adjustment or a replacement, or cancelled. An e-invoice already sent to the tax
+authority cannot be cancelled where the seller’s tax jurisdiction forbids it (Vietnam since 2025-06-01,
+Decree 70/2025/ND-CP; tax pack rule <code>einvoice.cancel_after_submission</code>): <code>409 invoices.einvoice_not_cancellable</code> with the legal basis — issue an adjustment (<code>direction: decrease</code>) or a
+replacement. One the tax authority rejected is cancelled locally. Autoxide does not send the error notice
+form 04/SS; lodge it at the provider’s or tax authority’s portal when it is required.</li>
+<li>A unit may issue for a seller under a <strong>mandate</strong> (<code>/invoices/mandates</code>).</li>
+</ul>
+<h2 id="exchange-rates-and-foreign-currency-documents"><a class="header" href="#exchange-rates-and-foreign-currency-documents">Exchange rates and foreign-currency documents</a></h2>
+<p>Rates live in the ledger, per tenant, per currency pair, with an <strong>effective date</strong>: a rate is used
+from its day until a later rate of the same pair.</p>
+<ul>
+<li>Record by hand: <code>POST /ledger/exchange-rates</code> <code>{"base": "USD", "quote": "VND", "rate": "25345.5", "effective_date": "2026-11-17"}</code> (permission <code>ledger.settings_manage</code> for the whole tenant).
+Recorded rates are never changed; a different rate for the same pair and day is refused.</li>
+<li>Fetch from a rate source: <code>POST /ledger/exchange-rates/fetch</code> (a connector implementing the kernel
+trait <code>ExchangeRateSource</code>; only a fake source ships today).</li>
+<li>Look up: <code>GET /ledger/exchange-rates/effective?base=USD&amp;quote=VND&amp;on=2026-11-17</code> — the latest rate on
+or before that day; on the same day a hand-entered rate wins over a fetched one. MCP tool
+<code>ledger.exchange_rate</code>.</li>
+</ul>
+<p>A <strong>foreign-currency document</strong> takes the rate of its issue date when it is issued and keeps a copy
+(<code>exchange_rate</code>, <code>exchange_rate_id</code>, <code>base_total</code>); later rates never change it. Without a rate,
+issuing fails with <code>invoices.rate_missing</code>. Entries in a currency other than the book’s store the rate
+on every line and an amount in the book currency; the converted total is rounded once and shared
+between the lines, so the entry balances in both currencies. A reversal uses the rate of the entry it
+reverses. (Accounting Law 88/2015, Article 11: amounts in foreign currency are converted to đồng —
+needs checking.)</p>
+<h2 id="printing-documents"><a class="header" href="#printing-documents">Printing documents</a></h2>
+<p><code>GET /invoices/documents/{id}/render?format=html|pdf&amp;locale=vi|en</code> prints a document.</p>
+<ul>
+<li><strong>HTML</strong> comes from a <strong>print template</strong>: the unit’s template for the document kind and language,
+else the tenant’s, else the built-in one. Templates use Jinja syntax (<code>{{ buyer.name }}</code>,
+<code>{% for line in lines %}</code>, filters <code>money</code>, <code>number</code>, <code>date</code>) and run in a <strong>sandbox</strong>: no files,
+no network, no other templates, limits on size (<code>AUTOXIDE_TEMPLATE_MAX_BYTES</code>), steps and output.
+Every value is HTML-escaped and there is no <code>safe</code> filter.</li>
+<li>Manage templates with <code>/invoices/templates</code> (permission <code>invoices.templates_manage</code>). Saving checks
+the template and reports every problem at once with line and column: <code>template.syntax_error</code>,
+<code>template.unknown_variable</code>, <code>template.required_variable_missing</code>. <code>GET /invoices/template-defaults</code>
+gives the built-in template and the variables; <code>POST /invoices/templates/preview</code> tries a template
+without saving it.</li>
+<li><strong>PDF</strong> has a fixed A4 layout built from the same data (title, parties, lines with wrapping and page
+breaks, totals, signature blocks), with an embedded font that carries Vietnamese marks. Templates
+change the HTML only; for a PDF in your own layout, print the HTML from a browser.</li>
+<li>Other modules (orders, inventory) print their delivery notes, goods receipts and receipts the same
+way: they create the document through <code>dyn Invoices</code> and call <code>Invoices::render</code>.</li>
+</ul>
+<h2 id="accounting-exports"><a class="header" href="#accounting-exports">Accounting exports</a></h2>
+<p><code>POST /invoices/exports</code> <code>{"profile": "generic_journal", "format": "csv", "from": "2026-01-01", "to": "2026-01-31"}</code> (permission <code>invoices.export</code>) makes a file in the background; follow the
+<code>Location</code> until <code>status</code> is <code>ready</code>, then <code>GET /invoices/exports/{id}/download</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Profile</th><th>Rows</th></tr>
+</thead>
+<tbody>
+<tr><td><code>generic_journal</code></td><td>one row per entry line: posting date, entry, document date and number, description, account, debit, credit, currency, rate, amounts in the book currency, counterparty</td></tr>
+<tr><td><code>vn_double_entry</code></td><td>debit/credit pairs (<code>TK Nợ</code>, <code>TK Có</code>, <code>Số tiền</code>) — the shape Vietnamese accounting software imports as general vouchers through its column-mapping step</td></tr>
+<tr><td><code>generic_documents</code></td><td>one row per document line: date, series, number, buyer, item, quantity, price, VAT rate and amounts</td></tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li>CSV is UTF-8 with a BOM (opens in Excel with Vietnamese marks), cells starting with <code>= + - @</code> are
+prefixed with <code>'</code> (no formula injection). XLSX is also available.</li>
+<li>Account numbers: the account’s own <code>external_code</code>, else the Vietnamese chart of accounts mapping
+of its purpose (<code>modules/ledger/data/vn-accounts.json</code>, e.g. <code>revenue.sales</code> → 5111 — <strong>needs
+checking by an accountant</strong> against Circulars 99/2025/TT-BTC and 133/2016/TT-BTC).</li>
+<li>The vendor templates of MISA, Fast and other packages are downloaded inside each product and change
+between versions, so no vendor-specific profile ships yet; map the columns of <code>vn_double_entry</code> in
+the product’s import screen.</li>
+</ul>
+<h2 id="keeping-records-for-10-years"><a class="header" href="#keeping-records-for-10-years">Keeping records for 10 years</a></h2>
+<p>Accounting documents and books are kept at least 10 years after the end of the accounting year
+(Accounting Law 88/2015/QH13 Article 41; Decree 174/2016/ND-CP Article 12 — needs checking).</p>
+<ul>
+<li>Issued documents cannot be deleted (<code>invoices.retention_hold</code>); each carries <code>retention_until</code>.</li>
+<li>Deleting a tenant for good keeps the accounting tables (<code>ledger_*</code>, <code>invoices_series</code>,
+<code>invoices_documents</code>, <code>invoices_lines</code>, <code>invoices_mandates</code>, <code>invoices_archives</code>); everything else is
+removed.</li>
+<li><strong>Archive copy</strong>: <code>POST /invoices/archives</code> (permission <code>invoices.archive</code>) writes the general journal
+(<code>ledger/journal.csv</code>), every document (<code>documents.jsonl</code>) and <code>manifest.json</code> (SHA-256 of every file)
+to the shared file storage under <code>archives/&lt;tenant&gt;/&lt;id&gt;/</code> — outside the tenant’s folder, so it stays
+after the tenant is deleted. A deleted tenant without an archive gets one automatically.</li>
+<li><strong>After the retention period</strong> a daily job (<code>invoices.purge_expired</code>) removes the personal data of
+consumer buyers from expired documents (name, email, address, personal id); for deleted tenants it
+deletes expired documents and drafts. Documents still inside their retention period are never
+touched. The ledger of a deleted tenant is kept whole: its hash chain cannot be cut in part.</li>
+</ul>
+<h2 id="writing-a-partner-connector"><a class="header" href="#writing-a-partner-connector">Writing a partner connector</a></h2>
+<p>A connector is a module of its own that depends only on the kernel and registers <strong>before</strong>
+<code>ledger</code>/<code>invoices</code>: it implements one of the kernel traits and contributes it in <code>start</code> with
+<code>context.contribute::&lt;dyn PaymentGateway&gt;(Arc::new(…))</code> (or <code>PayoutGateway</code>, <code>BankFeed</code>,
+<code>ExchangeRateSource</code>, <code>EInvoiceProvider</code>). Every call receives the tenant: read that tenant’s
+credentials from the tenant secret store, never from environment variables. Check webhook signatures
+on the raw body with a constant-time comparison. Test with the fakes of <code>autoxide-testkit</code>
+(<code>FakePaymentGateway</code>, <code>FakePayoutGateway</code>, <code>FakeBankFeed</code>, <code>FakeExchangeRateSource</code>,
+<code>FakeEInvoiceProvider</code>).</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/MODULE_GUIDE.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/NEWSLETTER.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/MODULE_GUIDE.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/NEWSLETTER.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

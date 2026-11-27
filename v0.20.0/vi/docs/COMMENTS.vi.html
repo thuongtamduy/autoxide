@@ -1,0 +1,536 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Bình luận - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="bình-luận"><a class="header" href="#bình-luận">Bình luận</a></h1>
+<p><em>English: <a href="COMMENTS.html">COMMENTS.md</a></em></p>
+<p>Module <code>comments</code> cho người đọc bình luận vào bất cứ thứ gì website hiển thị — bài viết, trang,
+ảnh — theo loại và id của nó (<code>target_type</code>, <code>target_id</code>). Luồng có hai cấp: bình luận gốc và các
+trả lời (trả lời một trả lời thì vào cùng luồng và nhớ đang trả lời ai). Người dùng đăng nhập và
+khách đều bình luận được; mọi bình luận đi qua một chuỗi kiểm tra cố định và, mặc định, bình luận
+của khách chờ duyệt. Người đọc báo cáo được bình luận; người kiểm duyệt duyệt, từ chối, đánh dấu
+spam, cấm và đóng đích; tác giả sửa được bình luận trong một lúc ngắn và xoá được bất cứ lúc nào.
+Module chỉ có API: website hiển thị khung bình luận; màn hình quản trị là một dự án riêng. Đường
+dẫn: <code>/api/v1/comments</code>. Hợp đồng đầy đủ nằm trong <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>openapi.json</code></a>.</p>
+<p>Không cần tài khoản dịch vụ bên thứ ba: spam bị chặn bởi lớp chống spam dùng chung của core (ô bẫy
+ẩn, token form có chữ ký, giới hạn số lần, dò trùng; đề proof-of-work tự host tuỳ chọn) cộng danh
+sách từ và giới hạn số link của module.</p>
+<h2 id="permission"><a class="header" href="#permission">Permission</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Permission</th><th>Cho phép</th></tr>
+</thead>
+<tbody>
+<tr><td><code>comments.post</code></td><td>Bình luận khi đăng nhập, sửa và xoá bình luận của mình, đặt tên hiển thị</td></tr>
+<tr><td><code>comments.read</code></td><td>Đọc mọi bình luận ở mọi trạng thái, kèm email tác giả, dấu vết mạng và báo cáo</td></tr>
+<tr><td><code>comments.moderate</code></td><td>Duyệt, từ chối, đánh dấu spam, giữ lại; xoá hẳn</td></tr>
+<tr><td><code>comments.manage</code></td><td>Cấm và bỏ cấm; mở, đóng và ẩn đích</td></tr>
+<tr><td><code>comments.export</code></td><td>Xuất và xoá mọi bình luận viết bằng một địa chỉ email</td></tr>
+</tbody>
+</table>
+</div>
+<p>Khách không cần permission nào: mọi thứ dưới <code>/api/v1/comments/public/</code> đều mở.</p>
+<h2 id="đích"><a class="header" href="#đích">Đích</a></h2>
+<p><code>AUTOXIDE_COMMENTS_TARGET_TYPES</code> (mặc định <code>content.entry</code>) liệt kê các loại nhận bình luận. Khi
+một module khác tra được loại đó (module <code>content</code> tra <code>content.entry</code>), bình luận chỉ được nhận
+khi đích có thật và đang công khai; loại khác được nhận theo cấu hình. Đích có dòng riêng từ bình
+luận đầu tiên, giữ trạng thái (<code>open</code> / <code>closed</code>, <code>hidden</code>, <code>closes_at</code>) và số đếm. Module sở hữu
+loại đích khai event nào của nó đóng hay gỡ đích: khi <code>content</code> lưu trữ một bài, bình luận của bài
+đóng lại; khi xoá bài, bình luận còn bị ẩn. <code>AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS</code> đóng đích sau một số
+ngày kể từ bình luận đầu tiên.</p>
+<h2 id="hỏi-đáp"><a class="header" href="#hỏi-đáp">Hỏi đáp</a></h2>
+<p>Cùng các luồng đó làm hỏi đáp sản phẩm: câu hỏi là bình luận gốc, câu trả lời là trả lời của nó. Module
+sở hữu đích có thể gắn <strong>nhãn</strong> cho tác giả, tính lúc viết và trả về dạng mã ổn định trong <code>badges</code> (vd
+<code>seller</code> cho người quản lý sản phẩm, <code>verified_buyer</code> cho người đã nhận hàng); giao diện tự hiện nhãn
+cho từng mã.</p>
+<ul>
+<li>Tìm câu hỏi của một đích: <code>GET /api/v1/comments/public/threads?target_type=…&amp;target_id=…&amp;q=bảo hành</code>
+— không phân biệt hoa thường và dấu; khớp đúng dấu xếp trước.</li>
+<li>Số trên tab: <code>GET /api/v1/comments/public/counts</code> trả <code>thread_count</code> (câu hỏi đang hiện) bên cạnh
+<code>count</code> (mọi bình luận đang hiện); đích cũng trả <code>thread_count</code>, người kiểm duyệt có thêm
+<code>pending_thread_count</code>.</li>
+<li>Câu hỏi chưa trả lời (chưa có trả lời đang hiện): <code>GET /api/v1/comments?status=published&amp;unanswered=true</code>.</li>
+<li><code>AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES</code> liệt kê loại đích chỉ tài khoản đã xác thực được hỏi hay trả
+lời: khách bị từ chối, người dùng đăng nhập được hỏi qua module giữ trạng thái xác thực tài khoản
+(<code>comments.verification_required</code>, 403). Chưa cài module đó thì mọi tài khoản đăng nhập tính là đã
+xác thực.</li>
+</ul>
+<h2 id="tài-khoản-đã-xác-thực-việt-nam-nghị-định-1472024"><a class="header" href="#tài-khoản-đã-xác-thực-việt-nam-nghị-định-1472024">Tài khoản đã xác thực (Việt Nam, Nghị định 147/2024)</a></h2>
+<p>Module <code>compliance</code> giữ trạng thái xác thực tài khoản và trả lời câu hỏi đó cho module này:</p>
+<ul>
+<li><strong>Các mức:</strong> <code>none</code>, <code>phone</code> (số di động Việt Nam đã xác nhận bằng mã 6 số gửi qua SMS) và
+<code>identity</code> (hồ sơ định danh đã xác thực, <code>GET /api/v1/compliance/me/kyc</code>; bao gồm <code>phone</code>). Người
+dùng xem mức của mình bằng <code>GET /api/v1/compliance/me/verification</code> (MCP
+<code>compliance.account_verification</code>).</li>
+<li><strong>Xác thực số điện thoại:</strong> <code>POST /api/v1/compliance/me/phone-verifications {"phone": "0912 345 678"}</code>
+gửi mã (số cố định và số nước ngoài nhận <code>compliance.phone_not_allowed</code>), rồi
+<code>POST /api/v1/compliance/me/phone-verifications/{id}/confirm {"code": "123456"}</code>. Mã dùng được một
+lần, có hạn (<code>AUTOXIDE_COMPLIANCE_OTP_TTL_SECONDS</code>, 5 phút) và chỉ cho nhập sai vài lần
+(<code>AUTOXIDE_COMPLIANCE_OTP_MAX_ATTEMPTS</code>); số mã theo số điện thoại, tài khoản và địa chỉ bị giới
+hạn. Một số chỉ xác thực cho một tài khoản, trừ khi khách nâng chính sách
+<code>posting.max_accounts_per_phone</code> (<code>compliance.phone_in_use</code>). <code>DELETE /api/v1/compliance/me/phone</code>
+gỡ số. Gửi mã cần nhà cung cấp SMS; chưa có thì máy chủ trả <code>sms_disabled</code> (503). Hiện chưa có bộ
+nối nhà cung cấp SMS thật — cài module nối cho nhà cung cấp của bạn.</li>
+<li><strong>Hai cấu hình kết hợp thế nào:</strong>
+<ul>
+<li>Loại đích trong <code>AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES</code> cần ít nhất <code>phone</code>, hoặc mức của chính
+sách <code>posting.comments</code> của khách khi mức đó cao hơn (<code>identity</code>).</li>
+<li>Khi khách đặt <code>posting.comments</code> là <code>phone</code> hay <code>identity</code>
+(<code>PUT /api/v1/compliance/policies/posting.comments</code>, permission <code>compliance.policies.manage</code>),
+<strong>mọi</strong> loại đích cần mức đó, và khách vãng lai không bình luận được ở đâu nữa.</li>
+<li><code>posting.comments</code> = <code>none</code> (mặc định) giữ nguyên các loại đích khác.</li>
+<li>Bài bị từ chối trả <code>comments.verification_required</code> (403); đưa người dùng đi xác thực rồi đăng
+lại.</li>
+</ul>
+</li>
+</ul>
+<h2 id="website"><a class="header" href="#website">Website</a></h2>
+<ol>
+<li><code>GET /api/v1/comments/public/settings</code> — giới hạn và công tắc (có nhận khách không, số phút
+được sửa, độ dài tối đa, mail báo trả lời có bật không, Markdown có bật không).</li>
+<li><code>GET /api/v1/comments/public/threads?target_type=content.entry&amp;target_id=…&amp;order=desc&amp;limit=20&amp;replies_limit=3</code>
+— bình luận gốc đang hiện kèm vài trả lời đầu và <code>reply_count</code>; đi tiếp bằng
+<code>pagination.next_cursor</code>. Thêm trả lời: <code>GET /api/v1/comments/public/comments/{id}/replies</code>.
+Số đếm cho trang danh sách: <code>GET /api/v1/comments/public/counts?target_type=content.entry&amp;target_ids=a,b,c</code>
+(tối đa 100). Khung bình luận có mở không: <code>GET /api/v1/comments/public/targets/{type}/{id}</code>.</li>
+<li>Hiển thị <code>body_html</code> (mọi thứ đã escape, xuống dòng thành <code>&lt;br&gt;</code>, địa chỉ <code>http(s)</code> thành link
+có <code>rel="nofollow ugc noopener"</code>); không bao giờ chèn <code>body</code> như HTML. Ghi rõ khách là khách
+(<code>author.kind</code>). Xem “Chữ thường và Markdown” bên dưới.</li>
+<li>Mỗi lần hiện khung (không bao giờ trong HTML đã cache): <code>GET /api/v1/antispam/token?scope=comments:content.entry</code>.
+Hiện một ô bẫy ẩn mà người thật để trống.</li>
+<li><code>POST /api/v1/comments/public/comments</code>:</li>
+</ol>
+<pre><code class="language-json">{"target_type": "content.entry", "target_id": "0190…", "parent_id": null,
+ "body": "Bài hay!\nCảm ơn.", "author_name": "Ada", "email": "ada@example.com",
+ "notify_replies": true, "locale": "vi", "form_token": "…", "trap": ""}
+</code></pre>
+<ul>
+<li>Câu trả lời là <code>201</code> kèm bình luận, <code>status</code> (<code>published</code>, hoặc <code>pending</code>: chờ duyệt) và, với
+khách, một <code>edit_token</code> chỉ hiện ở đây. Bình luận chờ duyệt, bị giữ vì spam hay bị bộ chống spam
+bỏ đi đều trả <code>pending</code>: bot không biết gì thêm.</li>
+<li>Dữ liệu sai: <code>422</code> kèm mọi lỗi trong <code>errors</code> (chữ rỗng, quá dài, tên dành riêng, email sai…).
+Từ cấm: <code>422 comments.banned_word</code>. Token thiếu hay hết hạn: <code>400 antispam.token_*</code> — tải lại
+form. Đích đã đóng: <code>409 comments.target_closed</code>. Tác giả bị cấm: <code>403 comments.banned</code>.</li>
+<li>Gửi lại cùng <code>form_token</code> thì nhận lại đúng bình luận đó (với <code>edit_token</code> mới; token cũ thôi
+dùng được), không lưu thêm gì.</li>
+<li>Người dùng đăng nhập gửi access token thay cho token form, cần <code>comments.post</code>, và trước hết chọn
+tên hiển thị bằng <code>PUT /api/v1/comments/profile {"display_name": "…"}</code>.</li>
+<li>Tên (<code>author_name</code> của khách, tên hiển thị) dài 1 tới 50 ký tự, không có ký tự điều khiển, ký tự
+định dạng vô hình (gạch nối mềm, dấu hướng chữ, ký tự thẻ…), chữ trông như khoảng trống (chữ đệm
+Hangul và tương tự), hay một từ trộn chữ Latin, Hy Lạp và Kirin (<code>аdmin</code> với <code>а</code> Kirin). Chữ
+trông giống nhau giữa các bảng chữ trong cả một từ (tên viết trọn bằng chữ Kirin) thì không bắt
+được.</li>
+<li>Sửa: <code>PATCH /api/v1/comments/public/comments/{id} {"body": "…", "edit_token": "…"}</code> trong
+<code>AUTOXIDE_COMMENTS_EDIT_MINUTES</code>. Chữ được kiểm lại, và <code>status</code> của câu trả lời cho biết bình
+luận còn hiện không: bình luận đang hiện chờ duyệt lại khi giờ có từ nghi ngờ hay quá nhiều link,
+hoặc khi một bình luận mới của cùng tác giả trên đích đó sẽ phải chờ (chế độ <code>pre</code>, hay
+<code>first_time</code> khi tài khoản chưa có bình luận nào đang hiện) — nên mặc định bản sửa của khách luôn
+chờ duyệt lại. Xoá: <code>POST /api/v1/comments/public/comments/{id}/delete {"edit_token": "…"}</code> (tác
+giả đăng nhập gửi <code>{}</code>) — chữ, tên, email mất, chỗ trong luồng giữ lại. ID không tồn tại cũng trả
+<code>200</code>, nên không thể xoá thử để phân biệt bình luận bị bỏ với bình luận bị giữ. Sửa thử thì được:
+<code>PATCH</code> với ID giả của bình luận bị bỏ trả <code>404 comments.not_found</code> (giới hạn đã biết; bot chỉ
+biết đúng một bình luận đó bị bỏ).</li>
+<li>Báo cáo: <code>POST /api/v1/comments/public/comments/{id}/reports {"reason": "spam" | "abuse" | "illegal" | "other", "note": "…"}</code>. Mỗi tài khoản báo một bình luận một lần; khách được đếm theo
+khối mạng (<code>/24</code> với IPv4, <code>/48</code> với IPv6).</li>
+</ul>
+<h2 id="chữ-thường-và-markdown"><a class="header" href="#chữ-thường-và-markdown">Chữ thường và Markdown</a></h2>
+<p>Bình luận gửi kèm <code>format</code>: <code>text</code> (mặc định) hay <code>markdown</code>. <code>markdown</code> chỉ dùng được khi
+<code>GET /api/v1/comments/public/settings</code> trả <code>markdown: true</code> (<code>AUTOXIDE_COMMENTS_MARKDOWN</code>, mặc định
+bật; tắt thì <code>markdown</code> bị từ chối ở trường <code>format</code>). Sửa mà không gửi <code>format</code> thì giữ định dạng
+của bình luận. Bình luận cũ là <code>text</code> và hiện như trước.</p>
+<ul>
+<li><code>text</code>: chữ thường. Dấu <code>*</code> vẫn là <code>*</code>; xuống dòng được giữ; địa chỉ <code>http(s)</code> thành link.</li>
+<li><code>markdown</code>: một phần nhỏ của Markdown — <code>**đậm**</code>, <code>*nghiêng*</code>, <code>[link](https://…)</code> và
+<code>&lt;https://…&gt;</code>, <code>&gt; trích dẫn</code>, <code>`code`</code> và khối code. Tiêu đề và mục danh sách hiện như đoạn
+văn; ảnh hiện thành chữ của nó (không bao giờ tải ảnh); HTML thô hiện thành chữ. Chỉ link
+<code>http(s)</code> dùng được, đều có <code>rel="nofollow ugc noopener"</code>.</li>
+</ul>
+<p>Máy chủ dựng <code>body_html</code> từ một danh sách thẻ cố định (<code>p</code>, <code>br</code>, <code>strong</code>, <code>em</code>, <code>a</code>,
+<code>blockquote</code>, <code>code</code>, <code>pre</code>), nên website chèn nguyên <code>body_html</code> ở cả hai định dạng. Link Markdown
+được tính vào <code>AUTOXIDE_COMMENTS_MAX_LINKS</code> như địa chỉ trần. Từ cấm được so trên chữ người viết.</p>
+<h2 id="kiểm-duyệt"><a class="header" href="#kiểm-duyệt">Kiểm duyệt</a></h2>
+<p>Thứ tự kiểm: đích đóng → độ dài → nội dung (ký tự điều khiển và ký tự vô hình bị từ chối) → trùng
+→ bị cấm → từ cấm (từ chối) / từ nghi ngờ (giữ lại) → quá nhiều link (giữ lại) → chống spam → chế
+độ duyệt. Chế độ: <code>pre</code> (mọi bình luận chờ duyệt), <code>first_time</code> (tới khi <strong>tài
+khoản</strong> có một bình luận đang hiện — bình luận được duyệt rồi bị đánh spam hay bị từ chối không
+tính) và <code>post</code> (hiện ngay); mặc định <code>pre</code> cho khách và <code>first_time</code> cho người dùng,
+chỉnh được theo loại đích (<code>AUTOXIDE_COMMENTS_MODERATION_BY_TYPE</code>). Email của khách không bao giờ
+là bằng chứng danh tính — ai cũng gõ được địa chỉ bất kỳ — nên nó không bao giờ giúp bình luận
+vượt duyệt, kể cả khi đã xác nhận.</p>
+<ul>
+<li><code>GET /api/v1/comments?status=pending&amp;target_type=&amp;target_id=&amp;q=</code> — hàng chờ (<code>q</code> tìm trong chữ
+và tên, không phân biệt hoa thường, dấu), kèm email, dấu vết mạng, lý do giữ lại và số báo cáo.
+Mỗi bình luận có <code>target_title</code> và <code>target_url</code> khi module sở hữu đích mô tả được nó và đích đang
+công khai.</li>
+<li><code>GET /api/v1/comments/targets?target_type=&amp;state=open|closed&amp;pending=true|false</code> — các đích có
+bình luận, mới trước, kèm số đếm và (khi công khai) <code>title</code>, <code>url</code>.</li>
+<li><code>PATCH /api/v1/comments/{id} {"status": "published" | "rejected" | "spam" | "pending"}</code> kèm
+<code>If-Match</code>. <code>DELETE /api/v1/comments/{id}</code> xoá hẳn (bình luận gốc thì xoá cả luồng).</li>
+<li>Đủ <code>AUTOXIDE_COMMENTS_REPORT_THRESHOLD</code> báo cáo thì bình luận đang hiện bị giữ lại một lần; người
+kiểm duyệt duyệt lại rồi thì báo cáo sau không ẩn nó nữa. Bình luận bị giữ như vậy nằm trong hàng
+chờ tới khi người kiểm duyệt quyết: job dọn không bao giờ xoá bình luận đã từng hiện.
+<code>GET /api/v1/comments/{id}/reports</code>.</li>
+<li><code>POST /api/v1/comments/bans {"kind": "user" | "email" | "ip", "value": "…", "reason": "…", "until": null}</code> (<code>ip</code> nhận <code>ip_fingerprint</code> của bình luận), <code>GET</code>, <code>DELETE /api/v1/comments/bans/{id}</code>.</li>
+<li><code>PUT /api/v1/comments/targets/{type}/{id} {"state": "closed", "hidden": false, "closes_at": null}</code>.</li>
+</ul>
+<p>Mọi quyết định là một event (<code>comments.comment_status_changed</code>, <code>comments.comment_deleted</code>,
+<code>comments.ban_created</code>, <code>comments.target_closed</code>…) mà module <code>audit</code> ghi lại kèm ai làm, lúc nào.</p>
+<h3 id="bị-ẩn-vì-vụ-việc"><a class="header" href="#bị-ẩn-vì-vụ-việc">Bị ẩn vì vụ việc</a></h3>
+<p>Một bình luận có thể là đối tượng của vụ việc của module <code>compliance</code> (<code>comments.comment:&lt;id&gt;</code>;
+<code>comments</code> đăng ký loại này trong sổ đối tượng của kernel, tác giả là chủ). Khi vụ việc ẩn nó (event
+<code>compliance.target_restricted</code>), bình luận thành <code>rejected</code> với lý do giữ <code>compliance</code> và nhớ trạng thái
+cũ; <code>compliance.target_restored</code> trả lại trạng thái đó. Trong lúc đó người kiểm duyệt không đổi được
+trạng thái của nó (<code>comments.restricted</code>, 409). Xem
+<a href="COMPLIANCE.vi.html#báo-vi-phạm-và-khiếu-nại-của-người-tiêu-dùng"><code>COMPLIANCE.vi.md</code></a>.</p>
+<h2 id="mail-báo-trả-lời"><a class="header" href="#mail-báo-trả-lời">Mail báo trả lời</a></h2>
+<p>Tắt cho tới khi đặt cả <code>AUTOXIDE_COMMENTS_VERIFY_URL</code> lẫn <code>AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL</code>.
+Gửi <code>notify_replies: true</code> kèm <code>email</code> thì một mail xác nhận tới địa chỉ đó (nhiều nhất
+<code>AUTOXIDE_COMMENTS_VERIFY_MAILS_PER_DAY</code>); trang của website gửi token trong đó tới <code>POST /api/v1/comments/public/verify</code>. Từ đó, mỗi trả lời được hiện cho bình luận ấy gửi một mail tới
+địa chỉ đó, chỉ có tiêu đề và link của đích — không bao giờ có chữ của trả lời hay tên người trả
+lời, để tính năng này không thành công cụ gửi spam — và một link mà token của nó gửi tới <code>POST /api/v1/comments/public/unsubscribe</code> (<code>"all": true</code> thôi nhận mail về mọi bình luận theo dõi bằng
+địa chỉ đó).</p>
+<p>Trên máy chủ có nhiều khách, token có thể bắt đầu bằng <code>t&lt;id khách&gt;.</code>: token tự nêu khách của nó, nên
+lệnh xác nhận địa chỉ và thôi nhận mail chạy được trên mọi tên miền của API mà không cần header
+<code>Autoxide-Tenant</code>. Gửi lại token đúng nguyên văn (token có thể chứa dấu <code>.</code>).</p>
+<h2 id="dữ-liệu-cá-nhân"><a class="header" href="#dữ-liệu-cá-nhân">Dữ liệu cá nhân</a></h2>
+<ul>
+<li><code>GET /api/v1/comments/data?email=…</code> liệt kê, và <code>DELETE /api/v1/comments/data?email=…</code> xoá, mọi
+bình luận viết bằng một địa chỉ (permission <code>comments.export</code>): chữ, tên, email và dấu vết mạng
+mất, chỗ trong luồng giữ lại, mail báo dừng. Lệnh cấm địa chỉ đó được giữ (nó có để chặn địa chỉ
+đó); bỏ bằng tay nếu được yêu cầu.</li>
+<li>Địa chỉ mạng không bao giờ được lưu: chỉ lưu bản băm có khoá của khối mạng, xoá sau
+<code>AUTOXIDE_COMMENTS_IP_RETENTION_DAYS</code> — ở bình luận và ở báo cáo của khách (báo cáo giữ lại,
+<code>reporter_key</code> thành <code>expired:&lt;id báo cáo&gt;</code>).</li>
+<li>Bình luận chờ duyệt hay spam <strong>chưa từng hiện</strong> bị xoá sau <code>AUTOXIDE_COMMENTS_RETENTION_DAYS</code> kể
+từ lúc gửi. Bình luận đã từng hiện rồi quay về chờ (bị giữ vì báo cáo, tác giả sửa, người kiểm
+duyệt giữ lại hay đánh spam) không bao giờ tự bị xoá: người kiểm duyệt duyệt, từ chối hay xoá nó.</li>
+<li>Event (và vì thế webhook) chỉ mang id, đích và trạng thái, không bao giờ có chữ, tên hay địa chỉ.</li>
+<li>Khi một tài khoản bị xoá, bình luận của nó được xoá theo cùng cách, tên hiển thị bị xoá và báo
+cáo của nó không còn chỉ về nó. Bản xuất dữ liệu của tài khoản có bình luận, tên hiển thị và báo
+cáo của nó.</li>
+</ul>
+<h2 id="pháp-lý"><a class="header" href="#pháp-lý">Pháp lý</a></h2>
+<p>Luật đòi gì ở bình luận tuỳ vào nơi bạn và người đọc ở. Module cho bạn cấu hình, không cài luật
+cứng trong code; <strong>các điều dưới đây chưa được đối chiếu với văn bản luật gốc — hãy tự kiểm cho
+trường hợp của bạn trước khi dựa vào.</strong></p>
+<ul>
+<li><strong>Việt Nam, Nghị định 147/2024/NĐ-CP (dịch vụ internet):</strong> theo các nguồn phụ, mạng xã hội chỉ
+được cho tài khoản đã xác thực bằng số điện thoại Việt Nam bình luận; trang thông tin điện tử
+tổng hợp có giấy phép có thể không được cho người đọc bình luận tin bài; nội dung vi phạm phải gỡ
+trong 24 giờ khi cơ quan có thẩm quyền yêu cầu, và một số dịch vụ phải lưu nhật ký xử lý (có
+nguồn nói 2 năm). Module có <code>AUTOXIDE_COMMENTS_ENABLED</code>, <code>AUTOXIDE_COMMENTS_ALLOW_GUESTS</code>,
+<code>AUTOXIDE_COMMENTS_SIGNED_IN_ONLY_TYPES</code>, đóng hay ẩn đích, xoá hẳn (<code>DELETE /api/v1/comments/{id}</code>, ghi vào audit log kèm ai làm, lúc nào) và lý do báo cáo <code>illegal</code>.
+<code>AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES</code> hỏi module giữ trạng thái xác thực số điện thoại hay định
+danh (không phải module này) trước khi nhận bình luận. Thời gian giữ audit log do module
+<code>audit</code> quyết.</li>
+<li><strong>Việt Nam, Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định 356/2025:</strong> người dùng có quyền
+xin dữ liệu và xin xoá; module xuất và xoá theo email và theo tài khoản, chỉ giữ dữ liệu mạng ở
+dạng băm và trong thời hạn cấu hình. Hãy kiểm thời hạn phải trả lời yêu cầu, và việc giữ nhật ký
+kiểm duyệt sau khi xoá (chỉ id, hành động, thời điểm) đã đủ với bạn chưa.</li>
+<li><strong>Nơi khác:</strong> ví dụ GDPR của EU (quyền của chủ dữ liệu) và Digital Services Act (thông báo và xử
+lý nội dung bất hợp pháp).</li>
+</ul>
+<h2 id="ai-agent-mcp"><a class="header" href="#ai-agent-mcp">AI agent (MCP)</a></h2>
+<p>Tool <code>comments.queue</code> và <code>comments.get</code> (<code>comments.read</code>), <code>comments.moderate</code>
+(<code>comments.moderate</code>; gửi <code>version</code> đã đọc, như <code>If-Match</code>) và <code>comments.set_target_state</code>
+(<code>comments.manage</code>), cùng permission và cùng kiểm tra như REST. Cho hỏi đáp: <code>comments.unanswered</code>
+(<code>comments.read</code>) liệt kê câu hỏi đang hiện chưa có trả lời đang hiện, và <code>comments.answer</code>
+(<code>comments.post</code>) trả lời một câu bằng tài khoản của người gọi — như người dùng đăng nhập trên website,
+cùng nhãn, cùng kiểm xác thực và kiểm duyệt (đặt tên hiển thị trước bằng <code>PUT /api/v1/comments/profile</code>). Không có tool mở luồng mới (đó là việc của người đọc trên website) và không
+có tool xoá hẳn (dùng REST).</p>
+<h2 id="cấu-hình"><a class="header" href="#cấu-hình">Cấu hình</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Biến</th><th>Mặc định</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_COMMENTS_ENABLED</code></td><td><code>true</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_TARGET_TYPES</code></td><td><code>content.entry</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_ALLOW_GUESTS</code></td><td><code>true</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_SIGNED_IN_ONLY_TYPES</code></td><td>—</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES</code></td><td>—</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_GUEST_MODERATION</code></td><td><code>pre</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_USER_MODERATION</code></td><td><code>first_time</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_MODERATION_BY_TYPE</code></td><td>—</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_MAX_LENGTH</code></td><td><code>4000</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_MAX_LINKS</code></td><td><code>2</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_MARKDOWN</code></td><td><code>true</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_EDIT_MINUTES</code></td><td><code>15</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_REPORT_THRESHOLD</code></td><td><code>3</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS</code></td><td><code>0</code> (không bao giờ)</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_BANNED_WORDS</code></td><td>—</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_SUSPECT_WORDS</code></td><td>—</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_RESERVED_NAMES</code></td><td><code>admin,administrator,moderator,root,system</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_PER_IP_PER_HOUR</code></td><td><code>20</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_PER_EMAIL_PER_HOUR</code></td><td><code>10</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_PER_USER_PER_HOUR</code></td><td><code>60</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_REPORTS_PER_HOUR</code></td><td><code>30</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_RETENTION_DAYS</code></td><td><code>30</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_IP_RETENTION_DAYS</code></td><td><code>90</code></td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_VERIFY_URL</code></td><td>— (cần cho mail báo trả lời)</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL</code></td><td>— (cần cho mail báo trả lời)</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_SITE_URL</code></td><td>— (link trang trong mail báo trả lời)</td></tr>
+<tr><td><code>AUTOXIDE_COMMENTS_VERIFY_MAILS_PER_DAY</code></td><td><code>3</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Lớp chống spam (<code>AUTOXIDE_ANTISPAM_*</code>) dùng chung cho mọi module. Mọi biến được mô tả trong
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a>.</p>
+<h3 id="theo-từng-khách"><a class="header" href="#theo-từng-khách">Theo từng khách</a></h3>
+<p>Khi có nhiều khách hàng (tenant), các biến trên là giá trị mặc định của mọi khách. Mỗi khách có thể
+thay một số biến bằng giá trị riêng (quản trị của khách gọi <code>PUT /api/v1/kernel/settings/{name}</code>,
+permission <code>kernel.settings.manage</code>; nhân sự nền tảng gọi
+<code>PUT /api/v1/kernel/tenants/{id}/settings/{name}</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Cấu hình của khách</th><th>Thay cho</th><th>Giá trị</th></tr>
+</thead>
+<tbody>
+<tr><td><code>comments.banned_words</code></td><td><code>AUTOXIDE_COMMENTS_BANNED_WORDS</code></td><td>các từ cách nhau bằng dấu phẩy; <code>-</code> là không có</td></tr>
+<tr><td><code>comments.suspect_words</code></td><td><code>AUTOXIDE_COMMENTS_SUSPECT_WORDS</code></td><td>các từ cách nhau bằng dấu phẩy; <code>-</code> là không có</td></tr>
+<tr><td><code>comments.max_links</code></td><td><code>AUTOXIDE_COMMENTS_MAX_LINKS</code></td><td><code>0</code> đến <code>100</code></td></tr>
+<tr><td><code>comments.guest_moderation</code></td><td><code>AUTOXIDE_COMMENTS_GUEST_MODERATION</code></td><td><code>pre</code>, <code>first_time</code> hay <code>post</code></td></tr>
+<tr><td><code>comments.user_moderation</code></td><td><code>AUTOXIDE_COMMENTS_USER_MODERATION</code></td><td><code>pre</code>, <code>first_time</code> hay <code>post</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Giá trị sai bị từ chối ngay lúc đặt (<code>422</code>, lỗi nằm trong <code>errors</code>). Chế độ duyệt riêng theo loại
+đích (<code>AUTOXIDE_COMMENTS_MODERATION_BY_TYPE</code>) vẫn thắng chế độ duyệt của khách. Gọi <code>DELETE</code> cấu hình
+đó để về giá trị của máy chủ. <code>GET /api/v1/comments/public/settings</code> trả <code>max_links</code> của chính khách.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/CATALOG.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/COMPATIBILITY.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/CATALOG.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/COMPATIBILITY.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

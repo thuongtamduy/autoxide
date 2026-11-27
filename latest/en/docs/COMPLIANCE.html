@@ -1,0 +1,653 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Compliance (Vietnam) - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="compliance-vietnam"><a class="header" href="#compliance-vietnam">Compliance (Vietnam)</a></h1>
+<p><a href="COMPLIANCE.vi.html">Tiếng Việt</a></p>
+<p>The <code>compliance</code> module helps a tenant run a commerce website in Vietnam without missing the basic legal
+duties. It is always on (it is not sold by plan). Every legal point that changes over time — lists of
+documents, deadlines, which logo domain is accepted — is <strong>data with an effective date</strong> (rules in
+<code>modules/compliance/rules/vn.json</code>, imported into the database), not code.</p>
+<blockquote>
+<p><strong>Not legal advice.</strong> The rules, checklists and templates shipped here were written from secondary
+sources. Every item says <code>needs_legal_review: true</code>: check it against the original legal text, with a
+legal professional, before you rely on it.</p>
+</blockquote>
+<p>What the module covers:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Part</th><th>Endpoints (under <code>/api/v1/compliance</code>)</th></tr>
+</thead>
+<tbody>
+<tr><td>Identity verification (KYC) of sellers, livestreamers, affiliates — profiles, checks and the gate <code>KycGate</code>; on a marketplace, <code>catalog</code> blocks listing goods of unverified sellers (see below)</td><td><code>/kyc/…</code>, <code>/me/kyc…</code></td></tr>
+<tr><td>Account verification for posting (phone / identity)</td><td><code>/me/verification</code>, <code>/me/phone-verifications…</code></td></tr>
+<tr><td>Versioned legal documents and proof of acceptance</td><td><code>/documents…</code>, <code>/me/acceptances</code>, <code>/public/documents/{kind}</code></td></tr>
+<tr><td>Consent ledger</td><td><code>/me/consents</code></td></tr>
+<tr><td><strong>Personal data</strong>: purposes and legal bases, retention, processing register, data residency</td><td><code>/purposes…</code>, <code>/retention</code>, <code>/processing-register</code>, <code>/residency</code>, <code>/public/purposes</code></td></tr>
+<tr><td><strong>Personal data breaches</strong> (72 hours) and <strong>data subject requests</strong> from other channels</td><td><code>/incidents…</code>, <code>/subject-requests…</code></td></tr>
+<tr><td><strong>Tracking tags and cookie consent</strong></td><td><code>/tracking-tags…</code>, <code>/cookie-settings/{org_id}</code>, <code>/public/consent-config</code>, <code>/public/cookie-consents</code></td></tr>
+<tr><td><strong>Reports of infringements</strong> (intellectual property, counterfeit) and <strong>consumer complaints</strong>, disclosures to authorities</td><td><code>/cases…</code>, <code>/respondent/cases</code>, <code>/disclosures</code>, <code>/public/reports</code>, <code>/public/complaints</code>, <code>/public/cases/{id}</code></td></tr>
+<tr><td>Legal rules with effective dates, tenant policies</td><td><code>/rules</code>, <code>/policies…</code></td></tr>
+<tr><td><strong>Website legal profile and the Ministry of Industry and Trade (MOIT)</strong></td><td><code>/legal-profiles…</code>, <code>/websites…</code>, <code>/public/badge</code>, <code>/public/owner</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>This guide explains the Ministry of Industry and Trade procedure with the mandatory page templates of
+<code>content</code>, then personal data (with the 72-hour breach runbook), reports of infringements with consumer
+complaints, and tracking tags with cookie consent.</p>
+<h2 id="the-ministry-of-industry-and-trade-procedure"><a class="header" href="#the-ministry-of-industry-and-trade-procedure">The Ministry of Industry and Trade procedure</a></h2>
+<p>Vietnamese law (from 1 July 2026 the E-commerce Law 122/2025/QH15 and Decree 248/2026/ND-CP, which
+replaces Decrees 52/2013/ND-CP and 85/2021/ND-CP; before that, those two decrees — check the originals)
+requires the items below. The rules <code>moit.checklist.*</code> version 2 apply from 1 July 2026. A website notified or
+registered before then files again under the new decree within the transition period (one summary says 30 June
+2027 — not confirmed); electronic identity checks of sellers and livestreamers apply from 1 January 2027. Which
+authority receives the files, whether online.gov.vn and the logos stay, is not confirmed yet — check.</p>
+<ul>
+<li>a <strong>sales website</strong> (you sell your own goods) to be <strong>notified</strong> to the ministry — it then shows a
+blue “Đã thông báo Bộ Công Thương” logo;</li>
+<li>a <strong>marketplace or other intermediary</strong> (others sell through you) to be <strong>registered</strong> — red “Đã đăng
+ký Bộ Công Thương” logo; the file includes a service project plan and operating regulations;</li>
+<li>the website to show the owner’s information and its policies (general conditions, shipping, payment,
+returns, inspection, personal data protection, complaints).</li>
+</ul>
+<p>A person submits on <a href="https://online.gov.vn">online.gov.vn</a>; there is no public API. Autoxide keeps the
+data, tells you what is missing, drafts the dossier and shows the logo once you record the result.</p>
+<h3 id="1-legal-profile-of-the-owner"><a class="header" href="#1-legal-profile-of-the-owner">1. Legal profile of the owner</a></h3>
+<p>One profile per organization unit. The tenant’s own profile belongs to the root unit (leave <code>org_id</code>
+out); a seller on a marketplace gets a profile on its unit. A website uses the profile of its own unit,
+or of the nearest unit above that has one.</p>
+<pre><code class="language-http">POST /api/v1/compliance/legal-profiles
+{
+  "entity_type": "organization",
+  "legal_name": "Cong ty TNHH Vi Du",
+  "tax_code": "0101234567",
+  "registration_number": "0101234567",
+  "registration_issued_on": "2020-01-02",
+  "registration_issued_by": "Phong Dang ky kinh doanh Ha Noi",
+  "address": {"country": "VN", "province_code": "01", "commune_code": "00004", "line": "12 Trang Tien"},
+  "representative_name": "Nguyen Van A",
+  "phone": "024 1234 5678",
+  "email": "lienhe@shop.example"
+}
+</code></pre>
+<ul>
+<li><code>entity_type</code>: <code>individual</code>, <code>household_business</code> or <code>organization</code>.</li>
+<li>The address is checked against the administrative units of the <code>address</code> module (import them first:
+<code>autoxide task address.import</code>).</li>
+<li><code>PATCH /legal-profiles/{id}</code> changes some fields (<code>""</code> clears a text, <code>null</code> clears <code>address</code>); send
+<code>If-Match</code> with the <code>ETag</code> you read.</li>
+<li><code>kyc_profile_id</code> links the owner’s identity verification; a marketplace checklist needs it <code>verified</code>.</li>
+</ul>
+<p>Permissions: <code>compliance.legal.read</code>, <code>compliance.legal.manage</code>. Both have a scope: a seller’s staff
+see and change only their unit’s profile and websites.</p>
+<h3 id="2-website"><a class="header" href="#2-website">2. Website</a></h3>
+<pre><code class="language-http">POST /api/v1/compliance/websites
+{"domain": "shop.example", "kind": "sales"}
+</code></pre>
+<ul>
+<li><code>kind</code>: <code>sales</code> (notification) or <code>platform</code> (registration). Changing <code>kind</code> later starts the
+procedure again.</li>
+<li><code>channel</code>: <code>website</code> (default) or <code>mobile_app</code>.</li>
+<li><code>org_id</code>: the unit of the website (e.g. a seller’s own store); left out, the whole tenant.</li>
+</ul>
+<h3 id="3-mandatory-pages"><a class="header" href="#3-mandatory-pages">3. Mandatory pages</a></h3>
+<p>Write each page in <code>content</code> — the templates in the next section give a starting text — publish it, then
+link it to the website:</p>
+<pre><code class="language-http">PUT /api/v1/compliance/websites/{id}/pages/return_policy
+{"entry_id": "&lt;id of the content entry&gt;"}
+</code></pre>
+<p>Page kinds: <code>owner_info</code>, <code>privacy_policy</code>, <code>return_policy</code>, <code>shipping_policy</code>, <code>payment_policy</code>,
+<code>inspection_policy</code>, <code>complaint_policy</code>, <code>terms_of_use</code>, <code>general_conditions</code>, and for a marketplace
+<code>platform_rules</code>, <code>seller_agreement</code>. A linked page counts only once it is published.</p>
+<h3 id="4-checklist"><a class="header" href="#4-checklist">4. Checklist</a></h3>
+<p><code>GET /api/v1/compliance/websites/{id}/checklist</code> (MCP <code>compliance.website_checklist</code>) lists every item of
+the rule <code>moit.checklist.sales</code> or <code>moit.checklist.platform</code> in force, each with a <code>status</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Status</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>met</code></td><td>Done.</td></tr>
+<tr><td><code>missing</code></td><td>To do; <code>hint</code> says which endpoint to call.</td></tr>
+<tr><td><code>unknown</code></td><td>Autoxide cannot tell yet (e.g. no installed module answers “each product page shows its seller”) — check it yourself.</td></tr>
+<tr><td><code>manual</code></td><td>Always checked by a person (e.g. your account on online.gov.vn).</td></tr>
+</tbody>
+</table>
+</div>
+<p>Each item carries its <code>legal_basis</code>. When the rules change, platform staff import a new version
+(<code>POST /api/v1/compliance/rules</code>) and the checklist follows — no upgrade needed.</p>
+<p><strong>Selling before the procedure is done</strong> is shown as “required by law” (<code>selling_before_done: "label"</code>),
+not blocked: the sources found treat it as an administrative offence with fines, not as a ban on
+transactions. Check this with a legal professional (decision D-358).</p>
+<h3 id="5-dossier"><a class="header" href="#5-dossier">5. Dossier</a></h3>
+<p><code>GET /api/v1/compliance/websites/{id}/dossier</code> (MCP <code>compliance.website_dossier</code>) returns, filled from
+your data:</p>
+<ul>
+<li><code>form</code>: the declaration fields (owner, website, identity verification, linked pages with full URLs,
+complaints contact);</li>
+<li><code>documents</code>: Markdown drafts in Vietnamese — the declaration; for a marketplace also a draft service
+project plan and draft operating regulations;</li>
+<li><code>checklist</code> and a <code>disclaimer</code>.</li>
+</ul>
+<p>Complete and review the drafts with a legal professional, then submit on online.gov.vn.</p>
+<h3 id="6-status-and-logo"><a class="header" href="#6-status-and-logo">6. Status and logo</a></h3>
+<p>Record each step by hand:</p>
+<pre><code class="language-http">POST /api/v1/compliance/websites/{id}/status
+{"status": "submitted", "reference": "HS-001"}
+</code></pre>
+<p>Statuses: <code>not_submitted</code>, <code>submitted</code>, <code>needs_supplement</code>, <code>notified</code> (sales website), <code>registered</code>
+(marketplace), <code>rejected</code>, <code>revoked</code>. For <code>notified</code> / <code>registered</code>, paste the logo code the ministry
+gave in <code>snippet</code> (or send <code>link_url</code> and <code>image_url</code>). Only a link to <code>online.gov.vn</code> around an image
+from <code>online.gov.vn</code> is accepted — scripts, event handlers, styles or other domains give
+<code>compliance.logo_snippet_invalid</code> (422). The code is never stored or returned as sent: Autoxide keeps
+the two addresses and rebuilds a clean snippet.</p>
+<h3 id="7-for-the-interface-public-no-sign-in"><a class="header" href="#7-for-the-interface-public-no-sign-in">7. For the interface (public, no sign-in)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Endpoint</th><th>Returns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>GET /api/v1/compliance/public/badge</code></td><td>The logo of the website being viewed: <code>color</code> (<code>blue</code> / <code>red</code>), <code>link_url</code>, <code>image_url</code>, <code>alt</code>, ready <code>snippet</code>. 404 while the website has no logo.</td></tr>
+<tr><td><code>GET /api/v1/compliance/public/owner</code></td><td>The owner’s information for the footer. 404 without a legal profile.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The website is found by <code>?domain=</code>, then the request’s domain, then the website of the unit being viewed
+(<code>?site=&lt;unit id&gt;</code> or a domain bound to a unit). Both send an <code>ETag</code>; send it back in <code>If-None-Match</code>
+to get <code>304</code>.</p>
+<h3 id="8-autoxide-doctor"><a class="header" href="#8-autoxide-doctor">8. <code>autoxide doctor</code></a></h3>
+<p>The check <code>compliance.moit_readiness</code> warns (never fails) when no website has a legal profile yet, or
+when a website not yet submitted still lacks checklist items — with the checklist address of each.</p>
+<h2 id="mandatory-page-templates-content"><a class="header" href="#mandatory-page-templates-content">Mandatory page templates (<code>content</code>)</a></h2>
+<p>The <code>content</code> module ships starting texts for the mandatory pages, in English and Vietnamese:</p>
+<pre><code class="language-http">GET  /api/v1/content/templates
+POST /api/v1/content/templates/{key}/drafts
+{"locale": "vi", "variables": {"policy": {"return_days": 7}}}
+</code></pre>
+<ul>
+<li>Keys: <code>owner_info</code>, <code>privacy_policy</code>, <code>return_policy</code>, <code>shipping_policy</code>, <code>payment_policy</code>,
+<code>inspection_policy</code>, <code>complaint_policy</code>, <code>terms_of_use</code>, <code>general_conditions</code>; for a marketplace
+<code>platform_rules</code>, <code>seller_agreement</code>, <code>seller_info</code>.</li>
+<li>The draft is filled with the legal profile of the unit (<code>owner.*</code>, <code>contact.*</code>, read from <code>compliance</code>),
+then with the <code>variables</code> you send (they win). Every value goes into text only — it can never add markup.
+A required variable still missing gives <code>content.template_variables_missing</code> (422) listing them all.</li>
+<li>The result is a <strong>draft</strong> page (<code>content.write</code>); review it, publish it, then link it to the website.</li>
+<li>Every template starts with “Sample content — have a legal professional review it before use”.</li>
+</ul>
+<h2 id="personal-data"><a class="header" href="#personal-data">Personal data</a></h2>
+<p>Personal Data Protection Law 91/2025/QH15 and Decree 356/2025/ND-CP (in force from 1 January 2026 — check
+the originals with a legal professional). Each tenant is the data controller of its own data.</p>
+<h3 id="purposes-and-legal-bases"><a class="header" href="#purposes-and-legal-bases">Purposes and legal bases</a></h3>
+<p><code>GET /purposes</code> (<code>compliance.privacy.read</code>) lists the purposes of processing: the defaults of the legal rule
+<code>privacy.default_purposes</code> (<code>service</code>, <code>marketing</code>, <code>analytics</code>, <code>legal</code>) merged with the tenant’s own.
+<code>POST /purposes</code> adds one, <code>PATCH /purposes/{key}</code> changes one (changing a default stores the tenant’s
+version) — both need <code>compliance.privacy.manage</code>. Each purpose has a <code>category</code>, a <code>legal_basis</code>
+(<code>consent</code>, <code>contract</code>, <code>legal_obligation</code>, <code>vital_interest</code>, <code>public_interest</code>), the kinds of data, the
+recipients (name, country) and a description by language. <code>GET /public/purposes</code> (no sign-in) lists the
+purposes in use for the privacy notice; active tracking providers appear there as recipients, with the
+country that receives the data.</p>
+<h3 id="retention"><a class="header" href="#retention">Retention</a></h3>
+<p>Every module declares the personal data it keeps and for how long (<code>Module::retention</code>, read from its
+settings). <code>GET /retention</code> lists them, each compared with the legal rule <code>privacy.retention_limits</code>:
+<code>ok</code>, <code>exceeds_limit</code> or <code>forever_not_allowed</code> (only <code>accounting</code> — proof the law requires — may be kept
+forever). The limits shipped are cautious defaults, not numbers from the law. <code>autoxide doctor</code> warns
+(<code>compliance.retention</code>) when an item is not <code>ok</code>; lower the setting named in <code>setting</code>.</p>
+<h3 id="processing-register"><a class="header" href="#processing-register">Processing register</a></h3>
+<p><code>GET /processing-register</code> returns purposes, legal bases, kinds of data, recipients, retention and where the
+data is kept — the input of a data protection impact assessment, whose official form needs a legal
+professional.</p>
+<h3 id="not-covered-yet-before-10"><a class="header" href="#not-covered-yet-before-10">Not covered yet (before 1.0)</a></h3>
+<p>Findings of the first legal review (AI-performed, not legal advice; <code>docs/legal/review-2026-11-r1/</code>) that core does
+not handle yet. Until they are done, the deployer covers them:</p>
+<ul>
+<li><strong>Seller identity before selling.</strong> The legal rule <code>kyc.required_activities</code> asks for verified sellers,
+livestreamers and affiliates (E-commerce Law 122/2025/QH15; Decree 248/2026/ND-CP Article 18, electronic identity
+of sellers from 1 January 2027 — check the originals). When the tenant is a marketplace
+(<code>kernel.business_model = marketplace</code>), <code>catalog</code> asks <code>KycGate</code> before a product of a seller (any branch other
+than the tenant’s root) goes <code>active</code>. The seller is the owning branch or a branch above it, below the root
+(marketplace → seller → store): one verified branch in that chain is enough. An unverified seller gets
+<code>compliance.kyc_required</code> (403); goods of the root and tenants that sell their own goods are not asked. If module
+<code>compliance</code> is turned off (for example <code>AUTOXIDE_MODULES=official,-compliance</code>), identity cannot be checked, so
+goods of a seller cannot go on sale on a marketplace (<code>catalog.seller_verification_unavailable</code>, 403). Only the
+change to <code>active</code> is checked: goods already on sale stay on sale when the tenant becomes a marketplace, the rule
+starts to apply or a seller’s verification expires or is revoked — stop them yourself
+(<code>POST /api/v1/catalog/products/{id}/status</code>). A marketplace that gives each seller its own child tenant instead
+of a branch is not checked this way: each child tenant sells its own goods. Still open: livestream and affiliate flows (no module
+yet), and the profile does not record every item Article 18 lists — individuals: full name, date of birth,
+personal identification number (one source adds residential address); organisations and household businesses:
+name, head office, identification number, legal representative; foreign individuals: passport (or equivalent)
+number and issuing country, valid at least 6 more months at review. The profile keeps the verified name and a
+hash and last 4 digits of the document; the other items stay with the eKYC provider. Check the originals before
+relying on this.</li>
+<li><strong>Personal data of children.</strong> Law 91/2025/QH15 sets special rules for children and persons under guardianship
+(consent of a parent or guardian; from age 7 also the child’s — the article and ages need checking). Core has no
+birth date, age check or guardian consent: a service aimed at children must collect and keep the guardian’s
+consent itself. Planned after 1.0: a per-tenant setting, self-declared age at sign-up and consent given on
+someone’s behalf in the consent ledger.</li>
+<li><strong>Data sent abroad by providers.</strong> The AI providers of module <code>ai</code>, mail, SMS and file storage may process
+personal data outside Vietnam; they are not added to the processing register by themselves. Add each provider
+as a recipient (name, country) of the purposes that use it (<code>POST /purposes</code>, <code>PATCH /purposes/{key}</code>), and
+prepare the impact assessment for transfers abroad (Decree 356/2025/ND-CP — form and exemptions for small
+businesses need checking). Planned after 1.0: modules declare their processors (<code>Module::processors</code>) and
+<code>autoxide doctor</code> warns about recipients abroad.</li>
+</ul>
+<h3 id="data-residency"><a class="header" href="#data-residency">Data residency</a></h3>
+<p>A tenant can be required to keep its data in one country (Cybersecurity Law 116/2025/QH15, in force 1 July
+2026, replacing the Cybersecurity Law 2018 and the Network Information Security Law 2015 — secondary sources,
+to check; its implementing
+decree, reported as Decree 333/2026/ND-CP, replaces Decree 53/2022/ND-CP — not confirmed. Who must keep data in
+Vietnam needs a legal check):</p>
+<pre><code class="language-bash">autoxide placement country main VN          # record where a placement's servers are
+</code></pre>
+<pre><code class="language-http">PUT /api/v1/compliance/residency
+{"tenant_id": "…", "data_residency": "VN"}
+</code></pre>
+<p>Only platform staff with <code>compliance.privacy.manage</code> set it. It is refused (<code>tenant_residency_violation</code>,
+409) while the tenant’s placement is not in that country or its country is unknown; moving the tenant later
+to a placement elsewhere is refused with the same code, and so is changing the placement’s country. <code>GET /residency</code> shows the tenant’s state; <code>autoxide doctor</code> warns (<code>compliance.data_residency</code>) about any tenant
+not met.</p>
+<h3 id="personal-data-breaches-the-72-hour-runbook"><a class="header" href="#personal-data-breaches-the-72-hour-runbook">Personal data breaches: the 72-hour runbook</a></h3>
+<p>The report to the authority is due <strong>72 hours after detection</strong> (legal rule <code>privacy.incident</code>, data with an
+effective date). Do this as soon as a breach is suspected:</p>
+<ol>
+<li><strong>Record it at once</strong> — <code>POST /incidents</code> with <code>title</code>, <code>severity</code> (<code>low</code>…<code>critical</code>) and <code>detected_at</code>
+(when it was detected, not when it started). The answer gives <code>report_due_at</code>. Needs
+<code>compliance.incidents.manage</code>.</li>
+<li><strong>Set who is reminded</strong> — the tenant policy <code>incident.alert_emails</code> (<code>PUT /policies/incident.alert_emails</code>
+with a list of addresses). A job every 15 minutes sends a mail at 24, 48, 60 and 68 hours and at the
+deadline (each once), and emits <code>compliance.incident_deadline_near</code>.</li>
+<li><strong>Contain and log</strong> — <code>PATCH /incidents/{id}</code> with <code>status: "contained"</code>, the kinds of data and the
+number of people; add each finding and action with <code>POST /incidents/{id}/entries</code> (the log only grows).</li>
+<li><strong>Draft the notifications</strong> — <code>GET /incidents/{id}/draft?audience=authority&amp;locale=vi</code> (and
+<code>audience=subjects</code> for the people affected). These are drafts filled from the incident and the
+<code>privacy.contact</code> policy: complete the missing parts, have them reviewed, send them yourself.</li>
+<li><strong>Record the report</strong> — <code>PATCH /incidents/{id}</code> with <code>authority_notified_at</code> and <code>authority_reference</code>
+(the breach becomes <code>reported</code>), then <code>subjects_notified_at</code> when people were told; <code>closed</code> at the end.</li>
+</ol>
+<p><code>GET /incidents?overdue=true</code> lists breaches past their deadline, and <code>autoxide doctor</code>
+(<code>compliance.privacy_deadlines</code>) warns about them. The deployment guide points here
+(<a href="DEPLOY.html">DEPLOY.md</a>).</p>
+<h3 id="requests-of-data-subjects-received-through-other-channels"><a class="header" href="#requests-of-data-subjects-received-through-other-channels">Requests of data subjects received through other channels</a></h3>
+<p>A request a user makes in their account (export, delete) runs at once. A request received by email, post,
+phone or from an authority is recorded so it is not lost:</p>
+<ul>
+<li><code>POST /subject-requests</code> with <code>kind</code> (<code>access</code>, <code>erasure</code>, <code>rectification</code>, <code>objection</code>, <code>restriction</code>,
+<code>withdrawal</code>), <code>channel</code> (<code>email</code>, <code>post</code>, <code>phone</code>, <code>authority</code>, <code>other</code>), <code>subject</code> (a user id, an email
+address or a phone number) and <code>received_at</code>. <code>due_at</code> comes from the legal rule <code>privacy.subject_requests</code>
+in force when it was received: 72 hours, stricter than the 2 working days to answer of Decree 356/2025/ND-CP
+Article 5 (which replaced Decree 13/2023/ND-CP). Version 2 of the rule also lists the days to carry the
+request out by kind (<code>fulfil_within_days</code>, from secondary sources) for reference; Autoxide does not track
+that second deadline yet — check the original texts.</li>
+<li><code>POST /subject-requests/{id}/fulfil</code>: <code>access</code> of a user returns the personal data of every module (send
+it to the person; it is not stored); <code>erasure</code> / <code>withdrawal</code> of an email or phone number empties it from
+the consent ledger (the hashed key and the records stay as proof, so nothing is sent again). Erasing a
+whole account is <code>DELETE /api/v1/auth/users/{id}</code>.</li>
+<li><code>PATCH /subject-requests/{id}</code> sets <code>in_progress</code> or <code>rejected</code> (with a <code>reason</code>). <code>GET /subject-requests?overdue=true</code> lists late ones. All need <code>compliance.privacy.manage</code>.</li>
+</ul>
+<p>When an account is deleted (<code>auth.user_deleted</code>), <code>compliance</code> deletes its verified phone number and
+pending codes and removes the user from cookie consent records; proof of consents, accepted documents and
+the identity verification result stay for the time the law requires. The personal data export of a user
+(<code>GET /api/v1/auth/me/export</code>) includes the <code>compliance</code> part.</p>
+<h2 id="reports-of-infringements-and-consumer-complaints"><a class="header" href="#reports-of-infringements-and-consumer-complaints">Reports of infringements and consumer complaints</a></h2>
+<p>Intellectual property infringements, counterfeits and prohibited goods are reported as <strong>cases</strong>;
+so are consumer complaints. A case goes: intake → (hide the target) → answer of the reported party →
+decision, with deadlines and a log that only grows. Basis — check the original texts: E-commerce Law
+122/2025/QH15 and Decree 248/2026/ND-CP (from 1 July 2026; take-down on request of an authority, Decree
+85/2021/ND-CP before), Intellectual Property Law, Consumer
+Protection Law 19/2023/QH15 and Decree 55/2024/ND-CP (complaints).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Who</th><th>Endpoints (under <code>/api/v1/compliance</code>)</th></tr>
+</thead>
+<tbody>
+<tr><td>Anyone (public form, tenant from the domain)</td><td><code>POST /public/reports</code>, <code>POST /public/complaints</code>, <code>GET /public/complaints</code>, <code>GET /public/cases/{id}?token=</code>, <code>GET /public/moderation-reasons</code></td></tr>
+<tr><td>Staff (<code>compliance.cases.read</code> / <code>.handle</code>)</td><td><code>GET|POST /cases</code>, <code>GET /cases/{id}</code>, <code>POST /cases/{id}/entries</code>, <code>…/restrict</code>, <code>…/restore</code>, <code>…/decision</code>, <code>…/close</code></td></tr>
+<tr><td>The reported party (signed in)</td><td><code>GET /respondent/cases</code>, <code>POST /cases/{id}/responses</code></td></tr>
+<tr><td>Staff (<code>compliance.disclosures.manage</code>)</td><td><code>GET|POST /disclosures</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Intake.</strong> The public forms ask a form token first (<code>GET /api/v1/antispam/token?scope=compliance:reports</code>,
+or <code>compliance:complaints</code>) and are limited per network block and email per hour
+(<code>AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR</code>, default 5). The target is the reported object as
+<code>&lt;module&gt;.&lt;type&gt;:&lt;id&gt;</code> (e.g. <code>content.entry:…</code>, <code>comments.comment:…</code>; a product once step 41 exists);
+it must exist. The sender gets <code>tracking_token</code> once — only its SHA-256 is kept — and a receipt mail
+when they gave an address (link: <code>AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL</code> with <code>{case}</code> and <code>{token}</code>).
+Staff record cases received by letter (<code>POST /cases</code>, <code>reporter_kind</code> <code>rights_holder</code> or <code>authority</code>).</p>
+<p><strong>Deadlines</strong> come from the legal rule <code>cases.deadlines</code>: hours to acknowledge, working days to answer
+and to decide by kind (consumer complaints: 3 and 7), and 24 hours to decide a request of an authority.
+Working days skip Saturdays, Sundays and the holidays listed in the rule (Vietnam time); lunar new year
+and make-up days are entered each year. The hourly schedule <code>compliance.case_deadlines</code> sends the event
+<code>compliance.case_overdue</code> and a mail to the <code>complaints.contact</code> policy’s <code>email</code>, once per deadline.</p>
+<p><strong>Hiding the target.</strong> A request of an authority hides the target at once; so does an intellectual
+property or counterfeit report when the tenant sets the policy <code>cases.auto_restrict</code> to <code>true</code>. Staff
+hide or show it by hand (<code>/restrict</code>, <code>/restore</code>). <code>compliance</code> never touches the tables of other
+modules: it sends <code>compliance.target_restricted</code> / <code>compliance.target_restored</code> (kernel contract
+<code>autoxide_kernel::moderation</code>), and the owning module hides the object — <code>content</code> answers <strong>451</strong>
+<code>content.restricted</code> and leaves the page out of lists, sitemap, feed and search; <code>comments</code> hides the
+comment and restores its former status. The target is shown again only when no other case still hides it.</p>
+<p><strong>The reported party</strong> is the owner of the target (from the kernel’s resource directory, e.g. the author
+of the page) and anyone with <code>compliance.cases.respond</code> on the reported unit (<code>respondent_org_id</code>, a
+seller on a marketplace). They see their cases without the reporter’s contact details and answer before
+<code>respond_by</code>; later gives <code>compliance.response_closed</code> (409).</p>
+<p><strong>Decision.</strong> A signed-in person with <code>compliance.cases.handle</code> decides (<code>upheld</code> or <code>partially_upheld</code>
+keep the target hidden; <code>rejected</code> shows it again); API keys get <code>compliance.session_required</code>. The
+reason is shown to both sides and mailed to the reporter. There is no MCP tool for deciding.</p>
+<p><strong>Disclosures to authorities.</strong> <code>POST /disclosures</code> (signed-in person, <code>compliance.disclosures.manage</code>)
+records the authority, its request number, the legal basis and the names of the fields given, and
+returns the values once — from the seller’s legal profile and identity verification kept by
+<code>compliance</code>. The record and the event <code>compliance.disclosure_recorded</code> never hold the values.</p>
+<p>MCP tools: <code>compliance.list_cases</code>, <code>compliance.get_case</code> (read), <code>compliance.add_case_note</code>,
+<code>compliance.restrict_case_target</code>.</p>
+<h3 id="consumer-protection"><a class="header" href="#consumer-protection">Consumer protection</a></h3>
+<ul>
+<li><strong>Hiding reviews.</strong> Content of consumers may be hidden only for the reasons of the legal rule
+<code>moderation.hide_reasons</code> (<code>spam</code>, <code>illegal_content</code>, <code>personal_data</code>, <code>unrelated</code>, <code>offensive</code> — to
+check). Modules that moderate reviews ask the trait <code>ModerationPolicy</code> (<code>autoxide_kernel::moderation</code>)
+before hiding — <code>orders</code> maps its own reasons (<code>unlawful_content</code> → <code>illegal_content</code>, <code>abusive_language</code> →
+<code>offensive</code>, <code>spam_or_advertising</code> → <code>spam</code>, <code>not_about_product</code> → <code>unrelated</code>), so a reason a tenant adds
+to its list cannot hide a review while <code>compliance</code> is installed
+(<code>compliance.hide_reason_not_allowed</code>, 422) and record the reason in their own event; the list is
+public at <code>GET /public/moderation-reasons</code>. A negative but lawful review stays visible.</li>
+<li><strong>General conditions of trade</strong> are a versioned legal document of kind <code>general_conditions</code>, public at
+<code>GET /public/documents/general_conditions</code>.</li>
+<li><strong>Complaint channel.</strong> <code>GET /public/complaints</code> gives the website’s complaint page the contact (policy
+<code>complaints.contact</code>) and the deadlines; complaints are cases of kind <code>consumer_complaint</code>.</li>
+</ul>
+<h3 id="ai-labels"><a class="header" href="#ai-labels">AI labels</a></h3>
+<p>Content written or edited from AI suggestions carries <code>ai_assisted</code> (<code>content</code>) and image alt texts from
+suggestions carry <code>alt_ai_assisted</code> (<code>media</code>), returned by the public endpoints so the interface labels
+them (Law on Artificial Intelligence 134/2025/QH15, from 1 March 2026 — check the decree). See
+<a href="CONTENT.html"><code>CONTENT.md</code></a> and <a href="MEDIA.html"><code>MEDIA.md</code></a>.</p>
+<h2 id="tracking-tags-and-cookie-consent"><a class="header" href="#tracking-tags-and-cookie-consent">Tracking tags and cookie consent</a></h2>
+<p>A tenant adds the measurement tags of advertising platforms without pasting scripts, and they run only after
+the visitor consents. (Personal Data Protection Law 91/2025/QH15, Decree 356/2025/ND-CP, Consumer Protection
+Law 19/2023/QH15 — whether analytics cookies need consent, and the impact assessment for transfers abroad,
+need a legal check; the design takes the strict reading: ask first.)</p>
+<h3 id="providers-and-tags"><a class="header" href="#providers-and-tags">Providers and tags</a></h3>
+<p><code>GET /tracking-providers</code> lists the built-in providers; the tenant only enters the ID:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th><code>provider</code></th><th>Name</th><th>Category</th><th>ID form</th><th>Data goes to</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ga4</code></td><td>Google Analytics 4</td><td><code>analytics</code></td><td><code>G-XXXXXXXXXX</code></td><td>US</td></tr>
+<tr><td><code>gtm</code></td><td>Google Tag Manager</td><td><code>marketing</code></td><td><code>GTM-XXXXXXX</code></td><td>US</td></tr>
+<tr><td><code>google_ads</code></td><td>Google Ads</td><td><code>marketing</code></td><td><code>AW-123456789</code></td><td>US</td></tr>
+<tr><td><code>meta</code></td><td>Meta Pixel</td><td><code>marketing</code></td><td>digits</td><td>US</td></tr>
+<tr><td><code>tiktok</code></td><td>TikTok Pixel</td><td><code>marketing</code></td><td>letters and digits</td><td>SG</td></tr>
+<tr><td><code>zalo</code></td><td>Zalo Ads Pixel</td><td><code>marketing</code></td><td>digits</td><td>VN</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>POST /tracking-tags {org_id, provider, tracking_id}</code>, <code>PATCH /tracking-tags/{id}</code> (<code>status</code>: <code>active</code> /
+<code>paused</code>), <code>DELETE /tracking-tags/{id}</code> — <code>compliance.tracking.manage</code> on the website’s unit. A wrong ID gives
+<code>compliance.tracking_id_invalid</code> with the expected form; an unknown provider
+<code>compliance.tracking_provider_unknown</code>.</p>
+<h3 id="banner"><a class="header" href="#banner">Banner</a></h3>
+<p><code>PUT /cookie-settings/{org_id}</code> sets <code>enabled</code>, the optional <code>categories</code> asked about (<code>preferences</code>,
+<code>analytics</code>, <code>marketing</code>; <code>necessary</code> is always on and carries no tag) and <code>position</code>. Categories of active
+tags are always asked. Changing the categories or the active providers raises <code>policy_version</code>: visitors are
+asked again. <code>GET /cookie-consents/stats?org_id=</code> gives totals of the last 30 days, never single records.</p>
+<h3 id="for-the-interface"><a class="header" href="#for-the-interface">For the interface</a></h3>
+<pre><code class="language-http">GET  /api/v1/compliance/public/consent-config?granted=analytics&amp;locale=vi
+POST /api/v1/compliance/public/cookie-consents
+{"consent_id": "&lt;random, kept in a necessary cookie&gt;", "categories": ["analytics"], "policy_version": 3}
+</code></pre>
+<p>The contract with the interface:</p>
+<ul>
+<li><strong>Nothing loads before consent.</strong> Without <code>granted</code> the config returns no tag; with it, only the active
+tags of those categories. Read the visitor’s choice from your necessary cookie and pass it.</li>
+<li><strong>Reject is as easy as accept.</strong> Show <code>texts.reject_all</code> as prominently as <code>texts.accept_all</code>, on the first
+layer; no category is preselected (<code>preselected: false</code>). <code>texts.legal</code> is not overridable.</li>
+<li><strong>Record the choice</strong> with <code>POST /public/cookie-consents</code> (no sign-in; limited per network block by
+<code>AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR</code>). It stores the random id, the categories, the version
+and a hash of the network block — never the raw IP — for the days of <code>privacy.consent_proof_days</code>. A
+signed-in visitor’s choice also goes to the consent ledger (purposes <code>analytics</code> / <code>marketing</code>, scope
+<code>website:&lt;unit id&gt;</code>). An old <code>policy_version</code> gives <code>compliance.cookie_policy_changed</code> (409): show the banner
+again.</li>
+<li><strong>Do not slow the page.</strong> Load tags <code>async</code>, after the page has rendered (<code>loading: after_consent_deferred</code>); add <code>csp_hosts</code> to the Content-Security-Policy; never load tags on sign-in or
+account pages; on checkout pages send only the standard conversion events (<code>view_item</code>, <code>add_to_cart</code>,
+<code>begin_checkout</code>, <code>purchase</code>).</li>
+<li>Sending conversions from the server to ad platforms is not built (it needs its own legal check on
+personal data transfers).</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/COMPATIBILITY.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/CONTENT.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/COMPATIBILITY.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/CONTENT.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

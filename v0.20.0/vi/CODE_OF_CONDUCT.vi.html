@@ -1,0 +1,380 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Quy tắc ứng xử Contributor Covenant 3.0 - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="quy-tắc-ứng-xử-contributor-covenant-30"><a class="header" href="#quy-tắc-ứng-xử-contributor-covenant-30">Quy tắc ứng xử Contributor Covenant 3.0</a></h1>
+<p><a href="CODE_OF_CONDUCT.html">English</a> · <strong>Tiếng Việt</strong></p>
+<blockquote>
+<p>Đây là bản dịch không chính thức của dự án Autoxide; Contributor Covenant 3.0 chưa có bản
+tiếng Việt chính thức. Khi hai bản khác nhau, <a href="CODE_OF_CONDUCT.html">bản tiếng Anh</a> có giá trị.</p>
+</blockquote>
+<h2 id="cam-kết-của-chúng-tôi"><a class="header" href="#cam-kết-của-chúng-tôi">Cam kết của chúng tôi</a></h2>
+<p>Chúng tôi cam kết làm cho cộng đồng của mình thân thiện, an toàn và công bằng với tất cả mọi
+người.</p>
+<p>Chúng tôi cam kết xây dựng một môi trường tôn trọng và đề cao phẩm giá, quyền và đóng góp của
+mọi cá nhân, bất kể các đặc điểm như chủng tộc, sắc tộc, đẳng cấp, màu da, tuổi tác, đặc điểm
+thể chất, đa dạng thần kinh, khuyết tật, giới tính sinh học hay giới, bản dạng giới hay biểu
+hiện giới, xu hướng tính dục, ngôn ngữ, triết lý hay tôn giáo, nguồn gốc dân tộc hay xã hội, vị
+trí kinh tế xã hội, trình độ học vấn, hay bất kỳ tình trạng nào khác. Mọi người tham gia với
+thiện chí và theo đúng Quy tắc này đều có cùng quyền tham gia.</p>
+<h2 id="hành-vi-được-khuyến-khích"><a class="header" href="#hành-vi-được-khuyến-khích">Hành vi được khuyến khích</a></h2>
+<p>Dù biết chuẩn mực xã hội mỗi nơi một khác, tất cả chúng ta đều cố gắng đáp ứng kỳ vọng của
+cộng đồng về cách cư xử tích cực. Chúng ta cũng hiểu rằng lời nói và việc làm của mình có thể
+được hiểu khác với ý mình, tuỳ văn hoá, hoàn cảnh hay tiếng mẹ đẻ.</p>
+<p>Với những điều đó, chúng ta đồng ý cư xử có ý thức với nhau và hành động theo những giá trị
+chung, gồm:</p>
+<ol>
+<li>Tôn trọng <strong>mục đích của cộng đồng</strong>, các hoạt động và cách chúng ta gặp gỡ nhau.</li>
+<li>Trao đổi với người khác một cách <strong>tử tế và trung thực</strong>.</li>
+<li>Tôn trọng <strong>những quan điểm</strong> và trải nghiệm khác nhau.</li>
+<li><strong>Chịu trách nhiệm</strong> về hành động và đóng góp của mình.</li>
+<li>Đưa và nhận <strong>góp ý mang tính xây dựng</strong> một cách nhã nhặn.</li>
+<li>Cam kết <strong>khắc phục tổn hại</strong> khi nó xảy ra.</li>
+<li>Cư xử theo những cách khác giúp thúc đẩy và duy trì <strong>sự lành mạnh của cộng đồng</strong>.</li>
+</ol>
+<h2 id="hành-vi-bị-hạn-chế"><a class="header" href="#hành-vi-bị-hạn-chế">Hành vi bị hạn chế</a></h2>
+<p>Chúng ta đồng ý hạn chế những hành vi sau trong cộng đồng. Việc thực hiện, đe doạ thực hiện
+hay cổ suý những hành vi này đều là vi phạm Quy tắc ứng xử.</p>
+<ol>
+<li><strong>Quấy rối.</strong> Vượt qua giới hạn người khác đã nói rõ, hay tiếp tục để ý cá nhân không cần
+thiết sau khi đã được yêu cầu dừng.</li>
+<li><strong>Công kích cá nhân.</strong> Đưa ra lời xúc phạm, hạ thấp hay miệt thị nhắm vào một thành viên hay
+một nhóm người.</li>
+<li><strong>Định kiến hay phân biệt đối xử.</strong> Đánh giá tính cách hay hành vi của bất kỳ ai dựa trên
+bản dạng hay đặc điểm không thể thay đổi.</li>
+<li><strong>Tình dục hoá.</strong> Cư xử theo cách thường bị coi là thân mật không phù hợp với hoàn cảnh hay
+mục đích của cộng đồng.</li>
+<li><strong>Vi phạm bí mật.</strong> Chia sẻ hay dùng thông tin cá nhân, riêng tư của người khác khi chưa
+được họ cho phép.</li>
+<li><strong>Gây nguy hiểm.</strong> Gây ra, khuyến khích hay đe doạ bạo lực hoặc tổn hại khác với bất kỳ
+người hay nhóm người nào.</li>
+<li>Cư xử theo những cách khác <strong>đe doạ sự lành mạnh</strong> của cộng đồng.</li>
+</ol>
+<h3 id="những-hạn-chế-khác"><a class="header" href="#những-hạn-chế-khác">Những hạn chế khác</a></h3>
+<ol>
+<li><strong>Giả mạo danh tính.</strong> Mạo danh người khác vì bất kỳ lý do gì, hay giả làm người khác để
+tránh bị xử lý.</li>
+<li><strong>Không ghi nguồn.</strong> Không ghi đúng nguồn của nội dung mình đóng góp.</li>
+<li><strong>Nội dung quảng cáo.</strong> Chia sẻ nội dung tiếp thị hay thương mại khác theo cách nằm ngoài
+chuẩn mực của cộng đồng.</li>
+<li><strong>Truyền đạt thiếu trách nhiệm.</strong> Không trình bày có trách nhiệm những nội dung chứa, dẫn tới
+hay mô tả bất kỳ hành vi bị hạn chế nào khác.</li>
+</ol>
+<h2 id="báo-cáo-một-sự-việc"><a class="header" href="#báo-cáo-một-sự-việc">Báo cáo một sự việc</a></h2>
+<p>Căng thẳng có thể xảy ra giữa các thành viên ngay cả khi họ đang cố hết sức để cùng làm việc.
+Không phải mâu thuẫn nào cũng là vi phạm Quy tắc ứng xử, và Quy tắc này củng cố những hành vi
+và chuẩn mực được khuyến khích, giúp tránh mâu thuẫn và giảm tổn hại.</p>
+<p>Khi sự việc xảy ra, cần báo cáo kịp thời. Để báo một vi phạm có thể đã xảy ra, gửi email cho
+người duy trì Autoxide ở <strong>thuongtamduy@live.com</strong>. Chỉ người duy trì đọc địa chỉ này. Hãy nói
+điều gì đã xảy ra, ở đâu (issue, pull request, discussion hay nơi khác) và khi nào, kèm đường
+dẫn nếu có. Bạn có thể viết tiếng Anh hay tiếng Việt. Lỗ hổng bảo mật thì làm theo
+<a href="SECURITY.vi.html"><code>SECURITY.vi.md</code></a>.</p>
+<p>Người điều hành cộng đồng coi trọng mọi báo cáo vi phạm và sẽ cố gắng phản hồi kịp thời. Họ
+sẽ điều tra mọi báo cáo vi phạm Quy tắc ứng xử, xem lại tin nhắn, nhật ký và bản ghi, hoặc
+trao đổi với nhân chứng và những người tham gia khác. Người điều hành cộng đồng giữ việc điều
+tra và xử lý minh bạch nhất có thể, đồng thời ưu tiên an toàn và bảo mật. Để giữ những giá trị
+này, việc xử lý được thực hiện riêng với những người liên quan, nhưng thông báo cho cả cộng
+đồng có thể là một phần của cách giải quyết được các bên đồng ý.</p>
+<h2 id="xử-lý-và-khắc-phục-tổn-hại"><a class="header" href="#xử-lý-và-khắc-phục-tổn-hại">Xử lý và khắc phục tổn hại</a></h2>
+<p>Nếu người điều hành cộng đồng điều tra và thấy Quy tắc ứng xử này bị vi phạm, có thể dùng
+thang xử lý dưới đây để quyết định cách khắc phục tổn hại tốt nhất, dựa trên tác động của sự
+việc tới những người liên quan và tới cả cộng đồng. Tuỳ mức nghiêm trọng của vi phạm, có thể
+bỏ qua các bậc thấp hơn.</p>
+<ol>
+<li>Cảnh cáo
+<ol>
+<li>Sự việc: Một vi phạm gồm một lần hay một loạt sự việc.</li>
+<li>Hậu quả: Một lời cảnh cáo riêng, bằng văn bản, từ người điều hành cộng đồng.</li>
+<li>Khắc phục: Ví dụ như một lời xin lỗi riêng bằng văn bản, nhận trách nhiệm, và hỏi rõ
+những gì cộng đồng mong đợi.</li>
+</ol>
+</li>
+<li>Hạn chế hoạt động có thời hạn
+<ol>
+<li>Sự việc: Lặp lại một vi phạm đã từng bị cảnh cáo, hoặc lần đầu có một vi phạm nghiêm
+trọng hơn.</li>
+<li>Hậu quả: Một lời cảnh cáo riêng, bằng văn bản, kèm một khoảng thời gian tạm lắng có hạn,
+để nhấn mạnh mức nghiêm trọng của sự việc và cho các thành viên liên quan thời gian nhìn
+nhận lại. Khoảng tạm lắng có thể chỉ áp cho một số kênh trao đổi hay việc tương tác với
+một số thành viên.</li>
+<li>Khắc phục: Ví dụ như xin lỗi, dùng khoảng tạm lắng để suy nghĩ về hành động và tác động
+của mình, và cân nhắc kỹ khi quay lại cộng đồng sau khoảng đó.</li>
+</ol>
+</li>
+<li>Tạm đình chỉ
+<ol>
+<li>Sự việc: Vi phạm lặp đi lặp lại mà người điều hành cộng đồng đã cố xử lý bằng cảnh cáo,
+hoặc một vi phạm nghiêm trọng.</li>
+<li>Hậu quả: Một lời cảnh cáo riêng, bằng văn bản, kèm điều kiện để được quay lại. Nói chung,
+tạm đình chỉ cho người bị đình chỉ thời gian suy nghĩ về hành vi của mình và cách sửa.</li>
+<li>Khắc phục: Ví dụ như tôn trọng tinh thần của việc đình chỉ, đáp ứng các điều kiện để
+quay lại, và cân nhắc kỹ cách hoà nhập lại với cộng đồng khi hết đình chỉ.</li>
+</ol>
+</li>
+<li>Cấm vĩnh viễn
+<ol>
+<li>Sự việc: Vi phạm lặp lại mà các bậc khác của thang không giải quyết được, hoặc một vi
+phạm nghiêm trọng tới mức người điều hành cộng đồng thấy không thể giữ cộng đồng an toàn
+nếu người này còn là thành viên.</li>
+<li>Hậu quả: Bị gỡ quyền truy cập mọi không gian, công cụ và kênh trao đổi của cộng đồng.
+Nói chung, cấm vĩnh viễn hiếm khi được dùng, phải có lý do chắc chắn, và chỉ dùng khi các
+cách khắc phục khác đã không thay đổi được hành vi.</li>
+<li>Khắc phục: Không có cách khắc phục nào cho mức nghiêm trọng này.</li>
+</ol>
+</li>
+</ol>
+<p>Thang xử lý này là hướng dẫn. Nó không giới hạn quyền của người quản lý cộng đồng được tự cân
+nhắc và phán đoán, vì lợi ích tốt nhất của cộng đồng.</p>
+<h2 id="phạm-vi"><a class="header" href="#phạm-vi">Phạm vi</a></h2>
+<p>Quy tắc ứng xử này áp dụng trong mọi không gian của cộng đồng, và cả khi một người chính thức
+đại diện cho cộng đồng ở nơi công cộng hay không gian khác. Ví dụ về việc đại diện cho cộng
+đồng gồm dùng địa chỉ email chính thức, đăng bài qua tài khoản mạng xã hội chính thức, hay
+làm đại diện được chỉ định tại một sự kiện trực tuyến hay trực tiếp.</p>
+<h2 id="ghi-nguồn"><a class="header" href="#ghi-nguồn">Ghi nguồn</a></h2>
+<p>Quy tắc ứng xử này được phỏng theo Contributor Covenant, phiên bản 3.0, có tại
+<a href="https://www.contributor-covenant.org/version/3/0/">https://www.contributor-covenant.org/version/3/0/</a>.</p>
+<p>Contributor Covenant do Organization for Ethical Source quản lý và được cấp phép theo CC BY-SA
+4.0; bản dịch này cũng theo cùng license đó. Xem bản sao license tại
+<a href="https://creativecommons.org/licenses/by-sa/4.0/">https://creativecommons.org/licenses/by-sa/4.0/</a>.</p>
+<p>Câu hỏi thường gặp về Contributor Covenant có ở
+<a href="https://www.contributor-covenant.org/faq">https://www.contributor-covenant.org/faq</a>. Các bản
+dịch có ở
+<a href="https://www.contributor-covenant.org/translations">https://www.contributor-covenant.org/translations</a>.
+Tài liệu bổ sung về xử lý vi phạm và hướng dẫn cộng đồng có ở
+<a href="https://www.contributor-covenant.org/resources">https://www.contributor-covenant.org/resources</a>.
+Thang xử lý lấy cảm hứng từ công việc của
+<a href="https://github.com/mozilla/inclusion">nhóm quy tắc ứng xử của Mozilla</a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="README.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="CONTRIBUTING.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="README.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="CONTRIBUTING.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

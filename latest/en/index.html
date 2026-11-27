@@ -1,0 +1,777 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Autoxide - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="autoxide"><a class="header" href="#autoxide">Autoxide</a></h1>
+<p><strong>English</strong> · <a href="README.vi.html">Tiếng Việt</a></p>
+<p>Autoxide is an open-source backend core written in Rust. The core is built first;
+business modules plug in on top of it. It runs on <strong>both SQLite and PostgreSQL</strong>
+from a single code base, exposes a REST API described by OpenAPI, and is designed
+to be used by AI agents as well as by people.</p>
+<p>It is a foundation for new products. It is not tied to any company or industry:
+the core contains no business concepts — those belong to modules.</p>
+<p><strong>A commerce-ready backend for the Vietnamese market.</strong> Taxes (a dated tax data pack), accounting
+documents and invoices, the official list of administrative units for addresses and the legal rules
+(e-commerce, personal data, record keeping) come built in. AI agents use it through MCP and the
+OpenAPI contract, with the same permissions as people. The core stays neutral and modules plug in.
+Payment, SMS, shipping and e-invoice providers sit behind interfaces that ship today with
+simulated providers only: connecting a real provider is still to be done.</p>
+<h2 id="try-it-in-one-command"><a class="header" href="#try-it-in-one-command">Try it in one command</a></h2>
+<p>Just looking around? <code>autoxide demo</code> needs no setup: it creates a folder, a SQLite database, random
+secrets and an administrator, loads the reference data, and prints the administrator’s password on
+screen. The API reference opens at <code>/api/docs</code>. Not for production.</p>
+<pre><code class="language-bash"># With Docker (nothing to install or compile):
+docker run --rm -it -p 127.0.0.1:8080:8080 ghcr.io/thuongtamduy/autoxide:latest demo
+# Or with a downloaded binary (Linux, macOS, Windows: see the release page):
+./autoxide demo
+</code></pre>
+<p>Needs a release made after 0.19.0. <a href="docs/GETTING-STARTED.html"><code>docs/GETTING-STARTED.md</code></a> has the
+downloads, keeping the demo data, and the next steps.</p>
+<h2 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h2>
+<p>One command, nothing to compile: SQLite in a Docker volume, the tables created, a first
+administrator and the reference data loaded. You need
+<a href="https://docs.docker.com/get-docker/">Docker</a> (with Compose) and <code>openssl</code>.</p>
+<pre><code class="language-bash">mkdir autoxide &amp;&amp; cd autoxide
+curl -fsSLO https://raw.githubusercontent.com/thuongtamduy/autoxide/main/compose.quickstart.yml
+# Two secrets, kept in .env next to it (never commit it)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" &gt; .env
+
+docker compose -f compose.quickstart.yml up -d
+# The administrator's generated password (see below)
+docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password
+</code></pre>
+<p><strong>The first administrator’s password.</strong> On its first start the server creates the administrator
+<code>admin@example.com</code> with a generated password. The password never goes to the log (logs are often
+collected elsewhere): it is written once to the file <code>data/initial-admin-password</code>, which only the
+server’s user can read. Inside the container that is <code>/var/lib/autoxide/data/initial-admin-password</code>,
+in the Docker volume <code>data</code> (named <code>&lt;directory&gt;_data</code> by Compose), so it survives restarts. The
+command above prints its two lines: the email, then the password. The log only says where the file
+is (<code>docker compose -f compose.quickstart.yml logs autoxide | grep "first administrator"</code>). If the command
+says the file “does not exist”, an administrator existed already (the volume was used before), or you set
+<code>AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD</code> yourself. Once you have signed in and changed the password,
+delete the file:
+<code>docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password --remove</code>.</p>
+<p>Then open <a href="http://127.0.0.1:8080/">http://127.0.0.1:8080/</a> (name, version and links) and sign in. The API reference page
+(<code>/api/docs</code>, it loads its script from a CDN) is off in the quickstart: add
+<code>AUTOXIDE_HTTP_API_DOCS=true</code> to <code>.env</code> and run <code>docker compose -f compose.quickstart.yml up -d</code>
+again to turn it on.</p>
+<pre><code class="language-bash">curl -sS http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"&lt;the password from the file&gt;"}'
+</code></pre>
+<p>The guides in <a href="docs/guides/README.html"><code>docs/guides/</code></a> write the same request shorter with
+<code>--json '…'</code>, which needs curl 7.82 or newer (<code>curl --version</code>); with an older curl, write
+<code>-H 'Content-Type: application/json' -d '…'</code> instead.</p>
+<p>To choose them yourself, add <code>AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…</code> and
+<code>AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…</code> to <code>.env</code> before the first start. Next: connect an AI agent
+over MCP (<a href="docs/guides/mcp.html#6-from-the-quickstart-to-a-working-agent"><code>docs/guides/mcp.md</code></a>). The
+quickstart needs a release made after 0.16.0; for PostgreSQL, several servers and HTTPS, see
+<a href="docs/DEPLOY.html"><code>docs/DEPLOY.md</code></a>.</p>
+<h3 id="what-the-quickstart-contains"><a class="header" href="#what-the-quickstart-contains">What the quickstart contains</a></h3>
+<p>The released image contains every module of the <code>autoxide</code> binary (all of <code>modules/</code> except the
+sample <code>notes</code>). The server runs the core and official ones by default; the experimental ones
+(marked * below) are off until you name them in <code>AUTOXIDE_MODULES</code> — see
+<a href="docs/MODULES.html"><code>docs/MODULES.md</code></a> for the tiers and how to choose.
+<code>GET /api/v1/kernel/modules</code> lists what runs on your server. Each module answers under
+<code>/api/v1/&lt;module&gt;</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Area</th><th>Modules</th></tr>
+</thead>
+<tbody>
+<tr><td>Accounts and access</td><td><code>auth</code> (sign-in, roles, API keys, two-step sign-in, passkeys), <code>organizations</code> (tenants, units, stores), <code>audit</code>, <code>idempotency</code></td></tr>
+<tr><td>Platform</td><td><code>files</code>, <code>mail</code>, <code>notifications</code>, <code>webhooks</code>, <code>ai</code> (off until you configure a provider), <code>address</code> (Vietnamese administrative units), <code>compliance</code>, <code>plans</code> (plans and subscriptions), <code>reporting</code>*, <code>automations</code>*</td></tr>
+<tr><td>Website</td><td><code>content</code> (posts, pages), <code>media</code>, <code>menus</code>, <code>forms</code>, <code>newsletter</code>*, <code>comments</code>*, <code>analytics</code>*</td></tr>
+<tr><td>Commerce</td><td><code>catalog</code>, <code>inventory</code>, <code>promotions</code>, <code>shipping</code>, <code>orders</code>, <code>customers</code>, <code>tax</code>, <code>ledger</code> (money), <code>invoices</code></td></tr>
+<tr><td>Service</td><td><code>bookings</code>*, <code>support</code>*, <code>conversations</code>*</td></tr>
+</tbody>
+</table>
+</div>
+<p>Nothing has to be turned on to try the core and official modules, and a module whose data you
+never write costs nothing. Modules that talk to outside services (an AI provider, payment or
+shipping partners, SMTP) send nothing out until you configure them. Which modules each tenant may
+use is set by its plan (<a href="docs/PLANS.html"><code>docs/PLANS.md</code></a>); the set the server runs is chosen with
+<code>AUTOXIDE_MODULES</code> (<a href="docs/MODULES.html"><code>docs/MODULES.md</code></a>), and listing it needs the
+<code>kernel.modules.read</code> permission (the administrator has it).</p>
+<h3 id="changing-a-record-if-match"><a class="header" href="#changing-a-record-if-match">Changing a record: <code>If-Match</code></a></h3>
+<p>Reading one record returns its version in the <code>ETag</code> header. Send it back in <code>If-Match</code> when you
+change the record, so two people never overwrite each other: a stale version gets <code>412</code>, and
+endpoints that require the header answer <code>428</code> without it.</p>
+<pre><code class="language-bash"># Read the post and keep its ETag header (a quoted number, such as "1763700000000000")
+curl -sS -i http://127.0.0.1:8080/api/v1/content/entries/&lt;id&gt; -H 'Authorization: Bearer &lt;access token&gt;'
+# Change it with that ETag
+curl -sS -X PATCH http://127.0.0.1:8080/api/v1/content/entries/&lt;id&gt; \
+  -H 'Authorization: Bearer &lt;access token&gt;' -H 'If-Match: &lt;the ETag&gt;' \
+  -H 'Content-Type: application/json' -d '{"title":"A new title"}'
+</code></pre>
+<p><a href="docs/guides/errors.html"><code>docs/guides/errors.md</code></a> shows each answer (<code>428</code>, <code>412</code>) as a run
+example.</p>
+<h2 id="status"><a class="header" href="#status">Status</a></h2>
+<p>The core is complete: <strong>every step of the roadmap is done</strong> — project skeleton,
+foundation, login with roles and permissions, two-step sign-in, events and audit log,
+job queue, i18n and idempotency, email, file storage, MCP endpoint, sample module,
+tooling and deployment, passkeys, session management, account deletion and data
+export, webhooks. Business modules come next. The core has the Cargo workspace, the quality gate, configuration,
+database access, per-module migrations, the module contract, the HTTP server
+under <code>/api/v1</code> with OpenAPI, health checks, logs, metrics, tracing and the CLI.
+The <code>auth</code> module stores
+users with Argon2id password hashes and signs them in with short-lived access
+tokens and rotating refresh tokens (<code>/api/v1/auth/login</code>, <code>/refresh</code>, <code>/logout</code>,
+<code>/me</code>). Access is controlled by roles: each module declares its permissions, roles
+group them (<code>/api/v1/auth/roles</code>), and a built-in <code>admin</code> role has them all. The
+first administrator is created from the command line (<code>autoxide user create</code>);
+after that, administrators manage accounts through <code>/api/v1/auth/users</code>. People can
+create their own accounts only when <code>AUTOXIDE_AUTH_SELF_REGISTRATION=true</code>.
+Programs and AI agents use API keys (<code>/api/v1/auth/api-keys</code>): a key acts as the
+user who created it, limited to the permissions listed on it, and is sent like an
+access token (<code>Authorization: Bearer axk1_…</code>; the key names its tenant, so no other header
+is needed). Creating a key, like adding a passkey, asks
+for the user’s current password, and resetting a password removes every key and passkey
+of that account. Users can turn on two-step sign-in
+with an authenticator app (TOTP) and get one-time recovery codes
+(<code>/api/v1/auth/me/mfa</code>). Every change is kept in an append-only audit log — who,
+what, which record, when, before and after — readable at <code>/api/v1/audit</code> with the
+<code>audit.read</code> permission. Background jobs live in the database too (no Redis): retried
+with backoff, kept when they fail for good (<code>autoxide jobs failed</code>, <code>autoxide jobs retry</code>), and run on a schedule when a module asks. <code>AUTOXIDE_PROCESS_ROLE</code> splits a
+deployment into API processes and worker processes. Error messages come in English or
+Vietnamese, chosen with the <code>Accept-Language</code> header. Write requests sent with an
+<code>Idempotency-Key</code> header are safe to retry: a repeat returns the first result (except a
+result holding a one-time secret, such as a new API key, which is never stored: the repeat
+gets <code>409 idempotency_result_not_kept</code>). Mail
+goes out through SMTP from the job queue (password reset, email verification). Files
+are stored on local disk or in S3. AI agents call the system as tools over MCP at
+<code>/mcp</code>, read its resources (module guides, JSON Schemas) and prompts, and find their way from
+<code>/llms.txt</code>, a page generated from the code.</p>
+<p>What the core contains, in build order (see <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>):</p>
+<ol>
+<li>Foundation: configuration, database access, migrations per module, the module
+contract, one error type, HTTP under <code>/api/v1</code>, OpenAPI, health checks, logs,
+metrics, tracing, CLI</li>
+<li>Login, roles and permissions, API keys for machines and AI agents</li>
+<li>MFA (TOTP and recovery codes)</li>
+<li>Events and an append-only audit log</li>
+<li>A job queue stored in the database (no Redis)</li>
+<li>i18n (English, Vietnamese) and idempotency keys</li>
+<li>Email, password reset, email verification</li>
+<li>File storage (local disk and S3)</li>
+<li>An MCP endpoint so AI agents can call the system as tools</li>
+<li>A sample module and a guide for writing modules</li>
+<li>Tooling and deployment: data copy between SQLite and PostgreSQL, benchmarks,
+Docker, backup and restore, a one-command check (<code>./gate.sh</code>)</li>
+<li>Passkeys; 13–14. account management, webhooks, a hardened API contract</li>
+<li>A media library: images, video, audio and documents in nested folders, served
+publicly or privately (<a href="docs/MEDIA.html"><code>docs/MEDIA.md</code></a>)</li>
+<li>Content: posts and pages in several languages, drafts and history, scheduling,
+categories, tags, authors, menus, redirects, and public endpoints for the website
+(<a href="docs/CONTENT.html"><code>docs/CONTENT.md</code></a>)</li>
+<li>AI features, off by default, with the provider you choose (Claude, OpenAI, Gemini,
+Ollama…): SEO and alt text suggestions, translation into drafts, search by meaning,
+and permissions that keep AI agents to their own work (<a href="docs/AI.html"><code>docs/AI.md</code></a>)</li>
+<li>Forms: contact and sign-up forms defined through the API, answers checked on the
+server, spam held back, an inbox with CSV export (<a href="docs/FORMS.html"><code>docs/FORMS.md</code></a>)</li>
+<li>Newsletters: lists, double opt-in, one-click unsubscribe, campaigns sent in batches
+with pause and resume, bounces, mail for new posts (<a href="docs/NEWSLETTER.html"><code>docs/NEWSLETTER.md</code></a>)</li>
+<li>Comments: two-level comments on any target for signed-in users or guests, a fixed
+moderation pipeline, reports, bans, reply mails (<a href="docs/COMMENTS.html"><code>docs/COMMENTS.md</code></a>)</li>
+<li>Website menus: main bar, mega menus and footer whose items link to addresses or to objects of
+any module, with automatic sub-items, dated badges and a cached public endpoint
+(<a href="docs/MENUS.html"><code>docs/MENUS.md</code></a>)</li>
+<li>Organizations and identity: an organization tree in each tenant (head office, regions,
+stores…) with permissions scoped to a unit or a branch, settings inherited down the tree,
+a website per unit, public store profiles; customer accounts apart from staff, invitations,
+sign-in links, delegation down chains of tenants, time-limited support access; the official
+list of Vietnamese administrative units for addresses (<a href="docs/ADDRESS.html"><code>docs/ADDRESS.md</code></a>)</li>
+</ol>
+<h2 id="try-it-with-docker-no-build"><a class="header" href="#try-it-with-docker-no-build">Try it with Docker (no build)</a></h2>
+<p>The same as the <a href="#quickstart">Quickstart</a>, step by step with plain <code>docker run</code> (works with every
+release): nothing to compile, SQLite inside a Docker volume. You need <a href="https://docs.docker.com/get-docker/">Docker</a> and <code>openssl</code>. The
+image is about 410 MB on disk and the server is ready about a second after it starts.</p>
+<pre><code class="language-bash"># Two secrets, made up here and kept in a file (use the same ones on every start; never commit it)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" &gt; autoxide.env
+chmod 600 autoxide.env
+
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.20.0   # a release from the GitHub Releases page
+RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
+
+# 1. Create the tables (the server will not start before this, and again after every update)
+$RUN $IMAGE migrate up
+# 2. The first administrator: a strong password is printed once
+$RUN $IMAGE user create --email you@example.com --name "Your Name" --admin
+# 3. Reference data (addresses, taxes, promotion limits); each is safe to run again
+$RUN $IMAGE task address.import
+$RUN $IMAGE task tax.import_pack
+$RUN $IMAGE task promotions.load_legal_data
+# 4. Start the server (it listens inside the container; this publishes it on this machine only)
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+
+curl http://127.0.0.1:8080/health/ready     # {"data":{"status":"ok"}}
+$RUN $IMAGE doctor                           # what is still missing before going live
+</code></pre>
+<p>Keep <code>-v autoxide-data:/var/lib/autoxide/data</code> on every command: the database, uploaded files
+and mail live in that volume, and without it they vanish with the container. A backup must go
+to a directory you mount, not to a path inside the container (<code>mkdir backups &amp;&amp; sudo chown 10001 backups</code>, then add <code>-v "$PWD/backups:/backups"</code> and run <code>backup /backups/&lt;name&gt;</code>). Sign in as
+shown under <a href="#configuration">Configuration</a> (use <code>http://127.0.0.1:8080</code>). For PostgreSQL,
+a reverse proxy with HTTPS, updates and restore, see <a href="docs/DEPLOY.html"><code>docs/DEPLOY.md</code></a>.</p>
+<p><strong>No Docker?</strong> Build the binary and run it by hand: <a href="docs/DEPLOY.html#b-one-binary-with-sqlite"><code>docs/DEPLOY.md</code>, section B</a>
+(SQLite) or <a href="docs/DEPLOY.html#b-one-binary-with-postgresql-from-scratch">B+</a> (PostgreSQL). The two secrets go in <code>.env</code>,
+<code>autoxide migrate up</code> runs before <code>autoxide serve</code>, and <code>AUTOXIDE_HTTP_ADDRESS</code> changes the address.</p>
+<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
+<p>These are only needed to build from source (to run a released image, see above).</p>
+<ul>
+<li><a href="https://rustup.rs">Rust</a> — <code>rustup</code> installs the exact toolchain pinned in
+<code>rust-toolchain.toml</code> the first time you run <code>cargo</code></li>
+<li>A C compiler (SQLite and libwebp are compiled from source and bundled into the binary;
+on Debian or Ubuntu: <code>sudo apt install build-essential</code>)</li>
+<li>To run the full quality gate: <a href="https://docs.docker.com/get-docker/">Docker</a> and
+<a href="https://github.com/EmbarkStudios/cargo-deny"><code>cargo-deny</code></a>
+(<code>cargo install cargo-deny --locked</code>)</li>
+</ul>
+<p><strong>Building takes a while.</strong> The first build (<code>cargo build --release</code>, or <code>docker build</code>) compiles
+several hundred crates: count on roughly 20 minutes to well over an hour, depending on the number
+of CPU cores and the memory (at least 4 GB of RAM, 8 GB is comfortable; raise Docker Desktop’s
+memory limit if a build is killed). Later builds reuse what was compiled. To run Autoxide rather
+than change it, use the released image above: nothing to compile.</p>
+<p><strong>Behind a company proxy.</strong> <code>cargo</code> and <code>rustup</code> read <code>HTTPS_PROXY</code> (and <code>HTTP_PROXY</code>, <code>NO_PROXY</code>)
+from the environment. <code>docker build</code> does not pass your shell’s variables into the build: give them
+as build arguments, which Docker knows already and does not keep in the image —</p>
+<pre><code class="language-bash">docker build --build-arg HTTPS_PROXY=http://proxy.example.com:3128   --build-arg HTTP_PROXY=http://proxy.example.com:3128 --build-arg NO_PROXY=localhost,127.0.0.1   -t autoxide .
+</code></pre>
+<p>— or set them once under <code>proxies</code> in <code>~/.docker/config.json</code>, which Docker passes to every build,
+<code>docker compose build</code> included. A proxy that inspects HTTPS with its own certificate makes the
+downloads fail with certificate errors inside the build; use the released image then.</p>
+<h2 id="getting-started"><a class="header" href="#getting-started">Getting started</a></h2>
+<pre><code class="language-bash">git clone https://github.com/thuongtamduy/autoxide.git autoxide
+cd autoxide
+
+# Build and run the command-line interface
+cargo run -p autoxide -- --help
+
+# Run the tests on SQLite (no setup needed)
+cargo test --workspace
+
+# Run the full quality gate: format, lints, boundary checks, dependency audit,
+# tests on SQLite, tests on PostgreSQL (started in a throwaway Docker container)
+./gate.sh
+</code></pre>
+<p>If you are going to commit, enable the Git hooks once. They scan staged changes
+for secrets (when <a href="https://github.com/gitleaks/gitleaks"><code>gitleaks</code></a> is installed)
+and check formatting:</p>
+<pre><code class="language-bash">git config core.hooksPath .githooks
+</code></pre>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>Every setting has a working default, so a fresh clone runs without any
+configuration. Settings are read from environment variables and from a <code>.env</code>
+file in the current directory; environment variables win.</p>
+<pre><code class="language-bash"># Check the configuration and show every setting with its current value
+cargo run -p autoxide -- config
+
+# Start your own configuration from the documented defaults
+cp .env.example .env
+</code></pre>
+<p>The database schema is managed by migrations, one set per module. They are never
+applied automatically — run them once per deployment:</p>
+<pre><code class="language-bash">cargo run -p autoxide -- migrate status          # what is applied, what is pending
+cargo run -p autoxide -- migrate up              # apply everything that is pending
+cargo run -p autoxide -- migrate down &lt;module&gt;   # revert the newest migration of one module
+</code></pre>
+<p>Create the first administrator. A strong password is generated and printed once;
+to choose your own, pipe it in and add <code>--password-stdin</code>:</p>
+<pre><code class="language-bash">cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
+</code></pre>
+<p>Import the reference data the server ships with. No step changes your own
+data, and running one again changes nothing:</p>
+<pre><code class="language-bash"># The Vietnamese administrative units (provinces, communes), used to check addresses.
+# Nothing imports it for you: run it once per installation, and again when an update
+# ships a newer list (`doctor` says so). See docs/ADDRESS.md.
+cargo run -p autoxide -- task address.import
+
+# The tax data pack (rates, withholding rules). A running server imports it by itself
+# within an hour; run this to have it at once. See docs/TAX.md.
+cargo run -p autoxide -- task tax.import_pack
+
+# The legal limits on promotions (Vietnam). Without them promotions cannot be turned on
+# (`doctor` warns). See docs/PROMOTIONS.md.
+cargo run -p autoxide -- task promotions.load_legal_data
+</code></pre>
+<p>Check the installation. <code>doctor</code> goes through the configuration, the database,
+the migrations, the signing keys, file storage, the SMTP server, the administrator
+account and the imported reference data, and says how to fix each problem (<code>--json</code> for scripts and AI agents; it exits with
+status 1 when a check failed):</p>
+<pre><code class="language-bash">cargo run -p autoxide -- doctor
+</code></pre>
+<p>Modules can add maintenance tasks; <code>autoxide task</code> lists them with their arguments
+(<code>cargo run -p autoxide -- task</code>).</p>
+<p>Then start the server. It refuses to start while a migration is pending, and
+stops gracefully on Ctrl-C or <code>SIGTERM</code> (requests in progress get
+<code>AUTOXIDE_HTTP_SHUTDOWN_SECONDS</code> to finish; behind a load balancer, see
+<a href="docs/DEPLOY.html#updating-without-dropping-requests">updating without dropping requests</a>):</p>
+<pre><code class="language-bash">cargo run -p autoxide -- serve
+</code></pre>
+<p>By default it listens on <code>127.0.0.1:8080</code>: check it with
+<code>curl http://127.0.0.1:8080/health/ready</code>. Logs go to standard error. Sign in and
+look at your account:</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email": "you@example.com", "password": "&lt;the password&gt;"}'
+curl -s http://127.0.0.1:8080/api/v1/auth/me -H 'Authorization: Bearer &lt;access_token&gt;'
+</code></pre>
+<p>The API contract is an OpenAPI document generated from the code. It is committed
+as <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>docs/openapi.json</code></a>, printed by <code>autoxide openapi</code>, and
+served by the running server at <code>/api/v1/openapi.json</code>. Its description lists the
+conventions every endpoint follows (response envelope, RFC 9457 errors with a
+stable <code>code</code>, cursor pagination, request ids).</p>
+<p>AI agents reach the same functions as tools through the
+<a href="https://modelcontextprotocol.io">Model Context Protocol</a> at <code>/mcp</code> (Streamable
+HTTP), authenticated like the API — an API key is the usual choice. An agent sees and
+calls only the tools its permissions allow; each tool runs the same code as the
+matching REST endpoint, so writes land in the audit log. For example, with Claude Code:</p>
+<pre><code class="language-bash">claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer &lt;api key&gt;"
+</code></pre>
+<p><a href="docs/guides/mcp.html"><code>docs/guides/mcp.md</code></a> walks through it: a key with the least
+permissions, other MCP clients, every tool with the permission it needs, and the limits.</p>
+<p>Back up everything — the data of every module and every stored file — into a
+directory, and restore it into a new, empty database (with any file storage) later. The
+database is read in one consistent snapshot, so the server may keep running:</p>
+<pre><code class="language-bash">cargo run -p autoxide -- backup backups/2026-11-11
+cargo run -p autoxide -- restore backups/2026-11-11
+</code></pre>
+<p>Restore only backups you made yourself: a backup is the whole content of the server.</p>
+<p>To move to PostgreSQL later (or bring data back to SQLite), stop the server and copy
+everything into a new, empty database; it gets every migration first:</p>
+<pre><code class="language-bash">printf '%s' 'postgres://user:password@host:5432/autoxide' | cargo run -p autoxide -- copy --to-stdin
+</code></pre>
+<p><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a> lists every setting with its description and
+default. It is generated from the code, so it cannot go out of date. An invalid
+configuration is reported in full — every problem at once, each saying what to
+fix — and the command exits with status 2. Secrets are never printed.</p>
+<p>Each client address may make 600 requests a minute by default
+(<code>AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE</code>), and an email is locked for 15 minutes after
+5 failed sign-ins. Behind a reverse proxy, set <code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> (for
+example to <code>X-Forwarded-For</code>) so that clients are told apart by their own address
+rather than the proxy’s.</p>
+<p>Users can also sign in with a passkey (Face ID, fingerprint, security key) instead of a
+password. Set <code>AUTOXIDE_AUTH_PASSKEY_RP_ID</code> to your site’s domain (and
+<code>AUTOXIDE_AUTH_PASSKEY_ORIGINS</code> when your web app runs on a subdomain); a signed-in user
+adds one with <code>POST /api/v1/auth/me/passkeys/registration</code> and <code>POST /api/v1/auth/me/passkeys</code>,
+and signs in with <code>POST /api/v1/auth/login/passkey/options</code> and
+<code>POST /api/v1/auth/login/passkey</code> — no email needed. The <code>options</code> returned go straight to
+<code>PublicKeyCredential.parseCreationOptionsFromJSON()</code> / <code>parseRequestOptionsFromJSON()</code> in the
+browser.</p>
+<p>Signing in with Google, Microsoft, GitHub or any OpenID Connect provider is off by default;
+turn it on with <code>AUTOXIDE_AUTH_OIDC=true</code>, then each tenant adds its providers with
+<code>POST /api/v1/auth/oidc-providers</code> (permission <code>auth.oidc.manage</code>). An existing account is linked
+only when both sides have verified the email, and two-step sign-in still applies. See
+<a href="docs/guides/oidc.html"><code>docs/guides/oidc.md</code></a>.</p>
+<p>Users with the <code>files.upload</code> permission upload a file by sending its raw content to
+<code>POST /api/v1/files?name=report.pdf</code> with its <code>Content-Type</code>, then list, download
+(<code>GET /api/v1/files/{id}/content</code>) and delete their own files; <code>files.manage</code> reaches
+everyone’s. Uploads are limited to 25 MiB (<code>AUTOXIDE_FILES_MAX_BYTES</code>) and, when you
+set <code>AUTOXIDE_FILES_ALLOWED_TYPES</code> (for example <code>image/*,application/pdf</code>), to those
+media types.</p>
+<p>Uploaded files are stored in <code>data/files</code> until you set <code>AUTOXIDE_FILES_S3_BUCKET</code>
+(with <code>AWS_REGION</code>, <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, and <code>AWS_ENDPOINT_URL</code>
+for an S3-compatible service such as Cloudflare R2). Back up <code>data/files</code> together with
+the database.</p>
+<p>Mail is written as <code>.eml</code> files to <code>data/mail</code> until you set <code>AUTOXIDE_MAIL_SMTP_URL</code>
+(for example <code>smtps://user:password@smtp.example.com:465</code>) and <code>AUTOXIDE_MAIL_FROM</code>.</p>
+<p>A user who forgot their password calls <code>POST /api/v1/auth/password-reset</code> with their
+email and receives a one-time token by mail, valid for 30 minutes; they then call
+<code>POST /api/v1/auth/password-reset/confirm</code> with the token and a new password. The
+answer is the same whether or not the email has an account. Set
+<code>AUTOXIDE_AUTH_PASSWORD_RESET_URL</code> (for example
+<code>https://app.example.com/reset?token={token}</code>) to send a link to your own page
+instead of the bare token.</p>
+<p>Signed-in users change their own password with <code>POST /api/v1/auth/me/password</code>
+(the current password is required). An administrator can give the first password to
+an account created without one (<code>PUT /api/v1/auth/users/{id}/password</code>), but cannot
+replace a password someone already has.</p>
+<p>Each sign-in is a session, named by the <code>session_id</code> in the token response. Users see
+their sessions — device and last activity — at <code>GET /api/v1/auth/me/sessions</code>, sign one
+out with <code>DELETE /api/v1/auth/me/sessions/{id}</code>, or every other one with
+<code>DELETE /api/v1/auth/me/sessions?keep={their session_id}</code>. Users download everything the
+server keeps about them with <code>GET /api/v1/auth/me/export</code> and delete their account with
+<code>DELETE /api/v1/auth/me</code> (current password required); every module then deletes its data
+about them. Administrators find users with <code>GET /api/v1/auth/users?search=ada</code>, sign a
+user out everywhere (<code>DELETE /api/v1/auth/users/{id}/sessions</code>) and delete accounts
+(<code>DELETE /api/v1/auth/users/{id}</code>). An administrator cannot act this way on someone who
+holds permissions they lack.</p>
+<p>Other systems receive events through webhooks: with the <code>webhooks.manage</code> permission,
+register an <code>https://</code> address and the events it wants at <code>POST /api/v1/webhooks</code> (the
+list of events is at <code>GET /api/v1/webhooks/events</code>). Each event is sent as a signed
+<code>POST</code> following <a href="https://www.standardwebhooks.com">Standard Webhooks</a>, so the receiver
+can check it with an existing library and the secret returned at creation. Failed
+deliveries are retried for about two hours; <code>GET /api/v1/webhooks/{id}/deliveries</code> shows
+what was sent and what failed. Webhooks go only to public addresses: an address in a
+private or local network (<code>localhost</code>, <code>10.x</code>, <code>192.168.x</code>, <code>169.254.x</code>…) is refused,
+unless <code>AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true</code> because the receivers run in your
+own network.</p>
+<p>New accounts receive a mail asking to confirm their address; the token in it (valid
+24 hours) is confirmed with <code>POST /api/v1/auth/email-verification/confirm</code>, and
+<code>email_verified_at</code> then shows when. To change their email, users call
+<code>POST /api/v1/auth/me/email</code> with the new address and their password: the email
+changes only once the new address is confirmed the same way. The old address then gets a
+mail saying so, with a token (valid 7 days) to report a change the owner did not make:
+<code>POST /api/v1/auth/email-change/report</code> signs the account out everywhere, removes its
+password, passkeys, API keys and two-step sign-in, gives the old address back when it is
+still free, and sends a password-reset mail there. Set
+<code>AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL</code> and <code>AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL</code> to link
+these mails to your own pages.</p>
+<p>For production, set <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> (the key that signs access tokens)
+to a long random value, the same on every server:</p>
+<pre><code class="language-bash">openssl rand -base64 48
+</code></pre>
+<p>Without it the server makes up a key at startup and logs a warning: fine for trying
+Autoxide out, but signed-in clients must refresh their access token after every
+restart.</p>
+<h3 id="running-the-tests-against-your-own-postgresql"><a class="header" href="#running-the-tests-against-your-own-postgresql">Running the tests against your own PostgreSQL</a></h3>
+<p>Tests pick their database from <code>TEST_DATABASE_URL</code>. Unset means SQLite. To use
+PostgreSQL 16 or newer, point it at any database on a server where the user may
+<code>CREATE DATABASE</code> — every test creates its own empty database and drops it
+afterwards:</p>
+<pre><code class="language-bash">TEST_DATABASE_URL=postgres://user:password@localhost:5432/postgres cargo test --workspace
+</code></pre>
+<p><code>./gate.sh</code> does this for you with Docker. To make the gate use an existing
+server instead, set <code>GATE_POSTGRES_URL</code> to the same kind of URL.</p>
+<p>Tests that build the whole application copy a template database that already has
+every migration applied, instead of migrating each empty database again. The
+templates live in the system temporary directory (<code>autoxide-templates/</code>) and, on
+PostgreSQL, as databases named <code>autoxide_tpl_…</code>; both are rebuilt when the test
+program or its migrations change, and removed after an hour. Set
+<code>TEST_DATABASE_TEMPLATE=off</code> to migrate every test database from scratch.</p>
+<p>File storage tests also run against S3 when <code>TEST_S3_ENDPOINT</code> points at an
+S3-compatible service with a bucket named <code>autoxide-test</code>. The gate starts a throwaway
+S3 emulator (<a href="https://github.com/getmoto/moto">moto</a>) in Docker for this; set
+<code>GATE_S3_ENDPOINT</code> to use an existing service instead.</p>
+<h2 id="project-layout"><a class="header" href="#project-layout">Project layout</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Path</th><th>What it is</th></tr>
+</thead>
+<tbody>
+<tr><td><code>crates/kernel</code></td><td>The foundation every module builds on. Knows no module.</td></tr>
+<tr><td><code>crates/app</code></td><td>The <code>autoxide</code> binary: the one place where modules are registered.</td></tr>
+<tr><td><code>crates/testkit</code></td><td>Test support: an isolated database per test, on SQLite or PostgreSQL.</td></tr>
+<tr><td><code>modules/&lt;name&gt;</code></td><td>One crate per module, each owning its tables (<code>auth</code> accounts and sign-in, <code>audit</code>, <code>files</code>, <code>mail</code>, <code>webhooks</code>, <code>content</code>, <code>media</code>, <code>catalog</code>, <code>orders</code>… — about thirty; <code>ls modules</code> lists them, the sections above say what each does).</td></tr>
+<tr><td><code>xtask</code></td><td>Developer tooling: <code>cargo xtask check</code> enforces the workspace boundaries.</td></tr>
+<tr><td><code>gate.sh</code></td><td>The quality gate. A change is done only when this is green.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Modules own their tables, talk to each other only through published traits, and
+never share foreign keys. These rules are checked automatically by the gate.</p>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<ul>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/STACK.md"><code>STACK.md</code></a> — which libraries are used and why</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a> — what is built, in what order</li>
+<li><code>docs/decisions/</code> — the decision log (the old entries are in <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/DECISIONS.md"><code>docs/DECISIONS.md</code></a>, new
+ones one file each here); <code>cargo xtask decisions</code> generates a by-topic index, <code>INDEX.md</code>, that is not committed</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CLAUDE.md"><code>CLAUDE.md</code></a> — the rules for contributors, human or AI agent</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CHANGELOG.md"><code>CHANGELOG.md</code></a> — what changed in each release; released Docker images
+are at <code>ghcr.io/&lt;owner&gt;/autoxide</code></li>
+<li><a href="docs/COMPATIBILITY.html"><code>docs/COMPATIBILITY.md</code></a> — what stays stable from 1.0 (API, error codes,
+settings, migrations, the Rust API for modules) and what may change</li>
+<li><a href="docs/guides/README.html"><code>docs/guides/</code></a> — task-by-task guides to the API, with <code>curl</code> and
+TypeScript examples that run as tests: a website, signing in, API keys, retries,
+pagination, errors, connecting an AI agent over MCP</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/sdk/typescript/README.md"><code>sdk/typescript/</code></a> — a typed TypeScript client generated from
+<code>docs/openapi.json</code>; <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/mcp-tools.json"><code>docs/mcp-tools.json</code></a> — the contract of every MCP tool</li>
+<li><a href="docs/DEPLOY.html"><code>docs/DEPLOY.md</code></a> — installing and deploying: Docker Compose with
+PostgreSQL or one binary with SQLite, reverse proxy, updates, backups</li>
+<li><a href="docs/MEDIA.html"><code>docs/MEDIA.md</code></a> — using the media library: upload, folders, public
+links, caching, trash</li>
+<li><a href="docs/CONTENT.html"><code>docs/CONTENT.md</code></a> — using the content module: drafts, publishing,
+pages and addresses, languages, public endpoints for the website, preview</li>
+<li><a href="docs/AI.html"><code>docs/AI.md</code></a> — the AI features: turning them on with each provider,
+embeddings, costs and limits, what is sent, limits for AI agents</li>
+<li><a href="docs/FORMS.html"><code>docs/FORMS.md</code></a> — using the forms module: defining a form, showing it
+on a website, anti-spam, the inbox, data requests by email</li>
+<li><a href="docs/NEWSLETTER.html"><code>docs/NEWSLETTER.md</code></a> — using the newsletter module: lists, the
+website’s sign-up, confirmation and preferences pages, campaigns, bounces, legal notes</li>
+<li><a href="docs/COMMENTS.html"><code>docs/COMMENTS.md</code></a> — using the comments module: targets, the
+website’s thread and comment box, moderation, reports and bans, reply mails, legal notes</li>
+<li><a href="docs/MENUS.html"><code>docs/MENUS.md</code></a> — using the menus module: items, objects of other modules,
+badges, the public endpoint and its caching, moving from the content module’s menus</li>
+<li><a href="docs/BOOKINGS.html"><code>docs/BOOKINGS.md</code></a> — bookings: services, staff and rooms, weekly schedules in
+the unit’s time zone, free times, deposits through the payment partner, cancellation policy,
+reminders, guests with a phone code</li>
+<li><a href="docs/CUSTOMERS.html"><code>docs/CUSTOMERS.md</code></a> — customers: profiles by account or phone number, purchase
+history from orders, masked contact details with audited reveal, manual and rule groups</li>
+<li><a href="docs/SUPPORT.html"><code>docs/SUPPORT.md</code></a> — customer support tickets: guests with a ticket token, staff
+scope by unit, teams and routing, business-hour deadlines, hand-over to consumer complaints, AI drafts</li>
+<li><a href="docs/ANALYTICS.html"><code>docs/ANALYTICS.md</code></a> — cookieless website analytics: sending events from a
+website, reports, funnels, consent for per-person tracking, legal notes</li>
+<li><a href="docs/ADDRESS.html"><code>docs/ADDRESS.md</code></a> — administrative units and addresses: reading the list,
+importing the official list</li>
+<li><a href="docs/CATALOG.html"><code>docs/CATALOG.md</code></a> — products: variants, categories, price lists with history,
+price floors</li>
+<li><a href="docs/PROMOTIONS.html"><code>docs/PROMOTIONS.md</code></a> — promotions: automatic discounts, coupons, vouchers,
+stacking, usage holds for orders, legal limits as dated data</li>
+<li><a href="docs/TAX.html"><code>docs/TAX.md</code></a> — taxes: the Vietnam tax data pack, computing taxes, tax profiles</li>
+<li><a href="docs/MONEY.html"><code>docs/MONEY.md</code></a> — money: the ledger, payments and flow modes, VietQR, accounting
+documents, exchange rates, printing, accounting exports, keeping records 10 years</li>
+<li><a href="docs/NOTIFICATIONS.html"><code>docs/NOTIFICATIONS.md</code></a> — notifications: kinds and categories, channels,
+consent and allowed hours for advertising, inbox and preferences, declaring a kind in a module</li>
+<li><a href="docs/MODULE_GUIDE.html"><code>docs/MODULE_GUIDE.md</code></a> — how to write a module, starting
+from the sample module <a href="https://github.com/thuongtamduy/autoxide/tree/v0.20.0/modules/notes"><code>modules/notes</code></a> (not registered by default)</li>
+</ul>
+<p>The first four documents steer the project and are written in Vietnamese, with
+technical terms kept in English. User-facing documentation (this README, the
+installation and usage guides, API descriptions) is written in English with a
+Vietnamese translation alongside.</p>
+<h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
+<p>While you work, <code>./gate.sh --quick</code> checks a change to one module in under a minute: it runs the tests of
+the crates you changed (and of the crates that depend on them) on SQLite only. Before a
+change is merged, run the full <code>./gate.sh</code>; a change is accepted only when the full gate is
+green on both SQLite and PostgreSQL. Never commit secrets — only <code>.env.example</code>
+belongs in Git, never <code>.env</code>. <a href="CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a> explains how to set up
+your machine, the rules that matter most and how to send a change.</p>
+<p>Every commit carries a <code>Signed-off-by</code> line (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/DCO">DCO</a>, <code>git commit -s</code>). Questions: <a href="SUPPORT.html"><code>SUPPORT.md</code></a>. How
+decisions are made and how to propose a change: <a href="GOVERNANCE.html"><code>GOVERNANCE.md</code></a>. Where the project is going:
+<a href="docs/ROADMAP.public.html"><code>docs/ROADMAP.public.md</code></a>. Building and listing your own module:
+<a href="docs/MODULE_ECOSYSTEM.html"><code>docs/MODULE_ECOSYSTEM.md</code></a>. Using the name: <a href="TRADEMARK.html"><code>TRADEMARK.md</code></a>.</p>
+<h2 id="security"><a class="header" href="#security">Security</a></h2>
+<p>Found a vulnerability? Please do not open a public issue: report it privately as
+described in <a href="SECURITY.html"><code>SECURITY.md</code></a>, which also lists the versions that receive
+security fixes. <a href="docs/THREAT_MODEL.html"><code>docs/THREAT_MODEL.md</code></a> describes the trust boundaries of the core,
+the controls at each one and what is still open.</p>
+<h2 id="license"><a class="header" href="#license">License</a></h2>
+<p>Licensed under either of</p>
+<ul>
+<li>Apache License, Version 2.0 (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/LICENSE-APACHE">LICENSE-APACHE</a>)</li>
+<li>MIT license (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/LICENSE-MIT">LICENSE-MIT</a>)</li>
+</ul>
+<p>at your option.</p>
+<p>Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this project by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+                            <a rel="next prefetch" href="CODE_OF_CONDUCT.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+                    <a rel="next prefetch" href="CODE_OF_CONDUCT.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

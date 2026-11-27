@@ -1,0 +1,509 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Sản phẩm - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="sản-phẩm"><a class="header" href="#sản-phẩm">Sản phẩm</a></h1>
+<p><a href="CATALOG.html">English</a></p>
+<p>Module <code>catalog</code> giữ sản phẩm mà mọi module thương mại đọc: sản phẩm có biến thể, cây danh mục và bảng
+giá có đủ lịch sử giá. Kho, khuyến mại, vận chuyển, đơn hàng và kênh bán đọc sản phẩm và giá qua
+<code>autoxide_catalog::api::Catalog</code>, không bao giờ đọc bảng <code>catalog_…</code>. Mọi thứ nằm dưới
+<code>/api/v1/catalog</code>; mỗi endpoint được mô tả trong <code>docs/openapi.json</code>, và cùng thao tác có tool MCP
+(<code>catalog.*</code>).</p>
+<h2 id="sản-phẩm-và-biến-thể"><a class="header" href="#sản-phẩm-và-biến-thể">Sản phẩm và biến thể</a></h2>
+<ul>
+<li><code>POST /products</code> tạo sản phẩm ở trạng thái <strong>nháp</strong> cùng biến thể đầu tiên. <code>kind</code> là <code>physical</code>
+(giao hàng, có tồn kho), <code>digital</code>, <code>service</code> hay <code>bundle</code>. <code>tax_category</code> là mã nhóm thuế của engine
+thuế (<code>GET /api/v1/tax/categories</code>), vd <code>vat.standard</code>.</li>
+<li>Nội dung theo ngôn ngữ (<code>PUT /products/{id}/translations/{locale}</code>); ngôn ngữ được phép là
+<code>AUTOXIDE_CATALOG_LOCALES</code>. Mỗi bản dịch có đường dẫn công khai <code>path</code>,
+<code>/&lt;AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX&gt;/&lt;slug&gt;</code>. <code>slug</code> trống thì sinh từ tên, trùng thì thêm <code>-2</code>, <code>-3</code>… Mô tả là chữ
+thuần (dòng trống ngăn đoạn); HTML không được hiểu.</li>
+<li>Tuỳ chọn (màu, cỡ…) đặt bằng <code>PUT /products/{id}/options</code>: tối đa 3 tuỳ chọn, mỗi tuỳ chọn tối đa
+100 giá trị. Thêm tuỳ chọn thì mọi biến thể đang có nhận giá trị đầu của tuỳ chọn đó. Mỗi biến thể
+giữ một giá trị của mỗi tuỳ chọn, và không hai biến thể nào trùng tổ hợp
+(<code>catalog.option_combination_taken</code>).</li>
+<li>SKU và mã vạch duy nhất trong một khách (<code>catalog.sku_taken</code>, <code>catalog.barcode_taken</code>); SKU so không
+phân biệt hoa thường và khoảng trắng. Mã vạch toàn số dài 8, 12, 13 hay 14 chữ số phải đúng chữ số
+kiểm tra GTIN.</li>
+<li>Chế độ bán của biến thể: <code>in_stock</code>, <code>backorder</code> hay <code>preorder</code> (kèm <code>preorder_available_on</code> sau hôm
+nay và <code>preorder_limit</code> nếu muốn).</li>
+<li>Ảnh là media công khai của module <code>media</code> (<code>PUT /products/{id}/media</code>).</li>
+<li>Trạng thái (<code>POST /products/{id}/status</code>, permission <code>catalog.products.publish</code>): <code>draft</code> → <code>active</code>
+hay <code>archived</code>; <code>active</code> ↔ <code>inactive</code>; mọi trạng thái → <code>archived</code>; <code>archived</code> → <code>draft</code>. Mở bán cần
+nhóm thuế, tên và một biến thể đang bật. Sản phẩm đã từng bán không xoá được, chỉ lưu trữ.</li>
+<li>Combo (<code>kind: bundle</code>) khai thành phần bằng <code>PUT /variants/{id}/components</code>; combo không chứa combo
+khác, chính nó hay dịch vụ.</li>
+</ul>
+<p>Số sản phẩm là hạn mức <code>catalog.products</code> của gói (sản phẩm lưu trữ vẫn tính). Tính năng theo gói:
+<code>catalog.variants</code> (hơn một biến thể), <code>catalog.price_lists</code> (hơn một bảng giá), <code>catalog.bundles</code>,
+<code>catalog.digital</code>, <code>catalog.ai</code>.</p>
+<h2 id="danh-mục"><a class="header" href="#danh-mục">Danh mục</a></h2>
+<p>Mỗi khách một cây, sâu tối đa 7 tầng (<code>/categories</code>, permission <code>catalog.categories.manage</code>).
+<code>POST /categories/{id}/move</code> dời danh mục cùng mọi thứ bên dưới; dời vào chính nó bị từ chối
+(<code>catalog.category_cycle</code>). Lọc sản phẩm theo một danh mục gồm cả danh mục con.</p>
+<h2 id="thuộc-tính-hàng-cấm-và-readiness"><a class="header" href="#thuộc-tính-hàng-cấm-và-readiness">Thuộc tính, hàng cấm và readiness</a></h2>
+<ul>
+<li><strong>Thuộc tính</strong> (<code>/attributes</code>, permission <code>catalog.categories.manage</code>) có kiểu: <code>text</code>, <code>integer</code>,
+<code>decimal</code> (kèm <code>scale</code>), <code>boolean</code>, <code>date</code>, <code>option</code>, <code>options</code>. Sản phẩm đặt giá trị bằng
+<code>PUT /products/{id}/attributes</code>.</li>
+<li>Danh mục khai thuộc tính bằng <code>PUT /categories/{id}/attributes</code>; thuộc tính có thể <strong>bắt buộc</strong>, từ
+<code>effective_from</code> tới <code>effective_to</code>, cho danh mục và (mặc định) các danh mục con. Thuộc tính bắt buộc là
+dữ liệu: quy định nhãn mới được thêm kèm ngày bắt đầu.</li>
+<li><strong>Hàng cấm và hàng có điều kiện</strong> là quy tắc dùng chung kèm căn cứ pháp lý (<code>GET /restriction-rules</code>).
+Người vận hành nạp bằng <code>autoxide task catalog.load_restrictions</code> (gói <code>vn</code> phát hành kèm máy chủ; cùng
+lệnh tạo thuộc tính nhãn hàng hoá mẫu như xuất xứ, hạn sử dụng cho một khách). Gắn quy tắc vào danh mục
+bằng <code>PUT /categories/{id}/restrictions</code>. Quy tắc tổng hợp từ nguồn thứ cấp — cần đối chiếu văn bản gốc
+với người có chuyên môn pháp lý.</li>
+<li>Hàng có điều kiện cần giấy tờ còn hạn (<code>/products/{id}/documents</code>, permission
+<code>catalog.documents.manage</code>), vd giấy phép bán lẻ rượu.</li>
+<li>Mỗi sản phẩm có <strong>readiness</strong>: <code>restricted</code> (hàng cấm), <code>missing_attributes</code>, <code>missing_documents</code> hay
+<code>ready</code>. Chỉ sản phẩm <code>ready</code> mới mở bán được. Lọc bằng <code>?readiness=</code>, đếm bằng
+<code>GET /products/counts?group_by=readiness</code>. Giấy tờ hết hạn được một job hằng ngày phát hiện.</li>
+<li>Mở bán còn kiểm nhóm thuế có trong engine thuế theo hồ sơ thuế của nút
+(<code>catalog.tax_category_unknown</code>).</li>
+</ul>
+<h2 id="giá"><a class="header" href="#giá">Giá</a></h2>
+<p><strong>Bảng giá</strong> thuộc một nút tổ chức (chuỗi hay cửa hàng) và áp ở đó cùng các nút bên dưới. Bảng có tiền
+tệ, <code>tax_inclusive</code>, đối tượng (<code>consumer</code> hay <code>business</code>), nhóm khách (không bắt buộc) và <code>priority</code>.</p>
+<p><strong>Dòng giá chỉ được thêm.</strong> Giá mới là dòng mới với <code>valid_from</code> riêng; <code>valid_from</code> ở tương lai là
+giá hẹn giờ, <code>valid_to</code> làm giá tạm thời — hết hạn thì giá trước đó tự áp lại. Lịch sử giá là
+<code>GET /price-lists/{id}/prices</code>. <code>POST /price-lists/{id}/prices</code> thêm tối đa 500 dòng dưới <code>reference</code>
+của bạn: gửi lại cùng reference và nội dung thì nhận lại các dòng đã ghi.</p>
+<p><strong>Bảng nào thắng.</strong> Với một cửa hàng, nhóm khách và thời điểm, các bảng áp được là bảng đang bật, đúng
+tiền tệ, ở cửa hàng hay một nút phía trên, có nhóm khách (và công ty, kênh, thị trường) trống hay khớp.
+Thứ tự: nút gần cửa hàng nhất trước, rồi khớp công ty, nhóm khách, kênh, thị trường, rồi <code>priority</code> lớn
+hơn, rồi id. Mỗi biến thể lấy giá từ bảng đầu tiên theo thứ tự đó có giá cho nó.
+<code>GET /variants/{id}/price?org_id=…&amp;currency=…</code> cho thấy giá và danh sách bảng ứng viên theo thứ tự.</p>
+<p><strong>Giá bán cho người tiêu dùng ở Việt Nam</strong> phải bằng VND và gồm thuế khi nút có hồ sơ thuế Việt Nam
+(Luật Giá 16/2023/QH15 — cần đối chiếu văn bản gốc với người có chuyên môn pháp lý).</p>
+<p><strong>Bảng giá suy ra</strong> lấy giá từ một bảng gốc (<code>derived_from</code>; chỉ một tầng, <code>catalog.derived_chain</code>),
+điều chỉnh theo <code>adjust_bp</code> (phần vạn, có dấu: <code>-1000</code> = giảm 10%) và <code>adjust_minor</code>, rồi làm tròn theo
+<strong>quy tắc làm tròn</strong> (<code>/rounding-rules</code>: bội số của <code>step_minor</code>, hay dạng <code>k × step_minor + ending_minor</code>, vd bước 10.000 và đuôi 9.000 cho 129.000, 199.000). Một job ghi dòng giá thật vào bảng suy
+ra mỗi khi bảng gốc có giá mới, nên đọc giá không bao giờ tính công thức. Dòng tay trong bảng suy ra ghim
+giá biến thể đó khi còn hiệu lực.</p>
+<p><strong>Đổi giá hàng loạt</strong> (<code>/price-lists/{id}/changes</code>): tạo (<code>set</code>, <code>percent</code> hay <code>amount</code>, cho danh mục,
+sản phẩm hay biến thể, có thể tạm thời với <code>valid_to</code>) → xem trước (số biến thể, 20 dòng mẫu, vi phạm sàn
+giá; không ghi gì) → duyệt (<code>catalog.prices.approve</code>; cài đặt nút
+<code>catalog.price_change_requires_second_person</code> bật thì người duyệt phải khác người tạo) → job ghi dòng giá
+(<code>source = bulk</code>). Hoàn tác bằng một lần đổi mới về giá cũ.</p>
+<p><strong>Sàn giá</strong> (<code>/price-guards</code>): giá tối thiểu và / hoặc biên lợi nhuận tối thiểu trên giá vốn, theo nút
+và (nếu muốn) theo danh mục, tác dụng <code>warn</code> (giá vẫn ghi, kèm cảnh báo) hay <code>block</code>
+(<code>catalog.price_below_floor</code>). Quy tắc của nút gần nhất thắng; trong một nút, quy tắc của danh mục gần
+nhất thắng. Giá vốn đến từ event <code>inventory.cost_changed</code>.</p>
+<h2 id="đọc-công-khai-cho-website"><a class="header" href="#đọc-công-khai-cho-website">Đọc công khai cho website</a></h2>
+<p>Không cần đăng nhập (<code>/api/v1/catalog/public/…</code>). Chỉ sản phẩm <code>active</code>, có giá ở website đang hỏi và có
+nội dung bằng ngôn ngữ hỏi; website lấy theo tên miền hay <code>?site=&lt;nút&gt;</code>. Mọi câu trả lời có <code>ETag</code> (gửi
+lại trong <code>If-None-Match</code> để nhận 304) và <code>Cache-Control: public, no-cache</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Endpoint</th><th>Việc</th></tr>
+</thead>
+<tbody>
+<tr><td><code>GET /public/products?locale=vi</code></td><td>thẻ sản phẩm; lọc <code>category=&lt;slug&gt;</code> (gồm danh mục con), <code>attr.&lt;mã&gt;=&lt;giá trị&gt;[,&lt;giá trị&gt;]</code> (thuộc tính lọc được), <code>price_min</code> / <code>price_max</code>, <code>q</code> (có dấu hay không đều được), <code>on_sale</code>, <code>seller=&lt;nút&gt;</code>, <code>sold_by=own|marketplace</code>, <code>min_rating</code>; <code>sort=newest|price_asc|price_desc|best_selling|rating</code></td></tr>
+<tr><td><code>GET /public/products/by-slug/{slug}?locale=vi</code></td><td>trang sản phẩm: biến thể kèm giá hiện tại, ảnh, thuộc tính, danh mục, ngôn ngữ khác</td></tr>
+<tr><td><code>GET /public/categories?locale=vi</code> · <code>GET /public/categories/{slug}?locale=vi</code></td><td>danh mục đang hiện (danh mục nằm dưới danh mục ẩn cũng ẩn)</td></tr>
+<tr><td><code>GET /public/sitemap</code></td><td>mọi đường dẫn sản phẩm ở mọi ngôn ngữ, tối đa 200 mỗi trang</td></tr>
+<tr><td><code>GET /public/products/{id}/similar?locale=vi</code></td><td>tối đa 12 sản phẩm có nội dung gần nghĩa (embedding của AI); không có embedding thì sản phẩm cùng danh mục, bán chạy trước</td></tr>
+<tr><td><code>GET /public/products/{id}/frequently-bought-together?locale=vi</code></td><td>tối đa 12 sản phẩm nằm cùng đơn hoàn tất trong 90 ngày qua, nhiều đơn nhất trước</td></tr>
+</tbody>
+</table>
+</div>
+<p>Thẻ sản phẩm có <code>variant_summary</code> (“3 cỡ”), <code>brand</code> (thuộc tính mã <code>brand</code>) và <code>unit_price</code> (giá mỗi
+kg, l, m hay cái) khi biến thể có lượng tịnh (<code>net_quantity</code> + <code>net_unit</code>, vd 500 và <code>g</code>). Trang sản
+phẩm cho mỗi biến thể một <code>path</code> kèm <code>?variant=&lt;id&gt;</code>, <code>unit_price</code>, và với giá tạm thời có
+<code>price_valid_until</code> và <code>regular_price</code> (giá ngay trước nó) — đủ cho dữ liệu có cấu trúc (<code>Product</code>,
+<code>ProductGroup</code>, <code>Offer</code>); GTIN là <code>barcode</code>.</p>
+<p>Hỗ trợ tìm:</p>
+<ul>
+<li><code>GET /public/search/suggest?q=…&amp;locale=vi</code> — gợi ý khi người mua gõ (sản phẩm, danh mục, và thứ
+module khác góp), khớp đúng dấu trước, tối đa 10.</li>
+<li><code>GET /public/products/facets</code> — nhận bộ lọc của <code>/public/products</code> và đếm số sản phẩm theo từng giá
+trị thuộc tính và theo người bán (số đếm của một bộ lọc không lọc theo chính nó).</li>
+<li><code>GET</code> / <code>PUT /synonyms</code> — nhóm từ đồng nghĩa của khách (<code>[["áo thun", "áo phông", "tee"]]</code>); tìm và
+gợi ý dùng chúng (<code>catalog.categories.manage</code>).</li>
+</ul>
+<p>Bán chạy và điểm đánh giá lấy từ module <code>orders</code>: mỗi đơn hoàn tất (<code>orders.order_completed</code>) đếm
+sản phẩm của nó một lần (event nhận lại không đếm hai lần), trong cửa sổ 90 ngày mà job hằng ngày
+(<code>catalog.refresh_sales</code>) dời tới; event đánh giá mang tổng số đánh giá và tổng số sao hiện tại của sản
+phẩm. Cũng các đơn đó cho “thường mua cùng”. “Tương tự” cần module <code>ai</code> bật embedding
+(<code>AUTOXIDE_EMBEDDING_PROVIDER</code> và các biến <code>AUTOXIDE_EMBEDDING_*</code> khác): mỗi sản phẩm đang bán có một vector mỗi ngôn ngữ, danh sách sản phẩm tương
+tự tính lúc lập index, không tính lúc đọc.</p>
+<p>Website hiện sản phẩm nào: của chính nút đó, của các nút cấp trên, và của người bán bên dưới nó
+(<code>seller.own = false</code> trên thẻ). Cửa hàng ẩn một sản phẩm của chuỗi bằng
+<code>PUT /stores/{org_id}/overrides/{product_id}</code> <code>{"hidden": true}</code> (<code>catalog.products.write</code> ở cửa hàng).</p>
+<p>Giá trên các trang này là giá hiện tại của bảng giá của website (nút gần nhất có bảng giá đang bật),
+không theo nhóm khách. Giá được tính sẵn vào một bảng dẫn xuất, dựng lại bằng job sau mỗi lần đổi giá,
+trạng thái, bảng giá hay lựa chọn của cửa hàng, và mỗi phút cho giá hẹn giờ vừa bắt đầu hay vừa hết
+(event <code>catalog.price_effective</code>). Nếu danh sách công khai có vẻ chưa cập nhật, chạy
+<code>autoxide task catalog.rebuild_storefront [tenant=&lt;slug&gt;]</code>.</p>
+<h2 id="bộ-sưu-tập"><a class="header" href="#bộ-sưu-tập">Bộ sưu tập</a></h2>
+<p>Bộ sưu tập gom sản phẩm cho một trang của website (“Giảm giá mùa hè”, “Hàng mới tháng này”). Quản lý dưới
+<code>/collections</code> (<code>catalog.collections.manage</code> ở nút của bộ sưu tập; đọc cần <code>catalog.products.read</code>); <code>PATCH</code>
+và <code>PUT /collections/{id}/items</code> cần <code>If-Match</code>.</p>
+<ul>
+<li><code>kind: manual</code> — sản phẩm chọn tay có thứ tự: <code>PUT /collections/{id}/items</code> <code>{"product_ids": [...]}</code> (tối đa
+500) thay cả danh sách.</li>
+<li><code>kind: rule</code> — sản phẩm khớp mọi điều kiện của <code>rules</code> (tối đa 10):
+<code>{"category_ids": [...], "attributes": {"color": ["red"]}, "price_min": 100000, "price_max": 500000, "new_within_days": 30, "on_promotion": true, "match": "all"}</code>. Giá theo đơn vị nhỏ nhất của tiền tệ bảng giá
+của website; <code>on_promotion</code> cần module <code>promotions</code> (<code>catalog.rule_needs_module</code>).</li>
+<li><code>sort</code>: <code>manual</code> (thứ tự chọn, chỉ bộ sưu tập chọn tay), <code>newest</code>, <code>price_asc</code>, <code>price_desc</code>, <code>best_selling</code>;
+giá trị bằng nhau giữ thứ tự ổn định theo ID trên cả hai database.</li>
+<li><code>texts</code> theo ngôn ngữ: <code>title</code>, <code>slug</code> (không trùng trong ngôn ngữ), <code>description</code>, <code>meta_title</code>,
+<code>meta_description</code>; <code>media_id</code> (ảnh công khai); <code>status</code> (<code>draft</code>, <code>active</code>, <code>archived</code>) và <code>starts_at</code> /
+<code>ends_at</code> tuỳ chọn.</li>
+<li><code>ai_assisted</code>: chữ soạn từ gợi ý của AI; trang công khai trả kèm để website gắn nhãn AI (Luật Trí tuệ nhân
+tạo — cần đối chiếu văn bản gốc). Tool MCP mặc định đặt dấu này; người viết lại chữ thì gỡ bằng <code>PATCH</code>.</li>
+</ul>
+<p>Website đọc <code>GET /api/v1/catalog/public/collections/{slug}?locale=vi</code> (công khai; <code>site</code> hay tên miền): chữ của
+bộ sưu tập và một trang sản phẩm, cùng thẻ như <code>/public/products</code>, chỉ sản phẩm còn hiện trên website đó, theo
+thứ tự của bộ sưu tập. Chỉ bộ sưu tập <code>active</code> trong khung giờ, của website hay nút cấp trên, là công khai. Banner
+và menu trỏ tới bộ sưu tập bằng <code>catalog.collection</code> của sổ đối tượng (<code>/collections/&lt;slug&gt;</code>). Tool MCP:
+<code>catalog.list_collections</code>, <code>catalog.save_collection</code> (chỉ bản nháp: người dùng bật <code>active</code>).
+Ví dụ dựng trang chủ: <a href="guides/storefront.vi.html"><code>docs/guides/storefront.vi.md</code></a>.</p>
+<h2 id="cho-module-khác"><a class="header" href="#cho-module-khác">Cho module khác</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let catalog = context.require::&lt;dyn autoxide_catalog::api::Catalog&gt;()?;
+<span class="boring">}</span></code></pre>
+<p><code>variants</code>, <code>variant_by_code</code>, <code>prices</code> (giá hiệu lực tại một thời điểm), <code>reference_prices</code> (giá hiệu
+lực ngay trước một thời điểm — “giá trước khuyến mại”), <code>price_floors</code> và <code>bundle_components</code>. Mỗi lần
+gọi nhận tối đa 500 ID và chạy số câu query cố định. Danh sách event ở
+<code>autoxide_catalog::api::events</code>.</p>
+<p>Module đăng ký sau <code>catalog</code> cắm vào qua <code>dyn CatalogExtensions</code>: module khuyến mại đưa giá giảm tự động
+vào danh sách công khai bằng <code>set_sale_price_source</code> (một <code>SalePriceSource</code>), và phát
+<code>promotions.automatic_prices_changed</code> (<code>after.variant_ids</code>) khi giá giảm đổi. Module sàn có thể từ chối
+mở bán một sản phẩm bằng <code>set_listing_gate</code> (một <code>ListingGate</code>); lúc đó đổi trạng thái trả 422
+<code>catalog.listing_denied</code>.</p>
+<p><code>catalog.display_price_changed</code> báo khi giá công khai của một sản phẩm trên một website đổi (giá sau giảm
+tự động nếu có, không thì giá thấp nhất của các biến thể; <code>null</code> khi không bán ở đó; không bao giờ là giá
+gạch <code>compare_at</code>). Dựng lại mà giá như cũ thì không gửi gì.</p>
+<h2 id="nhập-và-xuất-csv"><a class="header" href="#nhập-và-xuất-csv">Nhập và xuất (CSV)</a></h2>
+<p>Cả hai chạy nền và cần nơi lưu file (module <code>files</code>); không có thì trả 503 <code>catalog.storage_unavailable</code>.
+File giữ 7 ngày.</p>
+<ul>
+<li><code>POST /imports?org_id=&lt;nút&gt;</code> với thân là chính file (<code>Content-Type: text/csv</code>, UTF-8, tối đa 20 MiB và
+50 000 dòng; <code>catalog.import</code>). Cột ở dòng đầu, thứ tự tuỳ ý: <code>sku</code> (bắt buộc), <code>name</code>, <code>locale</code>,
+<code>short_description</code>, <code>description</code>, <code>kind</code>, <code>tax_category</code>, <code>barcode</code>, <code>weight_grams</code>. SKU đã có thì
+sửa biến thể đó và nội dung của sản phẩm ở <code>locale</code> (giữ đường dẫn); SKU mới thì tạo sản phẩm <strong>nháp</strong>
+một biến thể (cần <code>name</code> và <code>tax_category</code>). Nhập không bao giờ mở bán, nên nhập lại cùng file không
+đổi gì. Mỗi dòng được kiểm như sửa tay bằng quyền của bạn: dòng sai được báo, các dòng khác vẫn ghi.</li>
+<li><code>GET /imports/{id}</code>: <code>status</code> là <code>queued</code>, <code>running</code>, <code>succeeded</code>, <code>succeeded_with_errors</code> (xem
+<code>errors</code>: dòng, cột, mã, lời nhắn), <code>rejected</code> (file không hợp lệ; không ghi gì) hay <code>failed</code>. Chỉ người
+bắt đầu thấy. Sản phẩm nhiều biến thể hay tuỳ chọn thì hoàn thiện qua API sau khi nhập.</li>
+<li><code>POST /exports</code> <code>{"org_id": …}</code> (<code>catalog.export</code>): mọi biến thể của sản phẩm bạn đọc được, cùng cột,
+để sửa rồi nhập lại. Ô mà bảng tính sẽ chạy như công thức (<code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>) có <code>'</code> ở đầu; khi nhập
+lại, <code>'</code> đó được bỏ. Khi <code>GET /exports/{id}</code> báo <code>succeeded</code> thì tải <code>content_path</code>.</li>
+</ul>
+<p>Tool MCP: <code>catalog.start_import</code>, <code>catalog.import_status</code>.</p>
+<h2 id="bản-nháp-ai-cho-mô-tả-và-seo"><a class="header" href="#bản-nháp-ai-cho-mô-tả-và-seo">Bản nháp AI cho mô tả và SEO</a></h2>
+<p><code>POST /products/{id}/suggestions</code> <code>{"locale": "vi"}</code> (<code>catalog.products.write</code>, tính năng gói
+<code>catalog.ai</code>, module <code>ai</code> đã bật) xin mô hình mô tả ngắn, mô tả và chữ SEO chỉ dựa trên điều nội dung sản
+phẩm đã nói. Kết quả là <strong>bản nháp</strong>: sản phẩm không đổi gì. <code>POST /suggestions/{id}/apply</code> ghi vào nội
+dung ở ngôn ngữ đó (giữ tên và đường dẫn) và đánh dấu sản phẩm <code>ai_assisted</code>; <code>POST /suggestions/{id}/discard</code> bỏ nó. Tool MCP: <code>catalog.suggest_copy</code>.</p>
+<h3 id="tạo-sản-phẩm-nháp-từ-ảnh"><a class="header" href="#tạo-sản-phẩm-nháp-từ-ảnh">Tạo sản phẩm nháp từ ảnh</a></h3>
+<p><code>POST /products/from-images</code> <code>{"media_ids": […], "locale": "vi", "tax_category": "vat.standard", "category_id": null, "org_id": null}</code> (<code>catalog.products.write</code>, tính năng gói <code>catalog.ai</code>, mô hình AI
+đọc được ảnh) gửi 1 tới 8 ảnh trong thư viện media — bản thu nhỏ máy chủ làm, đã bỏ metadata, không bao
+giờ là ảnh gốc — cho mô hình, chạy nền. Theo <code>Location</code> (<code>GET /products/from-images/{id}</code>) tới khi
+<code>status</code> là <code>succeeded</code>: <code>product_id</code> là sản phẩm <strong>nháp</strong> mới mang <code>ai_assisted</code>, có tên, mô tả, chữ
+SEO, danh mục trong cây của bạn (hay danh mục bạn chọn; danh mục ngoài cây bị bỏ), giá trị thuộc tính của
+danh mục đó mà mô hình chắc chắn, và ảnh công khai làm ảnh sản phẩm. Giá, tồn kho, mã vạch để bạn nhập;
+SKU là mã tạm <code>AI-…</code>. Không có gì được mở bán. (Chặn gắn ảnh do AI tạo vào sản phẩm đi cùng bước 67,
+bước đánh dấu chúng.)</p>
+<h2 id="hỏi-đáp-sản-phẩm-menu-và-module-khác"><a class="header" href="#hỏi-đáp-sản-phẩm-menu-và-module-khác">Hỏi đáp sản phẩm, menu và module khác</a></h2>
+<p>Sản phẩm và danh mục nằm trong sổ đối tượng của kernel, nên module khác trỏ tới được mà không đọc
+bảng của catalog:</p>
+<ul>
+<li><code>catalog.product</code>: công khai khi đang bán (<code>active</code>) và có nội dung ở ngôn ngữ hỏi; tiêu đề, mô tả
+ngắn, đường dẫn <code>/&lt;tiền tố&gt;/&lt;slug&gt;</code> và ảnh đầu tiên. Hỏi đáp sản phẩm dùng module <code>comments</code> với loại
+đích này. Cấu hình gợi ý: <code>AUTOXIDE_COMMENTS_TARGET_TYPES</code> gồm <code>catalog.product</code>,
+<code>AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES=catalog.product</code> (chỉ tài khoản đã xác thực, Nghị định
+147/2024 — cần đối chiếu phạm vi với văn bản gốc) và
+<code>AUTOXIDE_COMMENTS_MODERATION_BY_TYPE=catalog.product:user=pre</code> (câu hỏi chờ duyệt). Lưu trữ hay xoá
+sản phẩm thì hỏi đáp của nó bị đóng và ẩn. Tác giả quản lý được sản phẩm (<code>catalog.products.write</code> ở
+nút của nó) có nhãn <code>seller</code>; module <code>orders</code> thêm nhãn <code>verified_buyer</code>.</li>
+<li><code>catalog.category</code>: cho menu của website (module <code>menus</code>) — tên và đường dẫn (<code>/categories/&lt;slug&gt;</code>)
+theo ngôn ngữ, danh mục con theo thứ tự hiển thị, chỉ danh mục đang hiện. Khối “Bán chạy” trong menu
+là danh sách sản phẩm công khai lọc theo danh mục, sắp <code>best_selling</code>.</li>
+</ul>
+<p>Chữ mô tả ảnh theo ngôn ngữ: <code>PUT /products/{id}/media/{media_id}/alts/{locale}</code> <code>{"alt": "…"}</code> (kèm
+<code>If-Match</code>; <code>DELETE</code> để bỏ). Trang sản phẩm ở ngôn ngữ đó hiện chữ này; không có thì <code>alt</code> của sản phẩm ở
+ngôn ngữ mặc định, rồi tới chữ của thư viện media ở ngôn ngữ đó. Bỏ ảnh khỏi sản phẩm thì chữ của nó cũng
+bị bỏ.</p>
+<h2 id="thông-tin-khác-nhau-giữa-các-biến-thể"><a class="header" href="#thông-tin-khác-nhau-giữa-các-biến-thể">Thông tin khác nhau giữa các biến thể</a></h2>
+<p><code>PUT /variants/{id}/attributes</code> đặt giá trị thuộc tính cho một biến thể — dùng cho mấy người, trong hộp có
+gì, cách chăm sóc, dùng được máy rửa bát — bằng bộ thuộc tính của khách (<code>POST /attributes</code>), nên không
+viết cứng cho ngành nào. Giá trị chữ có thể kèm bản dịch: <code>{"attribute_id": …, "value": "Rửa tay", "texts": {"en": "Hand wash"}}</code>. Trang sản phẩm công khai liệt kê chúng dưới từng biến thể
+(<code>variants[].attributes</code>) ở ngôn ngữ hỏi.</p>
+<h2 id="hàng-số"><a class="header" href="#hàng-số">Hàng số</a></h2>
+<p>Sản phẩm loại <code>digital</code> giao bằng link tải thay vì giao hàng (tính năng gói <code>catalog.digital</code>).</p>
+<ol>
+<li>Tải file lên bằng <code>POST /api/v1/files</code> (hay tải thẳng, <code>/api/v1/files/uploads</code>).</li>
+<li>Gắn vào biến thể: <code>POST /variants/{id}/digital-assets</code> <code>{"file_id": …, "download_limit": 5, "grant_days": 30}</code> (<code>catalog.products.write</code>). Nội dung được chép lại, nên xoá file đã tải lên sau
+đó không ảnh hưởng người mua. Hàng số chưa có file thì không mở bán được
+(<code>catalog.digital_asset_missing</code>).</li>
+<li>Khi module <code>orders</code> xác nhận một đơn <strong>đã trả tiền</strong> (<code>orders.order_confirmed</code> với <code>payment_status</code>
+<code>paid</code>), mỗi dòng đơn của biến thể hàng số được một quyền tải cho mỗi file: <code>download_limit</code> lượt,
+hiệu lực <code>grant_days</code> ngày. Nhận lại event không phát thêm. Huỷ đơn, hay hoàn tiền không gắn trả
+hàng, thu hồi quyền ngay.</li>
+<li>Người mua có tài khoản xem quyền của mình bằng <code>GET /downloads</code> và dùng một lượt bằng
+<code>POST /downloads/{id}</code>. Người quản lý có <code>catalog.downloads.manage</code> xem quyền của đơn
+(<code>GET /orders/{id}/downloads</code>), thu hồi (<code>POST /orders/{id}/downloads/revoke</code>) hay cấp token mới để
+gửi cho người mua không có tài khoản (<code>POST /orders/{id}/downloads/reissue</code>, lần duy nhất
+<code>token_path</code> hiện ra).</li>
+<li>Dùng một lượt (<code>POST /public/downloads/{token}</code>, không cần đăng nhập) trả địa chỉ file đã ký, sống
+<code>AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS</code>; địa chỉ nhận <code>Range</code> để tải tiếp và không trừ thêm lượt.
+Địa chỉ ký bằng khoá riêng của khách: địa chỉ của khách này không dùng được trên tên miền của khách
+khác.</li>
+</ol>
+<p>Dịch vụ (<code>service</code>) không giao hàng, không tồn kho; combo (<code>bundle</code>) trừ kho từng thành phần
+(<code>PUT /variants/{id}/components</code>); hàng đặt trước dùng <code>sale_mode</code> của biến thể.</p>
+<h2 id="cấu-hình"><a class="header" href="#cấu-hình">Cấu hình</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Biến</th><th>Mặc định</th><th>Ý nghĩa</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_CATALOG_LOCALES</code></td><td><code>en,vi</code></td><td>Ngôn ngữ được viết nội dung sản phẩm và danh mục</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX</code></td><td><code>products</code></td><td>Đoạn đầu của đường dẫn công khai của sản phẩm</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS</code></td><td><code>300</code></td><td>Số giây địa chỉ file đã ký của hàng số còn dùng được</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT</code></td><td><code>5</code></td><td>Số lượt tải mỗi file khi file không tự đặt</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS</code></td><td><code>30</code></td><td>Số ngày người mua tải được khi file không tự đặt</td></tr>
+</tbody>
+</table>
+</div>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/BOOKINGS.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/COMMENTS.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/BOOKINGS.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/COMMENTS.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

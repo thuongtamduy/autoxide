@@ -1,0 +1,529 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Catalog - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="catalog"><a class="header" href="#catalog">Catalog</a></h1>
+<p><a href="CATALOG.vi.html">Tiếng Việt</a></p>
+<p>The <code>catalog</code> module holds the products every commerce module reads: products with variants, a
+category tree, and price lists with a full price history. Inventory, promotions, shipping, orders and
+sales channels read products and prices through <code>autoxide_catalog::api::Catalog</code>, never through the
+<code>catalog_…</code> tables. Everything is under <code>/api/v1/catalog</code>; every endpoint is described in
+<code>docs/openapi.json</code>, and the same operations are MCP tools (<code>catalog.*</code>).</p>
+<h2 id="products-and-variants"><a class="header" href="#products-and-variants">Products and variants</a></h2>
+<ul>
+<li><code>POST /products</code> creates a product as a <strong>draft</strong> together with its first variant. <code>kind</code> is
+<code>physical</code> (shipped, stocked), <code>digital</code>, <code>service</code> or <code>bundle</code>. <code>tax_category</code> is a code of the tax
+engine (<code>GET /api/v1/tax/categories</code>), e.g. <code>vat.standard</code>.</li>
+<li>Texts are per language (<code>PUT /products/{id}/translations/{locale}</code>); the languages allowed are
+<code>AUTOXIDE_CATALOG_LOCALES</code>. Each translation has its public <code>path</code>,
+<code>/&lt;AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX&gt;/&lt;slug&gt;</code>. An empty <code>slug</code> is made from the name, with <code>-2</code>, <code>-3</code>… when taken. The
+description is plain text (blank lines separate paragraphs); HTML is not interpreted.</li>
+<li>Options (colour, size…) are set with <code>PUT /products/{id}/options</code>: up to 3 options of up to 100
+values. Adding an option gives every existing variant the option’s first value. Each variant holds
+one value of each option, and no two variants share a combination
+(<code>catalog.option_combination_taken</code>).</li>
+<li>SKUs and barcodes are unique in a tenant (<code>catalog.sku_taken</code>, <code>catalog.barcode_taken</code>); SKUs are
+compared ignoring case and spaces. A numeric barcode of 8, 12, 13 or 14 digits must have a right GTIN
+check digit.</li>
+<li>Sale mode per variant: <code>in_stock</code>, <code>backorder</code> or <code>preorder</code> (with <code>preorder_available_on</code> after
+today and an optional <code>preorder_limit</code>).</li>
+<li>Images are public media of the <code>media</code> module (<code>PUT /products/{id}/media</code>).</li>
+<li>Status (<code>POST /products/{id}/status</code>, permission <code>catalog.products.publish</code>): <code>draft</code> → <code>active</code> or
+<code>archived</code>; <code>active</code> ↔ <code>inactive</code>; any → <code>archived</code>; <code>archived</code> → <code>draft</code>. Going on sale needs a tax
+category, a name and an active variant. A product that was on sale once cannot be deleted, only
+archived.</li>
+<li>Bundles (<code>kind: bundle</code>) list their components with <code>PUT /variants/{id}/components</code>; a bundle
+cannot contain a bundle, itself or a service.</li>
+</ul>
+<p>The number of products is the plan limit <code>catalog.products</code> (archived products count). Plan features:
+<code>catalog.variants</code> (more than one variant), <code>catalog.price_lists</code> (more than one price list),
+<code>catalog.bundles</code>, <code>catalog.digital</code>, <code>catalog.ai</code>.</p>
+<h2 id="categories"><a class="header" href="#categories">Categories</a></h2>
+<p>One tree per tenant, at most 7 levels deep (<code>/categories</code>, permission <code>catalog.categories.manage</code>).
+<code>POST /categories/{id}/move</code> moves a category with everything below it; moving it under itself is
+refused (<code>catalog.category_cycle</code>). Filtering products by a category includes its subcategories.</p>
+<h2 id="attributes-restricted-goods-and-readiness"><a class="header" href="#attributes-restricted-goods-and-readiness">Attributes, restricted goods and readiness</a></h2>
+<ul>
+<li><strong>Attributes</strong> (<code>/attributes</code>, permission <code>catalog.categories.manage</code>) are typed: <code>text</code>, <code>integer</code>,
+<code>decimal</code> (with <code>scale</code>), <code>boolean</code>, <code>date</code>, <code>option</code>, <code>options</code>. Products set their values with
+<code>PUT /products/{id}/attributes</code>.</li>
+<li>A category lists its attributes with <code>PUT /categories/{id}/attributes</code>; an attribute can be
+<strong>required</strong>, from <code>effective_from</code> until <code>effective_to</code>, for the category and (by default) its
+subcategories. Required attributes are data: new labelling rules are added with their start date.</li>
+<li><strong>Prohibited and conditional goods</strong> are shared rules with their legal basis
+(<code>GET /restriction-rules</code>). The operator loads them with
+<code>autoxide task catalog.load_restrictions</code> (the <code>vn</code> pack ships with the server; the same command
+creates sample product-label attributes such as origin and use-by date for a tenant). Link rules to a
+category with <code>PUT /categories/{id}/restrictions</code>. The rules were compiled from secondary sources —
+check them against the source texts with a legal professional.</li>
+<li>A conditional product needs valid documents (<code>/products/{id}/documents</code>, permission
+<code>catalog.documents.manage</code>), e.g. an alcohol retail licence.</li>
+<li>Every product has a <strong>readiness</strong>: <code>restricted</code> (prohibited goods), <code>missing_attributes</code>,
+<code>missing_documents</code> or <code>ready</code>. Only <code>ready</code> products go on sale. Filter with <code>?readiness=</code> and count
+with <code>GET /products/counts?group_by=readiness</code>. Expired documents are noticed by a daily job.</li>
+<li>Going on sale also checks that the tax category exists in the tax engine for the unit’s tax
+profile (<code>catalog.tax_category_unknown</code>).</li>
+</ul>
+<h2 id="prices"><a class="header" href="#prices">Prices</a></h2>
+<p>A <strong>price list</strong> belongs to an organization unit (a chain or a store) and applies there and below.
+It has a currency, <code>tax_inclusive</code>, an audience (<code>consumer</code> or <code>business</code>), an optional customer
+group and a <code>priority</code>.</p>
+<p><strong>Price rows are only ever added.</strong> A new price is a new row with its own <code>valid_from</code>; a future
+<code>valid_from</code> schedules a price, and <code>valid_to</code> makes it temporary — when it ends, the earlier price
+applies again. The history is <code>GET /price-lists/{id}/prices</code>. <code>POST /price-lists/{id}/prices</code> adds up
+to 500 rows under your <code>reference</code>: sending the same reference and content again returns the rows
+already written.</p>
+<p><strong>Which list wins.</strong> For a store, customer group and time, the lists that apply are the active lists
+in the currency, at the store or a unit above it, whose customer group (and company, channel, market)
+is empty or matches. They are ordered: the unit closest to the store first, then a matching company,
+customer group, channel and market, then higher <code>priority</code>, then id. Each variant takes its price from
+the first list in that order that has one. <code>GET /variants/{id}/price?org_id=…&amp;currency=…</code> shows the
+price and the ordered candidate lists.</p>
+<p><strong>Consumer prices in Viet Nam</strong> must be in VND and include tax when the unit has a Vietnamese tax
+profile (Price Law 16/2023/QH15 — check the source text with a legal professional before relying on
+it).</p>
+<p><strong>Derived price lists</strong> take their prices from a source list (<code>derived_from</code>; one level only,
+<code>catalog.derived_chain</code>), adjusted by <code>adjust_bp</code> (basis points, signed: <code>-1000</code> = 10% off) and
+<code>adjust_minor</code>, then rounded by a <strong>rounding rule</strong> (<code>/rounding-rules</code>: multiples of <code>step_minor</code>, or
+<code>k × step_minor + ending_minor</code>, e.g. step 10,000 and ending 9,000 give 129,000 and 199,000). A job
+writes real price rows into the derived list whenever the source gets prices, so reading a price
+never computes a formula. A manual row in the derived list pins that variant’s price while it is in
+effect.</p>
+<p><strong>Bulk price changes</strong> (<code>/price-lists/{id}/changes</code>): create (<code>set</code>, <code>percent</code> or <code>amount</code>, for
+categories, products or variants, optionally temporary with <code>valid_to</code>) → preview (counts, 20
+sample rows, price-floor violations; nothing is written) → approve (<code>catalog.prices.approve</code>; with the
+unit setting <code>catalog.price_change_requires_second_person</code> on, someone other than the maker must
+approve) → a job writes the rows (<code>source = bulk</code>). Undo a change with a new change back to the old
+prices.</p>
+<p><strong>Price floors</strong> (<code>/price-guards</code>): a minimum price and / or a minimum margin over unit cost, per unit
+and optionally per category, acting as <code>warn</code> (the price is saved with a warning) or <code>block</code>
+(<code>catalog.price_below_floor</code>). The rule of the closest unit wins; within a unit, the rule of the
+closest category wins. Unit costs come from the <code>inventory.cost_changed</code> event.</p>
+<h2 id="public-reads-for-websites"><a class="header" href="#public-reads-for-websites">Public reads for websites</a></h2>
+<p>No sign-in needed (<code>/api/v1/catalog/public/…</code>). Only products that are <code>active</code>, have a price on the
+website asking and a text in the language asked; the website comes from the domain or <code>?site=&lt;unit&gt;</code>.
+Every answer has an <code>ETag</code> (send it back in <code>If-None-Match</code> to get 304) and
+<code>Cache-Control: public, no-cache</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Endpoint</th><th>What</th></tr>
+</thead>
+<tbody>
+<tr><td><code>GET /public/products?locale=vi</code></td><td>product cards; filters <code>category=&lt;slug&gt;</code> (with sub-categories), <code>attr.&lt;code&gt;=&lt;value&gt;[,&lt;value&gt;]</code> (filterable attributes), <code>price_min</code> / <code>price_max</code>, <code>q</code> (with or without accents), <code>on_sale</code>, <code>seller=&lt;unit&gt;</code>, <code>sold_by=own|marketplace</code>, <code>min_rating</code>; <code>sort=newest|price_asc|price_desc|best_selling|rating</code></td></tr>
+<tr><td><code>GET /public/products/by-slug/{slug}?locale=vi</code></td><td>the product page: variants with current prices, images, attributes, categories, other languages</td></tr>
+<tr><td><code>GET /public/categories?locale=vi</code> · <code>GET /public/categories/{slug}?locale=vi</code></td><td>visible categories (a category under a hidden one is hidden)</td></tr>
+<tr><td><code>GET /public/sitemap</code></td><td>every product address in every language, at most 200 per page</td></tr>
+<tr><td><code>GET /public/products/{id}/similar?locale=vi</code></td><td>up to 12 products whose texts mean something close (AI embeddings); without embeddings, products of the same categories, best sellers first</td></tr>
+<tr><td><code>GET /public/products/{id}/frequently-bought-together?locale=vi</code></td><td>up to 12 products found in the same completed orders over the last 90 days, most orders first</td></tr>
+</tbody>
+</table>
+</div>
+<p>Product cards carry <code>variant_summary</code> (“3 sizes”), <code>brand</code> (the attribute with code <code>brand</code>) and
+<code>unit_price</code> (price per kg, l, m or piece) when a variant has a net content (<code>net_quantity</code> +
+<code>net_unit</code>, e.g. 500 and <code>g</code>). Product pages give each variant a <code>path</code> with <code>?variant=&lt;id&gt;</code>,
+<code>unit_price</code>, and for a temporary price <code>price_valid_until</code> and <code>regular_price</code> (the price just before
+it) — what structured data (<code>Product</code>, <code>ProductGroup</code>, <code>Offer</code>) needs; the GTIN is <code>barcode</code>.</p>
+<p>Search helpers:</p>
+<ul>
+<li><code>GET /public/search/suggest?q=…&amp;locale=vi</code> — suggestions as the shopper types (products,
+categories, and what other modules add), exact accents first, at most 10.</li>
+<li><code>GET /public/products/facets</code> — takes the filters of <code>/public/products</code> and counts products per
+attribute value and per seller (the counts of one filter ignore that filter).</li>
+<li><code>GET</code> / <code>PUT /synonyms</code> — the tenant’s synonym groups (<code>[["áo thun", "áo phông", "tee"]]</code>); search
+and suggestions use them (<code>catalog.categories.manage</code>).</li>
+</ul>
+<p>Best sellers and ratings come from module <code>orders</code>: each completed order (<code>orders.order_completed</code>)
+counts its products once (a redelivered event is not counted twice), over a rolling 90-day window that
+a daily job (<code>catalog.refresh_sales</code>) moves forward; review events carry the product’s current review
+count and star total. The same orders feed “frequently bought together”. “Similar” needs the <code>ai</code>
+module with embeddings on (<code>AUTOXIDE_EMBEDDING_PROVIDER</code> and the other <code>AUTOXIDE_EMBEDDING_*</code> settings): each product on sale gets one vector per
+language, and its list of similar products is computed when it is indexed, not on each read.</p>
+<p>Which products a website shows: those of its own unit, of the units above it, and of sellers below
+it (<code>seller.own = false</code> on the card). A store hides a product of its chain with
+<code>PUT /stores/{org_id}/overrides/{product_id}</code> <code>{"hidden": true}</code> (<code>catalog.products.write</code> at the store).</p>
+<p>Prices on these pages are the current prices of the website’s price list (the closest unit with an
+active price list), without customer group. They are kept ready in a derived table rebuilt by a
+background job after every change of price, status, price list or store choice, and every minute for
+scheduled prices that just started or ended (event <code>catalog.price_effective</code>). If the public lists ever
+look out of date, run <code>autoxide task catalog.rebuild_storefront [tenant=&lt;slug&gt;]</code>.</p>
+<h2 id="collections"><a class="header" href="#collections">Collections</a></h2>
+<p>A collection groups products for a page of the website (“Summer sale”, “New this month”). Manage them
+under <code>/collections</code> (<code>catalog.collections.manage</code> at the collection’s unit; reading needs
+<code>catalog.products.read</code>); <code>PATCH</code> and <code>PUT /collections/{id}/items</code> need <code>If-Match</code>.</p>
+<ul>
+<li><code>kind: manual</code> — chosen products in order: <code>PUT /collections/{id}/items</code> <code>{"product_ids": [...]}</code> (at
+most 500) replaces the list.</li>
+<li><code>kind: rule</code> — products matching every condition of <code>rules</code> (at most 10):
+<code>{"category_ids": [...], "attributes": {"color": ["red"]}, "price_min": 100000, "price_max": 500000, "new_within_days": 30, "on_promotion": true, "match": "all"}</code>. Prices are in the smallest unit of the
+website’s price list currency; <code>on_promotion</code> needs module <code>promotions</code> (<code>catalog.rule_needs_module</code>).</li>
+<li><code>sort</code>: <code>manual</code> (chosen order, manual collections only), <code>newest</code>, <code>price_asc</code>, <code>price_desc</code>,
+<code>best_selling</code>; equal values keep a stable order by id on both databases.</li>
+<li><code>texts</code> by language: <code>title</code>, <code>slug</code> (unique in the language), <code>description</code>, <code>meta_title</code>,
+<code>meta_description</code>; <code>media_id</code> (a public picture); <code>status</code> (<code>draft</code>, <code>active</code>, <code>archived</code>) and an
+optional <code>starts_at</code> / <code>ends_at</code>.</li>
+<li><code>ai_assisted</code>: the texts were written with an AI’s suggestion; the public page carries it so the
+website shows an AI label (Vietnam’s Law on Artificial Intelligence — check the original text). MCP
+tools set it by default; a person clears it with <code>PATCH</code> after rewriting the texts.</li>
+</ul>
+<p>The website reads <code>GET /api/v1/catalog/public/collections/{slug}?locale=vi</code> (public; <code>site</code> or the
+domain): the collection’s texts and one page of its products, with the same cards as
+<code>/public/products</code>, only products still shown on that website, in the collection’s order. Only <code>active</code>
+collections in their time window, of the website or a unit above it, are public. Banners and menus
+point to a collection as <code>catalog.collection</code> of the object directory (<code>/collections/&lt;slug&gt;</code>). MCP tools:
+<code>catalog.list_collections</code>, <code>catalog.save_collection</code> (drafts only: a person sets a collection <code>active</code>).
+A worked home-page example: <a href="guides/storefront.html"><code>docs/guides/storefront.md</code></a>.</p>
+<h2 id="for-other-modules"><a class="header" href="#for-other-modules">For other modules</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let catalog = context.require::&lt;dyn autoxide_catalog::api::Catalog&gt;()?;
+<span class="boring">}</span></code></pre>
+<p><code>variants</code>, <code>variant_by_code</code>, <code>prices</code> (price in effect at a time), <code>reference_prices</code> (the price in
+effect just before a time — for “price before the discount”), <code>price_floors</code> and <code>bundle_components</code>.
+Every call takes at most 500 ids and runs a fixed number of queries. Events are listed in
+<code>autoxide_catalog::api::events</code>.</p>
+<p>A module registered after <code>catalog</code> plugs in through <code>dyn CatalogExtensions</code>: a promotions module gives
+the public lists their automatic sale prices with <code>set_sale_price_source</code> (a <code>SalePriceSource</code>), and
+emits <code>promotions.automatic_prices_changed</code> (<code>after.variant_ids</code>) when they change. A marketplace
+module can refuse to put a product on sale with <code>set_listing_gate</code> (a <code>ListingGate</code>); the status
+change then answers 422 <code>catalog.listing_denied</code>.</p>
+<p><code>catalog.display_price_changed</code> tells when the public price of a product on a website changes (the
+automatic sale price when there is one, otherwise the lowest variant price; <code>null</code> when it is not on
+sale there; never the crossed-out <code>compare_at</code>). A rebuild that leaves the price as it was sends
+nothing.</p>
+<h2 id="import-and-export-csv"><a class="header" href="#import-and-export-csv">Import and export (CSV)</a></h2>
+<p>Both run in the background and need file storage (module <code>files</code>); without it they answer 503
+<code>catalog.storage_unavailable</code>. Files are kept 7 days.</p>
+<ul>
+<li><code>POST /imports?org_id=&lt;unit&gt;</code> with the file itself as the body (<code>Content-Type: text/csv</code>, UTF-8, at
+most 20 MiB and 50 000 rows; <code>catalog.import</code>). Columns, first line, any order: <code>sku</code> (required),
+<code>name</code>, <code>locale</code>, <code>short_description</code>, <code>description</code>, <code>kind</code>, <code>tax_category</code>, <code>barcode</code>,
+<code>weight_grams</code>. A known SKU updates that variant and the product’s text in <code>locale</code> (the address
+stays); a new SKU creates a <strong>draft</strong> product with one variant (needs <code>name</code> and <code>tax_category</code>).
+Nothing is put on sale by an import, so importing the same file again changes nothing. Each row is
+checked like a manual change with your rights: a bad row is reported and the others are written.</li>
+<li><code>GET /imports/{id}</code>: <code>status</code> is <code>queued</code>, <code>running</code>, <code>succeeded</code>, <code>succeeded_with_errors</code> (see
+<code>errors</code>: line, column, code, message), <code>rejected</code> (the file is not valid; nothing was written) or
+<code>failed</code>. Only the person who started it sees it. Products with several variants or options are
+completed through the API after the import.</li>
+<li><code>POST /exports</code> <code>{"org_id": …}</code> (<code>catalog.export</code>): every variant of the products you can read, with
+the same columns, so the file can be edited and imported back. Cells a spreadsheet would run as a
+formula (<code>=</code>, <code>+</code>, <code>-</code>, <code>@</code>) start with <code>'</code>; an import removes that <code>'</code> again. When <code>GET /exports/{id}</code> says <code>succeeded</code>, download <code>content_path</code>.</li>
+</ul>
+<p>MCP tools: <code>catalog.start_import</code>, <code>catalog.import_status</code>.</p>
+<h2 id="ai-drafts-of-descriptions-and-seo"><a class="header" href="#ai-drafts-of-descriptions-and-seo">AI drafts of descriptions and SEO</a></h2>
+<p><code>POST /products/{id}/suggestions</code> <code>{"locale": "vi"}</code> (<code>catalog.products.write</code>, plan feature
+<code>catalog.ai</code>, the <code>ai</code> module on) asks the model for a short description, a description and SEO texts
+using only what the product’s texts already say. The result is a <strong>draft</strong>: nothing on the product
+changes. <code>POST /suggestions/{id}/apply</code> writes it into that language’s text (name and address unchanged)
+and marks the product <code>ai_assisted</code>; <code>POST /suggestions/{id}/discard</code> drops it. MCP tool:
+<code>catalog.suggest_copy</code>.</p>
+<h3 id="draft-a-product-from-photos"><a class="header" href="#draft-a-product-from-photos">Draft a product from photos</a></h3>
+<p><code>POST /products/from-images</code> <code>{"media_ids": […], "locale": "vi", "tax_category": "vat.standard", "category_id": null, "org_id": null}</code> (<code>catalog.products.write</code>, plan feature <code>catalog.ai</code>, an AI model
+that reads images) sends 1 to 8 photos of the media library — server-made thumbnails without metadata,
+never the originals — to the model, in the background. Follow <code>Location</code>
+(<code>GET /products/from-images/{id}</code>) until <code>status</code> is <code>succeeded</code>: <code>product_id</code> is a new <strong>draft</strong>
+product marked <code>ai_assisted</code>, with name, descriptions and SEO texts, a category of your tree (or the
+one you gave; a category outside your tree is dropped), the attribute values of that category the model
+was sure of, and the public photos as its images. Prices, stock and barcode are left for you; the SKU
+is a temporary <code>AI-…</code> code. Nothing is put on sale. (Refusing photos generated by AI as product
+images comes with step 67, which marks them.)</p>
+<h2 id="product-qa-menus-and-other-modules"><a class="header" href="#product-qa-menus-and-other-modules">Product Q&amp;A, menus and other modules</a></h2>
+<p>Products and categories are in the kernel’s object directory, so other modules can point at them
+without reading catalog tables:</p>
+<ul>
+<li><code>catalog.product</code>: public when on sale (<code>active</code>) with a text in the language asked; title, short
+description, address <code>/&lt;prefix&gt;/&lt;slug&gt;</code> and first image. Product questions and answers use module
+<code>comments</code> with this target type. Suggested settings: <code>AUTOXIDE_COMMENTS_TARGET_TYPES</code> including
+<code>catalog.product</code>, <code>AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES=catalog.product</code> (verified accounts only,
+Decree 147/2024 — check the scope with the original text) and
+<code>AUTOXIDE_COMMENTS_MODERATION_BY_TYPE=catalog.product:user=pre</code> (questions wait for review). Archiving
+or deleting a product closes and hides its questions. An author who can manage the product
+(<code>catalog.products.write</code> on its unit) gets the badge <code>seller</code>; module <code>orders</code> adds
+<code>verified_buyer</code>.</li>
+<li><code>catalog.category</code>: for website menus (module <code>menus</code>) — names and addresses (<code>/categories/&lt;slug&gt;</code>)
+by language, children in display order, only visible categories. A “best sellers” block in a menu is
+the public product list filtered by category and sorted <code>best_selling</code>.</li>
+</ul>
+<p>Image texts by language: <code>PUT /products/{id}/media/{media_id}/alts/{locale}</code> <code>{"alt": "…"}</code> (with
+<code>If-Match</code>; <code>DELETE</code> removes it). Product pages in that language show it; otherwise the product’s own
+<code>alt</code> in its default language, then the media library’s text in that language. Removing an image from
+the product removes its texts.</p>
+<h2 id="what-differs-between-variants"><a class="header" href="#what-differs-between-variants">What differs between variants</a></h2>
+<p><code>PUT /variants/{id}/attributes</code> sets attribute values on one variant — how many people it serves, what
+is in the box, care instructions, dishwasher safe — using the tenant’s attributes (<code>POST /attributes</code>),
+so nothing is fixed to one trade. Text values may carry translations: <code>{"attribute_id": …, "value": "Rửa tay", "texts": {"en": "Hand wash"}}</code>. The public product page lists them under each variant
+(<code>variants[].attributes</code>) in the language asked.</p>
+<h2 id="digital-products"><a class="header" href="#digital-products">Digital products</a></h2>
+<p>A product of kind <code>digital</code> is delivered as download links instead of being shipped (plan feature
+<code>catalog.digital</code>).</p>
+<ol>
+<li>Upload the file with <code>POST /api/v1/files</code> (or a direct upload, <code>/api/v1/files/uploads</code>).</li>
+<li>Attach it to the variant: <code>POST /variants/{id}/digital-assets</code> <code>{"file_id": …, "download_limit": 5, "grant_days": 30}</code> (<code>catalog.products.write</code>). The content is copied, so deleting the uploaded
+file later does not affect buyers. A digital product cannot go on sale without a file
+(<code>catalog.digital_asset_missing</code>).</li>
+<li>When module <code>orders</code> confirms a <strong>paid</strong> order (<code>orders.order_confirmed</code> with <code>payment_status</code>
+<code>paid</code>), each order line of a digital variant gets one download right per file: <code>download_limit</code>
+downloads, valid <code>grant_days</code> days. Receiving the event again gives nothing more. Cancelling the
+order, or a refund not tied to a return, revokes the rights at once.</li>
+<li>Buyers with an account list their rights with <code>GET /downloads</code> and spend one with
+<code>POST /downloads/{id}</code>. Staff with <code>catalog.downloads.manage</code> see an order’s rights
+(<code>GET /orders/{id}/downloads</code>), revoke them (<code>POST /orders/{id}/downloads/revoke</code>) or give new
+tokens to send to a buyer without an account (<code>POST /orders/{id}/downloads/reissue</code>, the only time
+a <code>token_path</code> is shown).</li>
+<li>Spending a download (<code>POST /public/downloads/{token}</code>, no sign-in) answers a signed file address
+valid <code>AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS</code>; it accepts <code>Range</code> to resume and does not spend
+more downloads. Addresses are signed with a key of the tenant: one tenant’s address does not work
+on another’s domain.</li>
+</ol>
+<p>Services (<code>service</code>) are neither shipped nor stocked; bundles (<code>bundle</code>) take stock from each
+component (<code>PUT /variants/{id}/components</code>); pre-orders use the variant’s <code>sale_mode</code>.</p>
+<h2 id="settings"><a class="header" href="#settings">Settings</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Variable</th><th>Default</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_CATALOG_LOCALES</code></td><td><code>en,vi</code></td><td>Languages product and category texts may be written in</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX</code></td><td><code>products</code></td><td>First segment of a product’s public address</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS</code></td><td><code>300</code></td><td>Seconds a signed file address of a digital product stays valid</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT</code></td><td><code>5</code></td><td>Downloads per file when the file sets none</td></tr>
+<tr><td><code>AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS</code></td><td><code>30</code></td><td>Days a buyer can download when the file sets none</td></tr>
+</tbody>
+</table>
+</div>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/BOOKINGS.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/COMMENTS.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/BOOKINGS.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/COMMENTS.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

@@ -1,0 +1,537 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Writing a module in your own repository - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="writing-a-module-in-your-own-repository"><a class="header" href="#writing-a-module-in-your-own-repository">Writing a module in your own repository</a></h1>
+<p>Vietnamese: <a href="writing-a-module.vi.html"><code>writing-a-module.vi.md</code></a>.</p>
+<p>Autoxide is a core that modules plug into. Your module does not have to live in the Autoxide repository, and you do not fork anything: you keep a repository of your own with <strong>your module</strong> (a library crate) and <strong>your server</strong> (a five-line binary that runs the official modules plus yours). Your module gets everything a built-in module gets: settings, migrations, permissions, events, background jobs, REST routes in the OpenAPI document, MCP tools for AI agents, and translations.</p>
+<p>This guide goes from an empty directory to a module that runs, has tests on SQLite and PostgreSQL, and is part of a server. Everything shown here is the example in <a href="https://github.com/thuongtamduy/autoxide/tree/v0.20.0/examples/external-module"><code>examples/external-module</code></a>, which CI builds and tests on every change — when in doubt, read the file there. The reference for each part of the module contract is <a href="../MODULE_GUIDE.html"><code>docs/MODULE_GUIDE.md</code></a>.</p>
+<h2 id="what-you-need"><a class="header" href="#what-you-need">What you need</a></h2>
+<ul>
+<li>Rust, in the version of the Autoxide release you build on (its <code>rust-toolchain.toml</code>) or newer; <code>rustup</code> installs it.</li>
+<li>Nothing else for SQLite. For the PostgreSQL tests, a PostgreSQL 16 or newer server and a user that may <code>CREATE DATABASE</code> (for example <code>docker run --rm -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16-alpine</code>).</li>
+</ul>
+<h2 id="1-the-workspace"><a class="header" href="#1-the-workspace">1. The workspace</a></h2>
+<p>One repository, two crates: the module and the server. To get this whole layout generated — a copy of the example with your names — run <code>cargo xtask new-module --external &lt;dir&gt; &lt;module&gt; &lt;entity&gt;</code> in a checkout of Autoxide (for example <code>cargo xtask new-module --external ../acme bookmarks bookmark</code>), then read on to see what each part does. The new folder builds and passes its tests at once; it also has a <code>README.md</code> + <code>README.vi.md</code>, an <code>AGENTS.md</code> with the rules for AI agents working in it (<code>CLAUDE.md</code> links to it, and short versions for Cursor and Copilot sit in <code>.cursor/rules/</code> and <code>.github/copilot-instructions.md</code>), and <code>.github/workflows/ci.yml</code>, which runs <code>check.sh</code> on SQLite and PostgreSQL once you push it. Add <code>--core-path &lt;checkout&gt;</code> to depend on a local checkout of Autoxide instead of the release tag (to try a change of the core).</p>
+<pre><code class="language-text">acme/
+├── Cargo.toml          the workspace
+├── rust-toolchain.toml
+├── clippy.toml
+├── check.sh            format, lints, tests on both databases
+├── README.md, README.vi.md
+├── AGENTS.md           rules for AI agents (CLAUDE.md links to it)
+├── .github/workflows/ci.yml
+├── bookmarks/          your module: crate `acme-bookmarks`
+│   ├── Cargo.toml
+│   ├── locales/vi.json
+│   └── src/
+└── server/             your server: crate `acme-server`, binary `acme`
+    ├── Cargo.toml
+    └── src/main.rs
+</code></pre>
+<p>The workspace <code>Cargo.toml</code> names the core once. Depend on a <strong>release tag</strong>, so that your build does not change until you choose a newer release:</p>
+<pre><code class="language-toml">[workspace]
+resolver = "3"
+members = ["bookmarks", "server"]
+
+[workspace.dependencies]
+autoxide = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
+autoxide-kernel = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
+autoxide-testkit = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
+
+async-trait = "0.1"
+axum = "0.8"
+sea-orm = { version = "2.0", default-features = false, features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+utoipa = "6.0"
+utoipa-axum = "0.3"
+uuid = { version = "1", features = ["v7"] }
+validator = { version = "0.21", features = ["derive"] }
+</code></pre>
+<p>Three things to know:</p>
+<ul>
+<li><strong>All three core crates use the same tag.</strong> Cargo then builds one copy of the kernel; two tags would give two kernels whose types do not match.</li>
+<li><strong>The libraries below the core are part of the module contract</strong> (<code>axum</code>, <code>sea-orm</code>, <code>utoipa</code>…): keep the major versions of the release you build on — the table “Stability of the module contract” in <a href="../MODULE_GUIDE.html"><code>MODULE_GUIDE.md</code></a> lists them. The core turns on the features it needs (database drivers, the async runtime); you add only what your code uses. For <code>sea-orm</code>, turn the default features off as above.</li>
+<li><strong>Library versions.</strong> A git dependency does not bring the core’s <code>Cargo.lock</code>: cargo picks the newest compatible version of every library. To start from exactly the versions the release was tested with, copy the <code>Cargo.lock</code> of the tag into your repository before the first build (cargo trims what you do not use). Commit your <code>Cargo.lock</code>.</li>
+</ul>
+<p><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/Cargo.toml">The example’s <code>Cargo.toml</code></a> also sets the lints of the core (no <code>unsafe</code>, no <code>unwrap</code> outside tests) and a build profile that keeps test programs small; copy both, with <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/clippy.toml"><code>clippy.toml</code></a>.</p>
+<h2 id="2-the-module-crate"><a class="header" href="#2-the-module-crate">2. The module crate</a></h2>
+<p><code>bookmarks/Cargo.toml</code> lists what the module’s code uses; the test kit is a dev-dependency:</p>
+<pre><code class="language-toml">[package]
+name = "acme-bookmarks"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait.workspace = true
+autoxide-kernel.workspace = true
+axum.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+tokio.workspace = true
+</code></pre>
+<p>The module’s <strong>name</strong> — here <code>bookmarks</code> — is the prefix of everything it owns: tables <code>bookmarks_…</code>, routes under <code>/api/v1/bookmarks</code>, permissions, events, jobs, error codes and MCP tools named <code>bookmarks.…</code>. Choose a name no official module has.</p>
+<p>A module crate shows exactly two things to other crates: <code>pub mod api</code> (traits and types other modules may use) and <code>pub fn module()</code>. Everything else is private. Start with one file per role:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>File</th><th>What it holds</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/lib.rs"><code>src/lib.rs</code></a></td><td>the <code>Module</code> implementation: what the module declares to the core</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/api.rs"><code>src/api.rs</code></a></td><td>the contract for other modules</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/config.rs"><code>src/config.rs</code></a></td><td>settings</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/migration/mod.rs"><code>src/migration/</code></a></td><td>tables</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/entity.rs"><code>src/entity.rs</code></a></td><td>the SeaORM entity of each table</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/permissions.rs"><code>src/permissions.rs</code></a></td><td>permissions</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/events.rs"><code>src/events.rs</code></a></td><td>events</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/service.rs"><code>src/service.rs</code></a></td><td>all the logic</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/http.rs"><code>src/http.rs</code></a></td><td>REST handlers</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/tools.rs"><code>src/tools.rs</code></a></td><td>MCP tools</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/retention.rs"><code>src/retention.rs</code></a></td><td>a scheduled background job</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/locales/vi.json"><code>locales/vi.json</code></a></td><td>Vietnamese texts</td></tr>
+<tr><td><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/tests.rs"><code>src/tests.rs</code></a></td><td>tests</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>lib.rs</code> is the table of contents. Every function of <code>Module</code> except <code>name</code> has a default, so a module declares only what it has:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub mod api;
+// … private modules …
+
+pub fn module() -&gt; impl Module {
+    BookmarksModule::default()
+}
+
+impl Module for BookmarksModule {
+    fn name(&amp;self) -&gt; &amp;'static str {
+        "bookmarks"
+    }
+
+    fn configure(&amp;mut self, reader: &amp;mut ConfigReader&lt;'_&gt;) -&gt; Result&lt;(), Invalid&gt; {
+        self.config = Some(BookmarksConfig::read(reader)?);
+        Ok(())
+    }
+
+    fn migrations(&amp;self) -&gt; Vec&lt;Box&lt;dyn MigrationTrait&gt;&gt; {
+        migration::all()
+    }
+
+    fn permissions(&amp;self) -&gt; Vec&lt;Permission&gt; {
+        permissions::all()
+    }
+
+    fn start(&amp;mut self, context: &amp;mut StartContext&lt;'_&gt;) -&gt; Result&lt;(), Error&gt; {
+        let config = self.config.clone().unwrap_or_default();
+        let service = Arc::new(BookmarkService::new(context.outbox()?, config));
+        self.service = Some(service.clone());
+        context.provide::&lt;dyn api::Bookmarks&gt;(service)
+    }
+
+    fn routes(&amp;self) -&gt; OpenApiRouter {
+        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    // … events, translations, subscriptions, jobs, schedules, tools …
+}
+<span class="boring">}</span></code></pre>
+<p>The rules that matter most, each shown in the example file named:</p>
+<ul>
+<li>
+<p><strong>Tables</strong> (<code>migration/</code>, <code>entity.rs</code>): named <code>bookmarks_…</code>; ids are UUIDv7 made in the application; a table that holds a customer’s data has a <code>tenant_id</code> column, and every key and index starts with it; no foreign key to a table of another module — keep the id only. Migrations are written with the schema builder, not SQL, so one migration runs on both databases, and each has a <code>down</code>. A released migration is never edited: add a new one.</p>
+</li>
+<li>
+<p><strong>Helper tables</strong> (<code>migration/mod.rs</code>): <code>Outbox::record</code> needs a <code>bookmarks_events</code> table and the job queue a <code>bookmarks_jobs</code> table. Do not write them yourself — the kernel defines them, and one call adds both in their current shape after your own migrations:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use autoxide_kernel::migration::{HelperTable, helper_tables};
+
+pub(crate) fn all() -&gt; Vec&lt;Box&lt;dyn MigrationTrait&gt;&gt; {
+    let mut migrations: Vec&lt;Box&lt;dyn MigrationTrait&gt;&gt; =
+        vec![Box::new(m0001_create_bookmark::Migration)];
+    migrations.extend(helper_tables("bookmarks", &amp;[HelperTable::Events, HelperTable::Jobs]));
+    migrations
+}
+<span class="boring">}</span></code></pre>
+<p>Ask only for what the module uses (<code>&amp;[HelperTable::Events]</code> for a module without jobs). Each helper table is its own chain of migrations with fixed names, so a table you need later is one more call <strong>at the end</strong> of the list, never a change to an earlier one. The official modules of the core keep their older step-by-step lists, because those names are already recorded in existing databases.</p>
+</li>
+<li>
+<p><strong>Logic in the service</strong> (<code>service.rs</code>): every method takes the <code>TenantContext</code> of the customer, reads through <code>tenant.database().read()</code>, writes in one short <code>begin_write()</code> transaction, and filters every query with <code>.scoped(tenant)</code>. A write records its event in the same transaction (<code>Outbox::record</code>).</p>
+</li>
+<li>
+<p><strong>Handlers and tools only call the service</strong> (<code>http.rs</code>, <code>tools.rs</code>): take the input (<code>ValidJson&lt;T&gt;</code>), check the permission (<code>principal.require(&amp;BOOKMARKS_WRITE)?</code>), call one service method, return <code>Data&lt;T&gt;</code>, <code>Page&lt;T&gt;</code> or <code>Created&lt;T&gt;</code>. Routes are registered with <code>routes!</code>, which puts them in the OpenAPI document; the <code>///</code> comment and every response <code>description</code> are copied there, so write them in English for the API’s callers.</p>
+</li>
+<li>
+<p><strong>Errors</strong> carry a stable <code>code</code> with the module prefix (<code>bookmarks.url_taken</code>) and an English text; the Vietnamese text goes under the same code in <code>locales/vi.json</code>.</p>
+</li>
+<li>
+<p><strong>Settings</strong> (<code>config.rs</code>) are declared once with <code>Setting</code> and read through <code>ConfigReader</code>, never <code>std::env::var</code>. Use a prefix of your own (<code>ACME_…</code>); <code>AUTOXIDE_…</code> belongs to the core.</p>
+</li>
+<li>
+<p><strong>Both databases, always.</strong> Do not use a type, function or syntax only one of them has.</p>
+</li>
+</ul>
+<h2 id="3-the-server"><a class="header" href="#3-the-server">3. The server</a></h2>
+<p><code>server/Cargo.toml</code>:</p>
+<pre><code class="language-toml">[package]
+name = "acme-server"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "acme"
+path = "src/main.rs"
+
+[dependencies]
+acme-bookmarks = { path = "../bookmarks" }
+autoxide.workspace = true
+</code></pre>
+<p><code>server/src/main.rs</code> is the whole program:</p>
+<pre class="playground"><code class="language-rust">use std::process::ExitCode;
+
+fn main() -&gt; ExitCode {
+    autoxide::Autoxide::new()
+        .name("acme")
+        .version(env!("CARGO_PKG_VERSION"))
+        .module(acme_bookmarks::module)
+        .run()
+}</code></pre>
+<p><code>Autoxide::new()</code> is the official program with every official module; <code>.module(…)</code> adds yours, one line each. Your modules start after the official ones, in the order added, so they can <code>require</code> any trait an official module provides, and a module of yours that uses another of yours comes after it. <code>.run()</code> gives the binary the standard command line.</p>
+<h2 id="4-run-it"><a class="header" href="#4-run-it">4. Run it</a></h2>
+<p>From the workspace directory. The first build compiles the whole core and takes a while.</p>
+<pre><code class="language-bash">cargo run -p acme-server -- config                # every setting, yours included; checks them
+cargo run -p acme-server -- migrate up            # creates the tables of every module, yours included
+AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=admin@example.com \
+AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD='correct horse battery staple' \
+  cargo run -p acme-server -- serve               # http://127.0.0.1:8080; creates the first administrator
+</code></pre>
+<p>Which modules run is a setting, <code>AUTOXIDE_MODULES</code> (see <a href="../MODULES.html"><code>docs/MODULES.md</code></a>): by default every official module and every module you added; <code>AUTOXIDE_MODULES=official,-bookmarks</code> turns yours off, and a module turned on brings the modules it names in <code>Module::depends_on</code>. <code>acme modules</code> lists every module with its tier, whether it is on, and what it depends on (<code>--json</code> for programs). <code>acme openapi</code> and <code>acme mcp-manifest</code> always print the full contract.</p>
+<p>With no settings the server keeps its data in SQLite under <code>./data</code>. For PostgreSQL set <code>DATABASE_URL=postgres://…</code>; nothing else changes. <code>acme config --env-example &gt; .env.example</code> writes a documented list of every setting, and <code>acme doctor</code> checks an installation step by step.</p>
+<p>In another terminal, sign in and call your module. The administrator created on first start holds every permission, including the ones your module declares:</p>
+<pre><code class="language-bash">export API=http://127.0.0.1:8080
+TOKEN=$(curl -sS "$API/api/v1/auth/login" \
+  --json '{"email":"admin@example.com","password":"correct horse battery staple"}' \
+  | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+curl -sS "$API/api/v1/bookmarks" -H "Authorization: Bearer $TOKEN" \
+  --json '{"url":"https://www.rust-lang.org/","title":"Rust"}'
+curl -sS "$API/api/v1/bookmarks" -H "Authorization: Bearer $TOKEN"
+</code></pre>
+<p>Your routes are in the API document at <code>$API/api/v1/openapi.json</code> (also <code>acme openapi</code>), your tools in <code>acme mcp-manifest</code> and at the MCP endpoint, and everything the module declares is listed at <code>GET /api/v1/kernel/modules</code>.</p>
+<h2 id="5-tests-on-both-databases"><a class="header" href="#5-tests-on-both-databases">5. Tests on both databases</a></h2>
+<p>Tests get an empty database each from <code>TestDatabase::run</code>; <code>TestApp</code> builds your module the way the server does and calls it over REST and with a real MCP client:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[tokio::test]
+async fn a_bookmark_can_be_created() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("ada", 0xada, &amp;["bookmarks.read", "bookmarks.write"])
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let answer = app
+            .post("/api/v1/bookmarks")
+            .token("ada")
+            .json(json!({"url": "https://www.rust-lang.org/", "title": "Rust"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::CREATED);
+    })
+    .await
+    .unwrap();
+}
+<span class="boring">}</span></code></pre>
+<p>The database is chosen by <code>TEST_DATABASE_URL</code>: unset is SQLite, a <code>postgres://</code> URL is PostgreSQL. Run every test on both:</p>
+<pre><code class="language-bash">cargo test --workspace
+TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres \
+  cargo test --workspace -- --test-threads=4
+</code></pre>
+<p><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/bookmarks/src/tests.rs"><code>src/tests.rs</code></a> of the example shows the tests a module should have: REST and MCP give the same result, permissions are checked, a concurrent write (two requests keeping the same link) lets one through, two tenants never see each other (<code>leak_check</code>), the tables follow the rules (<code>schema_ownership_violations</code>, <code>schema_tenancy_violations</code>), the job and the settings work. <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/server/tests/cli.rs"><code>server/tests/cli.rs</code></a> runs the real binary: <code>migrate up</code>, <code>openapi</code> and <code>mcp-manifest</code> include the module. <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/examples/external-module/check.sh"><code>check.sh</code></a> runs format, lints and both test runs; keep a script like it and run it in CI.</p>
+<h3 id="fakes-of-other-modules"><a class="header" href="#fakes-of-other-modules">Fakes of other modules</a></h3>
+<p>When your module calls a trait another module publishes, test it against that module’s fake instead of copying one. A module ships its fakes in <code>api::testing</code> behind the <code>testing</code> feature; enable it only for tests:</p>
+<pre><code class="language-toml">[dev-dependencies]
+autoxide-ledger = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z", features = ["testing"] }
+</code></pre>
+<p><code>autoxide_ledger::api::testing::FakeLedger</code> keeps entries, payments and refunds in memory with the same replay rules as the real ledger. Register <code>ledger.module()</code> before your module, read what your module did (<code>entries()</code>, <code>payments()</code>, <code>refunds()</code>, <code>balance</code>), and report a payment as collected with <code>ledger.succeed(&amp;tenant, &amp;payment)</code> — it writes <code>ledger.payment_succeeded</code> to the outbox like the real ledger, so your listener runs once you drain the dispatcher.</p>
+<p>The same pattern exists for the other traits modules most often call: <code>autoxide_notifications::api::testing::FakeNotifier</code> (keeps what your module sent — <code>sent()</code> with the real <code>dedupe_key</code> rule, <code>calls()</code> with every call, <code>kinds()</code> declared) and <code>autoxide_compliance::api::testing::FakeConsentLedger</code> (consents in memory with the real “broader key” rule; set them up with <code>allow</code> / <code>deny</code>, read them back with <code>state_of</code> / <code>records</code>, make the ledger fail with <code>set_failing</code>).</p>
+<p><code>autoxide_testkit::FakeMailer</code> keeps the mails your module sends (<code>sent()</code>, <code>to(address)</code>, <code>calls()</code>) with the real <code>dedupe_key</code> rule, and <code>autoxide_address::api::testing::FakeAdministrativeUnits</code> holds a few provinces and communes (<code>sample()</code>, or your own with <code>province</code> / <code>commune</code> / <code>expired_commune</code>) so addresses validate like the real <code>address</code> module.</p>
+<p><code>autoxide_media::api::testing::FakeMedia</code> is a media library in memory: <code>add(public)</code> / <code>add_with</code> / <code>insert</code> items, <code>upload(user)</code> for an item someone uploaded, <code>set_alt(id, locale, alt)</code>, <code>set_ai_image</code>, <code>remove</code>; IDs it does not hold are not returned, like the real <code>media</code> module.</p>
+<p><code>autoxide_catalog::api::testing::FakeCatalog</code> holds variants (build one with <code>variant(id, org)</code> and change what your tests need, then <code>insert_variant</code>), a price history per variant (<code>set_price</code>, <code>push_price</code>, <code>set_price_history</code>; current and reference prices follow it like the real catalog), price floors, bundles and display prices, and it accepts a sale-price source (<code>CatalogExtensions</code>).</p>
+<h2 id="6-the-rules-of-the-core-checked-on-your-crate"><a class="header" href="#6-the-rules-of-the-core-checked-on-your-crate">6. The rules of the core, checked on your crate</a></h2>
+<p>Inside the Autoxide repository, <code>cargo xtask check</code> enforces the module rules. For a crate anywhere else, run the same source rules from a checkout of Autoxide at the tag you build on:</p>
+<pre><code class="language-bash">cargo run --manifest-path /path/to/autoxide/xtask/Cargo.toml -- check-module /path/to/acme/bookmarks
+</code></pre>
+<p>It checks: the crate exposes only <code>pub mod api</code> and <code>pub fn module</code>; <code>api</code> does not reach into the crate’s internals; routes go through <code>routes!</code>; handlers and tools do not touch the database; safety lints are not switched off in <code>src/</code>; settings are not read with <code>std::env::var</code>; hand-written SQL is built with <code>autoxide_kernel::database::statement</code>; every error code and description has a Vietnamese text; entities have <code>tenant_id</code>; queries are filtered by tenant; MCP tools pass the caller to the service where REST limits by scope.</p>
+<p>What it cannot see lives in the database and is checked by your tests (step 5): the table prefix, no foreign key to another module, <code>tenant_id</code> first in every key and index, no data crossing tenants.</p>
+<h2 id="7-upgrading-to-a-newer-autoxide"><a class="header" href="#7-upgrading-to-a-newer-autoxide">7. Upgrading to a newer Autoxide</a></h2>
+<ol>
+<li>Read <code>CHANGELOG.md</code> of the new release: breaking changes for modules are under <strong>Changed</strong> and <strong>Removed</strong>, the Rust items under <code>### Breaking (Rust)</code>.</li>
+<li>Change the tag in your workspace <code>Cargo.toml</code> (all three core crates) and build: cargo updates <code>Cargo.lock</code> for the core crates. Run your tests on both databases.</li>
+<li>On each server: <code>acme migrate up</code>, then start the new binary — as for the official server (<a href="../DEPLOY.html"><code>docs/DEPLOY.md</code></a>).</li>
+</ol>
+<p>What the core promises: while its version is <code>0.x</code>, a breaking change to the module contract comes only in a minor release (<code>0.17</code> → <code>0.18</code>), never in a patch release; an item that is going away is <code>#[deprecated]</code> for at least one minor release first; the <code>Module</code> trait only grows by functions with a default body. From <code>1.0</code> the contract follows Semantic Versioning. The full statement is in <a href="../MODULE_GUIDE.html"><code>MODULE_GUIDE.md</code></a>, “Stability of the module contract”.</p>
+<p>The core crates are not on crates.io yet; until they are, the git tag is the way to depend on them.</p>
+<h2 id="checklist"><a class="header" href="#checklist">Checklist</a></h2>
+<ul>
+<li><input disabled="" type="checkbox"> The module crate exposes only <code>pub mod api</code> and <code>pub fn module</code></li>
+<li><input disabled="" type="checkbox"> Tables named <code>&lt;module&gt;_…</code>, UUIDv7 ids, <code>tenant_id</code> first in every key and index, migrations with <code>down</code>; event and job tables from <code>helper_tables</code></li>
+<li><input disabled="" type="checkbox"> Permissions declared; every handler and tool requires one</li>
+<li><input disabled="" type="checkbox"> Logic only in the service; each write records its event in the same transaction</li>
+<li><input disabled="" type="checkbox"> Every route documented: summary, permission, every response</li>
+<li><input disabled="" type="checkbox"> MCP tools for what agents should be able to do</li>
+<li><input disabled="" type="checkbox"> Error codes prefixed with the module name and translated</li>
+<li><input disabled="" type="checkbox"> Data about a user deleted on <code>USER_DELETED</code></li>
+<li><input disabled="" type="checkbox"> Holding personal data? Implement <code>Module::dormant</code> too: register the same export part (<code>context.personal_data</code>) and <code>USER_DELETED</code> handler (<code>context.on_user_deleted</code>), built without your service, so a turned-off module still exports and deletes a person’s data (see <code>modules/notes/src/lib.rs</code>)</li>
+<li><input disabled="" type="checkbox"> Settings with a prefix of your own, declared with <code>Setting</code></li>
+<li><input disabled="" type="checkbox"> Tests on SQLite and PostgreSQL, including concurrent writes, tenant isolation and the table rules</li>
+<li><input disabled="" type="checkbox"> <code>cargo xtask check-module</code> reports no violations</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../docs/guides/website.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../../docs/guides/providers/esms.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../docs/guides/website.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../../docs/guides/providers/esms.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../../mark-09e88c2c.min.js"></script>
+        <script src="../../searcher-09f2665d.js"></script>
+
+        <script src="../../clipboard-1626706a.min.js"></script>
+        <script src="../../highlight-abc7f01d.js"></script>
+        <script src="../../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

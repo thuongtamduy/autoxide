@@ -1,0 +1,437 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Tính năng AI - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="tính-năng-ai"><a class="header" href="#tính-năng-ai">Tính năng AI</a></h1>
+<p><em>English: <a href="AI.html">AI.md</a></em></p>
+<p>Autoxide có thể dùng một mô hình AI — do bạn chọn và trả tiền — để giúp người biên tập và AI
+agent:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Tính năng</th><th>Ở đâu</th><th>Cần</th></tr>
+</thead>
+<tbody>
+<tr><td>Kiểm SEO (không AI)</td><td><code>GET /api/v1/content/entries/{id}/seo-check</code></td><td>không cần gì</td></tr>
+<tr><td>Gợi ý SEO</td><td><code>POST /api/v1/content/entries/{id}/seo-suggestions</code></td><td>mô hình sinh chữ</td></tr>
+<tr><td>Gợi ý alt text</td><td><code>POST /api/v1/media/{id}/alt-suggestions</code></td><td>mô hình sinh chữ đọc được ảnh</td></tr>
+<tr><td>Dịch bài hay trang</td><td><code>POST /api/v1/content/entries/{id}/translate</code></td><td>mô hình sinh chữ</td></tr>
+<tr><td>Tìm theo ý nghĩa</td><td><code>GET /api/v1/content/search</code>, <code>/public/search</code></td><td>embedding</td></tr>
+<tr><td>Giới hạn cho AI agent</td><td>permission <code>content.write_own</code>, <code>content.publish_own</code></td><td>không cần gì</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Mọi thứ tắt cho tới khi bạn bật.</strong> Không nội dung nào rời máy chủ trước khi bạn cấu hình
+một nhà cung cấp. Gợi ý không bao giờ tự lưu: một người (hay một agent) xem rồi lưu bằng
+<code>PATCH</code> như thường. Bản dịch được ghi thành <strong>bản nháp</strong> và không bao giờ tự đăng.</p>
+<p>Mọi endpoint và mã lỗi có trong <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>openapi.json</code></a> (và ở <code>/api/docs</code> khi
+<code>AUTOXIDE_HTTP_API_DOCS=true</code>). Các tính năng này cũng là tool MCP cho AI agent: <code>ai.status</code>,
+<code>content.seo_check</code>, <code>content.suggest_seo</code>, <code>content.translate</code>,
+<code>content.get_translation_request</code>, <code>content.search</code>, <code>media.suggest_alt</code>.</p>
+<h2 id="bật-sinh-chữ"><a class="header" href="#bật-sinh-chữ">Bật sinh chữ</a></h2>
+<p>Đặt nhà cung cấp, key và (với <code>openai</code>) mô hình, rồi kiểm cấu hình:</p>
+<pre><code class="language-bash">autoxide ai check
+</code></pre>
+<p>Lệnh gửi một request rất nhỏ và nói bằng lời thường có chạy hay không (tốn vài token).</p>
+<p><strong>Claude (Anthropic):</strong></p>
+<pre><code class="language-bash">AUTOXIDE_AI_PROVIDER=anthropic
+AUTOXIDE_AI_API_KEY=sk-ant-…            # key của bạn
+# AUTOXIDE_AI_MODEL=claude-opus-5-5     # mặc định
+</code></pre>
+<p>Khi bộ lọc an toàn của Claude từ chối một request, Anthropic chạy lại trên mô hình khác ngay
+trong cùng lần gọi (<code>AUTOXIDE_AI_ANTHROPIC_FALLBACK=true</code>, mặc định). Đặt <code>false</code> cho mô hình
+không hỗ trợ, như Claude Haiku.</p>
+<p><strong>OpenAI:</strong></p>
+<pre><code class="language-bash">AUTOXIDE_AI_PROVIDER=openai
+AUTOXIDE_AI_API_KEY=sk-…
+AUTOXIDE_AI_MODEL=&lt;tên một mô hình OpenAI&gt;
+# AUTOXIDE_AI_OPENAI_SEND_EFFORT=true   # chỉ cho mô hình suy luận
+</code></pre>
+<p><strong>Google Gemini</strong> (qua endpoint tương thích OpenAI):</p>
+<pre><code class="language-bash">AUTOXIDE_AI_PROVIDER=openai
+AUTOXIDE_AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+AUTOXIDE_AI_API_KEY=&lt;API key Gemini của bạn&gt;
+AUTOXIDE_AI_MODEL=&lt;tên một mô hình Gemini&gt;
+</code></pre>
+<p><strong>Ollama, chạy ngay trên máy chủ của bạn</strong> — không gì rời máy:</p>
+<pre><code class="language-bash">AUTOXIDE_AI_PROVIDER=openai
+AUTOXIDE_AI_BASE_URL=http://localhost:11434/v1
+AUTOXIDE_AI_MODEL=&lt;mô hình bạn đã tải&gt;
+AUTOXIDE_AI_IMAGES=false                # trừ khi mô hình đọc được ảnh
+# AUTOXIDE_AI_OPENAI_SCHEMA_MODE=json_object   # nếu máy chủ bỏ qua JSON Schema
+# AUTOXIDE_AI_OPENAI_MAX_TOKENS_PARAM=max_tokens
+</code></pre>
+<p>vLLM, LM Studio và OpenRouter dùng cùng cách: <code>openai</code> cộng <code>AUTOXIDE_AI_BASE_URL</code> của chúng.</p>
+<p><strong>Câu trả lời được kiểm thế nào.</strong> Mỗi request yêu cầu mô hình trả JSON theo một schema, và
+máy chủ kiểm lại mọi câu trả lời — có máy chủ bỏ qua schema mà không báo. Câu trả lời sai được
+thử lại một lần, rồi báo lỗi (<code>ai.output_invalid</code>). Mô hình nhỏ chạy tại máy sai nhiều hơn;
+hãy dùng mô hình đủ mạnh để dịch.</p>
+<h2 id="bật-embedding-tìm-theo-ý-nghĩa"><a class="header" href="#bật-embedding-tìm-theo-ý-nghĩa">Bật embedding (tìm theo ý nghĩa)</a></h2>
+<p>Embedding tách khỏi sinh chữ: bạn có thể sinh chữ bằng Claude và tính embedding bằng Ollama.</p>
+<pre><code class="language-bash">AUTOXIDE_EMBEDDING_PROVIDER=openai          # dạng /embeddings
+AUTOXIDE_EMBEDDING_BASE_URL=http://localhost:11434/v1
+AUTOXIDE_EMBEDDING_MODEL=bge-m3
+AUTOXIDE_EMBEDDING_DIMENSIONS=1024
+</code></pre>
+<p>Cùng dạng này có ở OpenAI (<code>https://api.openai.com/v1</code>; đặt
+<code>AUTOXIDE_EMBEDDING_SEND_DIMENSIONS=true</code> để rút ngắn vector của <code>text-embedding-3-*</code>), Gemini
+và Voyage AI (Anthropic không có API embedding, chỉ giới thiệu Voyage). Hãy chọn mô hình <strong>đa
+ngôn ngữ</strong> khoảng 1024 chiều: <code>bge-m3</code> và <code>multilingual-e5-large</code> hiểu tốt tiếng Việt; mô hình
+3072 chiều tốn gấp ba bộ nhớ.</p>
+<p>Khi đã bật, mỗi thay đổi của một mục cập nhật index tìm kiếm của nó ở nền, và một job mỗi giờ
+lập index cho phần còn thiếu — sau khi bạn bật embedding, hay đổi mô hình hoặc số chiều (khi đó
+cả index được lập lại). Tìm kiếm giữ vector của một ngôn ngữ trong bộ nhớ: khoảng 41 MB cho
+10.000 đoạn ở 1024 chiều (một bài 1.500 chữ là 5–6 đoạn); thời gian tìm đã đo ở
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/BENCHMARKS.md"><code>BENCHMARKS.md</code></a>.</p>
+<p>Tìm kiếm gộp ý nghĩa và chữ (không phân biệt dấu và hoa thường): mỗi kết quả nói khớp bằng
+cách nào (<code>matched_by</code>) và kèm đoạn khớp nhất. Embedding tắt thì chỉ tìm theo chữ.
+<code>/api/v1/content/public/search</code> (cho người đọc không đăng nhập) tắt, trừ khi
+<code>AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true</code>; mỗi lần tìm công khai tốn một request
+embedding, nên tìm theo ý nghĩa có ngân sách mỗi phút
+(<code>AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE</code>, mặc định 30, một ngân sách chung cho mọi người
+đọc, đếm trong từng tiến trình) — vượt thì chỉ tìm theo chữ.</p>
+<h2 id="chi-phí-và-giới-hạn"><a class="header" href="#chi-phí-và-giới-hạn">Chi phí và giới hạn</a></h2>
+<ul>
+<li><strong>Hạn mức token mỗi ngày:</strong> <code>AUTOXIDE_AI_DAILY_TOKEN_LIMIT</code> (mặc định 2.000.000 token, gồm
+cả sinh chữ và embedding; <code>0</code> = không giới hạn), đếm trong database, chung mọi tiến trình
+máy chủ. Vượt thì tính năng AI trả <code>429 ai.quota_exceeded</code> tới nửa đêm UTC. <code>GET /api/v1/ai/status</code> (permission <code>ai.view</code>) cho biết đã dùng bao nhiêu hôm nay.</li>
+<li><strong>Metrics</strong> (khi <code>AUTOXIDE_HTTP_METRICS=true</code>): <code>ai_requests_total{purpose,outcome}</code>,
+<code>ai_tokens_total{purpose,direction}</code>, <code>ai_request_duration_seconds{purpose}</code>.</li>
+<li><strong>Chi phí ước tính</strong> dịch một bài 1.500 chữ (khoảng 5.000 token vào và 5.000 token ra), theo
+bảng giá Anthropic ngày 3/11/2026: Claude Opus 5.5 ≈ 0,12 USD, Claude Sonnet 5.5 ≈ 0,06 USD,
+Claude Haiku 5.5 ≈ 0,003 USD. Một lần gợi ý SEO tốn một phần nhỏ số đó. Mô hình chạy tại máy
+không tốn tiền theo request.</li>
+</ul>
+<h2 id="gửi-gì-cho-nhà-cung-cấp"><a class="header" href="#gửi-gì-cho-nhà-cung-cấp">Gửi gì cho nhà cung cấp</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Tính năng</th><th>Gửi</th></tr>
+</thead>
+<tbody>
+<tr><td>Gợi ý SEO</td><td>tiêu đề, tóm tắt, chữ thuần của bản nháp (12.000 ký tự đầu), tên danh mục và thẻ của ngôn ngữ đó</td></tr>
+<tr><td>Alt text</td><td>một bản nhỏ của ảnh (tối đa 1280 px, không bao giờ file gốc), ngôn ngữ, ngữ cảnh tuỳ chọn bạn gửi</td></tr>
+<tr><td>Dịch</td><td>chữ của revision đã ghim, theo từng mẩu — tiêu đề, tóm tắt, trường SEO, alt text của ảnh, đoạn văn và tiêu đề với định dạng thành thẻ có số; không bao giờ gửi link, ID ảnh hay khối code</td></tr>
+<tr><td>Tìm kiếm</td><td>chữ của mỗi mục theo đoạn (khi lập index), và mỗi câu tìm</td></tr>
+</tbody>
+</table>
+</div>
+<p>Module khác cũng gửi: <code>conversations</code> gửi các tin nhắn gần nhất của hội thoại để soạn nháp trả lời, <code>orders</code>
+gửi đánh giá sản phẩm để tóm tắt, <code>support</code> gửi câu hỏi để gợi ý trả lời. Các đoạn chữ này có thể chứa <strong>dữ liệu
+cá nhân</strong>, và phần lớn nhà cung cấp xử lý ngoài Việt Nam: đó là chuyển dữ liệu cá nhân ra nước ngoài (Luật
+91/2025/QH15, NĐ 356/2025/NĐ-CP — đối chiếu cùng người có chuyên môn pháp lý). Ghi nhà cung cấp làm bên nhận kèm
+nước trong các mục đích dùng AI (<code>/api/v1/compliance/purposes</code>), lưu hồ sơ đánh giá tác động chuyển dữ liệu, hoặc
+dùng nhà cung cấp / mô hình tự chạy ở Việt Nam. Sổ xử lý chưa tự liệt kê nhà cung cấp AI (sau 1.0).</p>
+<p><strong>Ảnh riêng tư</strong> chỉ được gửi khi <code>AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true</code>. Log không bao giờ chứa
+prompt, nội dung, ảnh hay key — chỉ việc gì, mô hình, số token và thời gian.</p>
+<h2 id="dịch-bài-chi-tiết"><a class="header" href="#dịch-bài-chi-tiết">Dịch bài, chi tiết</a></h2>
+<p><code>POST /api/v1/content/entries/{id}/translate</code> với <code>{"locale": "vi"}</code> trả <code>202</code> kèm một yêu
+cầu; một job nền làm việc (mỗi lần chạy tối đa 4 phút rồi thử lại; yêu cầu đứng yên ở <code>running</code>
+quá 15 phút thì yêu cầu mới cùng ngôn ngữ thay chỗ):</p>
+<ol>
+<li>Ghim mục như hiện tại (một revision): sửa sau đó không đổi bản dịch này.</li>
+<li>Chữ được cắt thành mẩu; định dạng trong đoạn thành thẻ có số (<code>&lt;m1&gt;chữ đậm&lt;/m1&gt;</code>,
+<code>&lt;br2/&gt;</code>) để thứ tự từ đổi được giữa hai ngôn ngữ. Mô hình không bao giờ thấy JSON của thân
+bài, link hay ID ảnh.</li>
+<li>Câu trả lời được kiểm: mỗi mẩu về đúng một lần, mỗi thẻ đúng một lần, không mẩu nào rỗng.
+Sai thì thử lại một lần, rồi yêu cầu thất bại với <code>content.translation_invalid</code>.</li>
+<li>Các mẩu được ráp lại vào cấu trúc gốc (link và ảnh lấy từ bản gốc) và lưu thành <strong>bản
+nháp</strong> của bản dịch: bản dịch mới với slug sinh từ tiêu đề đã dịch, hoặc bản dịch có sẵn —
+<strong>chỉ khi không ai sửa nó từ lúc yêu cầu</strong>; nếu có thì yêu cầu thất bại với
+<code>content.translation_conflict</code> và không gì bị ghi đè.</li>
+</ol>
+<p>Theo dõi bằng <code>GET /api/v1/content/translation-requests/{id}</code> hay webhook
+(<code>content.translation_succeeded</code>, <code>content.translation_failed</code>). Bản dịch mang <code>ai_generated</code>;
+khi bản gốc đổi sau đó, API quản trị trả <code>translation_outdated: true</code>. Khối code và nhúng
+không được dịch; tên riêng, số và địa chỉ được giữ.</p>
+<h2 id="ai-agent-giới-hạn-và-duyệt"><a class="header" href="#ai-agent-giới-hạn-và-duyệt">AI agent: giới hạn và duyệt</a></h2>
+<p>Cấp cho mỗi agent một API key riêng, hạn ngắn, chỉ những gì nó cần:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Agent được…</th><th>Permission</th></tr>
+</thead>
+<tbody>
+<tr><td>viết nháp, người đăng</td><td><code>content.read</code>, <code>content.write_own</code></td></tr>
+<tr><td>viết và tự đăng bài của mình</td><td><code>content.read</code>, <code>content.write_own</code>, <code>content.publish_own</code></td></tr>
+<tr><td>dùng cả công cụ AI</td><td>không thêm gì: gợi ý SEO và dịch theo <code>content.write_own</code>; alt text cần <code>media.write</code></td></tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li>Permission <code>_own</code> chỉ chạm tới mục tạo bằng <strong>chính key đó</strong>; key khác của cùng người dùng
+nhận <code>403 content.not_owner</code>. Agent không bao giờ lưu trữ, chuyển trang, hẹn giờ hay xoá
+(xoá cần <code>content.delete</code>).</li>
+<li>Viết xong, agent xin duyệt: <code>POST /api/v1/content/entries/{id}/request-review</code> (event
+<code>content.review_requested</code> — chuyển cho người biên tập bằng webhook).</li>
+<li>Request bằng API key bị rate limiting theo từng key
+(<code>AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE</code>, mặc định 120), và mọi thay đổi nằm trong
+audit log kèm key đã làm.</li>
+</ul>
+<h2 id="báo-cho-người-đọc-biết-nội-dung-do-ai-tạo"><a class="header" href="#báo-cho-người-đọc-biết-nội-dung-do-ai-tạo">Báo cho người đọc biết nội dung do AI tạo</a></h2>
+<p>Mục mang <code>ai_generated</code> (máy chủ tự đặt cho bản nó dịch; agent nên gửi <code>"ai_generated": true</code>
+cho thứ nó viết). Khi <strong>một người</strong> (đăng nhập, không phải API key) đăng mục đó sau khi đã
+duyệt, họ gửi <code>{"ai_reviewed": true}</code> tới <code>POST /entries/{id}/publish</code>; bản công khai ghi ai
+duyệt và lúc nào. Endpoint công khai trả <code>ai_generated</code> và <code>ai_reviewed</code>, để website hiện thông
+báo khi luật yêu cầu — ví dụ Điều 50 của EU AI Act, áp dụng từ 2/8/2026 cho văn bản do AI tạo,
+đăng để thông tin cho công chúng về việc công ích; ngoại lệ cho văn bản đã qua người duyệt và
+có người chịu trách nhiệm biên tập được hiểu hẹp. Autoxide chỉ ghi lại sự thật, không đưa ra
+lời khuyên pháp lý.</p>
+<h2 id="khi-có-lỗi"><a class="header" href="#khi-có-lỗi">Khi có lỗi</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Mã</th><th>Nghĩa</th><th>Làm gì</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ai.disabled</code>, <code>ai.embedding_disabled</code></td><td>chưa cấu hình</td><td>đặt <code>AUTOXIDE_AI_*</code> / <code>AUTOXIDE_EMBEDDING_*</code></td></tr>
+<tr><td><code>ai.misconfigured</code></td><td>nhà cung cấp từ chối key hay cấu hình</td><td>chạy <code>autoxide ai check</code>; log máy chủ ghi mã HTTP</td></tr>
+<tr><td><code>ai.provider_unavailable</code></td><td>bận, bị rate limit hay không kết nối được</td><td>thử lại sau <code>Retry-After</code>; dịch bài tự thử lại</td></tr>
+<tr><td><code>ai.quota_exceeded</code></td><td>hết hạn mức token của ngày</td><td>đợi tới nửa đêm UTC hay nâng hạn mức</td></tr>
+<tr><td><code>ai.request_rejected</code></td><td>nhà cung cấp từ chối request (nội dung quá dài so với mô hình, thiết lập mô hình không nhận)</td><td>xem lý do trong log máy chủ; giảm <code>AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS</code> hay đổi mô hình</td></tr>
+<tr><td><code>ai.refused</code></td><td>mô hình từ chối nội dung</td><td>sửa nội dung hay làm bằng tay</td></tr>
+<tr><td><code>ai.output_truncated</code></td><td>câu trả lời quá dài</td><td>giảm <code>AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS</code></td></tr>
+<tr><td><code>ai.output_invalid</code>, <code>content.translation_invalid</code></td><td>sai dạng hai lần</td><td>thử lại, hay dùng mô hình mạnh hơn</td></tr>
+<tr><td><code>ai.unsupported_input</code></td><td>mô hình không đọc ảnh</td><td>đặt đúng <code>AUTOXIDE_AI_IMAGES</code>, hay dùng mô hình đọc ảnh</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="cấu-hình"><a class="header" href="#cấu-hình">Cấu hình</a></h2>
+<p>Mọi biến và giá trị mặc định có trong <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a>: <code>AUTOXIDE_AI_*</code>,
+<code>AUTOXIDE_EMBEDDING_*</code>, <code>AUTOXIDE_MEDIA_AI_SEND_PRIVATE</code>,
+<code>AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS</code>, <code>AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH</code>,
+<code>AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE</code>, <code>AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_*</code>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/ADDRESS.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/ANALYTICS.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/ADDRESS.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/ANALYTICS.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

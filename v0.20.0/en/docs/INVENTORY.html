@@ -1,0 +1,478 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Inventory (inventory) - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="inventory-inventory"><a class="header" href="#inventory-inventory">Inventory (<code>inventory</code>)</a></h1>
+<p><a href="INVENTORY.vi.html">Tiếng Việt</a></p>
+<p>Module <code>inventory</code> keeps the stock of every product variant in every warehouse or store of a tenant. Every change
+goes into an append-only movement ledger, and stock is never oversold, even when many requests arrive at the same
+time, on SQLite and on PostgreSQL. Other modules use it through <code>autoxide_inventory::api</code>; the HTTP API lives under
+<code>/api/v1/inventory</code> (see <code>docs/openapi.json</code>) and the MCP tools are named <code>inventory.*</code>.</p>
+<h2 id="stock-model"><a class="header" href="#stock-model">Stock model</a></h2>
+<ul>
+<li>A <strong>warehouse</strong> is an organization unit of type <code>warehouse</code> or <code>store</code> (step 34), or the tenant’s root unit (a
+single shop keeps its stock there). A unit of another type answers <code>inventory.not_a_warehouse</code>.</li>
+<li>A <strong>stock level</strong> is one variant in one warehouse. It holds two numbers:
+<ul>
+<li><code>on_hand</code>: units physically in the warehouse — always the sum of the level’s movement ledger, never below 0;</li>
+<li><code>available</code>: units that can still be sold — <code>on_hand</code> minus the units reserved for orders. It may go below 0
+when goods leave a warehouse whose stock is all reserved (e.g. damaged) or when a product may be sold out of
+stock.
+<code>reserved</code> (<code>on_hand − available</code>) is computed, not stored.</li>
+</ul>
+</li>
+<li>The <strong>movement ledger</strong> (<code>GET /movements</code>) only grows: <code>receipt</code>, <code>sale</code>, <code>return</code>, <code>adjustment</code>, <code>count</code>,
+<code>transfer_out</code>, <code>transfer_in</code>, <code>expiry</code>, <code>supplier_return</code>. A mistake is corrected with a new adjustment.</li>
+<li>Stock numbers change only through single conditional <code>UPDATE</code> statements (<code>rows::adjust</code>), never read-then-write.</li>
+</ul>
+<h2 id="adjusting-stock"><a class="header" href="#adjusting-stock">Adjusting stock</a></h2>
+<p><code>POST /adjustments</code> (<code>inventory.adjust</code>) changes stock in one warehouse:</p>
+<pre><code class="language-json">{
+  "org_id": "…warehouse…",
+  "reference": "ADJ-2026-0042",
+  "lines": [
+    {"variant_id": "…", "quantity": -2, "reason_code": "damaged", "note": "Dropped"},
+    {"variant_id": "…", "quantity": 50, "reason_code": "found",
+     "unit_cost": {"amount": "120000", "currency": "VND"}}
+  ]
+}
+</code></pre>
+<ul>
+<li>Every line needs a reason from the tenant’s reason list <code>inventory.adjustment</code>
+(<code>GET /api/v1/kernel/reasons/inventory.adjustment</code>); built-in codes: <code>damaged</code>, <code>lost</code>, <code>found</code>,
+<code>data_entry_fix</code>, <code>sample_use</code>, <code>expired</code>, <code>count_variance</code>. Tenants rename, reorder, turn off and add codes.</li>
+<li><code>reference</code> makes the call safe to retry: the same reference and content returns the adjustment already made
+(<code>200</code>); the same reference with other content is <code>reference_reused</code>.</li>
+<li><code>on_hand</code> never goes below 0 (<code>inventory.insufficient_stock</code>).</li>
+<li>A positive line may carry a <code>unit_cost</code> (e.g. opening stock); it updates the average cost.</li>
+</ul>
+<h2 id="average-cost"><a class="header" href="#average-cost">Average cost</a></h2>
+<p>Each stock level keeps a weighted average unit cost for gross-margin reports: when goods with a cost come in,
+<code>(on hand × old cost + quantity × unit cost) / (on hand + quantity)</code>, rounded half away from zero to the currency’s
+minor unit. With nothing on hand the cost is the incoming cost. Goods without a cost (returns, found items) keep the
+cost. A change sends <code>inventory.cost_changed</code> (<code>catalog</code> uses it for price floors).</p>
+<h2 id="reorder-points-and-alerts"><a class="header" href="#reorder-points-and-alerts">Reorder points and alerts</a></h2>
+<p><code>PATCH /levels/{id}</code> (<code>inventory.settings.manage</code>) sets <code>reorder_point</code>. <code>inventory.low_stock</code> fires once when
+<code>available</code> falls from above the reorder point to it or below; <code>inventory.out_of_stock</code> when it falls from above 0
+to 0 or below. <code>GET /levels?below_reorder=true</code> and the MCP tool <code>inventory.list_low_stock</code> list them.</p>
+<h2 id="reservations-for-orders"><a class="header" href="#reservations-for-orders">Reservations (for orders)</a></h2>
+<p>Module <code>orders</code> holds stock through <code>autoxide_inventory::api::Inventory</code>:</p>
+<ol>
+<li><code>reserve</code> — all lines of an order or nothing, until <code>expires_at</code> (at most
+<code>AUTOXIDE_INVENTORY_MAX_HOLD_HOURS</code>). Calling again with the same <code>order_id</code> and content returns the same
+reservation; other content is <code>reference_reused</code>. Bundles take stock from each component; digital goods and services
+are skipped. Variants sold as <code>backorder</code> or <code>preorder</code> may take <code>available</code> below 0 (<code>backordered</code>).</li>
+<li><code>confirm</code> — the order was placed: the reservation no longer expires.</li>
+<li><code>fulfil</code> — ship some or all reserved units (<code>fulfilment_key</code> makes it safe to retry); writes <code>sale</code> lines.
+With module <code>orders</code>, stock leaves when the goods reach the buyer: <code>inventory</code> listens to
+<code>orders.fulfillment_delivered</code> (one shipment; key <code>fulfillment:&lt;id&gt;</code>) and <code>orders.order_delivered</code> (key
+<code>order:&lt;id&gt;:delivered</code>), so <code>on_hand</code> and <code>reserved</code> drop and the order becomes <code>fulfilled</code>. Units on the way
+stay reserved (already out of <code>available</code>). Each event line carries <code>delivered_quantity</code>, the units of the line
+that reached the buyer so far, and <code>inventory</code> issues the line <strong>up to</strong> that total, capped by what is still held:
+events arriving twice, late or in any order, or after units were already issued by hand with <code>fulfil</code> when the
+parcel left, never issue more. Because the goods are already gone, this path also:
+<ul>
+<li>takes units from an expired lot when the lots still in date are not enough (logged as a warning);</li>
+<li>issues units whose reservation the system had released (the hold expired, or the payment failed, for example
+a bank transfer that arrived after the hold ran out): the <code>sale</code> line takes them straight from <code>on_hand</code> and
+<code>available</code>. A reservation released by staff (<code>POST /reservations/{id}/release</code>) or by a cancelled order is
+never issued again;</li>
+<li>issues serial-tracked goods with the serial numbers recorded on the order line
+(<code>POST /api/v1/orders/{id}/lines/{line_id}/serials</code>), each serial from the warehouse that holds it. Units
+without a usable serial (not recorded yet, or not in stock in a warehouse holding the line) stay reserved
+(logged as a warning) while the other lines are issued; recording the serials later
+(<code>orders.line_serials_recorded</code>) issues them.
+A manual <code>fulfil</code> does none of these three. One event is issued in one transaction: if one of its lines is
+rejected (for example stock already gone), none of its lines is issued. When a delivered order cannot be issued
+(no reservation for goods that track stock, or rejected), <code>inventory</code> logs a warning with the error <code>code</code> and
+counts <code>inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}</code>. Reconcile by hand: release
+the hold (<code>POST /api/v1/inventory/reservations/{id}/release</code>; a reservation released by staff is never issued
+again, so later events for the order, such as serials recorded afterwards, do not take the stock a second
+time), then record the units sold with an adjustment (<code>POST /api/v1/inventory/adjustments</code>, negative
+quantity, reason <code>data_entry_fix</code>).
+Upgrading from an earlier version: orders delivered before this version keep their reservation <code>confirmed</code>
+(their units stay <code>reserved</code>). List them with <code>GET /api/v1/inventory/reservations?status=confirmed</code> and
+reconcile each order already delivered the same way (release, then adjustment).</li>
+</ul>
+</li>
+<li><code>release</code> — give back what was not shipped (cancelled, payment failed…). Releasing twice adds back once.</li>
+<li><code>restock</code> — returned goods come back in (<code>reference</code> such as <code>return:&lt;id&gt;</code>); unsellable lines are only recorded.</li>
+</ol>
+<p>Unconfirmed reservations past <code>expires_at</code> are released by the job <code>inventory.expire_reservations</code> (every minute).
+Each reservation takes stock with one conditional <code>UPDATE</code> per line, in a fixed order, so 100 buyers of the last
+unit get exactly one success.</p>
+<h3 id="pre-orders"><a class="header" href="#pre-orders">Pre-orders</a></h3>
+<p>A variant sold as <code>preorder</code> may be reserved before stock exists. When the variant has a <code>preorder_limit</code> (set in
+<code>catalog</code>), held and confirmed pre-orders never exceed it, even when many buyers order at the same moment: the extra
+ones get 409 <code>inventory.preorder_sold_out</code>. Cancelling or expiring a pre-order gives its places back.</p>
+<p>When stock arrives at a warehouse that has waiting pre-orders (receipt, transfer, return, positive adjustment), the job
+<code>inventory.allocate_preorders</code> gives the free units to pre-order lines <strong>in the order they were placed</strong> and publishes
+<code>inventory.preorder_allocated</code> for each line (<code>quantity</code> this time, <code>allocated_quantity</code> in total), so <code>orders</code> can
+move the order on. Running the job again never allocates twice.</p>
+<p>Admins see reservations with <code>GET /reservations</code> (<code>inventory.reservations.read</code>) and release a stuck one with
+<code>POST /reservations/{id}/release</code> (<code>inventory.adjust</code>; recorded with their user id).</p>
+<p>Module <code>inventory</code> also listens to <code>orders.order_confirmed</code>, <code>orders.order_cancelled</code> and <code>orders.return_received</code>
+(when module <code>orders</code> is installed) and runs the same functions, so an event arriving before or after the direct call,
+or twice, changes stock once. It also listens to <code>orders.preorder_cancelled</code>: only the cancelled pre-order lines of an
+order that stays open are released (their stock and pre-order places come back; the rest of the order keeps its
+reservation), once per event even when it is delivered again.</p>
+<h2 id="choosing-warehouses"><a class="header" href="#choosing-warehouses">Choosing warehouses</a></h2>
+<p><code>PUT /sources/{store}</code> lists the warehouses serving a store or channel, by <code>priority</code>; without rows the store sells
+its own stock. <code>PUT /settings/{store}</code>:</p>
+<ul>
+<li><code>prefer_nearby</code> — warehouses in the buyer’s province first (the province comes from the units’ public profile in
+module <code>organizations</code>);</li>
+<li><code>allow_split</code> — split an order over several warehouses when none has every line (default off: one order, one
+warehouse).</li>
+</ul>
+<p>A reservation tries one warehouse that has every line first; with no candidate at all it answers
+<code>inventory.no_source</code>, with not enough stock <code>inventory.insufficient_stock</code> naming each line.</p>
+<h2 id="transfers"><a class="header" href="#transfers">Transfers</a></h2>
+<p><code>POST /transfers</code> (<code>inventory.transfer</code> at the source) creates a draft with a number such as <code>CK-2026-000001</code>.
+<code>POST /transfers/{id}/ship</code> takes the units from the source (only stock not reserved for orders) and adds them to
+<code>incoming</code> at the destination; <code>POST /transfers/{id}/receive</code> (at the destination) receives all or part — the
+destination’s average cost uses the source’s cost at shipping. <code>close</code> writes off what never arrived; <code>cancel</code> works
+on drafts. MCP tools <code>inventory.create_transfer</code>, <code>inventory.receive_transfer</code>.</p>
+<h2 id="stock-counts"><a class="header" href="#stock-counts">Stock counts</a></h2>
+<p><code>POST /counts</code> (<code>inventory.count</code>) opens a count (<code>KK-…</code>) for one warehouse; <code>PUT /counts/{id}/lines</code> or
+<code>POST /counts/{id}/import</code> (CSV with <code>sku</code>, <code>counted</code>, optional <code>reason_code</code>) records counted quantities. Each line
+keeps the on-hand quantity at the moment it was counted, so selling goes on while counting. <code>POST /counts/{id}/apply</code>
+(<code>inventory.adjust</code>) writes each difference <code>counted − expected_at_count</code> as a <code>count</code> ledger line with its reason
+(default <code>count_variance</code>).</p>
+<h2 id="lots-expiry-dates-and-serial-numbers"><a class="header" href="#lots-expiry-dates-and-serial-numbers">Lots, expiry dates and serial numbers</a></h2>
+<p>Turned on per product in <code>catalog</code> (<code>lot_tracked</code>, <code>serial_tracked</code>).</p>
+<ul>
+<li>Adding units of a lot-tracked variant needs <code>lot_code</code> (and <code>expires_on</code>). Reservations hold stock at the level;
+the lot is chosen when goods leave: the named lot, or else the lots that expire first, then units without a lot —
+never an expired lot (<code>inventory.lot_unavailable</code>).</li>
+<li><code>GET /lots?expiry_state=ok|expiring|expired</code>: <code>expiring</code> means within the unit setting <code>inventory.expiring_days</code>
+(default 30). A daily job writes expired lots off the stock (<code>expiry</code> ledger lines, event <code>inventory.lot_expired</code>).</li>
+<li>Serial-tracked variants need exactly one serial number per unit when added, shipped (<code>FulfilLine::serials</code>),
+adjusted down or transferred; a serial number can be sold only once, even by two shipments at the same time.</li>
+<li>Transfers carry lots and serial numbers: the destination gets the same lot codes and expiry dates.</li>
+</ul>
+<h2 id="purchasing"><a class="header" href="#purchasing">Purchasing</a></h2>
+<ul>
+<li><code>POST /suppliers</code> (<code>inventory.purchasing.manage</code>): suppliers belong to a purchasing unit; <code>GET /suppliers</code> shows
+<code>payable</code> — what that unit owes each supplier, from module <code>ledger</code> (absent without it).</li>
+<li>Purchase orders (<code>PO-…</code>): draft → <code>POST /purchase-orders/{id}/order</code> (units count as <code>incoming</code>) → goods receipts,
+in parts → <code>close</code> (what never arrived leaves <code>incoming</code>) or <code>cancel</code>.</li>
+<li><code>POST /receipts</code> (<code>inventory.receive</code>, <code>PN-…</code>): against a purchase order (never more than ordered) or directly; each
+line updates the average cost and may carry a lot and serial numbers. With a supplier and module <code>ledger</code>, a job posts
+Debit <code>inventory.stock</code> / Credit <code>payable.supplier</code> once (<code>ledger_status</code>: <code>pending</code>, <code>posted</code>, <code>failed</code> — retry
+with <code>POST /receipts/{id}/retry-ledger</code> — or <code>not_applicable</code>). MCP tool <code>inventory.create_receipt</code>.</li>
+<li><code>POST /supplier-returns</code> (<code>TH-…</code>): goods back to the supplier at the current average cost (or a given price); the
+posting is reversed.</li>
+</ul>
+<h2 id="public-availability"><a class="header" href="#public-availability">Public availability</a></h2>
+<p><code>GET /api/v1/inventory/public/availability?variant_ids=&lt;id&gt;,&lt;id&gt;&amp;store_id=&lt;unit&gt;</code> needs no sign-in. For each variant
+(1 to 100 per call) and store it answers a level:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Level</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>in_stock</code></td><td>Enough to sell; the number is never shown</td></tr>
+<tr><td><code>low</code></td><td>Fewer than <code>AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD</code> (5) left; <code>quantity</code> says how many</td></tr>
+<tr><td><code>out</code></td><td>None to sell now</td></tr>
+<tr><td><code>preorder</code></td><td>Not in stock yet, sold as <code>preorder</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>A store sells from its warehouse sources (or its own stock): with <code>allow_split</code> the sources add up, otherwise the
+fullest one counts, as for a reservation. Bundles count the sets their components make; variants not tracking stock
+are always <code>in_stock</code>. Unknown or hidden variants are left out. Without <code>store_id</code> every store offering pickup is
+listed. The answer changes as soon as stock is reserved; it carries an <code>ETag</code> (send it in <code>If-None-Match</code> for 304)
+and <code>Cache-Control: public, max-age=5</code>. Module <code>catalog</code> filters “available at store X” with the same rule
+(<code>Inventory::in_stock_at</code>).</p>
+<h2 id="back-in-stock-alerts"><a class="header" href="#back-in-stock-alerts">Back-in-stock alerts</a></h2>
+<p>Shoppers ask to be told when an item is back at a store (needs module <code>notifications</code>):</p>
+<ol>
+<li><code>POST /api/v1/inventory/public/restock-alerts</code> with <code>variant_id</code>, <code>store_id</code> (omit for the online shop), <code>email</code> or
+<code>phone</code>, and <code>consent: true</code> (plus the <code>consent_text</code> shown, kept as proof). Visitors who are not signed in send a
+<code>form_token</code> from <code>GET /api/v1/antispam/token?scope=inventory:restock_alerts</code>. A signed-in buyer may give no
+contact: alerts go to their account at once. The answer is always the same <code>202</code>.</li>
+<li>Visitors get a message with a link to your page <code>AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL</code> (<code>{token}</code> is replaced);
+the page sends the token to <code>POST /api/v1/inventory/public/restock-alerts/confirm</code>.</li>
+<li>When the store can sell the item again, each confirmed alert gets <strong>one</strong> message (<code>inventory.back_in_stock</code>) per
+time the item comes back, never twice for the same wave. Every message links to the page again; sending its token
+to <code>POST /api/v1/inventory/public/restock-alerts/stop</code> stops the alerts.</li>
+</ol>
+<p>The messages are transactional (asked for and confirmed by the person, no advertising). Module <code>customers</code> asks
+<code>Inventory::restock_alerts_of</code> so a buyer is not told twice about the same item.</p>
+<h2 id="checking-the-numbers"><a class="header" href="#checking-the-numbers">Checking the numbers</a></h2>
+<p><code>autoxide task inventory.verify_levels [tenant=&lt;slug&gt;] [org_id=&lt;unit&gt;]</code> compares every level with its ledger and
+its reservations and only reports. <code>autoxide doctor</code> runs the same check on a sample of 1,000 levels per tenant.</p>
+<h2 id="permissions"><a class="header" href="#permissions">Permissions</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Permission</th><th>Allows</th></tr>
+</thead>
+<tbody>
+<tr><td><code>inventory.read</code></td><td>Stock levels, ledger, lots, valuation</td></tr>
+<tr><td><code>inventory.adjust</code></td><td>Adjustments, applying counts, releasing stuck reservations</td></tr>
+<tr><td><code>inventory.receive</code></td><td>Goods receipts</td></tr>
+<tr><td><code>inventory.transfer</code></td><td>Shipping and receiving transfers</td></tr>
+<tr><td><code>inventory.count</code></td><td>Stock counts</td></tr>
+<tr><td><code>inventory.reservations.read</code></td><td>Reservations of orders</td></tr>
+<tr><td><code>inventory.settings.manage</code></td><td>Reorder points, warehouse sources, store settings</td></tr>
+<tr><td><code>inventory.purchasing.read</code> / <code>.manage</code></td><td>Suppliers, purchase orders, supplier returns</td></tr>
+</tbody>
+</table>
+</div>
+<p>All of them are scoped by organization unit: a person with a <code>unit</code> grant on warehouse A sees and changes only
+warehouse A.</p>
+<h2 id="plans"><a class="header" href="#plans">Plans</a></h2>
+<p>Limit <code>inventory.warehouses</code> (units holding stock); features <code>inventory.multi_warehouse</code>, <code>inventory.transfers</code>,
+<code>inventory.lots</code>, <code>inventory.serials</code>, <code>inventory.purchasing</code>.</p>
+<h2 id="settings"><a class="header" href="#settings">Settings</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Variable</th><th>Default</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_INVENTORY_MAX_HOLD_HOURS</code></td><td><code>72</code></td><td>Longest reservation of an unpaid order</td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_EXPIRE_BATCH</code></td><td><code>200</code></td><td>Expired reservations released per job run</td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_MAX_LINES_PER_RESERVATION</code></td><td><code>200</code></td><td>Lines per reservation</td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD</code></td><td><code>5</code></td><td>Below it the public availability says <code>low</code></td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL</code></td><td>—</td><td>Website page for back-in-stock alert links, with <code>{token}</code></td></tr>
+</tbody>
+</table>
+</div>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/GETTING-STARTED.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/MEDIA.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/GETTING-STARTED.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/MEDIA.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

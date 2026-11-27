@@ -1,0 +1,628 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Tuân thủ pháp luật (Việt Nam) - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="tuân-thủ-pháp-luật-việt-nam"><a class="header" href="#tuân-thủ-pháp-luật-việt-nam">Tuân thủ pháp luật (Việt Nam)</a></h1>
+<p><a href="COMPLIANCE.html">English</a></p>
+<p>Module <code>compliance</code> giúp một khách chạy website thương mại tại Việt Nam mà không bỏ sót các nghĩa vụ pháp lý
+nền. Module luôn bật (không bán theo gói). Mọi điểm luật hay đổi — danh mục hồ sơ, thời hạn, miền logo được
+chấp nhận — là <strong>dữ liệu có ngày hiệu lực</strong> (quy tắc trong <code>modules/compliance/rules/vn.json</code>, nhập vào
+database), không phải code.</p>
+<blockquote>
+<p><strong>Không phải tư vấn pháp lý.</strong> Quy tắc, danh sách kiểm và mẫu đi kèm được viết từ nguồn thứ cấp. Mục nào
+cũng ghi <code>needs_legal_review: true</code>: hãy đối chiếu văn bản gốc, cùng người có chuyên môn pháp lý, trước khi
+dựa vào.</p>
+</blockquote>
+<p>Module gồm:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Phần</th><th>Endpoint (dưới <code>/api/v1/compliance</code>)</th></tr>
+</thead>
+<tbody>
+<tr><td>Định danh (KYC) người bán, người livestream, người tiếp thị liên kết — hồ sơ, xác thực và cổng <code>KycGate</code>; trên sàn, <code>catalog</code> chặn mở bán hàng của người bán chưa định danh (xem dưới)</td><td><code>/kyc/…</code>, <code>/me/kyc…</code></td></tr>
+<tr><td>Xác thực tài khoản đăng nội dung (số điện thoại / định danh)</td><td><code>/me/verification</code>, <code>/me/phone-verifications…</code></td></tr>
+<tr><td>Văn bản pháp lý có phiên bản và bằng chứng chấp nhận</td><td><code>/documents…</code>, <code>/me/acceptances</code>, <code>/public/documents/{kind}</code></td></tr>
+<tr><td>Sổ đồng ý</td><td><code>/me/consents</code></td></tr>
+<tr><td><strong>Dữ liệu cá nhân</strong>: mục đích và căn cứ xử lý, thời hạn lưu, sổ hoạt động xử lý, nơi lưu dữ liệu</td><td><code>/purposes…</code>, <code>/retention</code>, <code>/processing-register</code>, <code>/residency</code>, <code>/public/purposes</code></td></tr>
+<tr><td><strong>Sự cố dữ liệu cá nhân</strong> (72 giờ) và <strong>yêu cầu của chủ thể dữ liệu</strong> qua kênh khác</td><td><code>/incidents…</code>, <code>/subject-requests…</code></td></tr>
+<tr><td><strong>Mã theo dõi quảng cáo và đồng ý cookie</strong></td><td><code>/tracking-tags…</code>, <code>/cookie-settings/{org_id}</code>, <code>/public/consent-config</code>, <code>/public/cookie-consents</code></td></tr>
+<tr><td><strong>Báo vi phạm</strong> (sở hữu trí tuệ, hàng giả) và <strong>khiếu nại của người tiêu dùng</strong>, cung cấp thông tin cho cơ quan</td><td><code>/cases…</code>, <code>/respondent/cases</code>, <code>/disclosures</code>, <code>/public/reports</code>, <code>/public/complaints</code>, <code>/public/cases/{id}</code></td></tr>
+<tr><td>Quy tắc pháp lý có ngày hiệu lực, chính sách của khách</td><td><code>/rules</code>, <code>/policies…</code></td></tr>
+<tr><td><strong>Hồ sơ pháp lý website và Bộ Công Thương</strong></td><td><code>/legal-profiles…</code>, <code>/websites…</code>, <code>/public/badge</code>, <code>/public/owner</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Hướng dẫn này nói về thủ tục với Bộ Công Thương cùng mẫu trang bắt buộc của <code>content</code>, rồi dữ liệu cá nhân
+(kèm sổ tay sự cố 72 giờ), báo vi phạm cùng khiếu nại của người tiêu dùng, và mã theo dõi quảng cáo với
+đồng ý cookie.</p>
+<h2 id="thủ-tục-với-bộ-công-thương"><a class="header" href="#thủ-tục-với-bộ-công-thương">Thủ tục với Bộ Công Thương</a></h2>
+<p>Pháp luật Việt Nam (từ 01/7/2026 là Luật Thương mại điện tử 122/2025/QH15 và NĐ 248/2026/NĐ-CP, thay NĐ
+52/2013/NĐ-CP và NĐ 85/2021/NĐ-CP; trước đó là hai nghị định này — đối chiếu văn bản gốc) yêu cầu các mục dưới
+đây. Quy tắc <code>moit.checklist.*</code> phiên bản 2 áp dụng từ 01/7/2026. Website đã thông báo hay đăng ký trước ngày đó
+làm lại hồ sơ theo nghị định mới trong hạn chuyển tiếp (một bản tổng quan nêu 30/6/2027 — chưa xác nhận); định danh
+điện tử người bán, người livestream áp dụng từ 01/01/2027. Cơ quan tiếp nhận hồ sơ, việc còn dùng online.gov.vn và
+logo chưa xác nhận — cần đối chiếu.</p>
+<ul>
+<li><strong>website bán hàng</strong> (bạn bán hàng của mình) phải <strong>thông báo</strong> với Bộ — sau đó gắn logo xanh “Đã thông
+báo Bộ Công Thương”;</li>
+<li><strong>sàn hay trung gian</strong> (người khác bán qua bạn) phải <strong>đăng ký</strong> — logo đỏ “Đã đăng ký Bộ Công Thương”;
+hồ sơ có đề án cung cấp dịch vụ và quy chế quản lý hoạt động;</li>
+<li>website công khai thông tin chủ sở hữu và các chính sách (điều kiện giao dịch chung, vận chuyển, thanh
+toán, đổi trả, kiểm hàng, bảo vệ dữ liệu cá nhân, khiếu nại).</li>
+</ul>
+<p>Con người nộp hồ sơ trên <a href="https://online.gov.vn">online.gov.vn</a>; không có API công khai. Autoxide giữ dữ liệu,
+báo còn thiếu gì, soạn nháp bộ hồ sơ và hiện logo khi bạn ghi kết quả.</p>
+<h3 id="1-hồ-sơ-pháp-lý-của-chủ-sở-hữu"><a class="header" href="#1-hồ-sơ-pháp-lý-của-chủ-sở-hữu">1. Hồ sơ pháp lý của chủ sở hữu</a></h3>
+<p>Mỗi nút tổ chức một hồ sơ. Hồ sơ của chính khách thuộc nút gốc (bỏ <code>org_id</code>); người bán trên sàn có hồ sơ ở
+nút của mình. Website dùng hồ sơ của nút của nó, hoặc của nút cấp trên gần nhất có hồ sơ.</p>
+<pre><code class="language-http">POST /api/v1/compliance/legal-profiles
+{
+  "entity_type": "organization",
+  "legal_name": "Cong ty TNHH Vi Du",
+  "tax_code": "0101234567",
+  "registration_number": "0101234567",
+  "registration_issued_on": "2020-01-02",
+  "registration_issued_by": "Phong Dang ky kinh doanh Ha Noi",
+  "address": {"country": "VN", "province_code": "01", "commune_code": "00004", "line": "12 Trang Tien"},
+  "representative_name": "Nguyen Van A",
+  "phone": "024 1234 5678",
+  "email": "lienhe@shop.example"
+}
+</code></pre>
+<ul>
+<li><code>entity_type</code>: <code>individual</code>, <code>household_business</code> hoặc <code>organization</code>.</li>
+<li>Địa chỉ được kiểm theo danh mục đơn vị hành chính của module <code>address</code> (nhập trước:
+<code>autoxide task address.import</code>).</li>
+<li><code>PATCH /legal-profiles/{id}</code> sửa một số trường (<code>""</code> xoá một trường chữ, <code>null</code> xoá <code>address</code>); gửi
+<code>If-Match</code> với <code>ETag</code> đã đọc.</li>
+<li><code>kyc_profile_id</code> gắn hồ sơ định danh của chủ sở hữu; danh sách kiểm của sàn cần nó ở trạng thái <code>verified</code>.</li>
+</ul>
+<p>Permission: <code>compliance.legal.read</code>, <code>compliance.legal.manage</code>. Cả hai có phạm vi: nhân sự của người bán chỉ
+xem và sửa hồ sơ, website của nút mình.</p>
+<h3 id="2-website"><a class="header" href="#2-website">2. Website</a></h3>
+<pre><code class="language-http">POST /api/v1/compliance/websites
+{"domain": "shop.example", "kind": "sales"}
+</code></pre>
+<ul>
+<li><code>kind</code>: <code>sales</code> (thông báo) hoặc <code>platform</code> (đăng ký). Đổi <code>kind</code> sau này thì thủ tục làm lại từ đầu.</li>
+<li><code>channel</code>: <code>website</code> (mặc định) hoặc <code>mobile_app</code>.</li>
+<li><code>org_id</code>: nút của website (vd cửa hàng riêng của một người bán); bỏ trống là cả khách.</li>
+</ul>
+<h3 id="3-trang-bắt-buộc"><a class="header" href="#3-trang-bắt-buộc">3. Trang bắt buộc</a></h3>
+<p>Soạn từng trang trong <code>content</code> — mẫu ở mục sau cho sẵn nội dung khởi đầu — đăng trang, rồi gắn vào website:</p>
+<pre><code class="language-http">PUT /api/v1/compliance/websites/{id}/pages/return_policy
+{"entry_id": "&lt;id của trang trong content&gt;"}
+</code></pre>
+<p>Loại trang: <code>owner_info</code>, <code>privacy_policy</code>, <code>return_policy</code>, <code>shipping_policy</code>, <code>payment_policy</code>,
+<code>inspection_policy</code>, <code>complaint_policy</code>, <code>terms_of_use</code>, <code>general_conditions</code>, và với sàn thêm
+<code>platform_rules</code>, <code>seller_agreement</code>. Trang đã gắn chỉ được tính khi đã đăng.</p>
+<h3 id="4-danh-sách-kiểm"><a class="header" href="#4-danh-sách-kiểm">4. Danh sách kiểm</a></h3>
+<p><code>GET /api/v1/compliance/websites/{id}/checklist</code> (MCP <code>compliance.website_checklist</code>) liệt kê mọi mục của quy
+tắc <code>moit.checklist.sales</code> hoặc <code>moit.checklist.platform</code> đang hiệu lực, mỗi mục có <code>status</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Trạng thái</th><th>Nghĩa</th></tr>
+</thead>
+<tbody>
+<tr><td><code>met</code></td><td>Đã xong.</td></tr>
+<tr><td><code>missing</code></td><td>Cần làm; <code>hint</code> nói endpoint cần gọi.</td></tr>
+<tr><td><code>unknown</code></td><td>Autoxide chưa trả lời được (vd chưa module nào trả lời “trang sản phẩm hiện người bán”) — tự kiểm.</td></tr>
+<tr><td><code>manual</code></td><td>Luôn do người kiểm (vd tài khoản của bạn trên online.gov.vn).</td></tr>
+</tbody>
+</table>
+</div>
+<p>Mỗi mục kèm <code>legal_basis</code>. Khi quy định đổi, nhân sự nền tảng nhập phiên bản quy tắc mới
+(<code>POST /api/v1/compliance/rules</code>) và danh sách kiểm đổi theo — không cần nâng cấp.</p>
+<p><strong>Bán trước khi xong thủ tục</strong> được hiện là “bắt buộc theo luật” (<code>selling_before_done: "label"</code>), không bị
+chặn: các nguồn tìm được coi đó là vi phạm hành chính bị phạt tiền, không phải lệnh cấm giao dịch. Hãy đối
+chiếu với người có chuyên môn pháp lý (quyết định D-358).</p>
+<h3 id="5-bộ-hồ-sơ"><a class="header" href="#5-bộ-hồ-sơ">5. Bộ hồ sơ</a></h3>
+<p><code>GET /api/v1/compliance/websites/{id}/dossier</code> (MCP <code>compliance.website_dossier</code>) trả về, điền từ dữ liệu của
+bạn:</p>
+<ul>
+<li><code>form</code>: các trường tờ khai (chủ sở hữu, website, định danh, trang đã gắn kèm URL đầy đủ, đầu mối khiếu nại);</li>
+<li><code>documents</code>: bản nháp Markdown tiếng Việt — thông tin khai báo; với sàn thêm nháp đề án cung cấp dịch vụ và
+nháp quy chế quản lý hoạt động;</li>
+<li><code>checklist</code> và <code>disclaimer</code>.</li>
+</ul>
+<p>Hoàn thiện và duyệt bản nháp cùng người có chuyên môn pháp lý, rồi nộp trên online.gov.vn.</p>
+<h3 id="6-trạng-thái-và-logo"><a class="header" href="#6-trạng-thái-và-logo">6. Trạng thái và logo</a></h3>
+<p>Ghi từng bước bằng tay:</p>
+<pre><code class="language-http">POST /api/v1/compliance/websites/{id}/status
+{"status": "submitted", "reference": "HS-001"}
+</code></pre>
+<p>Trạng thái: <code>not_submitted</code>, <code>submitted</code>, <code>needs_supplement</code>, <code>notified</code> (website bán hàng), <code>registered</code>
+(sàn), <code>rejected</code>, <code>revoked</code>. Với <code>notified</code> / <code>registered</code>, dán đoạn mã logo Bộ cấp vào <code>snippet</code> (hoặc gửi
+<code>link_url</code> và <code>image_url</code>). Chỉ nhận một link tới <code>online.gov.vn</code> bọc một ảnh từ <code>online.gov.vn</code> — script,
+thuộc tính sự kiện, style hay miền khác trả <code>compliance.logo_snippet_invalid</code> (422). Đoạn mã không bao giờ
+được lưu hay trả lại nguyên văn: Autoxide giữ hai địa chỉ và dựng lại đoạn mã sạch.</p>
+<h3 id="7-cho-giao-diện-công-khai-không-cần-đăng-nhập"><a class="header" href="#7-cho-giao-diện-công-khai-không-cần-đăng-nhập">7. Cho giao diện (công khai, không cần đăng nhập)</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Endpoint</th><th>Trả về</th></tr>
+</thead>
+<tbody>
+<tr><td><code>GET /api/v1/compliance/public/badge</code></td><td>Logo của website đang xem: <code>color</code> (<code>blue</code> / <code>red</code>), <code>link_url</code>, <code>image_url</code>, <code>alt</code>, <code>snippet</code> dựng sẵn. 404 khi website chưa có logo.</td></tr>
+<tr><td><code>GET /api/v1/compliance/public/owner</code></td><td>Thông tin chủ sở hữu cho chân trang. 404 khi chưa có hồ sơ pháp lý.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Website được tìm theo <code>?domain=</code>, rồi tên miền của request, rồi website của nút đang xem (<code>?site=&lt;id nút&gt;</code> hay
+tên miền gắn với nút). Cả hai gửi <code>ETag</code>; gửi lại trong <code>If-None-Match</code> để nhận <code>304</code>.</p>
+<h3 id="8-autoxide-doctor"><a class="header" href="#8-autoxide-doctor">8. <code>autoxide doctor</code></a></h3>
+<p>Bước kiểm <code>compliance.moit_readiness</code> cảnh báo (không bao giờ báo hỏng) khi chưa website nào có hồ sơ pháp lý,
+hoặc website chưa nộp còn thiếu mục trong danh sách kiểm — kèm địa chỉ danh sách kiểm của từng website.</p>
+<h2 id="mẫu-trang-bắt-buộc-content"><a class="header" href="#mẫu-trang-bắt-buộc-content">Mẫu trang bắt buộc (<code>content</code>)</a></h2>
+<p>Module <code>content</code> có sẵn nội dung khởi đầu cho các trang bắt buộc, tiếng Anh và tiếng Việt:</p>
+<pre><code class="language-http">GET  /api/v1/content/templates
+POST /api/v1/content/templates/{key}/drafts
+{"locale": "vi", "variables": {"policy": {"return_days": 7}}}
+</code></pre>
+<ul>
+<li>Khoá: <code>owner_info</code>, <code>privacy_policy</code>, <code>return_policy</code>, <code>shipping_policy</code>, <code>payment_policy</code>,
+<code>inspection_policy</code>, <code>complaint_policy</code>, <code>terms_of_use</code>, <code>general_conditions</code>; với sàn thêm
+<code>platform_rules</code>, <code>seller_agreement</code>, <code>seller_info</code>.</li>
+<li>Bản nháp được điền bằng hồ sơ pháp lý của nút (<code>owner.*</code>, <code>contact.*</code>, đọc từ <code>compliance</code>), rồi bằng
+<code>variables</code> bạn gửi (giá trị gửi thắng). Mọi giá trị chỉ vào phần chữ — không bao giờ thêm được thẻ. Còn
+thiếu biến bắt buộc thì trả <code>content.template_variables_missing</code> (422) liệt kê đủ một lần.</li>
+<li>Kết quả là trang <strong>nháp</strong> (<code>content.write</code>); duyệt, đăng, rồi gắn vào website.</li>
+<li>Mẫu nào cũng mở đầu bằng “Nội dung mẫu — cần người có chuyên môn pháp lý duyệt trước khi dùng”.</li>
+</ul>
+<h2 id="dữ-liệu-cá-nhân"><a class="header" href="#dữ-liệu-cá-nhân">Dữ liệu cá nhân</a></h2>
+<p>Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định 356/2025/NĐ-CP (hiệu lực từ 01/01/2026 — đối chiếu văn
+bản gốc cùng người có chuyên môn pháp lý). Mỗi khách là bên kiểm soát dữ liệu của chính mình.</p>
+<h3 id="mục-đích-và-căn-cứ-xử-lý"><a class="header" href="#mục-đích-và-căn-cứ-xử-lý">Mục đích và căn cứ xử lý</a></h3>
+<p><code>GET /purposes</code> (<code>compliance.privacy.read</code>) liệt kê mục đích xử lý: mặc định của quy tắc
+<code>privacy.default_purposes</code> (<code>service</code>, <code>marketing</code>, <code>analytics</code>, <code>legal</code>) gộp với mục đích riêng của khách.
+<code>POST /purposes</code> thêm, <code>PATCH /purposes/{key}</code> sửa (sửa mục mặc định thì lưu bản của khách) — cả hai cần
+<code>compliance.privacy.manage</code>. Mỗi mục đích có <code>category</code>, <code>legal_basis</code> (<code>consent</code>, <code>contract</code>,
+<code>legal_obligation</code>, <code>vital_interest</code>, <code>public_interest</code>), loại dữ liệu, bên nhận (tên, nước) và mô tả theo
+ngôn ngữ. <code>GET /public/purposes</code> (không cần đăng nhập) liệt kê mục đích đang dùng cho thông báo về quyền riêng
+tư; nhà cung cấp mã theo dõi đang bật hiện ở đó như bên nhận, kèm nước nhận dữ liệu.</p>
+<h3 id="thời-hạn-lưu"><a class="header" href="#thời-hạn-lưu">Thời hạn lưu</a></h3>
+<p>Mỗi module khai dữ liệu cá nhân nó giữ và giữ bao lâu (<code>Module::retention</code>, đọc từ cấu hình của module). <code>GET /retention</code> liệt kê, mỗi mục so với quy tắc <code>privacy.retention_limits</code>: <code>ok</code>, <code>exceeds_limit</code> hay
+<code>forever_not_allowed</code> (chỉ <code>accounting</code> — bằng chứng luật buộc giữ — được giữ mãi). Giới hạn đi kèm là mặc định
+thận trọng, không phải con số của luật. <code>autoxide doctor</code> cảnh báo (<code>compliance.retention</code>) khi có mục không
+<code>ok</code>; hạ cấu hình ghi ở <code>setting</code>.</p>
+<h3 id="sổ-hoạt-động-xử-lý"><a class="header" href="#sổ-hoạt-động-xử-lý">Sổ hoạt động xử lý</a></h3>
+<p><code>GET /processing-register</code> trả mục đích, căn cứ, loại dữ liệu, bên nhận, thời hạn lưu và nơi lưu dữ liệu — đầu
+vào cho hồ sơ đánh giá tác động xử lý dữ liệu cá nhân; mẫu hồ sơ chính thức cần người có chuyên môn pháp lý.</p>
+<h3 id="chưa-làm-trước-10"><a class="header" href="#chưa-làm-trước-10">Chưa làm (trước 1.0)</a></h3>
+<p>Phát hiện của đợt rà pháp lý vòng 1 (AI thực hiện, không phải ý kiến pháp lý; <code>docs/legal/review-2026-11-r1/</code>) mà core
+chưa xử lý. Trong lúc chờ, người triển khai tự bù:</p>
+<ul>
+<li><strong>Định danh người bán trước khi bán.</strong> Quy tắc <code>kyc.required_activities</code> đòi người bán, người livestream, người tiếp
+thị liên kết đã định danh (Luật Thương mại điện tử 122/2025/QH15; NĐ 248/2026/NĐ-CP Điều 18, định danh điện tử
+người bán từ 01/01/2027 — cần đối chiếu văn bản gốc). Khi khách là sàn (<code>kernel.business_model = marketplace</code>),
+<code>catalog</code> hỏi <code>KycGate</code> trước khi sản phẩm của người bán (nút bất kỳ không phải nút gốc của khách) chuyển <code>active</code>.
+Người bán là nút sở hữu hay một nút phía trên nó, dưới nút gốc (sàn → người bán → cửa hàng): một nút trong chuỗi
+đã định danh là đủ. Người bán chưa định danh nhận <code>compliance.kyc_required</code> (403); hàng của nút gốc và khách tự bán
+hàng của mình không bị hỏi. Module <code>compliance</code> bị tắt (vd <code>AUTOXIDE_MODULES=official,-compliance</code>) thì không kiểm
+được định danh, nên trên sàn hàng của người bán không mở bán được (<code>catalog.seller_verification_unavailable</code>, 403).
+Chỉ bước chuyển sang <code>active</code> được kiểm: hàng đang bán vẫn bán khi khách chuyển thành sàn, quy tắc bắt đầu áp dụng
+hay định danh của người bán hết hạn / bị thu hồi — tự dừng chúng (<code>POST /api/v1/catalog/products/{id}/status</code>).
+Sàn cho mỗi người bán một khách con thay vì một nút thì không được kiểm theo cách này: mỗi khách con tự bán hàng của
+mình. Còn mở: luồng livestream và tiếp thị liên kết (chưa có module), và hồ sơ chưa ghi đủ mọi mục Điều 18
+nêu — cá nhân: họ tên, ngày sinh, số định danh cá nhân (một nguồn thêm địa chỉ cư trú); tổ chức, hộ kinh doanh:
+tên, trụ sở, số định danh, người đại diện theo pháp luật; cá nhân nước ngoài: số hộ chiếu (hay giấy tờ tương
+đương) và nước cấp, còn hiệu lực ít nhất 6 tháng lúc xét duyệt. Hồ sơ giữ tên đã xác thực, mã băm và 4 số cuối của
+giấy tờ; các mục còn lại nằm ở nhà cung cấp eKYC. Cần đối chiếu văn bản gốc trước khi dựa vào.</li>
+<li><strong>Dữ liệu cá nhân của trẻ em.</strong> Luật 91/2025/QH15 có quy định riêng cho trẻ em và người được giám hộ (đồng ý của
+cha mẹ / người giám hộ; từ đủ 7 tuổi thêm đồng ý của trẻ — điều luật và độ tuổi cần đối chiếu). Core không có ngày
+sinh, kiểm tuổi hay đồng ý của người giám hộ: dịch vụ hướng tới trẻ em phải tự thu và lưu đồng ý của người giám hộ.
+Sau 1.0: cấu hình theo khách, tự khai tuổi khi đăng ký và sổ đồng ý ghi người đồng ý thay.</li>
+<li><strong>Dữ liệu gửi ra nước ngoài qua nhà cung cấp.</strong> Nhà cung cấp AI của module <code>ai</code>, mail, SMS và nơi lưu file có thể
+xử lý dữ liệu cá nhân ngoài Việt Nam; họ không tự vào sổ xử lý. Thêm từng nhà cung cấp làm bên nhận (tên, nước) của
+mục đích dùng nó (<code>POST /purposes</code>, <code>PATCH /purposes/{key}</code>) và lập hồ sơ đánh giá tác động chuyển dữ liệu ra nước
+ngoài (NĐ 356/2025/NĐ-CP — mẫu và miễn trừ cho doanh nghiệp nhỏ cần đối chiếu). Sau 1.0: module khai bên xử lý
+(<code>Module::processors</code>) và <code>autoxide doctor</code> cảnh báo bên nhận ở nước ngoài.</li>
+</ul>
+<h3 id="nơi-lưu-dữ-liệu"><a class="header" href="#nơi-lưu-dữ-liệu">Nơi lưu dữ liệu</a></h3>
+<p>Có thể buộc một khách lưu dữ liệu ở một nước (Luật An ninh mạng 116/2025/QH15, hiệu lực 01/7/2026, thay Luật
+An ninh mạng 2018 và Luật An toàn thông tin mạng 2015 — nguồn thứ cấp, cần đối chiếu; nghị định hướng dẫn, theo nguồn thứ cấp là NĐ 333/2026/NĐ-CP,
+thay NĐ 53/2022/NĐ-CP — chưa xác nhận. Ai bắt buộc lưu tại Việt Nam cần đối chiếu pháp lý):</p>
+<pre><code class="language-bash">autoxide placement country main VN          # ghi nước đặt máy chủ của một vị trí dữ liệu
+</code></pre>
+<pre><code class="language-http">PUT /api/v1/compliance/residency
+{"tenant_id": "…", "data_residency": "VN"}
+</code></pre>
+<p>Chỉ nhân sự nền tảng có <code>compliance.privacy.manage</code> đặt được. Bị từ chối (<code>tenant_residency_violation</code>, 409)
+khi vị trí dữ liệu của khách không ở nước đó hoặc chưa rõ nước; sau này dời khách sang vị trí ở nước khác cũng bị
+từ chối cùng mã, đổi nước của vị trí dữ liệu cũng vậy. <code>GET /residency</code> cho xem trạng thái của khách; <code>autoxide doctor</code> cảnh báo (<code>compliance.data_residency</code>) khách nào chưa đáp ứng.</p>
+<h3 id="sự-cố-dữ-liệu-cá-nhân-sổ-tay-72-giờ"><a class="header" href="#sự-cố-dữ-liệu-cá-nhân-sổ-tay-72-giờ">Sự cố dữ liệu cá nhân: sổ tay 72 giờ</a></h3>
+<p>Báo cáo gửi cơ quan có hạn <strong>72 giờ kể từ khi phát hiện</strong> (quy tắc <code>privacy.incident</code>, dữ liệu có ngày hiệu lực).
+Làm ngay khi nghi có sự cố:</p>
+<ol>
+<li><strong>Ghi ngay</strong> — <code>POST /incidents</code> với <code>title</code>, <code>severity</code> (<code>low</code>…<code>critical</code>) và <code>detected_at</code> (lúc phát hiện,
+không phải lúc bắt đầu). Kết quả có <code>report_due_at</code>. Cần <code>compliance.incidents.manage</code>.</li>
+<li><strong>Đặt người nhận nhắc</strong> — chính sách <code>incident.alert_emails</code> của khách (<code>PUT /policies/incident.alert_emails</code>
+với danh sách địa chỉ). Một job 15 phút một lần gửi mail ở mốc 24, 48, 60, 68 giờ và ở mốc hạn (mỗi mốc một
+lần), và phát <code>compliance.incident_deadline_near</code>.</li>
+<li><strong>Khoanh vùng và ghi lại</strong> — <code>PATCH /incidents/{id}</code> với <code>status: "contained"</code>, loại dữ liệu và số người;
+mỗi phát hiện, mỗi việc đã làm thêm bằng <code>POST /incidents/{id}/entries</code> (nhật ký chỉ thêm).</li>
+<li><strong>Soạn thông báo</strong> — <code>GET /incidents/{id}/draft?audience=authority&amp;locale=vi</code> (và <code>audience=subjects</code> cho
+người bị ảnh hưởng). Đây là bản nháp điền từ sự cố và chính sách <code>privacy.contact</code>: điền phần còn thiếu, nhờ
+duyệt, rồi tự gửi.</li>
+<li><strong>Ghi đã báo</strong> — <code>PATCH /incidents/{id}</code> với <code>authority_notified_at</code> và <code>authority_reference</code> (sự cố thành
+<code>reported</code>), rồi <code>subjects_notified_at</code> khi đã báo người bị ảnh hưởng; cuối cùng <code>closed</code>.</li>
+</ol>
+<p><code>GET /incidents?overdue=true</code> liệt kê sự cố quá hạn, <code>autoxide doctor</code> (<code>compliance.privacy_deadlines</code>) cảnh
+báo chúng. Hướng dẫn triển khai trỏ về đây (<a href="DEPLOY.vi.html">DEPLOY.vi.md</a>).</p>
+<h3 id="yêu-cầu-của-chủ-thể-dữ-liệu-qua-kênh-khác"><a class="header" href="#yêu-cầu-của-chủ-thể-dữ-liệu-qua-kênh-khác">Yêu cầu của chủ thể dữ liệu qua kênh khác</a></h3>
+<p>Yêu cầu người dùng tự làm trong tài khoản (xuất, xoá) chạy ngay. Yêu cầu nhận qua email, thư, điện thoại hay từ
+cơ quan được ghi sổ để không bị sót:</p>
+<ul>
+<li><code>POST /subject-requests</code> với <code>kind</code> (<code>access</code>, <code>erasure</code>, <code>rectification</code>, <code>objection</code>, <code>restriction</code>,
+<code>withdrawal</code>), <code>channel</code> (<code>email</code>, <code>post</code>, <code>phone</code>, <code>authority</code>, <code>other</code>), <code>subject</code> (ID người dùng, địa chỉ
+email hay số điện thoại) và <code>received_at</code>. <code>due_at</code> lấy từ quy tắc <code>privacy.subject_requests</code> hiệu lực lúc
+nhận: 72 giờ, chặt hơn hạn trả lời 2 ngày làm việc của NĐ 356/2025/NĐ-CP Điều 5 (thay NĐ 13/2023/NĐ-CP). Phiên
+bản 2 của quy tắc ghi thêm số ngày thực hiện theo loại (<code>fulfil_within_days</code>, theo nguồn thứ cấp) để tham khảo;
+Autoxide chưa tính hạn thứ hai này — cần đối chiếu văn bản gốc.</li>
+<li><code>POST /subject-requests/{id}/fulfil</code>: <code>access</code> của người dùng trả dữ liệu cá nhân của mọi module (gửi cho
+người đó; không lưu lại); <code>erasure</code> / <code>withdrawal</code> của email hay số điện thoại xoá giá trị đó khỏi sổ đồng ý
+(khoá băm và bản ghi giữ làm bằng chứng, để không gửi lại). Xoá cả tài khoản là <code>DELETE /api/v1/auth/users/{id}</code>.</li>
+<li><code>PATCH /subject-requests/{id}</code> đặt <code>in_progress</code> hay <code>rejected</code> (kèm <code>reason</code>). <code>GET /subject-requests?overdue=true</code> liệt kê yêu cầu trễ hạn. Mọi endpoint cần <code>compliance.privacy.manage</code>.</li>
+</ul>
+<p>Khi tài khoản bị xoá (<code>auth.user_deleted</code>), <code>compliance</code> xoá số điện thoại đã xác thực và mã đang chờ của người
+đó, gỡ người dùng khỏi bằng chứng đồng ý cookie; bằng chứng đồng ý, văn bản đã chấp nhận và kết quả định danh giữ
+trong thời gian luật yêu cầu. Bản xuất dữ liệu cá nhân của người dùng (<code>GET /api/v1/auth/me/export</code>) có phần của
+<code>compliance</code>.</p>
+<h2 id="báo-vi-phạm-và-khiếu-nại-của-người-tiêu-dùng"><a class="header" href="#báo-vi-phạm-và-khiếu-nại-của-người-tiêu-dùng">Báo vi phạm và khiếu nại của người tiêu dùng</a></h2>
+<p>Vi phạm sở hữu trí tuệ, hàng giả, hàng cấm được báo dưới dạng <strong>vụ việc</strong>; khiếu nại của người tiêu
+dùng cũng vậy. Một vụ việc đi: tiếp nhận → (ẩn đối tượng) → phản hồi của bên bị phản ánh → quyết định,
+có hạn và lưu vết chỉ thêm. Căn cứ — cần đối chiếu văn bản gốc: Luật Thương mại điện tử 122/2025/QH15 và
+NĐ 248/2026/NĐ-CP (từ 01/7/2026; gỡ khi cơ quan có thẩm quyền yêu cầu, trước đó là NĐ 85/2021/NĐ-CP), Luật Sở
+hữu trí tuệ, Luật Bảo vệ quyền lợi người tiêu
+dùng 19/2023/QH15 và NĐ 55/2024/NĐ-CP (khiếu nại).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Ai</th><th>Endpoint (dưới <code>/api/v1/compliance</code>)</th></tr>
+</thead>
+<tbody>
+<tr><td>Bất kỳ ai (form công khai, khách suy từ tên miền)</td><td><code>POST /public/reports</code>, <code>POST /public/complaints</code>, <code>GET /public/complaints</code>, <code>GET /public/cases/{id}?token=</code>, <code>GET /public/moderation-reasons</code></td></tr>
+<tr><td>Nhân sự (<code>compliance.cases.read</code> / <code>.handle</code>)</td><td><code>GET|POST /cases</code>, <code>GET /cases/{id}</code>, <code>POST /cases/{id}/entries</code>, <code>…/restrict</code>, <code>…/restore</code>, <code>…/decision</code>, <code>…/close</code></td></tr>
+<tr><td>Bên bị phản ánh (đăng nhập)</td><td><code>GET /respondent/cases</code>, <code>POST /cases/{id}/responses</code></td></tr>
+<tr><td>Nhân sự (<code>compliance.disclosures.manage</code>)</td><td><code>GET|POST /disclosures</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Tiếp nhận.</strong> Form công khai xin token form trước (<code>GET /api/v1/antispam/token?scope=compliance:reports</code>,
+hay <code>compliance:complaints</code>) và bị giới hạn theo khối mạng và email mỗi giờ
+(<code>AUTOXIDE_COMPLIANCE_PUBLIC_REPORTS_PER_IP_PER_HOUR</code>, mặc định 5). Đối tượng là thứ bị báo, dạng
+<code>&lt;module&gt;.&lt;type&gt;:&lt;id&gt;</code> (vd <code>content.entry:…</code>, <code>comments.comment:…</code>; sản phẩm khi có bước 41); phải có
+thật. Người gửi nhận <code>tracking_token</code> một lần — chỉ lưu SHA-256 — và thư báo đã nhận khi có để lại địa
+chỉ (link: <code>AUTOXIDE_COMPLIANCE_CASE_TRACKING_URL</code> có <code>{case}</code> và <code>{token}</code>). Nhân sự ghi vụ nhận qua
+thư (<code>POST /cases</code>, <code>reporter_kind</code> <code>rights_holder</code> hay <code>authority</code>).</p>
+<p><strong>Hạn</strong> lấy từ quy tắc <code>cases.deadlines</code>: số giờ để xác nhận, số ngày làm việc để phản hồi và để quyết
+định theo loại (khiếu nại của người tiêu dùng: 3 và 7), và 24 giờ để quyết định yêu cầu của cơ quan.
+Ngày làm việc bỏ thứ Bảy, Chủ nhật và ngày lễ ghi trong quy tắc (giờ Việt Nam); Tết âm lịch và ngày
+nghỉ bù nhập mỗi năm. Lịch hằng giờ <code>compliance.case_deadlines</code> phát event <code>compliance.case_overdue</code> và
+gửi thư tới <code>email</code> của chính sách <code>complaints.contact</code>, mỗi mốc hạn một lần.</p>
+<p><strong>Ẩn đối tượng.</strong> Yêu cầu của cơ quan ẩn đối tượng ngay; báo vi phạm sở hữu trí tuệ hay hàng giả cũng
+vậy khi khách đặt chính sách <code>cases.auto_restrict</code> là <code>true</code>. Nhân sự ẩn hay hiện tay (<code>/restrict</code>,
+<code>/restore</code>). <code>compliance</code> không bao giờ đụng bảng của module khác: nó phát <code>compliance.target_restricted</code>
+/ <code>compliance.target_restored</code> (hợp đồng kernel <code>autoxide_kernel::moderation</code>), module sở hữu tự ẩn —
+<code>content</code> trả <strong>451</strong> <code>content.restricted</code> và bỏ trang khỏi danh sách, sitemap, feed, tìm kiếm;
+<code>comments</code> ẩn bình luận và khôi phục trạng thái cũ. Đối tượng chỉ hiện lại khi không còn vụ nào khác
+đang ẩn nó.</p>
+<p><strong>Bên bị phản ánh</strong> là chủ đối tượng (từ sổ đối tượng của kernel, vd tác giả của trang) và người có
+<code>compliance.cases.respond</code> trên nút bị phản ánh (<code>respondent_org_id</code>, người bán trên sàn). Họ thấy vụ của
+mình không kèm cách liên lạc của người báo, và phản hồi trước <code>respond_by</code>; muộn hơn thì
+<code>compliance.response_closed</code> (409).</p>
+<p><strong>Quyết định.</strong> Một người đăng nhập có <code>compliance.cases.handle</code> quyết định (<code>upheld</code> hay
+<code>partially_upheld</code> giữ ẩn; <code>rejected</code> hiện lại); API key nhận <code>compliance.session_required</code>. Lý do hiện cho
+cả hai bên và gửi thư cho người báo. Không có tool MCP để quyết định.</p>
+<p><strong>Cung cấp thông tin cho cơ quan.</strong> <code>POST /disclosures</code> (người đăng nhập, <code>compliance.disclosures.manage</code>)
+ghi cơ quan, số văn bản yêu cầu, căn cứ và tên các trường đã đưa, rồi trả giá trị một lần — từ hồ sơ
+pháp lý và hồ sơ định danh của người bán mà <code>compliance</code> giữ. Bản ghi và event
+<code>compliance.disclosure_recorded</code> không bao giờ chứa giá trị.</p>
+<p>Tool MCP: <code>compliance.list_cases</code>, <code>compliance.get_case</code> (đọc), <code>compliance.add_case_note</code>,
+<code>compliance.restrict_case_target</code>.</p>
+<h3 id="bảo-vệ-người-tiêu-dùng"><a class="header" href="#bảo-vệ-người-tiêu-dùng">Bảo vệ người tiêu dùng</a></h3>
+<ul>
+<li><strong>Ẩn đánh giá.</strong> Nội dung của người tiêu dùng chỉ được ẩn vì các lý do của quy tắc
+<code>moderation.hide_reasons</code> (<code>spam</code>, <code>illegal_content</code>, <code>personal_data</code>, <code>unrelated</code>, <code>offensive</code> — cần
+đối chiếu). Module kiểm duyệt đánh giá hỏi trait <code>ModerationPolicy</code> (<code>autoxide_kernel::moderation</code>) trước khi
+ẩn — <code>orders</code> ánh xạ lý do của mình (<code>unlawful_content</code> → <code>illegal_content</code>, <code>abusive_language</code> → <code>offensive</code>,
+<code>spam_or_advertising</code> → <code>spam</code>, <code>not_about_product</code> → <code>unrelated</code>), nên lý do khách tự thêm không ẩn được
+đánh giá khi đã cài <code>compliance</code>
+(<code>compliance.hide_reason_not_allowed</code>, 422) và ghi lý do trong event của chính nó; danh sách công khai ở
+<code>GET /public/moderation-reasons</code>. Đánh giá tiêu cực mà hợp lệ vẫn hiện.</li>
+<li><strong>Điều kiện giao dịch chung</strong> là văn bản pháp lý có phiên bản loại <code>general_conditions</code>, công khai ở
+<code>GET /public/documents/general_conditions</code>.</li>
+<li><strong>Kênh khiếu nại.</strong> <code>GET /public/complaints</code> cho trang khiếu nại của website liên hệ (chính sách
+<code>complaints.contact</code>) và hạn xử lý; khiếu nại là vụ việc loại <code>consumer_complaint</code>.</li>
+</ul>
+<h3 id="nhãn-ai"><a class="header" href="#nhãn-ai">Nhãn AI</a></h3>
+<p>Nội dung viết hay sửa từ gợi ý của AI mang <code>ai_assisted</code> (<code>content</code>) và alt text của ảnh lấy từ gợi ý
+mang <code>alt_ai_assisted</code> (<code>media</code>), endpoint công khai trả về để giao diện gắn nhãn (Luật Trí tuệ nhân tạo
+134/2025/QH15, từ 1/3/2026 — cần đối chiếu nghị định). Xem <a href="CONTENT.vi.html"><code>CONTENT.vi.md</code></a> và
+<a href="MEDIA.vi.html"><code>MEDIA.vi.md</code></a>.</p>
+<h2 id="mã-theo-dõi-quảng-cáo-và-đồng-ý-cookie"><a class="header" href="#mã-theo-dõi-quảng-cáo-và-đồng-ý-cookie">Mã theo dõi quảng cáo và đồng ý cookie</a></h2>
+<p>Khách gắn mã đo của nền tảng quảng cáo mà không phải dán script, và mã chỉ chạy sau khi người xem đồng ý. (Luật
+Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP, Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15 —
+cookie đo lường có cần đồng ý không, và hồ sơ đánh giá tác động khi chuyển dữ liệu ra nước ngoài, cần đối chiếu
+pháp lý; thiết kế chọn cách hiểu chặt: hỏi trước.)</p>
+<h3 id="nhà-cung-cấp-và-mã"><a class="header" href="#nhà-cung-cấp-và-mã">Nhà cung cấp và mã</a></h3>
+<p><code>GET /tracking-providers</code> liệt kê nhà cung cấp cho sẵn; khách chỉ điền mã ID:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th><code>provider</code></th><th>Tên</th><th>Nhóm</th><th>Dạng mã</th><th>Dữ liệu đi tới</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ga4</code></td><td>Google Analytics 4</td><td><code>analytics</code></td><td><code>G-XXXXXXXXXX</code></td><td>US</td></tr>
+<tr><td><code>gtm</code></td><td>Google Tag Manager</td><td><code>marketing</code></td><td><code>GTM-XXXXXXX</code></td><td>US</td></tr>
+<tr><td><code>google_ads</code></td><td>Google Ads</td><td><code>marketing</code></td><td><code>AW-123456789</code></td><td>US</td></tr>
+<tr><td><code>meta</code></td><td>Meta Pixel</td><td><code>marketing</code></td><td>chữ số</td><td>US</td></tr>
+<tr><td><code>tiktok</code></td><td>TikTok Pixel</td><td><code>marketing</code></td><td>chữ và số</td><td>SG</td></tr>
+<tr><td><code>zalo</code></td><td>Zalo Ads Pixel</td><td><code>marketing</code></td><td>chữ số</td><td>VN</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>POST /tracking-tags {org_id, provider, tracking_id}</code>, <code>PATCH /tracking-tags/{id}</code> (<code>status</code>: <code>active</code> /
+<code>paused</code>), <code>DELETE /tracking-tags/{id}</code> — cần <code>compliance.tracking.manage</code> trên nút của website. Mã sai dạng trả
+<code>compliance.tracking_id_invalid</code> kèm dạng mong đợi; nhà cung cấp lạ trả <code>compliance.tracking_provider_unknown</code>.</p>
+<h3 id="banner"><a class="header" href="#banner">Banner</a></h3>
+<p><code>PUT /cookie-settings/{org_id}</code> đặt <code>enabled</code>, các nhóm tuỳ chọn được hỏi <code>categories</code> (<code>preferences</code>,
+<code>analytics</code>, <code>marketing</code>; <code>necessary</code> luôn bật và không mang mã nào) và <code>position</code>. Nhóm của mã đang bật luôn được
+hỏi. Đổi nhóm hay nhà cung cấp đang bật thì tăng <code>policy_version</code>: người xem được hỏi lại. <code>GET /cookie-consents/stats?org_id=</code> cho số gộp 30 ngày gần nhất, không bao giờ trả bản ghi riêng.</p>
+<h3 id="cho-giao-diện"><a class="header" href="#cho-giao-diện">Cho giao diện</a></h3>
+<pre><code class="language-http">GET  /api/v1/compliance/public/consent-config?granted=analytics&amp;locale=vi
+POST /api/v1/compliance/public/cookie-consents
+{"consent_id": "&lt;ngẫu nhiên, giữ trong cookie cần thiết&gt;", "categories": ["analytics"], "policy_version": 3}
+</code></pre>
+<p>Hợp đồng với giao diện:</p>
+<ul>
+<li><strong>Không tải gì trước khi đồng ý.</strong> Không có <code>granted</code> thì cấu hình không trả mã nào; có thì chỉ mã đang bật của
+các nhóm đó. Đọc lựa chọn của người xem từ cookie cần thiết của bạn rồi gửi lên.</li>
+<li><strong>Từ chối dễ như đồng ý.</strong> Hiện <code>texts.reject_all</code> nổi bật ngang <code>texts.accept_all</code>, ngay lớp đầu; không nhóm nào
+được chọn sẵn (<code>preselected: false</code>). <code>texts.legal</code> không đổi được.</li>
+<li><strong>Ghi lựa chọn</strong> bằng <code>POST /public/cookie-consents</code> (không cần đăng nhập; giới hạn theo khối mạng bằng
+<code>AUTOXIDE_COMPLIANCE_COOKIE_CONSENTS_PER_IP_PER_HOUR</code>). Lưu mã ngẫu nhiên, nhóm, phiên bản và bản băm của khối
+mạng — không bao giờ lưu IP thô — trong số ngày của <code>privacy.consent_proof_days</code>. Người xem đã đăng nhập thì lựa
+chọn đi vào cả sổ đồng ý (mục đích <code>analytics</code> / <code>marketing</code>, phạm vi <code>website:&lt;id nút&gt;</code>). <code>policy_version</code> cũ
+trả <code>compliance.cookie_policy_changed</code> (409): hiện lại banner.</li>
+<li><strong>Không làm chậm trang.</strong> Tải mã <code>async</code>, sau khi trang đã hiện (<code>loading: after_consent_deferred</code>); thêm
+<code>csp_hosts</code> vào Content-Security-Policy; không tải mã ở trang đăng nhập và trang tài khoản; ở trang thanh toán
+chỉ gửi sự kiện chuyển đổi chuẩn (<code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code>, <code>purchase</code>).</li>
+<li>Chưa làm gửi chuyển đổi từ máy chủ tới nền tảng quảng cáo (cần đối chiếu riêng về chuyển dữ liệu cá nhân).</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/COMPATIBILITY.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/CONTENT.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/COMPATIBILITY.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/CONTENT.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

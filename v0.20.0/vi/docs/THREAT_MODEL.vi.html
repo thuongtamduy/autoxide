@@ -1,0 +1,699 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Mô hình mối đe doạ của core - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="mô-hình-mối-đe-doạ-của-core"><a class="header" href="#mô-hình-mối-đe-doạ-của-core">Mô hình mối đe doạ của core</a></h1>
+<p><em>English: <a href="THREAT_MODEL.html">THREAT_MODEL.md</a></em></p>
+<blockquote>
+<p><strong>Đây là gì:</strong> mô hình của nhóm duy trì về những thứ kẻ tấn công có thể nhắm tới trong một máy chủ Autoxide, những
+chốt chặn (control) đang có và những gì còn mở. Tài liệu được viết với AI hỗ trợ, dựa trên code và nhật ký quyết
+định, làm đầu vào cho một đợt kiểm thử xâm nhập (penetration test) do người ngoài dự án thực hiện. Đây <strong>không</strong>
+phải kiểm toán và không khẳng định Autoxide không có lỗ hổng. Muốn báo lỗi, làm theo
+<a href="../SECURITY.vi.html"><code>SECURITY.vi.md</code></a>.</p>
+</blockquote>
+<ul>
+<li><strong>Ngày:</strong> 2026-11-26, <code>main</code> của loạt <code>0.x</code> trước 1.0</li>
+<li><strong>Mục lộ trình:</strong> bước 71, G13 (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>)</li>
+<li><strong>Dựa trên:</strong> <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/security/review-2026-11.md">đợt rà soát tháng 11/2026</a> (rà code và test hộp đen) và
+<a href="security/pentest-2026-11/README.vi.html">đợt test bảo mật và hiệu năng tháng 11/2026</a> (29.566 case trên cả hai
+database)</li>
+<li><strong>Cách làm:</strong> <a href="https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats">STRIDE</a> theo
+từng ranh giới tin cậy (trust boundary) — <strong>S</strong>poofing (giả danh), <strong>T</strong>ampering (sửa lén), <strong>R</strong>epudiation (chối
+bỏ), <strong>I</strong>nformation disclosure (lộ thông tin), <strong>D</strong>enial of service (làm nghẽn), <strong>E</strong>levation of privilege
+(leo thang quyền)</li>
+</ul>
+<h2 id="cách-đọc-tài-liệu-này"><a class="header" href="#cách-đọc-tài-liệu-này">Cách đọc tài liệu này</a></h2>
+<p>Mỗi ranh giới trong tám ranh giới dưới đây có cùng các phần:</p>
+<ul>
+<li><strong>Tài sản</strong> — thứ kẻ tấn công muốn có ở ranh giới đó.</li>
+<li><strong>Điểm vào</strong> — nơi dữ liệu đi qua ranh giới.</li>
+<li><strong>Giả định tin cậy</strong> — điều thiết kế coi là đúng. Một bài test phá được giả định là một phát hiện.</li>
+<li><strong>Bảng STRIDE</strong> — mối đe doạ → control đang có → rủi ro còn lại hay việc còn mở. Control ghi nơi nó nằm: đường dẫn
+code (tính từ gốc repo), mã quyết định (<code>D-…</code> trong <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/DECISIONS.md"><code>docs/DECISIONS.md</code></a> hay
+<code>docs/decisions/D-….md</code>) hoặc một luật gate của <code>cargo xtask check</code>. Control ghi <strong>(cần kiểm chứng)</strong> là control do
+thiết kế hay tài liệu mô tả, nhưng chưa được lần theo trọn trong code khi viết tài liệu này; danh sách ở cuối, mục
+<a href="#control-cần-kiểm-chứng">Control cần kiểm chứng</a>.</li>
+</ul>
+<p>Phát hiện của các đợt trước giữ mã cũ: <code>H-</code>, <code>M-</code>, <code>L-</code>, <code>I-</code>, <code>P-</code> (rà soát) và <code>PT-</code> (đợt test).</p>
+<h2 id="tổng-quan-hệ-thống"><a class="header" href="#tổng-quan-hệ-thống">Tổng quan hệ thống</a></h2>
+<pre><code class="language-text">           trình duyệt, ứng dụng, AI agent, máy chủ đối tác, callback thanh toán / vận chuyển / ngân hàng
+                                         │  HTTPS (TLS kết thúc ở reverse proxy)
+  ┌──────────────────────────────────────▼───────────────────────────────────────────────┐
+  │ (1) Lớp HTTP: request id → security headers → log → giới hạn → CORS → khách → auth   │
+  │     REST /api/v1/…  ·  OpenAPI  ·  SSE / WebSocket  ·  route công khai  ·  webhook vào│
+  │ (2) MCP endpoint /mcp, /mcp/&lt;module&gt;                                                 │
+  ├──────────────────────────────────────────────────────────────────────────────────────┤
+  │ (3) kernel: Principal và permission, đa khách, throttle, idempotency, outbox, job,   │
+  │     cấu hình và secret, seal, lọc địa chỉ gọi ra, trait lưu file và AI               │
+  ├──────────────────────────────────────────────────────────────────────────────────────┤
+  │ (4) module (mỗi module một crate, bảng riêng, nói chuyện qua trait và event)         │
+  ├──────────────────────────────────────────────────────────────────────────────────────┤
+  │ (5) database: database điều khiển + placement (SQLite hay PostgreSQL), kho file      │
+  └───────────────┬───────────────────────────────────────────────────┬──────────────────┘
+                  │ (6) placement: khách ở database chung hay riêng   │
+                  ▼                                                   ▼
+  (7) nhà cung cấp bên ngoài: thanh toán, biến động số dư,     (8) nhà cung cấp AI do người cài
+      vận chuyển, SMS, hoá đơn điện tử, mail, webhook gửi đi,      chọn (TextModel / Embedder)
+      web push
+</code></pre>
+<p><strong>Chế độ.</strong> <code>AUTOXIDE_TENANCY_MODE=single</code> phục vụ một khách mặc định, bỏ qua <code>Host</code> và header chọn khách. <code>multi</code>
+phục vụ nhiều khách trong một tiến trình; đây là chế độ có nhiều ranh giới nhất và là chế độ nên test.</p>
+<h3 id="tác-nhân"><a class="header" href="#tác-nhân">Tác nhân</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Tác nhân</th><th>Credential</th><th>Được tin cho việc gì</th></tr>
+</thead>
+<tbody>
+<tr><td>Khách vãng lai</td><td>không có</td><td>route công khai của một khách (cửa hàng, nội dung đã đăng, form, bình luận, tìm kiếm công khai)</td></tr>
+<tr><td>Người mua</td><td>access token của tài khoản người mua</td><td>bản ghi của chính họ; không bao giờ là dữ liệu của nhân viên</td></tr>
+<tr><td>Nhân viên của khách</td><td>access token, có thể kèm TOTP / passkey; permission từ role, có thể giới hạn theo một nút tổ chức</td><td>những gì permission cho phép, trong khách và nhánh của họ</td></tr>
+<tr><td>Quản trị viên của khách</td><td>như nhân viên, giữ permission ngang admin</td><td>mọi thứ trong khách của họ; <strong>không</strong> phải khách khác (xem <a href="../SECURITY.vi.html"><code>SECURITY.vi.md</code></a>, mục “không phải lỗ hổng”)</td></tr>
+<tr><td>Máy / AI agent</td><td>API key <code>axk1_…</code> (phạm vi ∩ quyền hiện tại của chủ key, có thể rào IP)</td><td>phạm vi của key; không bao giờ hơn chủ key</td></tr>
+<tr><td>Client SCIM</td><td>token SCIM gắn với quyền của người tạo</td><td>cấp tài khoản trong tầm của người tạo</td></tr>
+<tr><td>Nhân sự nền tảng</td><td>tài khoản của khách nền tảng có permission <code>kernel.tenants.*</code></td><td>vận hành khách; vào một khách chỉ qua lần cấp hỗ trợ có thời hạn</td></tr>
+<tr><td>Khách cha</td><td>uỷ quyền (delegation)</td><td>làm việc ở khách con, tại một nút, với permission của một role</td></tr>
+<tr><td>Nhà cung cấp</td><td>URL webhook riêng của khách + chữ ký của nhà cung cấp</td><td>báo thanh toán, tiền vào tài khoản, trạng thái vận đơn</td></tr>
+<tr><td>Người vận hành</td><td>shell trên máy chủ, biến môi trường, database</td><td>mọi thứ (ngoài phạm vi)</td></tr>
+<tr><td>Người viết module ngoài</td><td>code biên dịch vào binary</td><td>mọi thứ tiến trình làm được (xem ranh giới 4)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="giả-định-chung"><a class="header" href="#giả-định-chung">Giả định chung</a></h3>
+<ul>
+<li>TLS kết thúc ở reverse proxy hay load balancer phía trước; bản thân máy chủ nói HTTP
+(<a href="DEPLOY.vi.html"><code>docs/DEPLOY.vi.md</code></a>). <code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> / <code>AUTOXIDE_HTTP_TRUSTED_PROXIES</code> chỉ được
+đặt khi có proxy như vậy (<code>crates/kernel/src/config/http.rs</code>).</li>
+<li><code>AUTOXIDE_SECRET_KEY</code> và <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> được đặt giá trị ngẫu nhiên ở production; giá trị mẫu của
+<code>.env.example</code> bị từ chối lúc khởi động (H-3; <code>crates/kernel/src/security/secret.rs</code>, <code>modules/auth/src/config.rs</code>).</li>
+<li>Chỉ máy chủ và người vận hành tới được database và kho file.</li>
+<li>Code là Rust an toàn bộ nhớ: <code>unsafe_code = "forbid"</code> cho mọi crate của workspace (<code>Cargo.toml</code>); bản release giữ
+kiểm tràn số (tràn là 500, không quay vòng — PT-5).</li>
+</ul>
+<hr>
+<h2 id="1-client--lớp-http"><a class="header" href="#1-client--lớp-http">1. Client ↔ lớp HTTP</a></h2>
+<p><strong>Tài sản:</strong> API còn phục vụ được; ánh xạ request → khách; credential trên đường truyền; dữ liệu của khách trong
+response; phiên trình duyệt trên website của khách.</p>
+<p><strong>Điểm vào:</strong> mọi route REST dưới <code>/api/v1/</code> (<code>docs/openapi.json</code>, khoảng 1.300 operation); route công khai
+(<code>security((), ("bearer" = []))</code>); <code>/api/v1/openapi.json</code>, <code>/api/docs</code> (phải bật), <code>/llms.txt</code>; <code>/health/*</code>;
+<code>/metrics</code> (phải bật); <code>GET /api/v1/kernel/events/stream</code> (SSE) và <code>/events/ws</code> (WebSocket); webhook từ nhà cung
+cấp (ranh giới 7); các header <code>Host</code>, <code>Origin</code>, <code>Autoxide-Tenant</code>, <code>Authorization</code>, <code>Idempotency-Key</code>, <code>If-Match</code>,
+header địa chỉ client.</p>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>Khách của một request có xác thực lấy <strong>từ credential</strong>, không bao giờ chỉ từ <code>Host</code> hay header
+(<code>crates/kernel/src/data/tenancy/request.rs</code>).</li>
+<li>Một <code>Host</code> chỉ trỏ tới một khách khi khách đó đã <strong>xác minh</strong> tên miền bằng bản ghi DNS TXT
+(<code>crates/kernel/src/data/tenancy/domains.rs</code>).</li>
+<li>Route công khai chỉ trả dữ liệu khách đã công bố; chọn khách khác cho một request công khai (bằng host, header hay
+<code>?site=</code>) là được phép và chỉ lộ dữ liệu công khai của khách đó.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Giả làm khách khác bằng cách gửi <code>Host</code> hay <code>Autoxide-Tenant</code> của họ kèm credential của mình</td><td>Khách của credential được so với header và tên miền đã xác minh → <code>tenant_mismatch</code>; chỉ nhân sự nền tảng có <code>kernel.tenants.operate</code>, uỷ quyền hay lần cấp hỗ trợ mới vào được khách khác (<code>data/tenancy/request.rs</code>, <code>modules/auth/src/delegation.rs</code>, <code>modules/auth/src/support.rs</code>)</td><td>Đã test trên cả hai database ở P14 và đợt test 2026-11 (nhóm IDOR, TOKEN)</td></tr>
+<tr><td>S</td><td>Nhận một tên miền không phải của mình</td><td>DNS TXT <code>_autoxide-challenge.&lt;tên miền&gt;</code>; kiểm lại hằng ngày, 3 lần không thấy → <code>failed</code>; mỗi tên miền tối đa một dòng <code>verified</code> (partial unique index, P-4, D-20261125-domain-claims)</td><td>Test chắc chắn đi qua nhánh “thua cuộc đua” còn mở (P16)</td></tr>
+<tr><td>S</td><td>Giả địa chỉ client để né giới hạn theo địa chỉ</td><td>Địa chỉ chỉ đọc từ header đã cấu hình, đếm từ các proxy tin cậy (<code>http/client.rs</code>); khoá là một địa chỉ IPv4 hay một khối IPv6 /64 (<code>throttle::address_key</code>, PT-4, D-20261125-address-keys, gate <code>address-key</code>)</td><td>Gate chỉ bắt một mẫu viết (P17)</td></tr>
+<tr><td>T</td><td>Request chéo trang từ trình duyệt</td><td>CORS: danh sách <code>AUTOXIDE_HTTP_CORS_ORIGINS</code>, hoặc <code>https://&lt;tên miền đã xác minh&gt;</code> chỉ cho đúng khách đó (<code>http/cors.rs</code>, D-20261125-tenant-cors); credential là header bearer, không phải cookie</td><td><code>*</code> là cấu hình sai đã ghi trong tài liệu và có cảnh báo trong log (L-5)</td></tr>
+<tr><td>T</td><td>Lệnh ghi bị gửi lại hay chạy hai lần (retry, agent)</td><td><code>Idempotency-Key</code> lưu theo người gọi và request; thân khác → 422; đang chạy → 409 (<code>security/idempotency.rs</code>, <code>http/idempotency.rs</code>, D-058); kiểm đồng thời lạc quan bằng <code>If-Match</code></td><td>—</td></tr>
+<tr><td>T</td><td>Chèn mã qua tham số query, cursor, khoá sắp xếp, thân request</td><td>SeaORM với giá trị bind; câu SQL viết tay chỉ qua <code>database::statement</code> (D-20261121-raw-statement); cursor mang giá trị, cột do máy chủ chọn; <code>ValidJson&lt;T&gt;</code> + kiểm ở service (D-083); ký tự NUL trong URL bị từ chối (<code>http/mod.rs</code>)</td><td>8.061 case INPUT mỗi database đều qua (đợt test 2026-11)</td></tr>
+<tr><td>R</td><td>Người gọi chối đã gửi request</td><td>Request id trên mọi response; nhật ký request theo khách có người dùng, API key, loại tác nhân, mẫu route, status, <code>Idempotency-Key</code> (<code>ops/request_log.rs</code>, D-202); chuỗi audit của mọi thay đổi (ranh giới 4)</td><td>Request công khai (không xác thực) cố ý không vào nhật ký request</td></tr>
+<tr><td>I</td><td>Thân lỗi, header hay log lộ chi tiết bên trong hay secret</td><td><code>Problem</code> theo RFC 9457 với <code>code</code> ổn định, không có stack hay câu SQL; log ghi mẫu route, không bao giờ ghi đường dẫn thô, query hay thân (<code>http/log.rs</code>); security headers trên mọi response, kể cả CSP <code>default-src 'none'; sandbox</code> (<code>http/security_headers.rs</code>, D-320)</td><td><code>/metrics</code> trên port công khai là cấu hình sai đã ghi trong tài liệu (có cảnh báo lúc khởi động)</td></tr>
+<tr><td>I</td><td>Biết bản ghi hay trường nào tồn tại khi không có quyền</td><td>Lớp kiểm permission chung đọc <code>x-permissions</code> và trả 403 trước khi đọc thân, <code>If-Match</code> và tra bản ghi (<code>http/permission_gate.rs</code>, PT-13/14, D-20261126-permission-gate)</td><td>Endpoint có <code>x-permissions: []</code> (mọi người đã đăng nhập) vẫn kiểm đầu vào trước</td></tr>
+<tr><td>I</td><td>Đọc bản nháp hay dữ liệu riêng qua route công khai</td><td>Danh sách, tìm kiếm, feed, sitemap và slug công khai lọc theo trạng thái đã đăng; token xem trước ký HMAC, so trong thời gian không đổi (<code>modules/content/src/publishing/preview.rs</code>)</td><td>PT-11 (thuật ngữ phân loại chưa có bài đăng nào dùng) còn mở (P17)</td></tr>
+<tr><td>D</td><td>Thân lớn hay lồng sâu, bom nén</td><td>Giới hạn thân theo route (<code>http/body_limit.rs</code>, D-066); thân request có <code>Content-Encoding</code> không được giải nén (rà soát P14); độ sâu JSON do bộ parse xử lý (nhóm DOS 2026-11)</td><td>—</td></tr>
+<tr><td>D</td><td>Kết nối chậm hay im lặng</td><td>Hết hạn đọc header 30 giây, đóng kết nối im lặng, <code>AUTOXIDE_HTTP_MAX_CONNECTIONS</code> (M-5, L-10; <code>http/server.rs</code>)</td><td>—</td></tr>
+<tr><td>D</td><td>Dội request từ một client, một key hay một khách</td><td>GCRA theo địa chỉ client (<code>http/rate_limit.rs</code>), theo API key, theo khách từ gói của họ (<code>http/tenant_rate_limit.rs</code>, D-20261126-tenant-rate-limit)</td><td>DoS theo lưu lượng nằm ngoài phạm vi (<code>SECURITY.vi.md</code>)</td></tr>
+<tr><td>D</td><td>Tìm kiếm công khai tốn kém</td><td>Trần số lượt cùng lúc mỗi tiến trình, giới hạn theo địa chỉ và thời gian (<code>AUTOXIDE_CONTENT_PUBLIC_SEARCH_*</code>; D-20261126-idle-polling)</td><td>Mỗi lượt tìm vẫn quét bằng <code>LIKE</code>; chỉ mục tìm chữ sau một trait còn mở (PT-15, P17)</td></tr>
+<tr><td>D</td><td>Đẩy bật cache <code>domain_site</code> bằng <code>Host</code> ngẫu nhiên</td><td>Cache giới hạn 10.000 mục</td><td>Cách bỏ mục còn mở (P16): khi bị dội như vậy, tên miền thật có thể phải đọc database ở mỗi request</td></tr>
+<tr><td>E</td><td>Gọi endpoint mà không có permission</td><td><code>Principal::require</code> trong mọi handler (luật 7) cộng lớp kiểm <code>x-permissions</code> chung; 2.691 case PERM mỗi database đều qua</td><td>—</td></tr>
+<tr><td>E</td><td>Dùng stream event để xem event của khách hay nhánh khác</td><td><code>StreamHub</code> lọc theo khách, permission và tầm với (<code>event/stream.rs</code>, D-378); giới hạn kết nối mỗi người dùng</td><td>Endpoint WebSocket chưa kiểm <code>Origin</code> (mức thấp: xác thực bằng header mà trình duyệt không gửi được khi mở WebSocket) (P16)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="2-api-và-mcp-endpoint"><a class="header" href="#2-api-và-mcp-endpoint">2. API và MCP endpoint</a></h2>
+<p><strong>Tài sản:</strong> cùng dữ liệu và hành động như REST; mô hình permission; lời hứa tương đương “tool MCP không bao giờ làm
+được hơn REST với cùng permission” (luật 8 của CLAUDE.md).</p>
+<p><strong>Điểm vào:</strong> <code>POST /mcp</code> và <code>/mcp/&lt;module&gt;</code> (Streamable HTTP, JSON-RPC): <code>tools/list</code>, <code>tools/call</code>,
+<code>resources/list|read</code>, <code>prompts/list|get</code>, <code>server/discover</code> (<code>crates/kernel/src/http/mcp.rs</code>,
+<code>http/mcp/protocol.rs</code>, <code>http/mcp/transport.rs</code>; D-068, D-20261121-mcp-server). Danh mục ở <code>docs/mcp-tools.json</code>
+(khoảng 310 tool).</p>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>MCP xác thực đúng như REST (<code>Authorization: Bearer</code> access token hay API key), ở một lớp chạy trước phần giao thức.</li>
+<li>Handler của tool là lớp chuyển mỏng: gọi cùng hàm service với handler REST, và truyền <code>Principal</code> mỗi khi REST giới
+hạn permission đó theo phạm vi.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Gọi tool không có credential hay với credential giả</td><td>Cùng bộ xác thực với REST, 401 trước phần giao thức (<code>http/mcp.rs</code>); 312 case MCPAUTH mỗi database đều qua</td><td>—</td></tr>
+<tr><td>S</td><td>DNS rebinding nhắm vào MCP client chạy trên máy</td><td><code>Origin</code> kiểm theo cùng <code>OriginGrant</code> với CORS; origin của tên miền khách gắn với khách đó (<code>http/mcp/transport.rs</code>)</td><td>—</td></tr>
+<tr><td>T</td><td>Tool ghi ra ngoài phạm vi của người gọi (nhánh, bản ghi của mình)</td><td>Gate <code>mcp-principal</code>: tool có permission mà REST kiểm theo phạm vi phải dùng <code>Principal</code> của nó (<code>xtask/src/mcp_principal.rs</code>, D-20261121-security-lints); tool gọi hàm service, không đụng bảng</td><td>Gate kiểm theo văn bản: permission truyền qua biến và handler là hàm đặt tên riêng không được kiểm (giới hạn đã ghi trong luật)</td></tr>
+<tr><td>T</td><td>Hành động tiền hay phá huỷ từ một phiên cũ</td><td>Step-up áp cho lời gọi tool đúng như REST (<code>security/access/step_up.rs</code>, D-20261119-step54-step-up; M-3 cho automations)</td><td>—</td></tr>
+<tr><td>R</td><td>Không biết agent nào đã làm gì</td><td>Mỗi lời gọi tool một dòng nhật ký request (<code>mcp:&lt;tool&gt;</code>, không ghi tham số) kèm API key; thay đổi vào chuỗi audit với tác nhân và key (<code>ops/request_log.rs</code>)</td><td>—</td></tr>
+<tr><td>I</td><td><code>tools/list</code> lộ thứ người gọi không được dùng</td><td>Danh sách tool, resource và prompt lọc theo permission; tool bị cấm trả lời như tool không tồn tại (<code>http/mcp.rs</code>)</td><td>—</td></tr>
+<tr><td>I</td><td>Tool danh sách trả nhiều dòng hơn REST</td><td>Cùng <code>limit</code> / <code>cursor</code> và <code>pagination</code> như REST (CLAUDE.md “Luật code”)</td><td>362 case MCPIDOR mỗi database: không trả gì của khách kia</td></tr>
+<tr><td>D</td><td><code>tools/list</code> quá lớn, lời gọi tốn kém</td><td>Mỗi module một endpoint (<code>/mcp/&lt;module&gt;</code>); REST và MCP xác thực qua cùng bộ xác thực có giới hạn theo API key (<code>http/mod.rs</code>, <code>rate_limit::ApiKeyLimited</code>)</td><td>—</td></tr>
+<tr><td>E</td><td>Tool làm được điều REST cùng permission không làm được</td><td>Luật 8; gate <code>mcp-principal</code>; L-2 đã sửa (tool thiếu một bước kiểm của REST)</td><td>Tool MCP chưa được nối với <code>operationId</code> REST từng cái một; nhóm test đã đề nghị (P17, mục cùng PT-11, PT-12, PT-18)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="3-kernel"><a class="header" href="#3-kernel">3. Kernel</a></h2>
+<p>Kernel (<code>crates/kernel</code>) giữ những thứ mọi module dựa vào. Module xác thực <code>auth</code> là một module, nhưng với mô hình
+này các bảo đảm của nó ở tầm kernel, nên được xét ở đây.</p>
+<p><strong>Tài sản:</strong> khoá ký và secret đã mã hoá; tài khoản, mật khẩu, yếu tố thứ hai, phiên, API key; danh mục permission
+và việc gán role; cây tổ chức; bản ghi idempotency; outbox và job queue; cấu hình.</p>
+<p><strong>Điểm vào:</strong> <code>/api/v1/auth/*</code> (đăng nhập, refresh, đăng xuất, MFA, passkey, link đăng nhập, đặt lại mật khẩu, lời
+mời, OIDC, SCIM, API key, role, uỷ quyền, cấp hỗ trợ); <code>/api/v1/kernel/*</code> (cài đặt, khách, tên miền, job, bản ghi,
+tag…); job nền và bộ phát event; cấu hình tiến trình.</p>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>Module nghiệp vụ chỉ kiểm permission qua <code>Principal</code> (<code>security/access/mod.rs</code>) và không phụ thuộc <code>auth</code> (D-046).</li>
+<li>Job và bộ nhận event lấy khách từ dòng đã lưu, không từ request.</li>
+<li>Cấu hình đến từ biến môi trường qua <code>ConfigReader</code>; cài đặt theo khách đi qua API cài đặt của tenancy.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Access token giả (lẫn <code>alg</code>, <code>tid</code> của khách khác)</td><td>JWT tự viết chỉ nhận <code>HS256</code>, so chữ ký trong thời gian không đổi, khoá dẫn xuất theo khách (<code>modules/auth/src/token.rs</code>, D-045, D-285); token được đối chiếu với phiên còn sống; mặc định sống 900 giây (<code>AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS</code>)</td><td>47 case TOKEN mỗi database đều qua</td></tr>
+<tr><td>S</td><td>Refresh token bị trộm</td><td>Xoay vòng theo họ (family) và phát hiện dùng lại: dùng lại thì thu hồi cả họ (<code>modules/auth/src/session/</code>); chỉ lưu bản băm (<code>session/entity.rs</code> <code>token_hash</code>)</td><td>—</td></tr>
+<tr><td>S</td><td>Đoán mật khẩu</td><td>Argon2id (tham số OWASP, <code>modules/auth/src/password.rs</code>); login throttling theo cặp email + địa chỉ cộng trần rộng hơn theo email, đếm trong database (<code>session/throttle.rs</code>, D-079, D-116, D-20261121-login-throttle-pair)</td><td>—</td></tr>
+<tr><td>S</td><td>Vượt yếu tố thứ hai</td><td>Mã TOTP chỉ dùng một lần mỗi bước (<code>mfa/service.rs</code>), recovery code; role đòi đăng nhập hai bước áp cả khi uỷ quyền và hỗ trợ (M-4); tài khoản chỉ có passkey phải dùng passkey (M-8); passkey qua <code>webauthn_rp</code> với nghi thức dùng một lần (D-077)</td><td>Passkey và OIDC chưa được test trọn trong trình duyệt (đợt 2026-11, mục “chưa phủ”)</td></tr>
+<tr><td>S</td><td>Mã SMS dùng một lần bị đoán hay bị dội</td><td>Trần theo số, theo khối client và trần chung (PT-4, PT-7, D-20261125-otp-wrong-by-block)</td><td>Trần chung vẫn để người lạ khoá đăng nhập SMS của một số trong một thời gian (việc tiếp theo của PT-7, P17)</td></tr>
+<tr><td>S</td><td>Token dùng một lần (đặt lại, xác minh, link đăng nhập) dùng lại hay chuyển sang khách khác</td><td>32 byte ngẫu nhiên, lưu SHA-256, gắn mục đích và khách, tiêu thụ nguyên tử (<code>security/tokens.rs</code>, D-117); token trong link mang khách (<code>data/tenancy/link_token.rs</code>, D-281)</td><td>—</td></tr>
+<tr><td>S</td><td>API key bị dùng từ nơi khác</td><td>Key = phạm vi ∩ quyền hiện tại của chủ key, lưu SHA-256, có thể rào IP / CIDR, xoay key (<code>modules/auth/src/api_key/</code>, <code>access.rs</code>); key không tạo được key, token SCIM hay nhà cung cấp đăng nhập (P-1, <code>auth.session_required</code>); key chỉ xem và thu hồi được chính nó, qua REST cũng như MCP, và thu hồi key của người khác cần bao trùm quyền của chủ key (UT-2, #572)</td><td>Tới khi #572 được merge, key xem và thu hồi được các key khác của cùng chủ (đợt dùng thử phát hiện)</td></tr>
+<tr><td>T</td><td>Sửa phiên hay role để có thêm quyền</td><td>“Chỉ cấp cái mình có”, kể cả cho chính mình (PT-9, D-20261126-no-self-grant); thay đổi qua SCIM xét theo quyền người tạo token (PT-1..3, D-20261125-scim-grant-cover)</td><td>Vài chỗ bất nhất của luật cấp quyền (so theo tên hay theo phạm vi, mã trạng thái 422 hay 403, thu hẹp role người khác đang giữ) ghi ở P16</td></tr>
+<tr><td>T</td><td>Quyết định trên một nút tổ chức không thuộc khách</td><td><code>OrgTree::contains</code> / <code>ensure_exists</code> (PT-8, D-20261125-org-must-exist); bảng closure (<code>data/tenancy/org_tree.rs</code>)</td><td>Dòng cũ trỏ tới nút không có cần lệnh dọn (P17)</td></tr>
+<tr><td>T</td><td>Job hay event bị xử lý hai lần hay bởi hai worker</td><td>Job được nhận bằng <code>SKIP LOCKED</code> (PostgreSQL) hay một câu nguyên tử (SQLite) sau trait <code>Claim</code> (<code>job/claim.rs</code>, D-009); event ghi trong cùng transaction nghiệp vụ, nhận bằng câu cập nhật có điều kiện (<code>event/outbox.rs</code>, <code>event/dispatcher.rs</code>, D-054); bên nhận phải chịu được nhận lại</td><td>Test CI nhiều máy chủ là một mục riêng của G13</td></tr>
+<tr><td>T</td><td>Đổi cấu hình lúc đang chạy</td><td>Biến khai một lần bằng <code>Setting</code>, đọc qua <code>ConfigReader</code>; không gọi thẳng <code>std::env::var</code> (gate <code>env-access</code>); cài đặt secret theo khách chỉ ghi được, đã seal (<code>contracts/provider.rs</code>, <code>data/tenancy/settings.rs</code>)</td><td>—</td></tr>
+<tr><td>R</td><td>Hành động bảo mật không để lại dấu</td><td>Event cho đăng nhập, đổi role, cấp quyền, uỷ quyền, truy cập hỗ trợ, đổi key vào chuỗi audit; truy cập hỗ trợ phải có lý do (<code>modules/auth/src/support.rs</code>)</td><td>Chuỗi audit không có khoá: xem ranh giới 5</td></tr>
+<tr><td>I</td><td>Đọc được secret từ bản dump database</td><td>Secret TOTP, secret webhook, khoá nhà cung cấp và URL placement được seal bằng AES-256-GCM gắn với mục đích, khách và dòng (<code>security/seal.rs</code>, D-257); xoay khoá bằng <code>autoxide secrets reseal</code></td><td>Không đặt <code>AUTOXIDE_SECRET_KEY</code> thì khoá gốc nằm trong database (<code>kernel_secrets</code>) và đi theo bản sao lưu (<code>security/secret.rs</code>, D-113)</td></tr>
+<tr><td>I</td><td>Dữ liệu cá nhân trong log</td><td>Log không có thân, token, query hay IP thô; IP lưu dạng HMAC có khoá theo khối /24 hay /64 (<code>security/ip_hash.rs</code>, D-115); email admin đầu tiên không vào log (I-4)</td><td>Mã hoá ở mức trường cho dữ liệu cá nhân nhạy cảm chưa làm (mục G13)</td></tr>
+<tr><td>D</td><td>Bảng throttle hay idempotency phình không giới hạn</td><td>Dòng có hạn và job dọn xoá chúng <strong>(cần kiểm chứng cho từng bảng throttle)</strong></td><td>—</td></tr>
+<tr><td>D</td><td>Tải do poll outbox / job</td><td>Lượt rảnh chỉ tốn một câu <code>EXISTS</code> mỗi database (D-20261126-idle-polling); dừng êm giữa hai lượt (PT-17)</td><td>—</td></tr>
+<tr><td>E</td><td>Principal hẹp chạm tới việc của admin</td><td>Permission tên <code>&lt;module&gt;.&lt;việc&gt;</code>, phạm vi theo nút tổ chức, <code>Principal::only</code> cho automations (D-20261126-automation-owner-revoked)</td><td><code>run_as_limit</code> chỉ so tên permission, không so phạm vi; event thu hồi vào dead-letter thì luật không tạm dừng (P16)</td></tr>
+<tr><td>E</td><td>Nhân sự nền tảng đọc dữ liệu khách khi khách không đồng ý</td><td>Vào khách cần lần cấp hỗ trợ có thời hạn và lý do; khách tắt được truy cập hỗ trợ (<code>modules/auth/src/support.rs</code>, D-313)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="4-module"><a class="header" href="#4-module">4. Module</a></h2>
+<p><strong>Tài sản:</strong> bảng và bất biến của từng module (tồn kho, tiền, trạng thái đăng); hợp đồng giữa các module (trait trong
+<code>api</code>, event); API Rust công khai mà module ngoài repo dùng.</p>
+<p><strong>Điểm vào:</strong> route, tool, đăng ký nhận event, job của module; <code>context.require::&lt;dyn Trait&gt;()</code>;
+<code>Autoxide::new().module(…)</code> cho module ngoài (<code>crates/app/src/lib.rs</code>).</p>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>Module trong repo theo luật ranh giới, do <code>cargo xtask check</code> kiểm (D-031): module chỉ mở <code>pub mod api</code> và
+<code>pub fn module(…)</code>, không import phần bên trong của module khác (<code>module-import</code>), không truy vấn database trong
+handler (<code>handler-database</code>), không đọc biến môi trường (<code>env-access</code>).</li>
+<li>Module sở hữu bảng của mình (<code>&lt;module&gt;_…</code>), không foreign key xuyên module, không join bảng của module khác (luật 1
+và 4).</li>
+<li><strong>Module ngoài là code được tin.</strong> Nó được biên dịch vào cùng tiến trình, dùng cùng kết nối database và khoá
+(D-20261121-external-modules). Luật gate của repo không chạy trên code ngoài repo.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Một module giả làm module khác để phát event hay cung cấp trait</td><td>Tên event mang tiền tố module và khai qua <code>Module::events</code>; trait đăng ký một lần lúc khởi động (<code>module/registry/</code>)</td><td>Trong một tiến trình, đây là việc của rà soát code, không phải ranh giới lúc chạy</td></tr>
+<tr><td>T</td><td>Một module ghi bảng của module khác</td><td>Tiền tố tên bảng theo module và bài test sở hữu bảng trong gate; luật <code>module-import</code></td><td>Không áp cho module ngoài</td></tr>
+<tr><td>T</td><td>Bất biến nghiệp vụ bị phá bởi race (bán quá tồn, dùng mã giảm giá hai lần, thanh toán hai lần)</td><td>Cập nhật nguyên tử có cận và nhận có điều kiện (rà soát, mục “Money”; M-2); test đồng thời trên cả hai database (CLAUDE.md “Gate”)</td><td>Việc tiếp theo của P17: trần giá cho giá trị rất lớn, kiểm tiền tệ ở vài đường mua hàng và POS</td></tr>
+<tr><td>T</td><td>Bên nhận tin mù quáng payload của event</td><td>Bên nhận đọc lại trạng thái từ bảng của mình hay trait của bên phát; phải chịu được nhận lại (D-054)</td><td>Event của module có dữ liệu theo đơn vị phải mang <code>org_id</code> ở mọi nơi (P16, D-20261125-event-org)</td></tr>
+<tr><td>R</td><td>Thay đổi qua một module không lần lại được</td><td><code>audit</code> nhận mọi event và nối vào chuỗi băm (<code>modules/audit/src/lib.rs</code>, D-055, D-183)</td><td>—</td></tr>
+<tr><td>I</td><td>Dữ liệu cá nhân còn sót sau khi xoá tài khoản, hay xuất thiếu</td><td>Module khai dữ liệu cá nhân của mình cho xuất và xoá (M-7; <code>contracts/privacy.rs</code>)</td><td>Mỗi module mới phải tự khai; không gate nào kiểm <strong>(cần kiểm chứng)</strong></td></tr>
+<tr><td>D</td><td>Module đã tắt vẫn gọi được</td><td>Module tắt không phục vụ route, tool, job hay event (<code>module/selection.rs</code>, <code>module/dormant.rs</code>, <a href="MODULES.vi.html"><code>docs/MODULES.vi.md</code></a>)</td><td>—</td></tr>
+<tr><td>E</td><td>Module thử nghiệm làm yếu core</td><td>Mặc định tắt; module chính thức không bao giờ phụ thuộc module thử nghiệm (<a href="MODULES.vi.html"><code>docs/MODULES.vi.md</code></a>)</td><td>Module thử nghiệm có cùng test tự động nhưng được rà ít hơn</td></tr>
+<tr><td>E</td><td>Module ngoài vượt qua các bước kiểm của kernel</td><td>Không có lúc chạy: Rust không có sandbox trong cùng tiến trình</td><td>Người cài phải rà module ngoài như mọi thư viện phụ thuộc; <a href="MODULE_GUIDE.vi.html">hướng dẫn viết module</a> dặn tác giả dùng <code>Principal</code>, <code>.scoped(&amp;tenant)</code> và hợp đồng <code>api</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="5-database"><a class="header" href="#5-database">5. Database</a></h2>
+<p><strong>Tài sản:</strong> mọi dữ liệu lưu trữ; tính toàn vẹn của schema; bản sao lưu; lịch sử migration; chuỗi audit.</p>
+<p><strong>Điểm vào:</strong> kết nối của máy chủ (pool đọc và kết nối ghi cho mỗi database); <code>autoxide migrate</code>, <code>autoxide backup</code>,
+<code>autoxide restore</code>, <code>autoxide copy</code> (CLI trên máy chủ); sao lưu theo lịch vào kho file; job xuất dữ liệu khách.</p>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>Mọi tính năng chạy trên SQLite và PostgreSQL (CLAUDE.md “Luật số một”); một bước kiểm chỉ đúng trên một database là
+một phát hiện.</li>
+<li>Mọi bảng cấp khách có <code>tenant_id</code>, và mọi truy vấn trên nó lọc qua <code>.scoped(&amp;tenant)</code> (<code>data/tenancy/scope.rs</code>,
+D-253) — kể cả khi khách có database riêng.</li>
+<li>Chỉ người vận hành tới được file database, thông tin kết nối và bản sao lưu.</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Request ghi qua kết nối đọc</td><td>Kết nối đọc chỉ đọc trên cả hai database (SQLite <code>read_only</code>, PostgreSQL <code>default_transaction_read_only</code>) (<code>data/database.rs</code>, D-009)</td><td>—</td></tr>
+<tr><td>T</td><td>Truy vấn quên lọc theo khách</td><td><code>.scoped(&amp;tenant)</code> và gate <code>tenant-scope</code> (<code>xtask/src/tenant_scope.rs</code>, D-20261121-security-lints; M-6 mở rộng cho macro của module); chỗ cố ý đọc mọi khách phải ghi lý do <code>// tenant-scope:</code></td><td>Luật kiểm theo văn bản: <code>E::find()</code> generic, truy vấn truyền qua hàm phụ và <code>update</code> / <code>delete</code> một dòng không được thấy (giới hạn đã ghi). 1.119 case REST + 362 case MCP chéo khách mỗi database không thấy gì</td></tr>
+<tr><td>T</td><td>SQL injection qua câu viết tay</td><td><code>database::statement</code> với giá trị bind có kiểu (D-20261121-raw-statement); SQL trực tiếp chỉ ở chỗ đã đo (CLAUDE.md “Luật dữ liệu”)</td><td>—</td></tr>
+<tr><td>T</td><td>Hai tiến trình chạy migration cùng lúc</td><td>Lock migration: advisory lock của PostgreSQL, lock file của hệ điều hành cho SQLite (<code>data/migration/lock.rs</code>); migration đã commit không bao giờ sửa</td><td>—</td></tr>
+<tr><td>T</td><td>Sửa dòng audit mà không bị phát hiện</td><td>Dòng audit nối thành chuỗi SHA-256; <code>autoxide doctor</code> báo dòng đầu tiên bị sửa, bị xoá hay chèn (D-183)</td><td>Chuỗi <strong>không có khoá và không neo ra ngoài</strong>: ai có quyền ghi database dựng lại được chuỗi. Nhật ký khó sửa lén là một mục của G13</td></tr>
+<tr><td>T</td><td>Bút toán sổ cái bị sửa ngoài module</td><td>Bút toán chỉ thêm, sửa bằng bút toán đảo, chuỗi băm (<code>modules/ledger/src/lib.rs</code>, D-342)</td><td>Cùng giới hạn như chuỗi audit</td></tr>
+<tr><td>R</td><td>Thao tác của người vận hành trên database không được ghi</td><td>Ngoài phạm vi (người vận hành được tin)</td><td>—</td></tr>
+<tr><td>I</td><td>Người dùng khác trên máy đọc được bản sao lưu</td><td>Thư mục sao lưu tạo với quyền <code>0700</code> (<code>data/backup.rs</code>, D-158); sao lưu theo lịch bỏ qua các bản sao lưu trước</td><td>Máy chủ không tự mã hoá file sao lưu; bản sao lưu chứa hash mật khẩu, secret đã seal và, nếu không đặt <code>AUTOXIDE_SECRET_KEY</code>, cả khoá gốc. Mã hoá trước khi chép ra ngoài là việc của người vận hành (<a href="DEPLOY.vi.html"><code>docs/DEPLOY.vi.md</code></a>, mục sao lưu mã hoá ngoài máy)</td></tr>
+<tr><td>I</td><td>Bản xuất dữ liệu khách lộ secret</td><td>Job xuất bỏ job queue, outbox và cột secret (hash, secret); tải về cần request đã đăng nhập hay link ký sống 24 giờ; nhân sự nền tảng chỉ qua lần cấp hỗ trợ còn hạn (<code>data/tenancy/exports.rs</code>, D-328)</td><td>—</td></tr>
+<tr><td>I</td><td><code>autoxide copy</code> trộn dữ liệu vào database đang dùng</td><td>Database đích phải mới (chưa có migration nào), một transaction, cùng phiên bản schema (<code>data/transfer.rs</code>, D-070)</td><td>—</td></tr>
+<tr><td>D</td><td>Tranh chấp ghi trên SQLite</td><td>Một kết nối ghi, lệnh ghi xếp hàng trong ứng dụng (D-009); không thấy lỗi <code>busy</code> dưới 1.024 kết nối (đợt test 2026-11)</td><td>Hướng dẫn sức chứa theo database là mục riêng của G13</td></tr>
+<tr><td>D</td><td>Danh sách không giới hạn hay offset sâu</td><td>Chỉ dùng keyset pagination (<code>fetch_page</code>, không <code>OFFSET</code>), index cho cột sắp; gate <code>api-unpaged-list</code></td><td>Vài danh sách cũ còn chờ trong <code>xtask/api-shape-allow.txt</code> (P9)</td></tr>
+<tr><td>E</td><td>Code của khách chạm bảng của mặt điều khiển</td><td>Bảng mặt điều khiển (khách, tên miền, placement, lượt chuyển) nằm ở database điều khiển; route của khách chỉ chạm qua service dành cho nền tảng (<code>data/tenancy/admin.rs</code>, <code>require_platform</code>)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="6-placement"><a class="header" href="#6-placement">6. Placement</a></h2>
+<p><strong>Tài sản:</strong> database và kho file nào giữ khách nào; URL kết nối của placement; ánh xạ tên miền → khách; cam kết lưu
+trú dữ liệu; khách trong lúc chuyển, tách hay gộp.</p>
+<p><strong>Điểm vào:</strong> <code>autoxide tenant move</code> và các endpoint REST / MCP chỉ cho nền tảng về placement, chuyển và tách gộp
+(<code>data/tenancy/placements.rs</code>, <code>moves*</code>, <code>relocate*</code>; permission <code>kernel.placements.read</code>, <code>kernel.tenants.move</code>,
+<code>kernel.tenants.relocate</code>); endpoint tên miền của từng khách (<code>data/tenancy/domains*</code>); sandbox
+(<code>data/tenancy/sandbox*</code>).</p>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>Chỉ tài khoản của khách nền tảng mới chuyển, tách, gộp hay xoá khách được (<code>require_platform</code>); nhân sự vào một
+khách bằng truy cập hỗ trợ thì không.</li>
+<li>Khách ở database riêng vẫn được lọc theo <code>tenant_id</code> (phòng thủ nhiều lớp).</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Quản trị viên của khách khởi động một lượt chuyển hay tách gộp</td><td><code>require_platform</code> + <code>kernel.tenants.move</code> / <code>relocate</code> (<code>data/tenancy/moves/http.rs</code>, <code>relocate/http.rs</code>)</td><td>—</td></tr>
+<tr><td>S</td><td>Khách giữ lưu lượng của tên miền không còn thuộc mình</td><td>Kiểm DNS lại hằng ngày; ba lần không thấy → <code>failed</code>; lỗi DNS không tính là không thấy (<code>data/tenancy/domains.rs</code>)</td><td>Tới khoảng ba ngày định tuyến cũ sau khi tên miền đổi chủ</td></tr>
+<tr><td>T</td><td>Mất hay nhân đôi dữ liệu khi chuyển</td><td>Mặc định chạy thử; kiểm trước (phiên bản schema, lượt chuyển đang chạy); sao chép chạy bằng job qua các pha trạng thái; bảng chép theo <code>tenant_id</code> với cột có kiểu (<code>data/tenancy/moves/</code>, <code>data/transfer.rs</code>)</td><td>Chuyển khi đang tải và placement database riêng chưa được đợt test 2026-11 phủ</td></tr>
+<tr><td>T</td><td>Tách hay gộp làm gãy tham chiếu</td><td>Mỗi module khai cách từng bảng đi theo (<code>Module::relocation</code>, <code>data/tenancy/relocate/policy.rs</code>, D-20261118-step38-relocation)</td><td>Cách suy từ cột chỉ là đoán; test của binary chặn bảng chưa khai (<code>crates/kernel/src/module.rs</code>), chỉ phủ module trong repo</td></tr>
+<tr><td>I</td><td>Lộ thông tin kết nối của placement</td><td>URL kết nối và cài đặt kho file riêng được seal, gắn với ID placement (<code>data/tenancy/registry.rs</code>)</td><td>—</td></tr>
+<tr><td>I</td><td>Dữ liệu rời khỏi quốc gia đã cam kết</td><td>Lưu trú dữ liệu theo khách; chuyển tới placement ở nước khác hay không rõ nước bị từ chối (<code>data/tenancy/residency.rs</code>, D-360)</td><td>Quốc gia của placement do người vận hành khai, không đo được</td></tr>
+<tr><td>I</td><td>Sandbox sao chép dữ liệu cá nhân</td><td>Sandbox chỉ chép cấu hình, ở cùng placement với khách gốc và tự hết hạn (<code>data/tenancy/sandbox.rs</code>, D-232)</td><td>Tính trọn vẹn của “chỉ cấu hình” ở từng module <strong>(cần kiểm chứng)</strong></td></tr>
+<tr><td>D</td><td>Mở quá nhiều pool</td><td>Tối đa <code>AUTOXIDE_TENANCY_MAX_OPEN_DATABASES</code> pool, bỏ pool ít dùng nhất (<code>data/tenancy/registry.rs</code>)</td><td>—</td></tr>
+<tr><td>D</td><td>Cache cũ sau khi tạm ngừng khách hay gỡ tên miền</td><td>Xoá cache ngay trên máy chủ thực hiện thay đổi; máy chủ khác trong <code>AUTOXIDE_TENANCY_CACHE_SECONDS</code></td><td>Tạm ngừng và gỡ tên miền mất tới một TTL ở máy chủ khác</td></tr>
+<tr><td>E</td><td>Khách chạm database của khách khác</td><td>Sổ database chỉ mở placement cho khách tìm từ credential, header hay tên miền đã xác minh; khách không tự đưa chuỗi kết nối</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="7-nhà-cung-cấp-bên-ngoài"><a class="header" href="#7-nhà-cung-cấp-bên-ngoài">7. Nhà cung cấp bên ngoài</a></h2>
+<p><strong>Tài sản:</strong> dòng tiền (thanh toán, hoàn tiền, tiền vào tài khoản — core không bao giờ giữ tiền của người mua,
+D-187); trạng thái vận đơn; hoá đơn thuế; thông tin tài khoản nhà cung cấp theo khách; secret của webhook gửi đi; vị
+trí mạng của máy chủ (SSRF).</p>
+<p><strong>Điểm vào:</strong></p>
+<ul>
+<li><strong>Vào:</strong> <code>/api/v1/ledger/webhooks/{provider}/{hook}</code>, <code>/api/v1/ledger/bank-feeds/{provider}/{hook}</code>,
+<code>/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}</code> (và dạng cũ); IPN của MoMo, biến động số dư SePay,
+callback trạng thái của GHN (<code>modules/momo</code>, <code>modules/sepay</code>, <code>modules/ghn</code>).</li>
+<li><strong>Ra:</strong> lời gọi thanh toán, vận chuyển, SMS (<code>modules/esms</code>), hoá đơn điện tử (<code>modules/einvoice_sepay</code>) và mail;
+webhook gửi đi (<code>modules/webhooks</code>, chữ ký Standard Webhooks, D-081); OIDC discovery; SMTP của khách; web push
+(hợp đồng <code>WebPushSender</code>).</li>
+<li><strong>Địa chỉ do người dùng chọn:</strong> đích webhook, issuer OIDC, máy chủ SMTP, endpoint của push subscription,
+<code>return_url</code> của thanh toán, <code>return_url</code> của KYC.</li>
+</ul>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>Mỗi tài khoản nhà cung cấp thuộc một khách và do khách đó cấu hình; máy chủ không bao giờ dùng tạm tài khoản của
+khách khác (<code>crates/kernel/src/contracts/provider.rs</code>, D-20261121-provider-accounts).</li>
+<li>Bộ nối nhà cung cấp trong repo ở <strong>hạng thử nghiệm</strong>: viết theo tài liệu công khai, chưa chạy với dịch vụ thật (đầu
+<code>lib.rs</code> của từng bộ nối).</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Callback thanh toán, ngân hàng hay vận chuyển giả</td><td>Tìm khách trước từ mã định danh không đoán được trong URL riêng của khách, rồi kiểm chữ ký của nhà cung cấp bằng secret của đúng khách đó, so trong thời gian không đổi (<code>contracts/provider.rs</code>, <code>modules/momo/src/gateway.rs</code>, <code>modules/sepay/src/feed.rs</code>)</td><td>Chữ ký thật của nhà cung cấp chưa được test (chỉ có bản giả)</td></tr>
+<tr><td>S</td><td>Callback từ tài khoản vận chuyển của người bán này cập nhật vận đơn của người bán khác</td><td>Chỉ khớp vận đơn đặt qua đúng tài khoản vận chuyển nhận callback (H-1, <code>modules/shipping/src/webhooks.rs</code>)</td><td>—</td></tr>
+<tr><td>T</td><td>Lệch số tiền, tiền tệ hay tài khoản mà vẫn ghi nhận thanh toán</td><td>Số tiền và tiền tệ so với thanh toán đã lưu; tiền vào phải đúng tài khoản ngân hàng của thanh toán (M-1); mục đối soát được nhận trước khi ghi nhận (M-2); hoàn tiền giới hạn theo số đã thu (L-6); nhà cung cấp hoàn tiền phải khớp (I-1)</td><td>Khoản thanh toán khác tiền tệ sau đối soát vào dead-letter, chưa có hướng dẫn cho người vận hành (P17)</td></tr>
+<tr><td>T</td><td>Callback bị gửi lại</td><td>Lượt gửi được chống trùng (rà soát, mục “Inbound webhooks”) — cơ chế của từng bộ nối <strong>(cần kiểm chứng)</strong></td><td>—</td></tr>
+<tr><td>R</td><td>Tranh cãi về điều nhà cung cấp đã báo</td><td>Lời gọi nhà cung cấp ghi log không có secret, kèm số đo (<code>contracts/provider.rs</code> <code>send</code>); bút toán sổ cái chỉ thêm</td><td>—</td></tr>
+<tr><td>I</td><td>Lộ secret của nhà cung cấp</td><td>Cài đặt secret được seal theo khách và dòng, chỉ ghi được qua API cài đặt (<code>contracts/provider.rs</code>, D-257)</td><td>—</td></tr>
+<tr><td>I</td><td>Chuyển hướng mở sau thanh toán hay xác minh danh tính</td><td><code>return_url</code> của thanh toán phải là <code>https://</code> trên tên miền đã xác minh của khách hay origin trong danh sách (P-5, <code>ledger.return_url_not_allowed</code>)</td><td><code>return_url</code> của KYC chưa có danh sách (L-11, P16); hiện chưa có bộ nối xác minh danh tính nào</td></tr>
+<tr><td>I</td><td>SSRF: máy chủ gọi vào địa chỉ nội bộ</td><td>Bộ lọc chung <code>crates/kernel/src/security/net.rs</code> (D-149, D-20261121-ssrf-targets): IP không công khai bị từ chối lúc lưu; tên miền phân giải qua <code>PublicOnly</code> lúc kết nối (chống DNS rebinding), tắt chuyển hướng, bỏ qua proxy hệ thống (L-4); giao thức không phải HTTP phân giải một lần rồi nối đúng IP đó</td><td>65 case SSRF mỗi database: không gì tới được listener trên máy</td></tr>
+<tr><td>I</td><td>Web push tới địa chỉ nội bộ</td><td>Push subscription chỉ nhận máy chủ công khai; hợp đồng <code>WebPushSender</code> đòi chỉ nối IP công khai (PT-10, <code>contracts/push.rs</code>)</td><td>Repo chưa có bộ gửi web push thật</td></tr>
+<tr><td>D</td><td>Lời gọi ra bị treo hay trả thân rất lớn</td><td><code>http_client</code> có timeout, không chuyển hướng; thân response giới hạn bởi <code>AUTOXIDE_PROVIDER_MAX_RESPONSE_BYTES</code> (I-2); thân webhook giới hạn theo route (<code>webhook_max_bytes</code> của <code>ledger</code>)</td><td>—</td></tr>
+<tr><td>D</td><td>Lạm dụng chi phí SMS (mỗi tin do cửa hàng trả)</td><td>Giới hạn theo số, theo khối client và theo giờ (P-2, PT-4)</td><td>—</td></tr>
+<tr><td>E</td><td>Gọi nhà cung cấp trong transaction ghi làm khoá database</td><td>Luật: không gọi mạng trong transaction ghi (CLAUDE.md “Luật dữ liệu”, <code>contracts/provider.rs</code>)</td><td>Do rà soát giữ, chưa có gate</td></tr>
+<tr><td>E</td><td>Webhook gửi đi lộ event mà chủ nơi nhận không được xem</td><td>Tạo webhook đòi permission stream của event; payload có chữ ký (<code>modules/webhooks</code>)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="8-ai"><a class="header" href="#8-ai">8. AI</a></h2>
+<p><strong>Tài sản:</strong> nội dung của khách gửi tới mô hình; ngân sách mô hình của người cài; tính đúng đắn của những gì được
+đăng; luật đưa cho mô hình.</p>
+<p><strong>Điểm vào:</strong> các tính năng gọi <code>TextModel</code> hay <code>Embedder</code> (<code>crates/kernel/src/contracts/ai.rs</code>, do <code>modules/ai</code>
+công bố): gợi ý SEO và alt text, dịch, bản nháp mô tả sản phẩm (<code>catalog</code>), bản nháp trả lời hỗ trợ
+(<code>support/src/ai.rs</code>), tóm tắt đánh giá (<code>orders/src/reviews.rs</code>), bản nháp hội thoại, tìm theo nghĩa. AI agent đóng
+vai client của API thuộc ranh giới 1–3.</p>
+<p><strong>Giả định tin cậy:</strong></p>
+<ul>
+<li>AI tắt cho tới khi người cài cấu hình nhà cung cấp (<a href="AI.vi.html"><code>docs/AI.vi.md</code></a>).</li>
+<li>Kết quả của mô hình là dữ liệu không tin cậy: phải khớp JSON Schema và chỉ thành <strong>gợi ý hay bản nháp</strong>; người
+(hay agent có permission đăng) quyết định (D-109).</li>
+<li>Luật cho mô hình ở <code>instructions</code>; dữ liệu người dùng chỉ ở <code>input</code> (<code>Prompt::new(…).input(…)</code>).</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>STRIDE</th><th>Mối đe doạ</th><th>Control đang có</th><th>Còn lại / còn mở</th></tr>
+</thead>
+<tbody>
+<tr><td>S</td><td>Nội dung do kẻ tấn công kiểm soát (một đánh giá, một phiếu hỗ trợ, một mô tả sản phẩm) bảo mô hình làm việc khác (prompt injection)</td><td>Tách <code>instructions</code> và <code>input</code>; kết quả phải khớp JSON Schema (<code>ai.output_invalid</code>); mô hình không có tool và không có credential; kết quả chỉ là bản nháp (D-109)</td><td>Injection vẫn có thể làm lệch bản nháp; người duyệt là control. Bài do AI tạo mang <code>ai_generated</code>, lúc đăng ghi <code>ai_reviewed</code> (<a href="AI.vi.html"><code>docs/AI.vi.md</code></a>)</td></tr>
+<tr><td>T</td><td>Bản nháp ghi đè sửa đổi của người</td><td>Bản dịch chỉ lưu khi không ai sửa bản đích từ lúc yêu cầu (<code>content.translation_conflict</code>)</td><td>—</td></tr>
+<tr><td>T</td><td>Kết quả mô hình mang markup hay link không an toàn</td><td>Bản dịch giữ link, ảnh và ID từ bản gốc; thẻ đánh số phải về đủ và đúng</td><td>Việc làm sạch mọi bản nháp AI trước khi client hiển thị <strong>(cần kiểm chứng theo từng tính năng)</strong></td></tr>
+<tr><td>R</td><td>Ai đã đăng chữ do AI tạo</td><td><code>ai_reviewed</code> kèm người và thời điểm khi đăng; chuỗi audit</td><td>—</td></tr>
+<tr><td>I</td><td>Gửi dữ liệu cá nhân hay riêng tư tới nhà cung cấp</td><td>Danh sách những gì được gửi có trong tài liệu; ảnh riêng tư chỉ gửi khi <code>AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true</code>; lịch sử hỗ trợ gửi đi đã bỏ email và số điện thoại; prompt, nội dung và khoá không bao giờ vào log (<a href="AI.vi.html"><code>docs/AI.vi.md</code></a>, <code>modules/support/src/ai.rs</code>)</td><td>Nhà cung cấp do người cài chọn; thoả thuận xử lý dữ liệu là việc của họ</td></tr>
+<tr><td>D</td><td>Cạn ngân sách</td><td>Hạn mức token mỗi ngày theo khách, từ gói (<code>ai.daily_tokens</code>) hay <code>AUTOXIDE_AI_DAILY_TOKEN_LIMIT</code>, đếm trong database chung mọi máy chủ (<code>modules/ai/src/config.rs</code>, <code>ai_usage</code>); job bị cắt và chạy lại; rate limiting theo key</td><td>—</td></tr>
+<tr><td>E</td><td>AI agent đăng hay xoá vượt vai trò</td><td>Permission <code>_own</code> giới hạn key của agent vào bài tạo bằng chính key đó; không lưu trữ / xoá khi thiếu permission (<code>content.write_own</code>, <code>content.publish_own</code>)</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="ngoài-phạm-vi"><a class="header" href="#ngoài-phạm-vi">Ngoài phạm vi</a></h2>
+<ul>
+<li>Người vận hành: bất kỳ ai có shell, biến môi trường, database hay bản sao lưu. Các cấu hình sai mà
+<a href="../SECURITY.vi.html"><code>SECURITY.vi.md</code></a> liệt kê (CORS <code>*</code>, <code>/metrics</code> công khai, rate limiting bằng <code>0</code>, header địa chỉ
+client khi không có proxy, secret chưa đặt).</li>
+<li>DoS theo lưu lượng; khuếch đại rẻ bằng một request đơn lẻ thì <strong>nằm trong</strong> phạm vi.</li>
+<li>Quản trị viên làm điều quản trị viên được làm trong chính khách của họ.</li>
+<li>Giao diện người dùng và bên dùng SDK (repo riêng), reverse proxy, cấu hình TLS, hệ điều hành, môi trường chạy
+container, DNS của tên miền khách.</li>
+<li>Tài khoản nhà cung cấp thật (thanh toán, ngân hàng, SMS, vận chuyển, hoá đơn điện tử, xác minh danh tính) và nhà
+cung cấp AI; bảo mật của chính họ.</li>
+<li>Chuỗi cung ứng ngoài những gì <code>cargo deny</code>, <code>gitleaks</code>, action ghim theo commit và bản phát hành có chữ ký đã phủ
+(<a href="VERIFYING.vi.html"><code>docs/VERIFYING.vi.md</code></a>).</li>
+<li>Bản thân việc tuân thủ pháp luật (xem <a href="COMPLIANCE.vi.html"><code>docs/COMPLIANCE.vi.md</code></a>); mô hình này chỉ xét control
+kỹ thuật của nó.</li>
+</ul>
+<h2 id="việc-còn-mở-đã-biết"><a class="header" href="#việc-còn-mở-đã-biết">Việc còn mở đã biết</a></h2>
+<p>Trạng thái nằm ở <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>, bước 70, mục <strong>P16</strong> (việc tiếp theo của đợt rà soát tháng 11/2026)
+và <strong>P17</strong> (sửa lỗi của đợt test tháng 11/2026), và ở bảng trạng thái của
+<a href="security/pentest-2026-11/README.vi.html"><code>docs/security/pentest-2026-11/README.vi.md</code></a>. Lúc viết, các lớp còn mở là:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Lớp lỗi</th><th>Ranh giới</th><th>Theo dõi ở</th></tr>
+</thead>
+<tbody>
+<tr><td>Chuyển hướng mở: <code>return_url</code> của xác minh danh tính chưa có danh sách cho phép</td><td>7</td><td>P16 (L-11)</td></tr>
+<tr><td>Bất nhất của luật cấp quyền (tên permission hay phạm vi; mã trạng thái; thu hẹp role người khác đang giữ; thành viên SCIM chờ, người tạo liên kết SCIM)</td><td>3</td><td>P16</td></tr>
+<tr><td>Luật tự động hoá: chưa chụp phạm vi của chủ luật; event thu hồi vào dead-letter không tạm dừng luật</td><td>3</td><td>P16</td></tr>
+<tr><td>Event của dữ liệu theo đơn vị chưa mang <code>org_id</code> ở vài module</td><td>4</td><td>P16</td></tr>
+<tr><td>Bỏ mục cache khi bị dội <code>Host</code> ngẫu nhiên; <code>Origin</code> của WebSocket; test chắc chắn cho cuộc đua nhận tên miền và cho lượt đọc ảnh chụp tên miền bị treo</td><td>1, 6</td><td>P16</td></tr>
+<tr><td>Tìm kiếm công khai tốn kém (chỉ mục tìm chữ sau một trait)</td><td>1</td><td>P17 (PT-15)</td></tr>
+<tr><td>Lộ thông tin giá trị thấp: thuật ngữ phân loại chưa dùng, analytics bị làm bẩn, trần mail xác nhận newsletter</td><td>1</td><td>P17 (PT-11, PT-12, PT-18)</td></tr>
+<tr><td>Giá hay cân nặng rất lớn bị bão hoà thay vì bị từ chối; kiểm tiền tệ ở vài đường mua hàng / POS</td><td>4, 7</td><td>P17</td></tr>
+<tr><td>Bản ghi trỏ tới nút tổ chức không có, tạo trước PT-8</td><td>3</td><td>P17</td></tr>
+<tr><td>Trần chung của đăng nhập SMS có thể khoá một số trong một thời gian</td><td>3</td><td>P17 (việc tiếp theo của PT-7)</td></tr>
+<tr><td>Gate <code>address-key</code> chỉ bắt một mẫu viết</td><td>1</td><td>P17</td></tr>
+<tr><td>Nhật ký audit khó sửa lén (chuỗi có khoá hay neo ra ngoài); mã hoá ở mức trường cho dữ liệu cá nhân nhạy cảm, khoá quản lý được và xoay được</td><td>3, 5</td><td>G13 (bước này)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Ở đây chỉ nêu lớp lỗi. Chi tiết của một lỗi còn mở chỉ chia sẻ riêng, qua kênh trong
+<a href="../SECURITY.vi.html"><code>SECURITY.vi.md</code></a>.</p>
+<h2 id="dùng-tài-liệu-này-cho-đợt-kiểm-thử-bên-ngoài"><a class="header" href="#dùng-tài-liệu-này-cho-đợt-kiểm-thử-bên-ngoài">Dùng tài liệu này cho đợt kiểm thử bên ngoài</a></h2>
+<p><strong>Chuẩn bị.</strong> Dùng <code>AUTOXIDE_TENANCY_MODE=multi</code>, ít nhất hai khách cộng khách nền tảng, một cây tổ chức có nhân
+viên giới hạn theo nút, và cả hai database. Script của đợt tháng 11/2026
+(<a href="https://github.com/thuongtamduy/autoxide/tree/v0.20.0/docs/security/pentest-2026-11/scripts"><code>docs/security/pentest-2026-11/scripts/</code></a>) dựng sẵn bộ như vậy và một ma trận
+case; dùng lại làm nền thay vì chạy lại các nhóm sinh tự động. Trỏ mọi nhà cung cấp tới bản giả trên máy hay tài khoản
+sandbox của chính bạn; chỉ test trên bản cài của chính bạn.</p>
+<p><strong>Trọng tâm đề xuất, giá trị cao nhất trước:</strong></p>
+<ol>
+<li><strong>Những gì các đợt trước chưa phủ:</strong> passkey và OIDC trọn vòng trong trình duyệt; callback thanh toán, biến động
+số dư và vận chuyển với chữ ký thật của nhà cung cấp (tài khoản sandbox); chuyển, tách và gộp khách giữa các
+database khi đang tải; khách ở database riêng; tải file và media ở giới hạn kích thước; WebSocket vượt trần mỗi
+người dùng; <code>ai</code> với mô hình thật.</li>
+<li><strong>Logic cấp quyền và phạm vi (ranh giới 3):</strong> role, thành viên, uỷ quyền, cấp hỗ trợ, SCIM, phạm vi API key ∩ chủ
+key, <code>run_as</code> của automations, step-up — tìm mọi đường làm một principal có nhiều hơn người tạo hay người giữ nó.
+Danh sách P16 nêu các vùng đã biết là bất nhất.</li>
+<li><strong>Cách ly khách và nhánh ở chỗ gate không thấy (ranh giới 5):</strong> đường code mà luật <code>tenant-scope</code> và
+<code>mcp-principal</code> không thấy (truy vấn generic, hàm phụ, handler là hàm đặt tên riêng) — so từng tool MCP với
+endpoint REST tương ứng.</li>
+<li><strong>Chọn khách theo <code>Host</code> và CORS (ranh giới 1):</strong> tên miền đã xác minh, <code>?site=</code>, tên miền đổi chủ giữa các khách,
+TTL của cache khi có nhiều máy chủ, khách bị tạm ngừng.</li>
+<li><strong>Đường tiền (ranh giới 4, 7):</strong> kiểm tiền tệ và số tiền ở mọi đường thanh toán, hoàn tiền, POS, số dư trả trước
+và khuyến mãi; race trên cả hai database.</li>
+<li><strong>Bản nháp AI (ranh giới 8):</strong> nội dung cài vào đánh giá, phiếu hỗ trợ hay mô tả sản phẩm có tạo được bản nháp mà
+client hiển thị không an toàn hay đánh lừa người duyệt không.</li>
+<li><strong>Từng control ghi (cần kiểm chứng)</strong> ở dưới.</li>
+</ol>
+<p><strong>Báo cáo.</strong> Dùng thang mức độ của <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/security/review-2026-11.md#severity">đợt rà soát tháng 11/2026</a> và kênh riêng
+trong <a href="../SECURITY.vi.html"><code>SECURITY.vi.md</code></a>. Ghi ranh giới và loại STRIDE theo tài liệu này.</p>
+<h2 id="control-cần-kiểm-chứng"><a class="header" href="#control-cần-kiểm-chứng">Control cần kiểm chứng</a></h2>
+<p>Các control do thiết kế hay tài liệu mô tả nhưng chưa được lần theo trọn trong code khi viết tài liệu này:</p>
+<ol>
+<li>Mọi bảng throttle và idempotency có hạn và job dọn (ranh giới 3).</li>
+<li>Mọi module giữ dữ liệu cá nhân đều khai nó cho xuất và xoá; chưa có gì buộc module mới làm vậy (ranh giới 4).</li>
+<li>Sandbox chỉ chép cấu hình, ở mọi module (ranh giới 6).</li>
+<li>Callback từ nhà cung cấp: cơ chế chống gửi lại / chống trùng của từng bộ nối (ranh giới 7).</li>
+<li>Bản nháp AI: việc làm sạch kết quả ở mọi tính năng lưu chữ do mô hình viết (ranh giới 8).</li>
+</ol>
+<h2 id="giữ-tài-liệu-này-luôn-đúng"><a class="header" href="#giữ-tài-liệu-này-luôn-đúng">Giữ tài liệu này luôn đúng</a></h2>
+<p>Sửa file này trong cùng pull request với thay đổi thêm một ranh giới, một loại điểm vào (một loại credential mới, một
+callback vào mới, một giao thức gọi ra mới) hay một control ghi ở đây, và sửa bản tiếng Anh cùng lúc.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/TAX.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/VERIFYING.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/TAX.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/VERIFYING.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

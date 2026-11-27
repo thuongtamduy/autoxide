@@ -1,0 +1,767 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Autoxide - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="autoxide"><a class="header" href="#autoxide">Autoxide</a></h1>
+<p><a href="README.html">English</a> · <strong>Tiếng Việt</strong></p>
+<p>Autoxide là một lõi backend mã nguồn mở viết bằng Rust. Core được dựng trước;
+module nghiệp vụ cắm vào sau. Một bộ code chạy được trên <strong>cả SQLite và
+PostgreSQL</strong>, có REST API mô tả bằng OpenAPI, và được thiết kế để AI agent dùng
+được như con người.</p>
+<p>Autoxide là nền cho sản phẩm mới. Nó không gắn với một công ty hay một ngành nào:
+core không chứa khái niệm nghiệp vụ — những thứ đó thuộc về module.</p>
+<p><strong>Backend thương mại sẵn cho thị trường Việt Nam.</strong> Thuế (gói dữ liệu thuế có ngày hiệu lực), chứng từ
+kế toán và hoá đơn, danh mục đơn vị hành chính chính thức cho địa chỉ và các quy định pháp luật (thương
+mại điện tử, dữ liệu cá nhân, lưu trữ chứng từ) có sẵn. AI agent dùng được qua MCP và hợp đồng OpenAPI,
+với cùng permission như con người. Core giữ trung lập, module cắm vào. Nhà cung cấp thanh toán, SMS,
+vận chuyển và hoá đơn điện tử nằm sau các interface hiện mới đi kèm bộ giả lập: việc nối nhà cung cấp
+thật vẫn chưa làm.</p>
+<h2 id="chạy-thử-bằng-một-lệnh"><a class="header" href="#chạy-thử-bằng-một-lệnh">Chạy thử bằng một lệnh</a></h2>
+<p>Chỉ muốn xem thử? <code>autoxide demo</code> không cần cài đặt gì: tự tạo một thư mục, database SQLite, secret ngẫu
+nhiên và một quản trị viên, nạp dữ liệu tham chiếu, rồi in mật khẩu quản trị ra màn hình. Trang xem API mở
+ở <code>/api/docs</code>. Không dùng cho production.</p>
+<pre><code class="language-bash"># Bằng Docker (không phải cài hay biên dịch gì):
+docker run --rm -it -p 127.0.0.1:8080:8080 ghcr.io/thuongtamduy/autoxide:latest demo
+# Hoặc bằng binary tải về (Linux, macOS, Windows: xem trang phát hành):
+./autoxide demo
+</code></pre>
+<p>Cần bản phát hành sau 0.19.0. <a href="docs/GETTING-STARTED.vi.html"><code>docs/GETTING-STARTED.vi.md</code></a> có đường tải về, cách
+giữ dữ liệu demo và các bước tiếp theo.</p>
+<h2 id="chạy-nhanh"><a class="header" href="#chạy-nhanh">Chạy nhanh</a></h2>
+<p>Một lệnh, không phải biên dịch gì: SQLite trong một Docker volume, bảng được tạo, có quản trị viên
+đầu tiên và dữ liệu tham chiếu đã nạp. Bạn cần <a href="https://docs.docker.com/get-docker/">Docker</a> (kèm
+Compose) và <code>openssl</code>.</p>
+<pre><code class="language-bash">mkdir autoxide &amp;&amp; cd autoxide
+curl -fsSLO https://raw.githubusercontent.com/thuongtamduy/autoxide/main/compose.quickstart.yml
+# Hai secret, giữ trong .env cạnh file đó (không commit)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" &gt; .env
+
+docker compose -f compose.quickstart.yml up -d
+# Mật khẩu tự sinh của quản trị viên (xem bên dưới)
+docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password
+</code></pre>
+<p><strong>Mật khẩu của quản trị viên đầu tiên.</strong> Lần chạy đầu, máy chủ tạo quản trị viên <code>admin@example.com</code>
+với một mật khẩu tự sinh. Mật khẩu không bao giờ vào log (log hay được gom về hệ thống khác): nó được
+ghi một lần vào file <code>data/initial-admin-password</code>, chỉ người dùng của máy chủ đọc được. Trong container
+đó là <code>/var/lib/autoxide/data/initial-admin-password</code>, nằm trong Docker volume <code>data</code> (Compose đặt tên
+<code>&lt;thư mục&gt;_data</code>), nên còn nguyên qua các lần khởi động lại. Lệnh trên in hai dòng của nó: email, rồi
+mật khẩu. Log chỉ nói file ở đâu (<code>docker compose -f compose.quickstart.yml logs autoxide | grep "first administrator"</code>). Nếu lệnh báo file “does not exist” thì quản trị viên đã có từ trước (volume đã dùng rồi),
+hoặc bạn đã tự đặt <code>AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD</code>. Đăng nhập và đổi mật khẩu xong thì xoá file:
+<code>docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password --remove</code>.</p>
+<p>Rồi mở <a href="http://127.0.0.1:8080/">http://127.0.0.1:8080/</a> (tên, phiên bản và các đường dẫn) và đăng nhập. Trang xem API
+(<code>/api/docs</code>, nạp script từ CDN) tắt trong bản chạy nhanh: thêm <code>AUTOXIDE_HTTP_API_DOCS=true</code> vào <code>.env</code>
+rồi chạy lại <code>docker compose -f compose.quickstart.yml up -d</code> để bật.</p>
+<pre><code class="language-bash">curl -sS http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"&lt;mật khẩu trong file&gt;"}'
+</code></pre>
+<p>Các hướng dẫn trong <a href="docs/guides/README.vi.html"><code>docs/guides/</code></a> viết request này gọn hơn bằng
+<code>--json '…'</code>, cần curl 7.82 trở lên (<code>curl --version</code>); curl cũ hơn thì viết
+<code>-H 'Content-Type: application/json' -d '…'</code> thay vào.</p>
+<p>Muốn tự chọn thì thêm <code>AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…</code> và <code>AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…</code>
+vào <code>.env</code> trước lần chạy đầu. Tiếp theo: nối một AI agent qua MCP
+(<a href="docs/guides/mcp.vi.html#6-từ-chạy-nhanh-tới-một-agent-làm-việc-thật"><code>docs/guides/mcp.vi.md</code></a>). Chạy nhanh
+cần bản phát hành sau 0.16.0; với PostgreSQL, nhiều máy chủ và HTTPS, xem
+<a href="docs/DEPLOY.vi.html"><code>docs/DEPLOY.vi.md</code></a>.</p>
+<h3 id="bản-chạy-nhanh-có-những-gì"><a class="header" href="#bản-chạy-nhanh-có-những-gì">Bản chạy nhanh có những gì</a></h3>
+<p>Image phát hành chứa mọi module của binary <code>autoxide</code> (mọi thư mục trong <code>modules/</code> trừ module mẫu
+<code>notes</code>). Máy chủ mặc định chạy các module hạng core và chính thức; module hạng thử nghiệm (đánh dấu
+* bên dưới) tắt cho tới khi bạn nêu tên trong <code>AUTOXIDE_MODULES</code> — xem
+<a href="docs/MODULES.vi.html"><code>docs/MODULES.vi.md</code></a> về các hạng và cách chọn.
+<code>GET /api/v1/kernel/modules</code> liệt kê module đang chạy trên máy chủ của bạn. Mỗi module trả lời dưới
+<code>/api/v1/&lt;module&gt;</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Mảng</th><th>Module</th></tr>
+</thead>
+<tbody>
+<tr><td>Tài khoản và quyền</td><td><code>auth</code> (đăng nhập, role, API key, xác thực hai bước, passkey), <code>organizations</code> (khách, đơn vị, cửa hàng), <code>audit</code>, <code>idempotency</code></td></tr>
+<tr><td>Nền tảng</td><td><code>files</code>, <code>mail</code>, <code>notifications</code>, <code>webhooks</code>, <code>ai</code> (tắt tới khi bạn cấu hình nhà cung cấp), <code>address</code> (đơn vị hành chính Việt Nam), <code>compliance</code>, <code>plans</code> (gói và thuê bao), <code>reporting</code>*, <code>automations</code>*</td></tr>
+<tr><td>Website</td><td><code>content</code> (bài viết, trang), <code>media</code>, <code>menus</code>, <code>forms</code>, <code>newsletter</code>*, <code>comments</code>*, <code>analytics</code>*</td></tr>
+<tr><td>Thương mại</td><td><code>catalog</code>, <code>inventory</code>, <code>promotions</code>, <code>shipping</code>, <code>orders</code>, <code>customers</code>, <code>tax</code>, <code>ledger</code> (tiền), <code>invoices</code></td></tr>
+<tr><td>Dịch vụ</td><td><code>bookings</code>*, <code>support</code>*, <code>conversations</code>*</td></tr>
+</tbody>
+</table>
+</div>
+<p>Không phải bật gì để thử các module hạng core và chính thức, và module bạn không ghi dữ liệu thì
+không tốn gì. Module nói chuyện với dịch vụ bên ngoài (nhà cung cấp AI, đối tác thanh toán hay vận
+chuyển, SMTP) không gửi gì ra ngoài cho tới khi bạn cấu hình. Mỗi khách được dùng module nào do gói
+của khách quyết (<a href="docs/PLANS.vi.html"><code>docs/PLANS.vi.md</code></a>); tập module máy chủ chạy chọn bằng
+<code>AUTOXIDE_MODULES</code> (<a href="docs/MODULES.vi.html"><code>docs/MODULES.vi.md</code></a>), và xem danh sách cần permission
+<code>kernel.modules.read</code> (quản trị viên có sẵn).</p>
+<h3 id="sửa-một-bản-ghi-if-match"><a class="header" href="#sửa-một-bản-ghi-if-match">Sửa một bản ghi: <code>If-Match</code></a></h3>
+<p>Đọc một bản ghi trả phiên bản của nó trong header <code>ETag</code>. Gửi lại giá trị đó trong <code>If-Match</code> khi sửa
+bản ghi, để hai người không ghi đè lên nhau: phiên bản cũ nhận <code>412</code>, và endpoint bắt buộc header này
+trả <code>428</code> khi thiếu.</p>
+<pre><code class="language-bash"># Đọc bài viết và giữ header ETag (một số trong ngoặc kép, như "1763700000000000")
+curl -sS -i http://127.0.0.1:8080/api/v1/content/entries/&lt;id&gt; -H 'Authorization: Bearer &lt;access token&gt;'
+# Sửa bài viết kèm ETag đó
+curl -sS -X PATCH http://127.0.0.1:8080/api/v1/content/entries/&lt;id&gt; \
+  -H 'Authorization: Bearer &lt;access token&gt;' -H 'If-Match: &lt;the ETag&gt;' \
+  -H 'Content-Type: application/json' -d '{"title":"A new title"}'
+</code></pre>
+<p><a href="docs/guides/errors.vi.html"><code>docs/guides/errors.vi.md</code></a> cho thấy từng câu trả lời (<code>428</code>, <code>412</code>)
+bằng ví dụ chạy thật.</p>
+<h2 id="trạng-thái"><a class="header" href="#trạng-thái">Trạng thái</a></h2>
+<p>Core đã hoàn chỉnh: <strong>mọi bước của lộ trình đã xong</strong> — khung dự án, nền, đăng nhập
+cùng role và permission, đăng nhập hai bước, event và audit log, job queue, i18n và
+idempotency, email, lưu file, MCP endpoint, module mẫu, công cụ và deploy, passkey, quản lý phiên, xoá tài khoản và xuất dữ liệu, webhook. Kế tiếp là
+các module nghiệp vụ. Core có workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
+module, hợp đồng module, máy chủ HTTP dưới <code>/api/v1</code> kèm OpenAPI, health check, log,
+metrics, tracing và CLI. Module <code>auth</code> lưu người dùng
+với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access token sống ngắn cùng
+refresh token xoay vòng (<code>/api/v1/auth/login</code>, <code>/refresh</code>, <code>/logout</code>, <code>/me</code>). Quyền truy
+cập theo role: mỗi module khai permission của mình, role gom chúng lại
+(<code>/api/v1/auth/roles</code>), và role <code>admin</code> dựng sẵn có tất cả. Quản trị viên đầu tiên
+được tạo bằng dòng lệnh (<code>autoxide user create</code>); sau đó quản trị viên quản lý tài
+khoản qua <code>/api/v1/auth/users</code>. Người dùng chỉ tự tạo được tài khoản khi đặt
+<code>AUTOXIDE_AUTH_SELF_REGISTRATION=true</code>. Chương trình và AI agent dùng API key
+(<code>/api/v1/auth/api-keys</code>): key hành động thay người tạo ra nó, chỉ trong các permission
+ghi trên key, và được gửi như access token (<code>Authorization: Bearer axk1_…</code>; key ghi sẵn
+khách của nó nên không cần header nào khác). Tạo key,
+cũng như thêm passkey, phải nhập lại mật khẩu hiện tại; đặt lại mật khẩu thì mọi key và
+passkey của tài khoản bị xoá. Người
+dùng có thể bật đăng nhập hai bước bằng ứng dụng authenticator (TOTP) kèm recovery
+code dùng một lần (<code>/api/v1/auth/me/mfa</code>). Mọi thay đổi được giữ trong audit log chỉ
+thêm — ai, làm gì, bản ghi nào, lúc nào, trước và sau — xem tại <code>/api/v1/audit</code> với
+permission <code>audit.read</code>. Job chạy nền cũng nằm trong database (không cần Redis): lỗi
+thì thử lại với backoff, hỏng hẳn thì được giữ lại (<code>autoxide jobs failed</code>, <code>autoxide jobs retry</code>), và chạy theo lịch khi module yêu cầu. <code>AUTOXIDE_PROCESS_ROLE</code> tách một
+bản triển khai thành tiến trình API và tiến trình worker. Thông báo lỗi có tiếng Anh và
+tiếng Việt, chọn bằng header <code>Accept-Language</code>. Lệnh ghi gửi kèm header
+<code>Idempotency-Key</code> gửi lại an toàn: lần gửi lại nhận đúng kết quả lần đầu (trừ kết quả chứa
+secret chỉ trả một lần, như API key mới, vốn không bao giờ được lưu: lần gửi lại nhận
+<code>409 idempotency_result_not_kept</code>). Mail gửi qua
+SMTP từ job queue (đặt lại mật khẩu, xác minh email). File lưu trên ổ đĩa hoặc S3. AI
+agent gọi hệ thống như công cụ qua MCP ở <code>/mcp</code>, đọc resource (hướng dẫn của module, JSON
+Schema) và prompt của nó, và tự tìm đường từ <code>/llms.txt</code>, trang sinh từ code.</p>
+<p>Core gồm những gì, theo thứ tự dựng (xem <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>):</p>
+<ol>
+<li>Nền: cấu hình, truy cập database, migration theo module, hợp đồng module, một
+kiểu lỗi chung, HTTP dưới <code>/api/v1</code>, OpenAPI, health check, log, metrics,
+tracing, CLI</li>
+<li>Đăng nhập, role và permission, API key cho máy và AI agent</li>
+<li>MFA (TOTP và recovery code)</li>
+<li>Event và audit log chỉ thêm</li>
+<li>Job queue lưu trong database (không cần Redis)</li>
+<li>i18n (tiếng Anh, tiếng Việt) và idempotency key</li>
+<li>Email, đặt lại mật khẩu, xác minh email</li>
+<li>Lưu file (ổ đĩa cục bộ và S3)</li>
+<li>MCP endpoint để AI agent gọi hệ thống như công cụ</li>
+<li>Một module mẫu và hướng dẫn viết module</li>
+<li>Công cụ và deploy: chép dữ liệu giữa SQLite và PostgreSQL, đo hiệu năng, Docker,
+backup và restore, một lệnh kiểm tra (<code>./gate.sh</code>)</li>
+<li>Passkey; 13–14. quản lý tài khoản, webhook, hợp đồng API chặt hơn</li>
+<li>Thư viện media: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, phục vụ
+công khai hay riêng tư (<a href="docs/MEDIA.vi.html"><code>docs/MEDIA.vi.md</code></a>)</li>
+<li>Nội dung: bài viết và trang nhiều ngôn ngữ, bản nháp và lịch sử, hẹn giờ, danh mục,
+thẻ, tác giả, menu, chuyển hướng, và endpoint công khai cho website
+(<a href="docs/CONTENT.vi.html"><code>docs/CONTENT.vi.md</code></a>)</li>
+<li>Tính năng AI, mặc định tắt, với nhà cung cấp bạn chọn (Claude, OpenAI, Gemini,
+Ollama…): gợi ý SEO và alt text, dịch bài vào bản nháp, tìm theo ý nghĩa, và permission
+giữ AI agent trong phần việc của nó (<a href="docs/AI.vi.html"><code>docs/AI.vi.md</code></a>)</li>
+<li>Biểu mẫu: form liên hệ, form đăng ký định nghĩa qua API, máy chủ kiểm câu trả lời,
+giữ lại spam, hộp thư có xuất CSV (<a href="docs/FORMS.vi.html"><code>docs/FORMS.vi.md</code></a>)</li>
+<li>Bản tin email: danh sách, xác nhận hai bước, huỷ một chạm, chiến dịch gửi theo lô có
+tạm dừng và tiếp tục, bounce, mail cho bài mới (<a href="docs/NEWSLETTER.vi.html"><code>docs/NEWSLETTER.vi.md</code></a>)</li>
+<li>Bình luận: bình luận hai cấp gắn vào đích bất kỳ, cho người dùng đăng nhập hoặc khách,
+kiểm duyệt theo pipeline cố định, báo cáo, cấm, mail báo trả lời (<a href="docs/COMMENTS.vi.html"><code>docs/COMMENTS.vi.md</code></a>)</li>
+<li>Menu của website: thanh menu chính, bảng xổ lớn, chân trang; mục trỏ tới địa chỉ hay tới đối
+tượng của module bất kỳ, tự lấy mục con, nhãn có hạn, endpoint công khai có cache
+(<a href="docs/MENUS.vi.html"><code>docs/MENUS.vi.md</code></a>)</li>
+<li>Tổ chức và danh tính: cây tổ chức trong mỗi khách (trụ sở, vùng, cửa hàng…) với quyền theo một
+nút hay một nhánh, cài đặt kế thừa theo cây, website riêng của từng nút, hồ sơ công khai của cửa
+hàng; tài khoản người mua tách khỏi nhân sự, lời mời, đăng nhập bằng link, uỷ quyền theo chuỗi
+khách, quyền vào hỗ trợ có thời hạn; danh mục đơn vị hành chính Việt Nam cho địa chỉ
+(<a href="docs/ADDRESS.vi.html"><code>docs/ADDRESS.vi.md</code></a>)</li>
+</ol>
+<h2 id="chạy-thử-bằng-docker-không-cần-build"><a class="header" href="#chạy-thử-bằng-docker-không-cần-build">Chạy thử bằng Docker (không cần build)</a></h2>
+<p>Như mục <a href="#chạy-nhanh">Chạy nhanh</a>, làm từng bước bằng <code>docker run</code> (dùng được với mọi bản phát
+hành): không phải biên dịch gì, SQLite nằm trong một Docker volume. Bạn cần <a href="https://docs.docker.com/get-docker/">Docker</a> và <code>openssl</code>.
+Image nặng khoảng 410 MB trên đĩa, máy chủ sẵn sàng khoảng một giây sau khi khởi động.</p>
+<pre><code class="language-bash"># Hai secret, tự sinh ở đây và giữ trong một file (dùng đúng giá trị này ở mọi lần chạy; không commit)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" &gt; autoxide.env
+chmod 600 autoxide.env
+
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.20.0   # một bản phát hành ở trang GitHub Releases
+RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
+
+# 1. Tạo bảng (máy chủ không khởi động được nếu chưa làm bước này; làm lại sau mỗi lần cập nhật)
+$RUN $IMAGE migrate up
+# 2. Quản trị viên đầu tiên: mật khẩu mạnh được in ra một lần
+$RUN $IMAGE user create --email you@example.com --name "Your Name" --admin
+# 3. Dữ liệu tham chiếu (địa chỉ, thuế, giới hạn khuyến mãi); chạy lại lần nữa vẫn an toàn
+$RUN $IMAGE task address.import
+$RUN $IMAGE task tax.import_pack
+$RUN $IMAGE task promotions.load_legal_data
+# 4. Chạy máy chủ (nó lắng nghe bên trong container; lệnh này mở ra chỉ trên máy này)
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+
+curl http://127.0.0.1:8080/health/ready     # {"data":{"status":"ok"}}
+$RUN $IMAGE doctor                           # còn thiếu gì trước khi đưa lên thật
+</code></pre>
+<p>Giữ <code>-v autoxide-data:/var/lib/autoxide/data</code> ở mọi lệnh: database, file tải lên và mail nằm
+trong volume đó, thiếu nó thì mất cùng container. Bản backup phải ghi vào một thư mục bạn gắn
+vào, không phải một đường dẫn bên trong container (<code>mkdir backups &amp;&amp; sudo chown 10001 backups</code>,
+rồi thêm <code>-v "$PWD/backups:/backups"</code> và chạy <code>backup /backups/&lt;tên&gt;</code>). Đăng nhập như ở mục
+<a href="#cấu-hình">Cấu hình</a> (dùng <code>http://127.0.0.1:8080</code>). Với PostgreSQL, reverse proxy có HTTPS,
+cập nhật và restore, xem <a href="docs/DEPLOY.vi.html"><code>docs/DEPLOY.vi.md</code></a>.</p>
+<p><strong>Không có Docker?</strong> Build binary và chạy bằng tay: <a href="docs/DEPLOY.vi.html#b-một-binary-với-sqlite"><code>docs/DEPLOY.vi.md</code>, mục B</a>
+(SQLite) hay <a href="docs/DEPLOY.vi.html#b-một-binary-với-postgresql-từ-đầu">B+</a> (PostgreSQL). Hai secret để trong <code>.env</code>,
+<code>autoxide migrate up</code> chạy trước <code>autoxide serve</code>, và <code>AUTOXIDE_HTTP_ADDRESS</code> đổi địa chỉ nghe.</p>
+<h2 id="yêu-cầu"><a class="header" href="#yêu-cầu">Yêu cầu</a></h2>
+<p>Chỉ cần khi build từ mã nguồn (muốn chạy image đã phát hành thì xem mục trên).</p>
+<ul>
+<li><a href="https://rustup.rs">Rust</a> — <code>rustup</code> tự cài đúng toolchain ghim trong
+<code>rust-toolchain.toml</code> ở lần đầu bạn chạy <code>cargo</code></li>
+<li>Một trình biên dịch C (SQLite và libwebp được biên dịch từ mã nguồn và đóng gói kèm binary;
+trên Debian hay Ubuntu: <code>sudo apt install build-essential</code>)</li>
+<li>Để chạy gate chất lượng đầy đủ: <a href="https://docs.docker.com/get-docker/">Docker</a> và
+<a href="https://github.com/EmbarkStudios/cargo-deny"><code>cargo-deny</code></a>
+(<code>cargo install cargo-deny --locked</code>)</li>
+</ul>
+<p><strong>Build mất khá lâu.</strong> Lần build đầu (<code>cargo build --release</code>, hay <code>docker build</code>) biên dịch vài trăm
+crate: tính khoảng 20 phút tới hơn một giờ, tuỳ số nhân CPU và bộ nhớ (RAM ít nhất 4 GB, 8 GB thì
+thoải mái; build bị dừng giữa chừng trên Docker Desktop thì nâng giới hạn bộ nhớ của nó). Các lần sau
+dùng lại phần đã biên dịch. Muốn chạy Autoxide chứ không sửa nó thì dùng image đã phát hành ở trên:
+không phải biên dịch gì.</p>
+<p><strong>Sau proxy của công ty.</strong> <code>cargo</code> và <code>rustup</code> đọc <code>HTTPS_PROXY</code> (và <code>HTTP_PROXY</code>, <code>NO_PROXY</code>) từ biến
+môi trường. <code>docker build</code> không chuyển biến của shell vào bước build: truyền chúng thành build
+argument — Docker biết sẵn các tên này và không giữ chúng trong image —</p>
+<pre><code class="language-bash">docker build --build-arg HTTPS_PROXY=http://proxy.example.com:3128 \
+  --build-arg HTTP_PROXY=http://proxy.example.com:3128 --build-arg NO_PROXY=localhost,127.0.0.1 \
+  -t autoxide .
+</code></pre>
+<p>— hoặc đặt một lần trong mục <code>proxies</code> của <code>~/.docker/config.json</code>, Docker sẽ truyền cho mọi lần build,
+kể cả <code>docker compose build</code>. Proxy soi HTTPS bằng chứng chỉ riêng làm việc tải thư viện trong lúc build
+lỗi chứng chỉ; khi đó hãy dùng image đã phát hành.</p>
+<h2 id="bắt-đầu"><a class="header" href="#bắt-đầu">Bắt đầu</a></h2>
+<pre><code class="language-bash">git clone https://github.com/thuongtamduy/autoxide.git autoxide
+cd autoxide
+
+# Biên dịch và chạy giao diện dòng lệnh
+cargo run -p autoxide -- --help
+
+# Chạy test trên SQLite (không cần cài đặt gì thêm)
+cargo test --workspace
+
+# Chạy gate chất lượng đầy đủ: định dạng, lint, kiểm ranh giới, kiểm thư viện,
+# test trên SQLite, test trên PostgreSQL (dựng trong một container Docker dùng xong bỏ)
+./gate.sh
+</code></pre>
+<p>Nếu bạn sẽ commit, bật Git hook một lần. Hook quét secret trong phần thay đổi sắp
+commit (khi đã cài <a href="https://github.com/gitleaks/gitleaks"><code>gitleaks</code></a>) và kiểm định
+dạng code:</p>
+<pre><code class="language-bash">git config core.hooksPath .githooks
+</code></pre>
+<h2 id="cấu-hình"><a class="header" href="#cấu-hình">Cấu hình</a></h2>
+<p>Mọi biến cấu hình đều có giá trị mặc định dùng được, nên bản clone mới chạy được
+ngay mà không cần cấu hình gì. Cấu hình đọc từ biến môi trường và từ file <code>.env</code>
+trong thư mục hiện tại; biến môi trường thắng.</p>
+<pre><code class="language-bash"># Kiểm cấu hình và xem mọi biến kèm giá trị đang có hiệu lực
+cargo run -p autoxide -- config
+
+# Bắt đầu cấu hình của riêng bạn từ các giá trị mặc định đã ghi sẵn
+cp .env.example .env
+</code></pre>
+<p>Cấu trúc database do migration quản lý, mỗi module một bộ. Migration không bao giờ
+tự chạy — hãy chạy một lần mỗi lần deploy:</p>
+<pre><code class="language-bash">cargo run -p autoxide -- migrate status          # cái gì đã áp dụng, cái gì còn chờ
+cargo run -p autoxide -- migrate up              # áp dụng mọi thứ còn chờ
+cargo run -p autoxide -- migrate down &lt;module&gt;   # gỡ migration mới nhất của một module
+</code></pre>
+<p>Tạo quản trị viên đầu tiên. Lệnh tự sinh một mật khẩu mạnh và in ra đúng một lần;
+muốn tự chọn mật khẩu thì đưa nó vào standard input và thêm <code>--password-stdin</code>:</p>
+<pre><code class="language-bash">cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
+</code></pre>
+<p>Nhập dữ liệu tham chiếu đi kèm máy chủ. Các bước này không đổi dữ liệu của bạn, và chạy
+lại thì không đổi gì:</p>
+<pre><code class="language-bash"># Danh mục đơn vị hành chính Việt Nam (tỉnh, xã), dùng để kiểm địa chỉ.
+# Không có gì tự nhập thay bạn: chạy một lần cho mỗi bản cài, và chạy lại khi bản cập nhật
+# mang danh mục mới hơn (`doctor` sẽ nhắc). Xem docs/ADDRESS.vi.md.
+cargo run -p autoxide -- task address.import
+
+# Gói dữ liệu thuế (thuế suất, quy tắc khấu trừ). Máy chủ đang chạy tự nhập trong vòng
+# một giờ; chạy lệnh này để có ngay. Xem docs/TAX.vi.md.
+cargo run -p autoxide -- task tax.import_pack
+
+# Giới hạn pháp lý về khuyến mãi (Việt Nam). Thiếu nó thì không bật được khuyến mãi
+# (`doctor` sẽ cảnh báo). Xem docs/PROMOTIONS.vi.md.
+cargo run -p autoxide -- task promotions.load_legal_data
+</code></pre>
+<p>Kiểm bản cài đặt. <code>doctor</code> đi qua cấu hình, database, migration, khoá ký, nơi lưu file,
+máy chủ SMTP, tài khoản quản trị và dữ liệu tham chiếu đã nhập, và nói cách sửa từng lỗi (<code>--json</code> cho script và AI agent;
+thoát với mã 1 khi có bước kiểm hỏng):</p>
+<pre><code class="language-bash">cargo run -p autoxide -- doctor
+</code></pre>
+<p>Module có thể thêm lệnh quản trị; <code>autoxide task</code> liệt kê chúng kèm tham số
+(<code>cargo run -p autoxide -- task</code>).</p>
+<p>Sau đó chạy máy chủ. Máy chủ từ chối chạy khi còn migration chưa áp dụng, và dừng êm
+khi nhận Ctrl-C hoặc <code>SIGTERM</code> (request đang chạy có <code>AUTOXIDE_HTTP_SHUTDOWN_SECONDS</code>
+giây để xong; sau bộ cân bằng tải thì xem
+<a href="docs/DEPLOY.vi.html#cập-nhật-không-làm-rơi-request">cập nhật không làm rơi request</a>):</p>
+<pre><code class="language-bash">cargo run -p autoxide -- serve
+</code></pre>
+<p>Mặc định máy chủ nghe ở <code>127.0.0.1:8080</code>: kiểm bằng
+<code>curl http://127.0.0.1:8080/health/ready</code>. Log ghi ra standard error. Đăng nhập và
+xem tài khoản của mình:</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email": "you@example.com", "password": "&lt;mật khẩu&gt;"}'
+curl -s http://127.0.0.1:8080/api/v1/auth/me -H 'Authorization: Bearer &lt;access_token&gt;'
+</code></pre>
+<p>Hợp đồng của API là một tài liệu OpenAPI sinh ra từ code. Nó nằm trong repo ở
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>docs/openapi.json</code></a>, in ra được bằng <code>autoxide openapi</code>, và máy
+chủ đang chạy phục vụ nó ở <code>/api/v1/openapi.json</code>. Phần mô tả của tài liệu liệt kê
+các quy ước mọi endpoint tuân theo (envelope của response, lỗi theo RFC 9457 với
+<code>code</code> ổn định, pagination theo con trỏ, request id).</p>
+<p>AI agent dùng cùng các chức năng đó như công cụ (tool) qua
+<a href="https://modelcontextprotocol.io">Model Context Protocol</a> ở <code>/mcp</code> (Streamable HTTP),
+xác thực như API — thường dùng API key. Agent chỉ thấy và gọi được tool mà permission
+của nó cho phép; mỗi tool chạy đúng code của endpoint REST tương ứng, nên lệnh ghi vào
+audit log. Ví dụ với Claude Code:</p>
+<pre><code class="language-bash">claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer &lt;api key&gt;"
+</code></pre>
+<p><a href="docs/guides/mcp.vi.html"><code>docs/guides/mcp.vi.md</code></a> hướng dẫn từng bước: key với ít permission
+nhất, client MCP khác, mọi tool kèm permission cần có, và các giới hạn.</p>
+<p>Backup mọi thứ — dữ liệu của mọi module và mọi file đã lưu — vào một thư mục, rồi về
+sau khôi phục vào một database mới, trống (với nơi lưu file bất kỳ). Database được đọc
+trong một snapshot nhất quán, nên máy chủ vẫn chạy được trong lúc backup:</p>
+<pre><code class="language-bash">cargo run -p autoxide -- backup backups/2026-11-11
+cargo run -p autoxide -- restore backups/2026-11-11
+</code></pre>
+<p>Chỉ khôi phục bản backup do chính bạn tạo: một bản backup là toàn bộ nội dung của máy
+chủ.</p>
+<p>Muốn chuyển sang PostgreSQL về sau (hay mang dữ liệu về SQLite), dừng máy chủ rồi chép
+mọi thứ sang một database mới, trống; database đó được áp dụng mọi migration trước:</p>
+<pre><code class="language-bash">printf '%s' 'postgres://user:password@host:5432/autoxide' | cargo run -p autoxide -- copy --to-stdin
+</code></pre>
+<p><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a> liệt kê mọi biến kèm mô tả và giá trị mặc định. File
+này sinh ra từ code nên không thể lỗi thời. Cấu hình sai được báo đầy đủ — mọi vấn
+đề cùng một lượt, mỗi vấn đề nói rõ phải sửa gì — và lệnh thoát với mã 2. Secret
+không bao giờ bị in ra.</p>
+<p>Mặc định mỗi địa chỉ client được gửi 600 request mỗi phút
+(<code>AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE</code>), và một email bị khoá đăng nhập 15 phút sau 5
+lần sai. Chạy sau reverse proxy thì đặt <code>AUTOXIDE_HTTP_CLIENT_IP_HEADER</code> (ví dụ
+<code>X-Forwarded-For</code>) để phân biệt client theo địa chỉ của chính họ thay vì của proxy.</p>
+<p>Người dùng cũng có thể đăng nhập bằng passkey (Face ID, vân tay, khoá bảo mật) thay cho
+mật khẩu. Đặt <code>AUTOXIDE_AUTH_PASSKEY_RP_ID</code> bằng tên miền của trang (và
+<code>AUTOXIDE_AUTH_PASSKEY_ORIGINS</code> khi ứng dụng web chạy ở tên miền con); người dùng đã đăng
+nhập thêm passkey bằng <code>POST /api/v1/auth/me/passkeys/registration</code> và
+<code>POST /api/v1/auth/me/passkeys</code>, rồi đăng nhập bằng <code>POST /api/v1/auth/login/passkey/options</code>
+và <code>POST /api/v1/auth/login/passkey</code> — không cần email. <code>options</code> trả về đưa thẳng vào
+<code>PublicKeyCredential.parseCreationOptionsFromJSON()</code> / <code>parseRequestOptionsFromJSON()</code> của
+trình duyệt.</p>
+<p>Đăng nhập bằng Google, Microsoft, GitHub hay nhà cung cấp OpenID Connect bất kỳ tắt mặc định;
+bật bằng <code>AUTOXIDE_AUTH_OIDC=true</code>, rồi mỗi khách thêm nhà cung cấp của mình bằng
+<code>POST /api/v1/auth/oidc-providers</code> (permission <code>auth.oidc.manage</code>). Tài khoản sẵn có chỉ được liên
+kết khi cả hai phía đã xác minh email, và đăng nhập hai bước vẫn áp dụng. Xem
+<a href="docs/guides/oidc.vi.html"><code>docs/guides/oidc.vi.md</code></a>.</p>
+<p>Người dùng có permission <code>files.upload</code> tải file lên bằng cách gửi nguyên nội dung tới
+<code>POST /api/v1/files?name=report.pdf</code> kèm <code>Content-Type</code> của nó, rồi xem danh sách, tải
+xuống (<code>GET /api/v1/files/{id}/content</code>) và xoá file của mình; <code>files.manage</code> với tới
+file của mọi người. File tải lên tối đa 25 MiB (<code>AUTOXIDE_FILES_MAX_BYTES</code>) và, khi bạn
+đặt <code>AUTOXIDE_FILES_ALLOWED_TYPES</code> (ví dụ <code>image/*,application/pdf</code>), chỉ thuộc các loại
+đó.</p>
+<p>File tải lên được lưu trong <code>data/files</code> cho tới khi bạn đặt <code>AUTOXIDE_FILES_S3_BUCKET</code>
+(kèm <code>AWS_REGION</code>, <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, và <code>AWS_ENDPOINT_URL</code>
+cho dịch vụ tương thích S3 như Cloudflare R2). Backup <code>data/files</code> cùng lúc với
+database.</p>
+<p>Mail được ghi thành file <code>.eml</code> vào <code>data/mail</code> cho tới khi bạn đặt
+<code>AUTOXIDE_MAIL_SMTP_URL</code> (ví dụ <code>smtps://user:password@smtp.example.com:465</code>) và
+<code>AUTOXIDE_MAIL_FROM</code>.</p>
+<p>Người dùng quên mật khẩu gọi <code>POST /api/v1/auth/password-reset</code> kèm email và nhận qua
+mail một token dùng một lần, có hạn 30 phút; rồi gọi
+<code>POST /api/v1/auth/password-reset/confirm</code> kèm token và mật khẩu mới. Câu trả lời
+giống nhau dù email có tài khoản hay không. Đặt <code>AUTOXIDE_AUTH_PASSWORD_RESET_URL</code> (ví
+dụ <code>https://app.example.com/reset?token={token}</code>) để gửi đường dẫn tới trang của bạn
+thay vì token trần.</p>
+<p>Người dùng đã đăng nhập tự đổi mật khẩu bằng <code>POST /api/v1/auth/me/password</code> (phải
+nhập mật khẩu hiện tại). Quản trị viên đặt được mật khẩu đầu tiên cho tài khoản tạo
+không kèm mật khẩu (<code>PUT /api/v1/auth/users/{id}/password</code>), nhưng không thay được
+mật khẩu người khác đã có.</p>
+<p>Mỗi lần đăng nhập là một phiên, có tên là <code>session_id</code> trong response token. Người dùng
+xem các phiên của mình — thiết bị và lần hoạt động gần nhất — ở
+<code>GET /api/v1/auth/me/sessions</code>, đăng xuất một phiên bằng
+<code>DELETE /api/v1/auth/me/sessions/{id}</code>, hoặc mọi phiên khác bằng
+<code>DELETE /api/v1/auth/me/sessions?keep={session_id của mình}</code>. Người dùng tải mọi dữ liệu
+máy chủ giữ về mình bằng <code>GET /api/v1/auth/me/export</code> và xoá tài khoản bằng
+<code>DELETE /api/v1/auth/me</code> (phải nhập mật khẩu hiện tại); sau đó mọi module tự xoá dữ liệu
+về người đó. Quản trị viên tìm người dùng bằng <code>GET /api/v1/auth/users?search=ada</code>, đăng
+xuất một người ở mọi nơi (<code>DELETE /api/v1/auth/users/{id}/sessions</code>) và xoá tài khoản
+(<code>DELETE /api/v1/auth/users/{id}</code>). Quản trị viên không làm được những việc này với người
+có permission mà mình không có.</p>
+<p>Hệ thống khác nhận event qua webhook: có permission <code>webhooks.manage</code> thì đăng ký một địa
+chỉ <code>https://</code> cùng các event muốn nhận ở <code>POST /api/v1/webhooks</code> (danh sách event ở
+<code>GET /api/v1/webhooks/events</code>). Mỗi event được gửi bằng một request <code>POST</code> có chữ ký theo
+<a href="https://www.standardwebhooks.com">Standard Webhooks</a>, nên bên nhận kiểm được bằng thư
+viện có sẵn và secret nhận lúc tạo. Lần gửi lỗi được thử lại trong khoảng hai giờ;
+<code>GET /api/v1/webhooks/{id}/deliveries</code> cho biết đã gửi gì và cái gì lỗi. Webhook chỉ gửi
+tới địa chỉ public: địa chỉ trong mạng riêng hay máy này (<code>localhost</code>, <code>10.x</code>, <code>192.168.x</code>,
+<code>169.254.x</code>…) bị từ chối, trừ khi đặt <code>AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true</code> vì máy
+nhận chạy trong mạng của bạn.</p>
+<p>Tài khoản mới nhận một mail đề nghị xác nhận địa chỉ; token trong đó (hạn 24 giờ)
+được xác nhận bằng <code>POST /api/v1/auth/email-verification/confirm</code>, sau đó
+<code>email_verified_at</code> cho biết lúc xác minh. Muốn đổi email, người dùng gọi
+<code>POST /api/v1/auth/me/email</code> kèm địa chỉ mới và mật khẩu: email chỉ đổi khi địa chỉ
+mới được xác nhận theo cùng cách. Khi đó địa chỉ cũ nhận một mail báo, kèm token (hạn 7
+ngày) để báo một lần đổi mà chủ tài khoản không làm: <code>POST /api/v1/auth/email-change/report</code>
+đăng xuất tài khoản ở mọi nơi, bỏ mật khẩu, passkey, API key và xác thực hai bước, trả lại địa
+chỉ cũ khi nó còn trống, rồi gửi mail đặt lại mật khẩu tới đó. Đặt
+<code>AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL</code> và <code>AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL</code> để các mail
+này dẫn tới trang của bạn.</p>
+<p>Khi chạy thật (production), đặt <code>AUTOXIDE_AUTH_TOKEN_SECRET</code> (khoá ký access token)
+bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:</p>
+<pre><code class="language-bash">openssl rand -base64 48
+</code></pre>
+<p>Không đặt thì máy chủ tự sinh khoá lúc khởi động và ghi một cảnh báo vào log: đủ để
+dùng thử Autoxide, nhưng client đã đăng nhập phải đổi access token sau mỗi lần khởi
+động lại.</p>
+<h3 id="chạy-test-trên-postgresql-của-riêng-bạn"><a class="header" href="#chạy-test-trên-postgresql-của-riêng-bạn">Chạy test trên PostgreSQL của riêng bạn</a></h3>
+<p>Test chọn database theo biến <code>TEST_DATABASE_URL</code>. Không đặt nghĩa là SQLite. Để dùng
+PostgreSQL 16 trở lên, trỏ biến này tới một database bất kỳ trên máy chủ mà người
+dùng có quyền <code>CREATE DATABASE</code> — mỗi test tự tạo một database trống riêng và xoá
+nó sau khi chạy xong:</p>
+<pre><code class="language-bash">TEST_DATABASE_URL=postgres://user:password@localhost:5432/postgres cargo test --workspace
+</code></pre>
+<p><code>./gate.sh</code> làm việc này giúp bạn bằng Docker. Muốn gate dùng một máy chủ có sẵn
+thì đặt <code>GATE_POSTGRES_URL</code> bằng một URL cùng dạng.</p>
+<p>Test dựng cả ứng dụng chép một database mẫu đã chạy sẵn mọi migration, thay vì
+migrate lại từng database trống. Mẫu nằm trong thư mục tạm của hệ thống
+(<code>autoxide-templates/</code>) và, trên PostgreSQL, là các database tên <code>autoxide_tpl_…</code>;
+cả hai được dựng lại khi chương trình test hay migration đổi, và bị xoá sau một giờ.
+Đặt <code>TEST_DATABASE_TEMPLATE=off</code> để mọi database test migrate từ đầu.</p>
+<p>Test lưu file chạy thêm trên S3 khi <code>TEST_S3_ENDPOINT</code> trỏ tới một dịch vụ tương thích
+S3 có bucket tên <code>autoxide-test</code>. Gate tự dựng một máy chủ S3 giả lập dùng xong bỏ
+(<a href="https://github.com/getmoto/moto">moto</a>) bằng Docker; muốn dùng dịch vụ có sẵn thì
+đặt <code>GATE_S3_ENDPOINT</code>.</p>
+<h2 id="bố-cục-dự-án"><a class="header" href="#bố-cục-dự-án">Bố cục dự án</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Đường dẫn</th><th>Là gì</th></tr>
+</thead>
+<tbody>
+<tr><td><code>crates/kernel</code></td><td>Nền mà mọi module dựa vào. Không biết module nào.</td></tr>
+<tr><td><code>crates/app</code></td><td>Binary <code>autoxide</code>: nơi duy nhất đăng ký module.</td></tr>
+<tr><td><code>crates/testkit</code></td><td>Đồ dùng cho test: mỗi test một database riêng, trên SQLite hoặc PostgreSQL.</td></tr>
+<tr><td><code>modules/&lt;tên&gt;</code></td><td>Mỗi module một crate, sở hữu bảng của mình (<code>auth</code> tài khoản và đăng nhập, <code>audit</code>, <code>files</code>, <code>mail</code>, <code>webhooks</code>, <code>content</code>, <code>media</code>, <code>catalog</code>, <code>orders</code>… — khoảng ba mươi module; <code>ls modules</code> liệt kê hết, các mục ở trên nói từng module làm gì).</td></tr>
+<tr><td><code>xtask</code></td><td>Công cụ cho người phát triển: <code>cargo xtask check</code> kiểm ranh giới workspace.</td></tr>
+<tr><td><code>gate.sh</code></td><td>Gate chất lượng. Một thay đổi chỉ xong khi lệnh này xanh.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Module sở hữu bảng của mình, chỉ gọi nhau qua trait đã công bố, và không bao giờ
+dùng foreign key xuyên module. Gate tự động kiểm các luật này.</p>
+<h2 id="tài-liệu"><a class="header" href="#tài-liệu">Tài liệu</a></h2>
+<ul>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/STACK.md"><code>STACK.md</code></a> — dùng thư viện nào và vì sao</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a> — dựng gì, theo thứ tự nào</li>
+<li><code>docs/decisions/</code> — nhật ký quyết định (mục cũ ở <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/DECISIONS.md"><code>docs/DECISIONS.md</code></a>, mục mới mỗi mục
+một file ở đây); <code>cargo xtask decisions</code> sinh mục lục theo chủ đề <code>INDEX.md</code>, file này không commit</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CLAUDE.md"><code>CLAUDE.md</code></a> — luật cho người đóng góp, là người hay AI agent</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CHANGELOG.md"><code>CHANGELOG.md</code></a> — thay đổi của từng bản phát hành (tiếng Anh); image
+Docker đã phát hành ở <code>ghcr.io/&lt;owner&gt;/autoxide</code></li>
+<li><a href="docs/COMPATIBILITY.vi.html"><code>docs/COMPATIBILITY.vi.md</code></a> — thứ giữ ổn định từ 1.0 (API, mã lỗi, cấu hình,
+migration, Rust API cho module) và thứ có thể đổi</li>
+<li><a href="docs/guides/README.vi.html"><code>docs/guides/</code></a> — hướng dẫn API theo tình huống, có ví dụ <code>curl</code> và
+TypeScript chạy như test: website, đăng nhập, API key, gọi lại an toàn, pagination, lỗi,
+nối AI agent qua MCP</li>
+<li><a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/sdk/typescript/README.vi.md"><code>sdk/typescript/</code></a> — client TypeScript có kiểu, sinh từ
+<code>docs/openapi.json</code>; <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/mcp-tools.json"><code>docs/mcp-tools.json</code></a> — hợp đồng của mọi tool MCP</li>
+<li><a href="docs/DEPLOY.vi.html"><code>docs/DEPLOY.vi.md</code></a> — cài đặt và deploy: Docker Compose với
+PostgreSQL hoặc một binary với SQLite, reverse proxy, cập nhật, backup</li>
+<li><a href="docs/MEDIA.vi.html"><code>docs/MEDIA.vi.md</code></a> — dùng thư viện media: tải lên, thư mục, link
+công khai, cache, thùng rác</li>
+<li><a href="docs/CONTENT.vi.html"><code>docs/CONTENT.vi.md</code></a> — dùng module nội dung: bản nháp, đăng, trang
+và địa chỉ, ngôn ngữ, endpoint công khai cho website, xem trước</li>
+<li><a href="docs/AI.vi.html"><code>docs/AI.vi.md</code></a> — tính năng AI: bật với từng nhà cung cấp, embedding, chi
+phí và giới hạn, gửi gì đi, giới hạn cho AI agent</li>
+<li><a href="docs/FORMS.vi.html"><code>docs/FORMS.vi.md</code></a> — dùng module biểu mẫu: định nghĩa form, hiện
+trên website, chống spam, hộp thư, yêu cầu dữ liệu theo email</li>
+<li><a href="docs/NEWSLETTER.vi.html"><code>docs/NEWSLETTER.vi.md</code></a> — dùng module bản tin: danh sách, ô đăng ký,
+trang xác nhận và trang lựa chọn của website, chiến dịch, bounce, lưu ý pháp lý</li>
+<li><a href="docs/COMMENTS.vi.html"><code>docs/COMMENTS.vi.md</code></a> — dùng module bình luận: đích, luồng và ô bình
+luận của website, kiểm duyệt, báo cáo và cấm, mail báo trả lời, lưu ý pháp lý</li>
+<li><a href="docs/MENUS.vi.html"><code>docs/MENUS.vi.md</code></a> — dùng module menu: mục, đối tượng của module khác, nhãn,
+endpoint công khai và cache, chuyển từ menu của module nội dung</li>
+<li><a href="docs/BOOKINGS.vi.html"><code>docs/BOOKINGS.vi.md</code></a> — đặt lịch dịch vụ: dịch vụ, nhân viên và phòng, lịch
+tuần theo múi giờ của nút, giờ trống, cọc qua đối tác thanh toán, chính sách huỷ, nhắc lịch, khách
+vãng lai đặt bằng mã điện thoại</li>
+<li><a href="docs/CUSTOMERS.vi.html"><code>docs/CUSTOMERS.vi.md</code></a> — khách hàng: hồ sơ theo tài khoản hay số điện thoại, lịch
+sử mua từ đơn hàng, che liên hệ và xem đủ có audit, nhóm tay và nhóm theo quy tắc</li>
+<li><a href="docs/SUPPORT.vi.html"><code>docs/SUPPORT.vi.md</code></a> — phiếu hỗ trợ khách hàng: khách vãng lai dùng token phiếu,
+phạm vi nhân viên theo nút, nhóm và phân công, hạn trả lời theo giờ làm, chuyển khiếu nại, bản nháp AI</li>
+<li><a href="docs/ANALYTICS.vi.html"><code>docs/ANALYTICS.vi.md</code></a> — phân tích truy cập không cookie: gửi sự kiện từ
+website, báo cáo, phễu, đồng ý cho theo dõi theo người, ghi chú pháp lý</li>
+<li><a href="docs/ADDRESS.vi.html"><code>docs/ADDRESS.vi.md</code></a> — đơn vị hành chính và địa chỉ: đọc danh mục, nhập
+danh mục chính thức</li>
+<li><a href="docs/CATALOG.vi.html"><code>docs/CATALOG.vi.md</code></a> — sản phẩm: biến thể, danh mục, bảng giá có lịch sử,
+sàn giá</li>
+<li><a href="docs/PROMOTIONS.vi.html"><code>docs/PROMOTIONS.vi.md</code></a> — khuyến mại: giảm tự động, coupon, voucher, cộng dồn,
+giữ lượt cho đơn hàng, hạn mức pháp luật là dữ liệu có ngày hiệu lực</li>
+<li><a href="docs/TAX.vi.html"><code>docs/TAX.vi.md</code></a> — thuế: gói dữ liệu thuế Việt Nam, tính thuế, hồ sơ thuế</li>
+<li><a href="docs/MONEY.vi.html"><code>docs/MONEY.vi.md</code></a> — tiền: sổ cái, thanh toán và chế độ dòng tiền, VietQR, chứng từ kế
+toán, tỉ giá, in chứng từ, xuất dữ liệu kế toán, lưu chứng từ 10 năm</li>
+<li><a href="docs/NOTIFICATIONS.vi.html"><code>docs/NOTIFICATIONS.vi.md</code></a> — thông báo: loại và nhóm, kênh, đồng ý và
+khung giờ của tin quảng cáo, hộp thư và tuỳ chọn, khai một loại trong module</li>
+<li><a href="docs/MODULE_GUIDE.vi.html"><code>docs/MODULE_GUIDE.vi.md</code></a> — cách viết một module, bắt đầu
+từ module mẫu <a href="https://github.com/thuongtamduy/autoxide/tree/v0.20.0/modules/notes"><code>modules/notes</code></a> (mặc định không đăng ký)</li>
+</ul>
+<p>Bốn tài liệu đầu điều hành dự án và được viết bằng tiếng Việt, thuật ngữ kỹ thuật
+giữ nguyên tiếng Anh. Tài liệu cho người dùng (README này, hướng dẫn cài đặt và sử
+dụng, mô tả API) viết bằng tiếng Anh, kèm bản dịch tiếng Việt song song.</p>
+<h2 id="đóng-góp"><a class="header" href="#đóng-góp">Đóng góp</a></h2>
+<p>Trong lúc làm, <code>./gate.sh --quick</code> kiểm một thay đổi ở một module trong chưa tới một phút: nó chạy test
+của các crate bạn đã sửa (và của các crate phụ thuộc vào chúng), chỉ trên SQLite. Trước khi
+merge, chạy <code>./gate.sh</code> đầy đủ; một thay đổi chỉ được nhận khi gate đầy đủ xanh trên cả
+SQLite và PostgreSQL. Không bao giờ commit secret — chỉ <code>.env.example</code> được nằm
+trong Git, <code>.env</code> thì không. <a href="CONTRIBUTING.vi.html"><code>CONTRIBUTING.vi.md</code></a> hướng dẫn chuẩn
+bị máy, những luật quan trọng nhất và cách gửi thay đổi.</p>
+<p>Mỗi commit có một dòng <code>Signed-off-by</code> (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/DCO">DCO</a>, <code>git commit -s</code>). Câu hỏi: <a href="SUPPORT.vi.html"><code>SUPPORT.vi.md</code></a>. Quyết
+định được đưa ra thế nào và cách đề xuất thay đổi: <a href="GOVERNANCE.vi.html"><code>GOVERNANCE.vi.md</code></a>. Dự án đang đi đâu (tiếng Anh):
+<a href="docs/ROADMAP.public.html"><code>docs/ROADMAP.public.md</code></a>. Xây và đăng module của riêng bạn:
+<a href="docs/MODULE_ECOSYSTEM.vi.html"><code>docs/MODULE_ECOSYSTEM.vi.md</code></a>. Dùng tên dự án: <a href="TRADEMARK.vi.html"><code>TRADEMARK.vi.md</code></a>.</p>
+<h2 id="bảo-mật"><a class="header" href="#bảo-mật">Bảo mật</a></h2>
+<p>Tìm thấy lỗ hổng? Đừng mở issue công khai: hãy báo riêng theo
+<a href="SECURITY.vi.html"><code>SECURITY.vi.md</code></a>, nơi cũng ghi những phiên bản được vá bảo mật.
+<a href="docs/THREAT_MODEL.vi.html"><code>docs/THREAT_MODEL.vi.md</code></a> mô tả các ranh giới tin cậy của core, control ở từng
+ranh giới và những gì còn mở.</p>
+<h2 id="license"><a class="header" href="#license">License</a></h2>
+<p>Phát hành theo một trong hai license, bạn tự chọn:</p>
+<ul>
+<li>Apache License, phiên bản 2.0 (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/LICENSE-APACHE">LICENSE-APACHE</a>)</li>
+<li>MIT license (<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/LICENSE-MIT">LICENSE-MIT</a>)</li>
+</ul>
+<p>Trừ khi bạn nêu rõ điều ngược lại, mọi đóng góp bạn chủ ý gửi để đưa vào dự án này,
+theo định nghĩa trong license Apache-2.0, sẽ được cấp phép kép như trên, không kèm
+thêm điều khoản hay điều kiện nào.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+                            <a rel="next prefetch" href="CODE_OF_CONDUCT.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+                    <a rel="next prefetch" href="CODE_OF_CONDUCT.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

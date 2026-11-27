@@ -1,0 +1,468 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Kho (inventory) - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="kho-inventory"><a class="header" href="#kho-inventory">Kho (<code>inventory</code>)</a></h1>
+<p><a href="INVENTORY.html">English</a></p>
+<p>Module <code>inventory</code> giữ tồn của mọi biến thể sản phẩm ở mọi kho hay cửa hàng của một khách. Mọi thay đổi vào một sổ
+biến động chỉ thêm, và không bao giờ bán quá tồn, kể cả khi nhiều request đến cùng lúc, trên SQLite lẫn PostgreSQL.
+Module khác dùng qua <code>autoxide_inventory::api</code>; API HTTP nằm dưới <code>/api/v1/inventory</code> (xem <code>docs/openapi.json</code>), tool
+MCP tên <code>inventory.*</code>.</p>
+<h2 id="mô-hình-tồn"><a class="header" href="#mô-hình-tồn">Mô hình tồn</a></h2>
+<ul>
+<li><strong>Kho</strong> là nút tổ chức loại <code>warehouse</code> hay <code>store</code> (bước 34), hoặc nút gốc của khách (cửa hàng đơn lẻ giữ tồn ở
+đó). Nút loại khác trả <code>inventory.not_a_warehouse</code>.</li>
+<li><strong>Dòng tồn</strong> là một biến thể ở một kho, giữ hai số:
+<ul>
+<li><code>on_hand</code>: hàng đang nằm trong kho — luôn bằng tổng sổ biến động của dòng, không bao giờ dưới 0;</li>
+<li><code>available</code>: hàng còn bán được — <code>on_hand</code> trừ hàng đang giữ cho đơn. Có thể dưới 0 khi hàng ra khỏi kho mà
+tồn đã giữ hết (vd hàng hỏng) hay khi sản phẩm cho bán khi hết hàng.
+<code>reserved</code> (<code>on_hand − available</code>) được tính, không lưu.</li>
+</ul>
+</li>
+<li><strong>Sổ biến động</strong> (<code>GET /movements</code>) chỉ thêm: <code>receipt</code>, <code>sale</code>, <code>return</code>, <code>adjustment</code>, <code>count</code>, <code>transfer_out</code>,
+<code>transfer_in</code>, <code>expiry</code>, <code>supplier_return</code>. Sai thì sửa bằng một lần điều chỉnh mới.</li>
+<li>Số tồn chỉ đổi bằng một câu <code>UPDATE</code> có điều kiện (<code>rows::adjust</code>), không bao giờ đọc rồi ghi.</li>
+</ul>
+<h2 id="điều-chỉnh-tồn"><a class="header" href="#điều-chỉnh-tồn">Điều chỉnh tồn</a></h2>
+<p><code>POST /adjustments</code> (<code>inventory.adjust</code>) đổi tồn ở một kho:</p>
+<pre><code class="language-json">{
+  "org_id": "…kho…",
+  "reference": "ADJ-2026-0042",
+  "lines": [
+    {"variant_id": "…", "quantity": -2, "reason_code": "damaged", "note": "Rơi vỡ"},
+    {"variant_id": "…", "quantity": 50, "reason_code": "found",
+     "unit_cost": {"amount": "120000", "currency": "VND"}}
+  ]
+}
+</code></pre>
+<ul>
+<li>Mỗi dòng cần một lý do trong danh sách lý do <code>inventory.adjustment</code> của khách
+(<code>GET /api/v1/kernel/reasons/inventory.adjustment</code>); mã có sẵn: <code>damaged</code>, <code>lost</code>, <code>found</code>, <code>data_entry_fix</code>,
+<code>sample_use</code>, <code>expired</code>, <code>count_variance</code>. Khách đổi nhãn, thứ tự, tắt và thêm mã.</li>
+<li><code>reference</code> giúp gọi lại an toàn: cùng mã và cùng nội dung trả lại lần điều chỉnh đã làm (<code>200</code>); cùng mã, khác
+nội dung là <code>reference_reused</code>.</li>
+<li><code>on_hand</code> không bao giờ dưới 0 (<code>inventory.insufficient_stock</code>).</li>
+<li>Dòng dương có thể kèm <code>unit_cost</code> (vd tồn đầu kỳ); giá này cập nhật giá vốn bình quân.</li>
+</ul>
+<h2 id="giá-vốn-bình-quân"><a class="header" href="#giá-vốn-bình-quân">Giá vốn bình quân</a></h2>
+<p>Mỗi dòng tồn giữ giá vốn đơn vị bình quân gia quyền cho báo cáo lãi gộp: khi hàng có giá nhập vào,
+<code>(tồn × giá cũ + số nhập × giá nhập) / (tồn + số nhập)</code>, làm tròn nửa lên xa số 0 về đơn vị nhỏ nhất của tiền tệ.
+Không còn tồn thì giá vốn bằng giá nhập. Hàng vào không có giá (trả về, tìm thấy) giữ nguyên giá vốn. Giá vốn đổi thì
+phát <code>inventory.cost_changed</code> (<code>catalog</code> dùng cho sàn giá).</p>
+<h2 id="điểm-đặt-hàng-lại-và-cảnh-báo"><a class="header" href="#điểm-đặt-hàng-lại-và-cảnh-báo">Điểm đặt hàng lại và cảnh báo</a></h2>
+<p><code>PATCH /levels/{id}</code> (<code>inventory.settings.manage</code>) đặt <code>reorder_point</code>. <code>inventory.low_stock</code> phát một lần khi
+<code>available</code> đi từ trên điểm đặt hàng lại xuống bằng hay dưới nó; <code>inventory.out_of_stock</code> khi đi từ trên 0 xuống 0
+hay dưới. <code>GET /levels?below_reorder=true</code> và tool MCP <code>inventory.list_low_stock</code> liệt kê các dòng đó.</p>
+<h2 id="giữ-chỗ-cho-đơn-hàng"><a class="header" href="#giữ-chỗ-cho-đơn-hàng">Giữ chỗ (cho đơn hàng)</a></h2>
+<p>Module <code>orders</code> giữ hàng qua <code>autoxide_inventory::api::Inventory</code>:</p>
+<ol>
+<li><code>reserve</code> — giữ mọi dòng của đơn hoặc không gì, tới <code>expires_at</code> (tối đa <code>AUTOXIDE_INVENTORY_MAX_HOLD_HOURS</code>). Gọi
+lại cùng <code>order_id</code> và cùng nội dung trả lại chỗ giữ cũ; khác nội dung là <code>reference_reused</code>. Combo trừ từng thành
+phần; hàng số và dịch vụ được bỏ qua. Biến thể bán <code>backorder</code> hay <code>preorder</code> được giữ làm <code>available</code> âm
+(<code>backordered</code>).</li>
+<li><code>confirm</code> — đơn đã đặt: chỗ giữ không còn hạn.</li>
+<li><code>fulfil</code> — xuất một phần hay hết số đã giữ (<code>fulfilment_key</code> để gọi lại an toàn); ghi dòng sổ <code>sale</code>.
+Có module <code>orders</code> thì hàng rời kho khi tới tay người mua: <code>inventory</code> nghe <code>orders.fulfillment_delivered</code>
+(một lần giao; khoá <code>fulfillment:&lt;id&gt;</code>) và <code>orders.order_delivered</code> (khoá <code>order:&lt;id&gt;:delivered</code>), nên <code>on_hand</code>
+và <code>reserved</code> giảm, đơn thành <code>fulfilled</code>. Hàng đang trên đường vẫn giữ (đã trừ khỏi <code>available</code>). Mỗi dòng của
+event mang <code>delivered_quantity</code> — số đơn vị của dòng đã tới tay người mua tính tới lúc đó — và <code>inventory</code> xuất
+dòng <strong>tới đúng</strong> tổng đó, không quá phần còn giữ: event tới hai lần, tới muộn, sai thứ tự, hay sau khi đã xuất
+tay bằng <code>fulfil</code> lúc gửi kiện cũng không xuất thừa. Vì hàng đã đi rồi, đường này còn:
+<ul>
+<li>lấy lô đã quá hạn khi lô còn hạn không đủ (ghi cảnh báo trong log);</li>
+<li>xuất cả đơn vị mà hệ thống đã tự trả chỗ giữ (hết hạn giữ, hay thanh toán lỗi — vd chuyển khoản tới sau khi
+hết hạn giữ): dòng <code>sale</code> trừ thẳng <code>on_hand</code> và <code>available</code>. Chỗ giữ do nhân viên trả
+(<code>POST /reservations/{id}/release</code>) hay do huỷ đơn thì không bao giờ xuất lại;</li>
+<li>xuất hàng theo serial bằng các số serial đã ghi ở dòng đơn
+(<code>POST /api/v1/orders/{id}/lines/{line_id}/serials</code>), mỗi số ở đúng kho đang giữ số đó. Đơn vị chưa có số dùng
+được (chưa ghi, hay số không còn ở kho nào đang giữ dòng) vẫn giữ (ghi cảnh báo trong log) trong khi các dòng
+khác được xuất; ghi serial sau đó (<code>orders.line_serials_recorded</code>) sẽ xuất nốt.
+<code>fulfil</code> gọi tay không làm ba điều trên. Một event xuất trong một transaction: một dòng của nó bị từ chối (vd
+tồn đã hết) thì không dòng nào của event được xuất. Đơn đã giao mà không xuất được (không có chỗ giữ cho hàng
+theo dõi tồn, hay bị từ chối) thì <code>inventory</code> ghi cảnh báo kèm <code>code</code> của lỗi và đếm
+<code>inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}</code>. Đối soát tay: trả chỗ giữ
+(<code>POST /api/v1/inventory/reservations/{id}/release</code>; chỗ giữ do nhân viên trả không bao giờ xuất lại, nên event
+sau của đơn — như ghi serial sau — không trừ kho lần hai), rồi ghi số đã bán bằng lệnh điều chỉnh
+(<code>POST /api/v1/inventory/adjustments</code>, số âm, lý do <code>data_entry_fix</code>).
+Nâng cấp từ bản trước: đơn đã giao trước bản này giữ chỗ <code>confirmed</code> mãi (đơn vị vẫn <code>reserved</code>). Liệt kê bằng
+<code>GET /api/v1/inventory/reservations?status=confirmed</code> và đối soát từng đơn đã giao như trên (trả chỗ giữ, rồi
+điều chỉnh).</li>
+</ul>
+</li>
+<li><code>release</code> — trả phần chưa xuất (huỷ đơn, thanh toán lỗi…). Trả hai lần chỉ cộng lại một lần.</li>
+<li><code>restock</code> — nhập lại hàng trả về (<code>reference</code> như <code>return:&lt;id&gt;</code>); dòng không bán lại được chỉ được ghi nhận.</li>
+</ol>
+<p>Chỗ giữ chưa xác nhận quá <code>expires_at</code> được job <code>inventory.expire_reservations</code> (mỗi phút) trả lại. Mỗi phần giữ trừ
+tồn bằng một câu <code>UPDATE</code> có điều kiện, theo thứ tự cố định, nên 100 người cùng mua cái cuối chỉ đúng một người được.</p>
+<h3 id="hàng-đặt-trước"><a class="header" href="#hàng-đặt-trước">Hàng đặt trước</a></h3>
+<p>Biến thể bán theo <code>preorder</code> giữ chỗ được trước khi có hàng. Khi biến thể có <code>preorder_limit</code> (khai ở <code>catalog</code>), tổng
+đặt trước đang giữ và đã xác nhận không bao giờ vượt giới hạn, kể cả khi nhiều người đặt cùng lúc: người đặt thừa nhận
+409 <code>inventory.preorder_sold_out</code>. Huỷ hoặc hết hạn đặt trước thì trả lại suất.</p>
+<p>Khi hàng về kho có đơn đặt trước đang chờ (nhập hàng, chuyển kho, trả về, điều chỉnh tăng), job
+<code>inventory.allocate_preorders</code> chia hàng rảnh cho các dòng đặt trước <strong>theo thứ tự đặt</strong> và phát
+<code>inventory.preorder_allocated</code> cho từng dòng (<code>quantity</code> lần này, <code>allocated_quantity</code> cộng dồn) để <code>orders</code> chuyển đơn
+sang bước tiếp. Chạy lại job không bao giờ chia hai lần.</p>
+<p>Quản trị xem chỗ giữ bằng <code>GET /reservations</code> (<code>inventory.reservations.read</code>) và gỡ chỗ bị kẹt bằng
+<code>POST /reservations/{id}/release</code> (<code>inventory.adjust</code>; ghi lại người gỡ).</p>
+<p>Module <code>inventory</code> cũng nghe <code>orders.order_confirmed</code>, <code>orders.order_cancelled</code> và <code>orders.return_received</code> (khi
+đã cài module <code>orders</code>) và chạy đúng các hàm đó, nên event đến trước hay sau lời gọi trực tiếp, hay đến hai lần, chỉ
+đổi tồn một lần. Module cũng nghe <code>orders.preorder_cancelled</code>: chỉ trả các dòng đặt trước bị huỷ của một đơn vẫn
+còn hiệu lực (tồn và suất đặt trước của các dòng đó trở lại; phần còn lại của đơn vẫn được giữ), mỗi event đúng một
+lần kể cả khi được giao lại.</p>
+<h2 id="chọn-kho"><a class="header" href="#chọn-kho">Chọn kho</a></h2>
+<p><code>PUT /sources/{cửa hàng}</code> khai các kho phục vụ một cửa hàng hay kênh, theo <code>priority</code>; không khai thì cửa hàng bán tồn
+của chính nó. <code>PUT /settings/{cửa hàng}</code>:</p>
+<ul>
+<li><code>prefer_nearby</code> — kho cùng tỉnh với người mua trước (tỉnh lấy từ hồ sơ công khai của nút ở module <code>organizations</code>);</li>
+<li><code>allow_split</code> — chia đơn cho nhiều kho khi không kho nào đủ mọi dòng (mặc định tắt: một đơn một kho).</li>
+</ul>
+<p>Giữ chỗ thử trước một kho đủ mọi dòng; không có kho ứng viên nào thì trả <code>inventory.no_source</code>, không đủ hàng thì
+<code>inventory.insufficient_stock</code> nêu từng dòng.</p>
+<h2 id="chuyển-kho"><a class="header" href="#chuyển-kho">Chuyển kho</a></h2>
+<p><code>POST /transfers</code> (<code>inventory.transfer</code> ở kho gửi) tạo phiếu nháp có số như <code>CK-2026-000001</code>.
+<code>POST /transfers/{id}/ship</code> lấy hàng khỏi kho gửi (chỉ hàng chưa giữ cho đơn) và cộng vào <code>incoming</code> của kho nhận;
+<code>POST /transfers/{id}/receive</code> (ở kho nhận) nhận hết hay một phần — giá vốn bình quân của kho nhận dùng giá vốn của kho
+gửi lúc gửi. <code>close</code> bỏ phần không tới; <code>cancel</code> cho phiếu nháp. Tool MCP <code>inventory.create_transfer</code>,
+<code>inventory.receive_transfer</code>.</p>
+<h2 id="kiểm-kê"><a class="header" href="#kiểm-kê">Kiểm kê</a></h2>
+<p><code>POST /counts</code> (<code>inventory.count</code>) mở phiếu kiểm kê (<code>KK-…</code>) cho một kho; <code>PUT /counts/{id}/lines</code> hay
+<code>POST /counts/{id}/import</code> (CSV có <code>sku</code>, <code>counted</code>, <code>reason_code</code> tuỳ chọn) ghi số đếm. Mỗi dòng giữ <code>on_hand</code> lúc đếm
+dòng đó, nên vẫn bán được trong lúc kiểm. <code>POST /counts/{id}/apply</code> (<code>inventory.adjust</code>) ghi mỗi chênh lệch
+<code>counted − expected_at_count</code> thành dòng sổ <code>count</code> kèm lý do (mặc định <code>count_variance</code>).</p>
+<h2 id="lô-hạn-dùng-và-số-serial"><a class="header" href="#lô-hạn-dùng-và-số-serial">Lô, hạn dùng và số serial</a></h2>
+<p>Bật theo sản phẩm ở <code>catalog</code> (<code>lot_tracked</code>, <code>serial_tracked</code>).</p>
+<ul>
+<li>Thêm hàng của biến thể theo dõi lô cần <code>lot_code</code> (và <code>expires_on</code>). Giữ chỗ ở mức dòng tồn; lô chọn lúc hàng ra: lô
+được nêu, không thì lô hết hạn trước, rồi tới hàng không gắn lô — không bao giờ lấy lô đã hết hạn
+(<code>inventory.lot_unavailable</code>).</li>
+<li><code>GET /lots?expiry_state=ok|expiring|expired</code>: <code>expiring</code> là trong số ngày của cài đặt theo nút
+<code>inventory.expiring_days</code> (mặc định 30). Job hằng ngày trừ lô quá hạn khỏi tồn (dòng sổ <code>expiry</code>, event
+<code>inventory.lot_expired</code>).</li>
+<li>Biến thể theo dõi serial cần đúng một số serial cho mỗi đơn vị khi thêm, xuất (<code>FulfilLine::serials</code>), điều chỉnh
+giảm hay chuyển kho; một serial chỉ bán được một lần, kể cả khi hai lần xuất chạy cùng lúc.</li>
+<li>Chuyển kho mang theo lô và serial: kho nhận có cùng mã lô và hạn dùng.</li>
+</ul>
+<h2 id="nhập-hàng"><a class="header" href="#nhập-hàng">Nhập hàng</a></h2>
+<ul>
+<li><code>POST /suppliers</code> (<code>inventory.purchasing.manage</code>): nhà cung cấp thuộc một nút mua hàng; <code>GET /suppliers</code> có <code>payable</code>
+— nút đó đang nợ từng nhà cung cấp bao nhiêu, đọc từ module <code>ledger</code> (không có thì vắng).</li>
+<li>Đơn đặt hàng (<code>PO-…</code>): nháp → <code>POST /purchase-orders/{id}/order</code> (hàng tính vào <code>incoming</code>) → phiếu nhập, nhận từng
+phần → <code>close</code> (phần không về rời <code>incoming</code>) hay <code>cancel</code>.</li>
+<li><code>POST /receipts</code> (<code>inventory.receive</code>, <code>PN-…</code>): theo đơn đặt hàng (không quá số đặt) hay nhập thẳng; mỗi dòng cập nhật
+giá vốn bình quân và có thể kèm lô, serial. Có nhà cung cấp và module <code>ledger</code> thì một job ghi Nợ <code>inventory.stock</code> /
+Có <code>payable.supplier</code> đúng một lần (<code>ledger_status</code>: <code>pending</code>, <code>posted</code>, <code>failed</code> — ghi lại bằng
+<code>POST /receipts/{id}/retry-ledger</code> — hay <code>not_applicable</code>). Tool MCP <code>inventory.create_receipt</code>.</li>
+<li><code>POST /supplier-returns</code> (<code>TH-…</code>): trả hàng cho nhà cung cấp theo giá vốn bình quân hiện tại (hay giá nêu); bút toán
+được đảo lại.</li>
+</ul>
+<h2 id="tình-trạng-hàng-công-khai"><a class="header" href="#tình-trạng-hàng-công-khai">Tình trạng hàng công khai</a></h2>
+<p><code>GET /api/v1/inventory/public/availability?variant_ids=&lt;id&gt;,&lt;id&gt;&amp;store_id=&lt;nút&gt;</code> không cần đăng nhập. Với mỗi biến thể
+(1 đến 100 mỗi lần) và cửa hàng, trả một mức:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Mức</th><th>Nghĩa</th></tr>
+</thead>
+<tbody>
+<tr><td><code>in_stock</code></td><td>Đủ bán; không bao giờ hiện số</td></tr>
+<tr><td><code>low</code></td><td>Còn dưới <code>AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD</code> (5); <code>quantity</code> cho biết còn bao nhiêu</td></tr>
+<tr><td><code>out</code></td><td>Hiện không còn để bán</td></tr>
+<tr><td><code>preorder</code></td><td>Chưa có hàng, bán theo <code>preorder</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Cửa hàng bán từ các kho nguồn của nó (hay tồn của chính nó): bật <code>allow_split</code> thì cộng các kho, không thì lấy kho nhiều
+nhất, như khi giữ chỗ. Combo tính số bộ ráp được từ thành phần; biến thể không theo dõi tồn luôn <code>in_stock</code>. Biến thể
+không có hay đang ẩn bị bỏ qua. Bỏ <code>store_id</code> thì liệt kê mọi cửa hàng nhận hàng tại chỗ. Câu trả lời đổi ngay khi có
+giữ chỗ; có <code>ETag</code> (gửi lại trong <code>If-None-Match</code> để nhận 304) và <code>Cache-Control: public, max-age=5</code>. Module <code>catalog</code>
+lọc “còn hàng ở cửa hàng X” bằng cùng cách tính (<code>Inventory::in_stock_at</code>).</p>
+<h2 id="báo-khi-có-hàng-lại"><a class="header" href="#báo-khi-có-hàng-lại">Báo khi có hàng lại</a></h2>
+<p>Người mua xin được báo khi một món có lại ở cửa hàng (cần module <code>notifications</code>):</p>
+<ol>
+<li><code>POST /api/v1/inventory/public/restock-alerts</code> với <code>variant_id</code>, <code>store_id</code> (bỏ đi cho cửa hàng online), <code>email</code>
+hoặc <code>phone</code>, và <code>consent: true</code> (kèm <code>consent_text</code> đã hiện, giữ làm bằng chứng). Khách chưa đăng nhập gửi
+<code>form_token</code> lấy từ <code>GET /api/v1/antispam/token?scope=inventory:restock_alerts</code>. Người mua đã đăng nhập có thể không
+nêu liên lạc: báo vào tài khoản ngay. Câu trả lời luôn là cùng một <code>202</code>.</li>
+<li>Khách vãng lai nhận tin có link tới trang <code>AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL</code> của bạn (<code>{token}</code> được thay);
+trang gửi token về <code>POST /api/v1/inventory/public/restock-alerts/confirm</code>.</li>
+<li>Khi cửa hàng bán được món đó trở lại, mỗi đăng ký đã xác nhận nhận <strong>một</strong> tin (<code>inventory.back_in_stock</code>) cho mỗi
+lần có hàng lại, không bao giờ hai lần cho cùng một đợt. Mỗi tin lại có link tới trang; gửi token của nó về
+<code>POST /api/v1/inventory/public/restock-alerts/stop</code> để dừng.</li>
+</ol>
+<p>Tin là tin giao dịch (người nhận tự xin và đã xác nhận, không quảng cáo). Module <code>customers</code> hỏi
+<code>Inventory::restock_alerts_of</code> để không báo trùng cho người mua cùng một món.</p>
+<h2 id="kiểm-số-liệu"><a class="header" href="#kiểm-số-liệu">Kiểm số liệu</a></h2>
+<p><code>autoxide task inventory.verify_levels [tenant=&lt;slug&gt;] [org_id=&lt;nút&gt;]</code> so mọi dòng tồn với sổ và chỗ giữ của nó,
+chỉ báo, không sửa. <code>autoxide doctor</code> chạy cùng phép kiểm trên mẫu 1.000 dòng mỗi khách.</p>
+<h2 id="permission"><a class="header" href="#permission">Permission</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Permission</th><th>Cho phép</th></tr>
+</thead>
+<tbody>
+<tr><td><code>inventory.read</code></td><td>Xem dòng tồn, sổ, lô, giá trị tồn</td></tr>
+<tr><td><code>inventory.adjust</code></td><td>Điều chỉnh, áp dụng kiểm kê, gỡ chỗ giữ bị kẹt</td></tr>
+<tr><td><code>inventory.receive</code></td><td>Phiếu nhập</td></tr>
+<tr><td><code>inventory.transfer</code></td><td>Gửi và nhận phiếu chuyển kho</td></tr>
+<tr><td><code>inventory.count</code></td><td>Kiểm kê</td></tr>
+<tr><td><code>inventory.reservations.read</code></td><td>Chỗ giữ hàng của đơn</td></tr>
+<tr><td><code>inventory.settings.manage</code></td><td>Điểm đặt hàng lại, kho phục vụ, cài đặt cửa hàng</td></tr>
+<tr><td><code>inventory.purchasing.read</code> / <code>.manage</code></td><td>Nhà cung cấp, đơn đặt hàng, trả hàng nhà cung cấp</td></tr>
+</tbody>
+</table>
+</div>
+<p>Mọi permission theo nút tổ chức: người có grant <code>unit</code> ở kho A chỉ thấy và đổi kho A.</p>
+<h2 id="gói"><a class="header" href="#gói">Gói</a></h2>
+<p>Hạn mức <code>inventory.warehouses</code> (số nút giữ tồn); tính năng <code>inventory.multi_warehouse</code>, <code>inventory.transfers</code>,
+<code>inventory.lots</code>, <code>inventory.serials</code>, <code>inventory.purchasing</code>.</p>
+<h2 id="cấu-hình"><a class="header" href="#cấu-hình">Cấu hình</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Biến</th><th>Mặc định</th><th>Nghĩa</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_INVENTORY_MAX_HOLD_HOURS</code></td><td><code>72</code></td><td>Thời gian giữ hàng dài nhất của đơn chưa trả tiền</td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_EXPIRE_BATCH</code></td><td><code>200</code></td><td>Số chỗ giữ quá hạn trả mỗi lần chạy job</td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_MAX_LINES_PER_RESERVATION</code></td><td><code>200</code></td><td>Số dòng mỗi chỗ giữ</td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD</code></td><td><code>5</code></td><td>Dưới số này tình trạng công khai là <code>low</code></td></tr>
+<tr><td><code>AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL</code></td><td>—</td><td>Trang của website cho link báo có hàng lại, có <code>{token}</code></td></tr>
+</tbody>
+</table>
+</div>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/GETTING-STARTED.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/MEDIA.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/GETTING-STARTED.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/MEDIA.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Connecting MCP clients with OAuth sign-in - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="connecting-mcp-clients-with-oauth-sign-in"><a class="header" href="#connecting-mcp-clients-with-oauth-sign-in">Connecting MCP clients with OAuth sign-in</a></h1>
+<p>Vietnamese: <a href="mcp-oauth.vi.html"><code>mcp-oauth.vi.md</code></a>.</p>
+<p>With OAuth sign-in on, a person adds your server to Claude, ChatGPT, an IDE or any MCP client by its address alone. The client opens a browser, the person signs in to <strong>your interface</strong> and picks what the client may do, and the client receives tokens that never carry more than that. Nobody copies or pastes a key. Without OAuth, clients still connect with an API key (<a href="mcp.html">Connecting an AI agent over MCP</a>).</p>
+<p>Autoxide follows the <a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization">MCP authorization specification</a> (2026-07-28): OAuth 2.1 with PKCE, Protected Resource Metadata (RFC 9728), Authorization Server Metadata (RFC 8414), resource indicators (RFC 8707), client metadata documents and, for older clients, dynamic client registration (RFC 7591).</p>
+<h2 id="1-turn-it-on"><a class="header" href="#1-turn-it-on">1. Turn it on</a></h2>
+<p>OAuth sign-in is on when both of these are set:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Setting</th><th>Value</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_HTTP_PUBLIC_URL</code></td><td>The address clients reach your server at, <strong>without a path</strong>, e.g. <code>https://api.example.com</code>. It is the OAuth issuer. With a path (<code>https://example.com/api</code>) OAuth stays off and the log says why.</td></tr>
+<tr><td><code>AUTOXIDE_AUTH_OAUTH_CONSENT_URL</code></td><td>The page of your interface where a signed-in person approves a client, with <code>{token}</code> where the request token goes, e.g. <code>https://app.example.com/connect?request={token}</code>.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Optional:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Setting</th><th>Default</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_AUTH_OAUTH_DYNAMIC_REGISTRATION</code></td><td><code>true</code></td><td>Let clients register themselves at <code>POST /api/v1/auth/oauth/register</code>. MCP 2026-07-28 deprecates this in favour of client metadata documents; keep it on while the clients you care about still use it.</td></tr>
+<tr><td><code>AUTOXIDE_AUTH_OAUTH_GRANT_DAYS</code></td><td><code>90</code></td><td>How long an approval lasts at most (1–365 days). The person approving can choose less. Afterwards the client asks again.</td></tr>
+<tr><td><code>AUTOXIDE_AUTH_OAUTH_ALLOW_PRIVATE_NETWORKS</code></td><td><code>false</code></td><td>Fetch client metadata documents from private addresses and over <code>http://</code>. <strong>Tests only</strong>: anyone can name a client, so in production this would let them make your server call your internal network.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Check with <code>autoxide doctor</code> (the <code>mcp_oauth</code> line names the issuer, or says why OAuth is off), then:</p>
+<pre><code class="language-bash">curl -sS https://api.example.com/.well-known/oauth-protected-resource/mcp
+curl -sS https://api.example.com/.well-known/oauth-authorization-server
+</code></pre>
+<p>The first names the resource (<code>https://api.example.com/mcp</code>) and its authorization server; the second lists the endpoints (<code>/api/v1/auth/oauth/authorize</code>, <code>/token</code>, <code>/revoke</code>, <code>/register</code>). While OAuth is off both answer <code>404</code> with code <code>oauth_unavailable</code>.</p>
+<p>Clients that run in someone else’s cloud (Claude and ChatGPT on the web) reach your server from the internet: <code>AUTOXIDE_HTTP_PUBLIC_URL</code> must be an <code>https://</code> address they can open. A client on the same machine (an IDE, Claude Code) can use a local address.</p>
+<h2 id="2-what-happens-when-a-client-connects"><a class="header" href="#2-what-happens-when-a-client-connects">2. What happens when a client connects</a></h2>
+<ol>
+<li>The client calls <code>/mcp</code> without a token and gets <code>401</code> with <code>WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp"</code>. From there it finds the authorization server.</li>
+<li>The client identifies itself: by a <strong>client metadata document</strong> (its <code>client_id</code> is an <code>https://</code> URL of a JSON document the server fetches), or by registering at <code>/register</code>.</li>
+<li>The client opens the browser at <code>/api/v1/auth/oauth/authorize</code> with PKCE (<code>S256</code>). The server checks every parameter and sends the browser to your consent page with a request token. Any parameter error answers <code>400</code> right there and never redirects back to the client.</li>
+<li>On the consent page the person signs in (if needed), sees who is asking and chooses permissions. The page approves or denies through the API, and the browser goes back to the client with a code.</li>
+<li>The client exchanges the code at <code>/token</code> and calls <code>/mcp</code> with <code>Authorization: Bearer axo1_…</code>.</li>
+</ol>
+<p>Tokens:</p>
+<ul>
+<li>The access token (<code>axo1_…</code>) is short-lived; the refresh token (<code>axr1_…</code>) gives a new pair once and is then used up. Clients must refresh <strong>one at a time</strong>: sending an old refresh token again (or two refreshes at once) is treated as theft and revokes the approval.</li>
+<li>A client for <code>/mcp</code> may also use <code>/mcp/&lt;module&gt;</code>. REST at <code>/api/v1</code> is a separate resource the client must ask for (<code>resource=https://api.example.com/api/v1</code>).</li>
+<li>The client acts as the person, with kind <code>agent</code>, never with more than the approved permissions <strong>and</strong> what the person can do right now. If the person loses a permission, the client loses it too.</li>
+<li><code>tools/list</code> shows only the tools the approval allows. Calling something the person could do but did not approve answers <code>403</code> with <code>WWW-Authenticate: Bearer error="insufficient_scope", scope="…"</code>, so the client can ask for more.</li>
+</ul>
+<p>Only staff accounts approve clients (customers of a shop cannot). The approval belongs to the tenant the person was signed in to on the consent page.</p>
+<h2 id="3-the-consent-page-of-your-interface"><a class="header" href="#3-the-consent-page-of-your-interface">3. The consent page of your interface</a></h2>
+<p>Autoxide has no web pages of its own: the consent page lives in your interface, at the address in <code>AUTOXIDE_AUTH_OAUTH_CONSENT_URL</code>. It needs a <strong>signed-in session of the person</strong> (password, passkey, single sign-on…). An API key or an OAuth token cannot read or decide requests (<code>403 auth.session_required</code>), so a client can never approve itself.</p>
+<ol>
+<li>
+<p><strong>Keep the request token.</strong> Read <code>request</code> from the address. If the person is not signed in, sign them in first and come back with the token. Requests wait 10 minutes.</p>
+</li>
+<li>
+<p><strong>Show the request</strong>: <code>GET /api/v1/auth/oauth/requests/{token}</code>.</p>
+<pre><code class="language-json">{
+  "data": {
+    "client_id": "https://client.example.com/oauth/metadata.json",
+    "client_host": "client.example.com",
+    "client_name": "Example assistant",
+    "registration": "cimd",
+    "redirect_uri": "https://client.example.com/oauth/callback",
+    "redirect_host": "client.example.com",
+    "localhost_redirect": false,
+    "resource": "https://api.example.com/mcp",
+    "requested_scope": ["content.*"],
+    "permissions": [
+      {"name": "content.read", "description": "…", "risk": "read", "requested": true},
+      {"name": "content.write_own", "description": "…", "risk": "write", "requested": true}
+    ],
+    "current_permissions": null,
+    "expires_at": "2026-11-27T10:10:00Z"
+  }
+}
+</code></pre>
+<ul>
+<li>Show <code>client_host</code> and <code>redirect_host</code> prominently. <code>client_name</code> is chosen by the client and not verified: show it next to the host, never alone.</li>
+<li><code>registration</code> is <code>cimd</code> (metadata document: the host really published it) or <code>dynamic</code> (self-registered: anyone could have chosen that name).</li>
+<li>When <code>localhost_redirect</code> is <code>true</code>, warn: the code goes back to a program on this device, and any program there could pretend to be this client.</li>
+<li><code>permissions</code> are the ones the person holds, narrowed to what the client asked for. Pre-select those with <code>requested: true</code>; let the person untick any. A prefix such as <code>content.*</code> is only a request: the approval stores the exact names chosen, so permissions added to the server later never slip into an old approval.</li>
+<li><code>current_permissions</code> is the person’s existing approval of this client for this resource, if any.</li>
+</ul>
+</li>
+<li>
+<p><strong>Approve</strong>: <code>POST /api/v1/auth/oauth/requests/{token}/approve</code> with</p>
+<pre><code class="language-json">{"permissions": ["content.read", "content.write_own"], "days": 30}
+</code></pre>
+<p><code>days</code> is optional (default and maximum: <code>AUTOXIDE_AUTH_OAUTH_GRANT_DAYS</code>). A permission whose <code>risk</code> is <code>destructive</code>, <code>sensitive_data</code> or <code>money</code> also needs <code>"reauth_token"</code> from <code>POST /api/v1/auth/me/reauth</code> (the person confirms with their password, a passkey or a code); without it the answer is <code>422</code> and the request keeps waiting.</p>
+</li>
+<li>
+<p><strong>Or deny</strong>: <code>POST /api/v1/auth/oauth/requests/{token}/deny</code>.</p>
+</li>
+<li>
+<p><strong>Send the browser on</strong>: both answer <code>{"data": {"redirect_to": "…"}}</code>. Set <code>window.location</code> to it: the client receives the code (or <code>error=access_denied</code>) with its <code>state</code> and the issuer <code>iss</code>.</p>
+</li>
+</ol>
+<h2 id="4-connecting-clients"><a class="header" href="#4-connecting-clients">4. Connecting clients</a></h2>
+<p>The address to give every client is <code>https://api.example.com/mcp</code> (or <code>/mcp/&lt;module&gt;</code> for one module’s tools only). Menu names change between versions; the client’s own documentation is the reference.</p>
+<ul>
+<li><strong>Claude</strong> (claude.ai, the desktop and mobile apps): add a custom connector with the server address. Claude opens your consent page in the browser; after approving, the tools appear in chats where the connector is enabled. Claude connects from the internet, so the address must be public <code>https://</code>.</li>
+<li><strong>Claude Code</strong>: <code>claude mcp add --transport http autoxide https://api.example.com/mcp</code>, then run <code>/mcp</code> in a session and choose to authenticate; the browser opens on this machine.</li>
+<li><strong>ChatGPT</strong>: in the settings for connectors / apps (developer mode where required), create a connector with the server address and OAuth authentication. ChatGPT also connects from the internet.</li>
+<li><strong>Other clients</strong> (IDEs, agent frameworks, the <a href="https://modelcontextprotocol.io/docs/sdk">MCP SDKs</a>): any client that implements MCP authorization works the same way: give it the address and let it open the browser. Clients that keep the redirect on the device use <code>http://127.0.0.1:&lt;any port&gt;/…</code>; the server accepts any port for <code>127.0.0.1</code> and <code>[::1]</code>, but not for the name <code>localhost</code> (RFC 8252).</li>
+</ul>
+<p>A client that cannot do OAuth still connects with an API key in the <code>Authorization</code> header (<a href="mcp.html">Connecting an AI agent over MCP</a>).</p>
+<h2 id="5-seeing-and-revoking-approvals"><a class="header" href="#5-seeing-and-revoking-approvals">5. Seeing and revoking approvals</a></h2>
+<ul>
+<li>The person: <code>GET /api/v1/auth/me/oauth-grants</code> lists their approvals (newest first, including revoked and expired); <code>DELETE /api/v1/auth/me/oauth-grants/{id}</code> revokes one. Tokens stop working at the next request.</li>
+<li>Administrators with <code>auth.oauth_grants.manage</code>: <code>GET /api/v1/auth/oauth-grants</code> and <code>DELETE /api/v1/auth/oauth-grants/{id}</code> for everyone in the tenant. Revoking (both endpoints) needs the person’s own signed-in session, working directly in their own tenant: an API key or an OAuth token gets <code>403 auth.session_required</code>.</li>
+<li>The client itself: <code>POST /api/v1/auth/oauth/revoke</code> (RFC 7009) with the access or refresh token revokes the whole approval.</li>
+<li>Automatically: locking, disabling or deleting the account, account recovery, a password change that signs out other sessions, and “sign out everywhere” revoke every approval of the person. Automation rules created through a client pause when its approval is revoked.</li>
+</ul>
+<p>Every approval and revocation is an event in the audit log (<code>auth.oauth_granted</code>, <code>auth.oauth_revoked</code>), and every change made through a client records which client acted for whom.</p>
+<h2 id="6-common-problems"><a class="header" href="#6-common-problems">6. Common problems</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Symptom</th><th>Cause and fix</th></tr>
+</thead>
+<tbody>
+<tr><td>The client says the server has no authorization / <code>/.well-known/…</code> answers <code>404 oauth_unavailable</code></td><td>OAuth is off: set <code>AUTOXIDE_HTTP_PUBLIC_URL</code> (no path) and <code>AUTOXIDE_AUTH_OAUTH_CONSENT_URL</code>, restart, check <code>autoxide doctor</code>. API endpoints answer <code>auth.oauth_disabled</code>.</td></tr>
+<tr><td>The browser shows <code>400</code> with <code>auth.oauth_client_invalid</code></td><td>The client metadata document could not be fetched or is not valid (it must be <code>https</code>, port 443, a public address, at most 5 KB, <code>client_id</code> equal to its own URL, no client secret), or dynamic registration is off and the client relies on it. The message gives the detail.</td></tr>
+<tr><td><code>400 auth.oauth_redirect_invalid</code></td><td>The client’s <code>redirect_uri</code> is not one it registered. Ports are flexible only for <code>127.0.0.1</code> / <code>[::1]</code>.</td></tr>
+<tr><td><code>400 auth.oauth_request_invalid</code></td><td>A parameter is missing or wrong (<code>code_challenge_method</code> must be <code>S256</code>, <code>resource</code> must be <code>…/mcp</code>, <code>…/mcp/&lt;module&gt;</code> or <code>…/api/v1</code> of this server).</td></tr>
+<tr><td>The consent page gets <code>404 auth.oauth_request_not_found</code></td><td>More than 10 minutes passed, or the request was already decided. Start connecting again from the client.</td></tr>
+<tr><td>The consent page gets <code>403 auth.session_required</code> / <code>auth.oauth_staff_only</code></td><td>Call with the person’s own signed-in session, not an API key; only staff accounts approve clients.</td></tr>
+<tr><td><code>422</code> on approve</td><td>A permission was not offered, <code>days</code> is outside 1 to <code>AUTOXIDE_AUTH_OAUTH_GRANT_DAYS</code>, or a sensitive permission needs <code>reauth_token</code>. The request still waits.</td></tr>
+<tr><td>The client is signed out after a while, <code>/token</code> answers <code>invalid_grant</code></td><td>The approval expired or was revoked, the person can no longer sign in, or the client refreshed twice at once (a reused refresh token revokes the approval). Connect again.</td></tr>
+<tr><td>A tool answers <code>403 insufficient_scope</code></td><td>The person has the permission but did not approve it for this client. Reconnect and approve it.</td></tr>
+<tr><td><code>auth.oauth_rate_limited</code></td><td>Too many authorization requests from one address; wait a minute.</td></tr>
+</tbody>
+</table>
+</div>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../docs/guides/list-pages-upgrade.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../../docs/guides/mcp.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../docs/guides/list-pages-upgrade.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../../docs/guides/mcp.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../../mark-09e88c2c.min.js"></script>
+        <script src="../../searcher-09f2665d.js"></script>
+
+        <script src="../../clipboard-1626706a.min.js"></script>
+        <script src="../../highlight-abc7f01d.js"></script>
+        <script src="../../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

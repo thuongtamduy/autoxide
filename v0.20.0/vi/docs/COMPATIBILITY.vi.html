@@ -1,0 +1,445 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Chính sách tương thích - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="chính-sách-tương-thích"><a class="header" href="#chính-sách-tương-thích">Chính sách tương thích</a></h1>
+<p><a href="COMPATIBILITY.html">English</a> · <strong>Tiếng Việt</strong></p>
+<p>Trang này nói bạn dựa vào được gì khi nâng cấp Autoxide, và cái gì có thể đổi. Áp dụng từ bản
+<strong>1.0.0</strong>. Trước 1.0 (<code>0.x</code>), một bản minor (<code>0.18</code> → <code>0.19</code>) được phép phá vỡ mọi hợp đồng dưới
+đây, kể cả HTTP API; mỗi chỗ phá vỡ được ghi ở mục <strong>Changed</strong> hay <strong>Removed</strong> của
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/CHANGELOG.md"><code>CHANGELOG.md</code></a> kèm việc cần làm thay thế. Từ 1.0.0 các luật dưới đây áp trọn
+vẹn: không gì trong <code>/api/v1</code> bị phá vỡ.</p>
+<p>Autoxide đánh số theo <a href="https://semver.org">Semantic Versioning</a>: một số phiên bản chung cho máy chủ,
+các crate Rust và SDK TypeScript.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Bản phát hành</th><th>Ví dụ</th><th>Được phép chứa</th></tr>
+</thead>
+<tbody>
+<tr><td>Patch</td><td><code>1.4.0 → 1.4.1</code></td><td>Sửa lỗi và vá bảo mật. Không tính năng mới, không biến cấu hình mới phải đặt.</td></tr>
+<tr><td>Minor</td><td><code>1.4.1 → 1.5.0</code></td><td>Tính năng mới, endpoint mới, biến cấu hình mới, deprecation. Không phá vỡ.</td></tr>
+<tr><td>Major</td><td><code>1.9.3 → 2.0.0</code></td><td>Thay đổi phá vỡ, mỗi cái ghi kèm cách làm thay thế.</td></tr>
+</tbody>
+</table>
+</div>
+<p>“Phá vỡ” là mọi thay đổi khiến một client, một bản cài đặt hay một module làm đúng tài liệu không
+còn chạy được nếu không sửa.</p>
+<h2 id="hợp-đồng-ổn-định-gồm-những-gì"><a class="header" href="#hợp-đồng-ổn-định-gồm-những-gì">Hợp đồng ổn định gồm những gì</a></h2>
+<p>Mọi thứ trong mục này thuộc các module hạng <strong>core</strong> và <strong>official</strong>
+(<a href="MODULES.vi.html"><code>docs/MODULES.vi.md</code></a>). Module thử nghiệm không nằm trong đó (xem
+<a href="#phần-không-cam-kết">Phần không cam kết</a>).</p>
+<h3 id="rest-api-và-openapi"><a class="header" href="#rest-api-và-openapi">REST API và OpenAPI</a></h3>
+<p>Hợp đồng là <code>docs/openapi.json</code>, phục vụ ở <code>/api/v1/openapi.json</code>.</p>
+<ul>
+<li>Trong <code>/api/v1</code> không có gì bị phá vỡ, ở bất kỳ bản nào: không bỏ hay đổi tên endpoint, không thêm
+đầu vào bắt buộc, không bỏ hay đổi kiểu trường của response, không đổi nghĩa của status code.</li>
+<li>Thay đổi sẽ làm vỡ client thì làm thành <strong>endpoint mới</strong>. Endpoint cũ chạy y như cũ và được khai
+deprecated (<code>Module::deprecations</code>): tài liệu OpenAPI đánh dấu <code>deprecated</code>, response mang header
+<code>Deprecation</code>, <code>Sunset</code> và <code>Link</code> (RFC 9745, RFC 8594) trỏ tới endpoint thay thế.</li>
+<li>Endpoint deprecated chỉ bị bỏ sau <strong>ngày sunset</strong>, ít nhất <strong>sáu tháng</strong> sau bản phát hành khai
+deprecated, và không bao giờ trong một bản patch.</li>
+<li>Bản minor được <strong>thêm</strong>: endpoint, trường tuỳ chọn của request, tham số query, trường của response,
+header, và giá trị mới trong enum của response. Client phải bỏ qua trường response không biết và
+coi giá trị enum lạ là “khác”.</li>
+<li><code>/api/v2</code> (nếu có) chỉ xuất hiện ở bản major, và <code>/api/v1</code> vẫn chạy song song ít nhất thêm một bản
+major nữa.</li>
+<li><code>cargo xtask api-diff</code> trong gate so mọi thay đổi với bản phát hành trước và đỏ khi có phá vỡ.</li>
+</ul>
+<h3 id="mã-lỗi"><a class="header" href="#mã-lỗi">Mã lỗi</a></h3>
+<p>Trường <code>code</code> của lỗi (<code>notes.title_taken</code>, <code>validation_failed</code>…) là hợp đồng với chương trình.</p>
+<ul>
+<li>Mã không bao giờ đổi tên, không bao giờ dùng lại với nghĩa khác.</li>
+<li>Request hỏng với một mã thì sau bản minor vẫn hỏng với đúng mã đó.</li>
+<li>Bản minor được thêm mã mới, cho lỗi mới. Client phải xử lý mã không biết theo HTTP status.</li>
+<li>Câu <code>message</code>, bản dịch của nó và <code>errors[].detail</code> là cho người đọc, có thể đổi ở bất kỳ bản nào.</li>
+</ul>
+<h3 id="cấu-hình"><a class="header" href="#cấu-hình">Cấu hình</a></h3>
+<p>Các biến môi trường (<code>.env.example</code> liệt kê đủ), nghĩa và giá trị mặc định của chúng.</p>
+<ul>
+<li>Không bỏ hay đổi tên biến trong bản minor. Khi buộc phải đổi tên, tên mới được thêm và <strong>tên cũ
+vẫn chạy</strong>, kèm cảnh báo trong log khởi động nêu tên mới, ít nhất một bản minor và ít nhất sáu
+tháng; tên cũ chỉ bị bỏ ở bản major.</li>
+<li>Giá trị mặc định làm đổi hành vi (vd giới hạn chặt hơn) chỉ đổi ở bản major, trừ khi để vá lỗ hổng
+bảo mật; khi đó changelog ghi ở mục <strong>Security</strong>.</li>
+<li>Biến mới luôn có mặc định, nên file <code>.env</code> sẵn có vẫn chạy.</li>
+<li><code>AUTOXIDE_MODULES</code> theo cùng luật: trong một bản major, không module nào bị chuyển từ official sang
+experimental (việc đó sẽ tắt nó theo mặc định).</li>
+</ul>
+<h3 id="database-và-migration"><a class="header" href="#database-và-migration">Database và migration</a></h3>
+<ul>
+<li>Bản mới luôn đọc được dữ liệu của bản cũ: chạy binary mới (hay <code>autoxide migrate up</code>), migration
+đưa database lên. Nâng từ <strong>bất kỳ bản 1.x</strong> lên bất kỳ bản 1.x mới hơn được ngay, không phải dừng
+ở từng bản minor. CI thử việc nâng cấp từ bản phát hành trước trên cả SQLite và PostgreSQL.</li>
+<li>Migration đã phát hành không bao giờ bị sửa; thay đổi đi bằng migration mới.</li>
+<li>Mọi migration có bước <code>down</code>, nên quay về được bản trước: dùng binary <strong>mới</strong>, chạy
+<code>autoxide migrate down &lt;module&gt; --steps &lt;n&gt;</code> cho các migration nó thêm (changelog và
+<code>autoxide migrate status</code> cho biết là những cái nào), rồi chạy binary cũ. Backup trước; đi xuống có
+thể bỏ dữ liệu mà chỉ bản mới lưu.</li>
+<li>SQLite và PostgreSQL đều được hỗ trợ ở mọi bản. Một bản major của PostgreSQL mà dự án PostgreSQL đã
+ngừng bảo trì có thể thôi được hỗ trợ ở một bản minor, báo trước trong changelog một bản minor.</li>
+<li>Bản thân các bảng <strong>không</strong> là hợp đồng: chúng thuộc module của mình và có thể đổi hình dạng ở bất
+kỳ bản nào. Đọc và ghi dữ liệu qua API, không bằng SQL.</li>
+</ul>
+<h3 id="tool-mcp"><a class="header" href="#tool-mcp">Tool MCP</a></h3>
+<p>Danh sách tool (<code>docs/mcp-tools.json</code>, do MCP endpoint phục vụ) theo luật của REST: tool giữ tên,
+nhận mọi đầu vào nó từng nhận và trả mọi trường nó từng trả. Tool phải đổi thì làm tool mới và khai
+tool cũ deprecated kèm ngày sunset (<code>Deprecation::tool</code>), ít nhất sáu tháng. Tool không bao giờ cần
+permission rộng hơn trước.</p>
+<h3 id="event-và-webhook"><a class="header" href="#event-và-webhook">Event và webhook</a></h3>
+<p>Tên event và các trường trong payload (thứ module nhận và webhook gửi đi) được thêm trường ở bản
+minor, nhưng không bao giờ mất hay đổi kiểu một trường. Event phải đổi hình dạng thì phát dưới tên
+mới, và event cũ vẫn được phát tới bản major kế tiếp.</p>
+<h3 id="dòng-lệnh"><a class="header" href="#dòng-lệnh">Dòng lệnh</a></h3>
+<p>Các lệnh và tuỳ chọn <code>autoxide</code> có trong tài liệu, mã thoát của chúng và đầu ra của tuỳ chọn <code>--json</code>
+theo luật như cấu hình: thêm ở bản minor, bỏ hay đổi chỉ ở bản major. Chữ in ra cho người đọc có thể
+đổi.</p>
+<h3 id="rust-api-cho-module"><a class="header" href="#rust-api-cho-module">Rust API cho module</a></h3>
+<p>Với người viết module ở repo riêng (<a href="guides/writing-a-module.vi.html">hướng dẫn</a>), hợp đồng là phần
+Rust công khai của:</p>
+<ul>
+<li><code>autoxide-kernel</code> và <code>autoxide-testkit</code>;</li>
+<li><code>autoxide::Autoxide</code>, thứ công khai duy nhất của crate <code>autoxide</code>;</li>
+<li><code>pub mod api</code> và <code>pub fn module(…)</code> của mọi crate module hạng core và official.</li>
+</ul>
+<p>Luật, theo <a href="https://doc.rust-lang.org/cargo/reference/semver.html">hướng dẫn SemVer của Cargo</a>:</p>
+<ul>
+<li>Thay đổi phá vỡ (bỏ hay đổi tên thứ công khai, đổi chữ ký hàm, thêm method bắt buộc vào trait mà
+không có mặc định, …) chỉ có ở bản <strong>major</strong>.</li>
+<li>Trước khi bị bỏ, một thứ được đánh dấu <code>#[deprecated]</code> kèm ghi chú nêu thứ thay thế, ít nhất một bản
+minor.</li>
+<li>Tính năng mới cho module đến dưới dạng method mới của trait <strong>có cài đặt mặc định</strong>, nên module sẵn
+có biên dịch được mà không phải sửa.</li>
+<li><code>cargo-semver-checks</code> so các crate này với bản phát hành trước ở mọi pull request chạm vào chúng và
+ở mọi pull request phát hành; từ 1.0, có phá vỡ thì kiểm tra đỏ.</li>
+<li>Các thư viện có kiểu lộ ra trong API này (<code>axum</code>, <code>sea-orm</code>, <code>utoipa</code>, <code>tokio</code>, <code>serde</code>… — bảng ở
+<a href="MODULE_GUIDE.vi.html#độ-ổn-định-của-hợp-đồng-module"><code>docs/MODULE_GUIDE.vi.md</code></a>) là một phần của
+nó: đưa một thư viện trong đó lên phiên bản lớn mới là thay đổi phá vỡ, nên phải chờ bản major.</li>
+<li>Phiên bản Rust tối thiểu theo bản Rust ổn định gần đây (<code>rust-toolchain.toml</code>). Nâng nó chỉ ở bản
+minor, không bao giờ ở bản patch, và có ghi trong changelog.</li>
+</ul>
+<h3 id="sdk-typescript"><a class="header" href="#sdk-typescript">SDK TypeScript</a></h3>
+<p>SDK (<code>sdk/typescript</code>) sinh từ <code>docs/openapi.json</code> và mang cùng số phiên bản. Nó theo luật của REST:
+bản minor thêm method và trường tuỳ chọn; method hay kiểu chỉ biến mất ở bản major. Endpoint
+deprecated vẫn ở trong SDK tới ngày sunset.</p>
+<h2 id="phần-không-cam-kết"><a class="header" href="#phần-không-cam-kết">Phần không cam kết</a></h2>
+<p>Những thứ sau có thể đổi ở bất kỳ bản nào, kể cả bản patch khi đó là sửa lỗi:</p>
+<ul>
+<li><strong>Module thử nghiệm</strong> (hạng <code>experimental</code> trong <a href="MODULES.vi.html"><code>docs/MODULES.vi.md</code></a>, tắt theo
+mặc định): endpoint, tool, event, cấu hình và Rust API của chúng có thể đổi giữa các bản minor, kể cả
+thay đổi phá vỡ. Mọi thay đổi đều có trong changelog, và việc chuyển dữ liệu của chúng sang bản mới
+được mô tả trong ghi chú nâng cấp khi cần làm tay.</li>
+<li>Thứ được đánh dấu <strong>experimental</strong> ở chỗ khác: operation OpenAPI có <code>"x-stability": "experimental"</code>, tool MCP có <code>"stability": "experimental"</code>, và tính năng mà tài liệu ghi
+“experimental”.</li>
+<li>Phần Rust không công khai: <code>pub(crate)</code> và thứ riêng tư, thứ có <code>#[doc(hidden)]</code>, và mọi thứ trong
+crate module ngoài <code>api</code> và <code>module(…)</code>. Module mẫu <code>notes</code> và crate <code>xtask</code> hoàn toàn không thuộc
+hợp đồng.</li>
+<li>Dòng log: định dạng, câu và trường. Tên và nhãn của số đo (metric) được ghi trong changelog khi đổi
+nhưng không bị đóng băng.</li>
+<li>Chữ cho người đọc: <code>message</code> của lỗi, bản dịch, mô tả trong OpenAPI và MCP, đầu ra CLI không có
+<code>--json</code>.</li>
+<li>Bảng, cột và index của database (xem trên), thứ tự phần tử ở chỗ API không hứa thứ tự, và số đo
+hiệu năng.</li>
+</ul>
+<h2 id="build-từ-mã-nguồn"><a class="header" href="#build-từ-mã-nguồn">Build từ mã nguồn</a></h2>
+<h3 id="phiên-bản-rust-tối-thiểu-msrv"><a class="header" href="#phiên-bản-rust-tối-thiểu-msrv">Phiên bản Rust tối thiểu (MSRV)</a></h3>
+<p>MSRV là <code>rust-version</code> trong <code>Cargo.toml</code> gốc của workspace (hiện là bản phát hành liền trước toolchain được ghim trong
+<code>rust-toolchain.toml</code>). Chính sách:</p>
+<ul>
+<li>Repo build được và các crate thư viện biên dịch được với MSRV; CI có một job build workspace bằng đúng phiên bản đó,
+nên một tính năng ngôn ngữ mới không lọt vào mà không ai biết.</li>
+<li>Toolchain được ghim (<code>rust-toolchain.toml</code>, dùng bởi người phát triển, CI và image Docker) mới hơn MSRV và đi theo Rust
+stable; MSRV chỉ được nâng khi một dependency hay một tính năng cần, không bao giờ trong bản patch, và việc nâng được
+ghi trong changelog.</li>
+<li>Module ở repo khác cần ít nhất MSRV. Ví dụ module ngoài dùng cùng <code>rust-version</code> (<code>cargo xtask check</code> kiểm).</li>
+</ul>
+<h3 id="cargo-feature"><a class="header" href="#cargo-feature">Cargo feature</a></h3>
+<p>Bản build mặc định có đủ mọi feature mà một máy chủ production cần. Các feature tuỳ chọn:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Crate</th><th>Feature</th><th>Làm gì</th><th>Trong bản phát hành</th><th>Hợp đồng</th></tr>
+</thead>
+<tbody>
+<tr><td><code>autoxide</code></td><td><code>avif</code></td><td>Ảnh thu nhỏ AVIF (<code>AUTOXIDE_MEDIA_AVIF</code>); kéo bộ mã hoá <code>rav1e</code></td><td>Tắt</td><td>Ổn định</td></tr>
+<tr><td><code>autoxide</code></td><td><code>bench-seed</code></td><td><code>task &lt;module&gt;.bench_seed</code> sinh dữ liệu mẫu để đo</td><td>Tắt</td><td>Không</td></tr>
+<tr><td><code>autoxide-kernel</code></td><td><code>permission-audit</code></td><td>Chỉ cho test: dựng route không có lớp permission để rà soát</td><td>Tắt</td><td>Không</td></tr>
+<tr><td>các crate module</td><td><code>testing</code></td><td>Đồ phụ trợ test module dùng chung với <code>autoxide-testkit</code></td><td>Tắt</td><td>Không</td></tr>
+<tr><td>các crate module</td><td><code>bench-seed</code>, <code>avif</code></td><td>Chuyển tiếp từ các feature của <code>autoxide</code> ở trên</td><td>Tắt</td><td>Như trên</td></tr>
+</tbody>
+</table>
+</div>
+<p>“Không” nghĩa là nằm ngoài cam kết tương thích: không bao giờ bật trong ứng dụng. Feature chỉ cộng thêm; feature mới
+không bao giờ đổi bản build mặc định.</p>
+<h3 id="build-tái-lập"><a class="header" href="#build-tái-lập">Build tái lập</a></h3>
+<p>Image phát hành được build với mục tiêu cùng mã nguồn cho ra cùng binary. Đây là mục tiêu: chưa có test tự động nào build hai lần
+rồi so sánh, nên đừng dựa vào việc giống từng byte. Những gì đã có:</p>
+<ul>
+<li><code>Cargo.lock</code> được commit và mọi bản build phát hành dùng <code>--locked</code>; toolchain được ghim (<code>rust-toolchain.toml</code>,
+<code>RUST_VERSION</code> của Docker) và image nền ghim theo digest.</li>
+<li>Dockerfile build trong một thư mục cố định và truyền <code>--remap-path-prefix</code> để không đường dẫn build nào lọt vào
+binary; <code>SOURCE_DATE_EPOCH</code> (thời điểm commit của bản phát hành) dùng cho mọi mốc thời gian, kể cả file nén phát hành
+(xếp theo tên, chủ sở hữu và thời gian sửa cố định).</li>
+<li>Để so một bản phát hành với bản build của bạn: build lại từ tag bằng cùng Dockerfile, chép <code>/usr/local/bin/autoxide</code> ra khỏi
+image của bạn, giải nén file nén phát hành (<code>tar -xzf autoxide-X.Y.Z-&lt;target&gt;.tar.gz</code>) rồi so <code>sha256sum</code> của hai file
+<code>autoxide</code>. (<code>SHA256SUMS</code> liệt kê các file nén, không phải binary bên trong.) Khác nhau chưa phải bằng chứng bị sửa đổi: digest
+image nền hay kiến trúc đích khác cũng làm binary khác. <a href="VERIFYING.vi.html"><code>docs/VERIFYING.vi.md</code></a> chỉ cách kiểm chữ ký và
+attestation, là cách kiểm được hỗ trợ.</li>
+</ul>
+<h3 id="bảng-kê-vật-liệu-phần-mềm-sbom"><a class="header" href="#bảng-kê-vật-liệu-phần-mềm-sbom">Bảng kê vật liệu phần mềm (SBOM)</a></h3>
+<p>Mỗi bản phát hành kèm hai danh sách những gì nằm bên trong:</p>
+<ul>
+<li><strong>Crate Rust trong binary.</strong> Binary được build bằng <code>cargo auditable</code>, công cụ nhúng đúng danh sách dependency vào file
+thực thi. Các công cụ như <code>cargo audit bin autoxide</code>, Syft, Trivy hay Grype đọc được, nên máy quét lỗ hổng thấy các crate
+Rust kể cả trong binary đã strip.</li>
+<li><strong>File CycloneDX.</strong> <code>autoxide.cdx.json</code> (CycloneDX 1.5, sinh từ <code>Cargo.lock</code> bằng <code>cargo cyclonedx</code>) được đính kèm
+GitHub Release và có attestation; image còn mang một SBOM SPDX (<code>sbom.spdx.json</code>).</li>
+</ul>
+<h2 id="hỗ-trợ"><a class="header" href="#hỗ-trợ">Hỗ trợ</a></h2>
+<p>Từ 1.0 mỗi phiên bản major có hỗ trợ dài hạn:</p>
+<ul>
+<li>Bản minor mới nhất nhận mọi bản sửa; bản minor trước nhận vá bảo mật <strong>3 tháng</strong> sau khi bản minor kế tiếp ra; khi có
+bản major mới, bản minor cuối của major trước nhận vá bảo mật <strong>6 tháng</strong>. Bản cũ hơn không được vá. Bảng ở
+<a href="../SECURITY.vi.html#phiên-bản-được-vá"><code>SECURITY.vi.md</code></a>.</li>
+<li><strong>Vá ngược.</strong> Bản sửa làm trên <code>main</code> trước. Với dòng cũ còn được hỗ trợ, người duy trì cherry-pick nó vào nhánh
+<code>release/X.Y</code> cắt từ tag <code>vX.Y.Z</code> mới nhất của dòng đó, phát hành thành bản patch kế tiếp (<code>X.Y.Z+1</code>) chỉ chứa bản sửa
+đó, sau khi chạy gate đầy đủ trên cả hai database. Bản patch không bao giờ chứa tính năng mới, cài đặt mới bắt buộc
+hay thay đổi hợp đồng, nên cài riêng được an toàn.</li>
+<li>Tương thích <strong>database</strong> giữa các phiên bản (nâng từ bản nào được, bước tay nào cần) ghi trong changelog của từng bản
+phát hành.
+Cách phát hành ghi ở <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/RELEASING.md"><code>docs/RELEASING.md</code></a>.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/COMMENTS.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/COMPLIANCE.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/COMMENTS.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/COMPLIANCE.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

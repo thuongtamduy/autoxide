@@ -1,0 +1,689 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Content - Autoxide documentation v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-62521c5e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-7f73b88f.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Autoxide documentation v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="content"><a class="header" href="#content">Content</a></h1>
+<p><em>Tiếng Việt: <a href="CONTENT.vi.html">CONTENT.vi.md</a></em></p>
+<p>The <code>content</code> module keeps the posts and pages of a website, in several languages, with
+drafts, history, scheduling, categories, tags, authors, menus and redirects. It is API only:
+the admin screens and the website itself are separate projects that call it. It lives under
+<code>/api/v1/content</code>. The full contract, with every parameter and error code, is in
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>openapi.json</code></a> (and at <code>/api/docs</code> when <code>AUTOXIDE_HTTP_API_DOCS=true</code>).</p>
+<p>Images are items of the media library (<a href="MEDIA.html"><code>MEDIA.md</code></a>): an entry keeps only their
+ids, and they must be public before the entry can be published.</p>
+<h2 id="permissions"><a class="header" href="#permissions">Permissions</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Permission</th><th>Allows</th></tr>
+</thead>
+<tbody>
+<tr><td><code>content.read</code></td><td>Reading drafts, revisions and schedules</td></tr>
+<tr><td><code>content.write</code></td><td>Creating and changing drafts, translations, restoring revisions, preview links, asking for a review</td></tr>
+<tr><td><code>content.write_own</code></td><td>The same as <code>content.write</code>, but only on entries the caller created (same user <strong>and</strong> same API key)</td></tr>
+<tr><td><code>content.publish</code></td><td>Publishing, taking down, archiving, moving pages, scheduling; the terms and authors of a published entry</td></tr>
+<tr><td><code>content.publish_own</code></td><td>Publishing and taking down only entries the caller created; no archive, schedule or moving published pages</td></tr>
+<tr><td><code>content.delete</code></td><td>Deleting entries for good</td></tr>
+<tr><td><code>content.manage</code></td><td>Categories, tags, authors, menus, redirects, display placements</td></tr>
+<tr><td><code>content.banners</code></td><td>Banners of display placements, per organization unit</td></tr>
+</tbody>
+</table>
+</div>
+<p>Give them to a role with <code>PUT /api/v1/auth/roles/{id}</code>. The <code>admin</code> role has them all.
+Readers of the website need none: everything under <code>/api/v1/content/public/</code> is open.</p>
+<h2 id="the-model"><a class="header" href="#the-model">The model</a></h2>
+<p>An <strong>entry</strong> is a post (<code>kind: post</code>) or a page (<code>kind: page</code>, can have a parent page). Each
+entry has a <strong>draft</strong> — always there, the version editors change — and, while it is
+published, a separate <strong>published version</strong> that readers see. Changing the draft never
+changes what readers see until it is published again (<code>has_unpublished_changes</code> tells).</p>
+<ul>
+<li><code>status</code> is <code>draft</code>, <code>published</code> or <code>archived</code>.</li>
+<li><code>slug</code> is the last part of the address: made from the title when not given (<code>"Đường đến Đà Lạt"</code> → <code>duong-den-da-lat</code>; <code>-2</code>, <code>-3</code>… when taken), lower-case letters and digits joined by
+<code>-</code>, unique among the entries of the same kind, language and parent.</li>
+<li><code>body</code> is a <a href="https://prosemirror.net">ProseMirror</a> / <a href="https://tiptap.dev">Tiptap</a> JSON
+document. The server checks it against an allowlist of nodes, marks and attributes
+(paragraphs, headings 2–4, lists, quotes, code, tables, images, embeds from
+<code>AUTOXIDE_CONTENT_EMBED_HOSTS</code>; bold, italic, underline, strike, code, links), refuses
+<code>javascript:</code> and other unsafe links, keeps images as media ids only, and reports every
+problem at once with its place (<code>body.content[2].attrs.href</code>). It stores no HTML: the
+website renders the JSON.</li>
+<li>The server computes <code>word_count</code>, <code>reading_time_minutes</code> and a plain-text copy used by
+search (accents and case ignored: <code>da lat</code> finds <code>Đà Lạt</code>).</li>
+<li>SEO fields: <code>meta_title</code>, <code>meta_description</code>, <code>og_media_id</code> (sharing image),
+<code>canonical_url</code>, <code>noindex</code>.</li>
+</ul>
+<h2 id="write-and-publish"><a class="header" href="#write-and-publish">Write and publish</a></h2>
+<pre><code class="language-bash"># Create a draft
+curl -X POST http://localhost:8080/api/v1/content/entries \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"kind": "post", "locale": "en", "title": "Hello",
+       "body": {"type": "doc", "content": [{"type": "paragraph",
+                "content": [{"type": "text", "text": "First post."}]}]}}'
+
+# Read it: note the ETag header
+curl -i http://localhost:8080/api/v1/content/entries/$ID -H "Authorization: Bearer $TOKEN"
+
+# Change the draft: If-Match is required
+curl -X PATCH http://localhost:8080/api/v1/content/entries/$ID \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H 'If-Match: "1731400000000000"' -d '{"excerpt": "A short summary."}'
+
+# Publish
+curl -X POST http://localhost:8080/api/v1/content/entries/$ID/publish \
+  -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1731400000000001"'
+</code></pre>
+<ul>
+<li><strong><code>If-Match</code> is required</strong> to change or delete an entry, to change its state (publish,
+unpublish, archive, move, restore, schedule), to change a term, author or redirect, and to
+replace a menu: send the <code>ETag</code> you read (<code>*</code> to change it whatever its version). Missing:
+<code>428 precondition_required</code>; someone changed it since: <code>412 precondition_failed</code> — read it
+again and reapply your change. This keeps two editors (or AI agents) from overwriting each
+other. Deleting a term, author or redirect and setting an entry’s terms or authors do not
+need it: nothing is overwritten.</li>
+<li><code>POST …/unpublish</code> takes an entry down (it is a draft again, its address answers 404);
+<code>POST …/archive</code> takes it down for good (its address answers 410); <code>DELETE</code> deletes it
+(published entries are taken down first, their address answers 410).</li>
+<li>A page cannot be published before its parent page, nor taken down or deleted while it has
+published subpages.</li>
+</ul>
+<h2 id="history-and-scheduling"><a class="header" href="#history-and-scheduling">History and scheduling</a></h2>
+<ul>
+<li>A <strong>revision</strong> is a full copy of the editable fields. One is kept on creation, on each
+publish and take-down, on restore, when asked (<code>"save_revision": true</code>), and automatically
+when the last one is more than 10 minutes old. <code>GET …/revisions</code> lists them,
+<code>POST …/revisions/{revision_id}/restore</code> copies one back into the draft (it does not
+publish). The newest <code>AUTOXIDE_CONTENT_MAX_REVISIONS</code> (default 50) are kept per entry, plus
+the published one and those of pending schedules; a daily job prunes the rest.</li>
+<li><strong>Scheduling</strong>: <code>POST …/schedules</code> with <code>{"action": "publish" | "unpublish", "run_at": …}</code>.
+A scheduled publish pins the current draft as a revision: later edits are not published by
+it. If the entry was published by hand after the schedule was made, the schedule fails
+(<code>content.schedule_outdated</code>) instead of overwriting it. A failed schedule keeps its error
+code (<code>status: failed</code>) and sends the event <code>content.schedule_failed</code>. Taking an entry down
+cancels its pending scheduled publish, and archiving cancels every pending schedule of the
+entry (each sends <code>content.schedule_canceled</code>): a schedule made earlier never brings back an
+entry that was taken down.</li>
+</ul>
+<h2 id="pages-and-addresses"><a class="header" href="#pages-and-addresses">Pages and addresses</a></h2>
+<p>The server computes the address (<code>path</code>) of every published entry:</p>
+<ul>
+<li>a post: <code>/&lt;AUTOXIDE_CONTENT_POST_PATH_PREFIX&gt;/&lt;slug&gt;</code> (default <code>/blog/hello</code>);</li>
+<li>a page: the slugs of its parent pages, then its own (<code>/about/team</code>); at most 5 levels.</li>
+</ul>
+<p>The website only adds its domain and, if it uses one, a language prefix (<code>/vi/…</code>).</p>
+<ul>
+<li><code>POST …/move</code> puts a page under another parent (or at the root). It takes effect at once,
+for the draft and the published version, and for every subpage. A page cannot move under
+itself or one of its subpages (<code>content.tree_cycle</code>).</li>
+<li><strong>When a published address changes</strong> (new slug, move), the server records a <code>301</code> redirect
+from the old address to the entry — for the entry and every subpage — so old links keep
+working. Archiving or deleting records a <code>410 Gone</code>.</li>
+<li>Redirects can also be made by hand (<code>/api/v1/content/redirects</code>, permission
+<code>content.manage</code>): <code>301</code>, <code>302</code>, <code>307</code>, <code>308</code> to an entry or an address, or <code>410</code>. Loops
+are refused (<code>content.redirect_loop</code>). An address in the site starts with a single <code>/</code>:
+<code>//host</code> (which browsers read as another site) is refused, here and in menus.</li>
+</ul>
+<h2 id="languages"><a class="header" href="#languages">Languages</a></h2>
+<p>Languages are set by <code>AUTOXIDE_CONTENT_LOCALES</code> (default <code>en,vi</code>, BCP 47 codes) and
+<code>AUTOXIDE_CONTENT_DEFAULT_LOCALE</code> (default <code>en</code>).</p>
+<p>With several tenants, these are the default of every tenant: a tenant can set its own
+<code>content.locales</code> and <code>content.default_locale</code> (its administrator with
+<code>PUT /api/v1/kernel/settings/{name}</code>, permission <code>kernel.settings.manage</code>; platform staff with
+<code>PUT /api/v1/kernel/tenants/{id}/settings/{name}</code>). Its languages then apply to everything of that
+tenant: what entries, terms, menus and redirects accept, the <code>locale</code> of public routes, and the
+<code>content</code> part of <code>GET /api/v1/kernel/client-config</code> for requests that name the tenant. When the
+tenant’s default language is not one of its languages, the server’s default is used if it is one of
+them, otherwise the first of them. Entries already written in a language a tenant drops stay as
+they are. Wrong codes are refused when they are set; <code>DELETE</code> a setting to go back to the
+server’s value.</p>
+<ul>
+<li>Each translation is its own entry, with its own slug, status and history, linked to the
+others by <code>translation_group_id</code>. Create one with <code>POST …/entries/{id}/translations</code>
+(<code>{"locale": "vi", "title": …}</code>). A subpage can be translated only once its parent is.</li>
+<li><strong>Posts and pages never fall back to another language</strong>: a missing translation is <code>404</code>, so
+canonical and <code>hreflang</code> stay right. Published entries list their translations
+(<code>translations</code>, for <code>hreflang</code>).</li>
+<li>Names of categories, tags and menus fall back to the default language; the answer says which
+language it used (<code>locale</code>).</li>
+</ul>
+<h2 id="categories-tags-authors-menus"><a class="header" href="#categories-tags-authors-menus">Categories, tags, authors, menus</a></h2>
+<p>Permission <code>content.manage</code>.</p>
+<ul>
+<li><strong>Terms</strong> (<code>/api/v1/content/terms</code>): <code>category</code> (can have a parent) or <code>tag</code>, with a name,
+slug, description and SEO texts per language. Attach them with
+<code>PUT /api/v1/content/entries/{id}/terms</code> (<code>{"term_ids": [...]}</code>, the first category is the
+main one). This takes effect at once, also on the published version — so for a published
+entry it needs <code>content.publish</code> as well as <code>content.write</code> (the same for its authors).</li>
+<li><strong>Authors</strong> (<code>/api/v1/content/authors</code>): profiles of the content module — display name, slug,
+bio, avatar (a media id), website — optionally linked to a user account (<code>user_id</code>). An
+entry can have several, in order: <code>PUT /api/v1/content/entries/{id}/authors</code>. Setting the
+terms or authors of an entry needs the right to edit it, not <code>content.read</code>.</li>
+<li><strong>Menus</strong> (<code>/api/v1/content/menus/{key}?locale=</code>): a tree of items (at most 4 levels, 200
+items), each pointing to an entry, a term, or an address. <code>PUT</code> replaces the whole tree
+(<code>If-Match: *</code> to create one). <strong>Deprecated</strong> (sunset 14 May 2027): website menus moved to the
+<code>menus</code> module, whose items can point to objects of any module; copy yours with
+<code>autoxide task menus.import_content_menus</code> (<a href="MENUS.html"><code>MENUS.md</code></a>).</li>
+</ul>
+<h2 id="stores-and-websites"><a class="header" href="#stores-and-websites">Stores and websites</a></h2>
+<p>In a tenant with an organization tree (module <code>organizations</code>), each entry belongs to a unit:
+<code>org_id</code> when creating it (omitted: your only unit, or the root when your role covers the whole
+tenant). The permissions above follow the scope of the role: someone with <code>content.write</code> on a
+store (<code>subtree</code>) writes only entries of that store and the units below it; entries outside their
+scope answer 404. Filter the admin list with <code>owner_org</code> (one unit) or <code>site</code> (what a website
+shows).</p>
+<p>Each unit can have a website: its domain bound to the unit (<code>PATCH /api/v1/kernel/domains/{id}</code>
+with <code>org_id</code>), or <code>?site=&lt;unit id&gt;</code> on the public endpoints. A website shows the entries of its
+unit and of every unit above it — head-office posts appear on every store’s website, a store’s
+posts never on another store’s.</p>
+<p>Each website has its own addresses and slugs: two stores can both have <code>/about</code>. When a unit and
+a unit above it both publish the same address, the website shows the one nearest to it (the
+store’s <code>/about</code> hides the head office’s on the store’s website; the sitemap lists it once). The
+languages a website offers are the setting <code>organizations.languages</code> of its unit
+(<code>PUT /api/v1/organizations/units/{id}/settings/organizations.languages</code> with <code>["vi", "en"]</code>; the
+first is its default), kept to the tenant’s languages; unset, the tenant’s languages. Public
+reads, the sitemap, the feed and public search follow the website’s languages and show only what
+the website shows.</p>
+<h2 id="the-website-public-endpoints"><a class="header" href="#the-website-public-endpoints">The website: public endpoints</a></h2>
+<p>No sign-in needed. Only published versions are ever returned — drafts never.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Endpoint</th><th>Gives</th></tr>
+</thead>
+<tbody>
+<tr><td><code>GET /public/resolve?locale=&amp;path=</code></td><td>What lives at an address: <code>entry</code>, <code>redirect</code> or <code>gone</code></td></tr>
+<tr><td><code>GET /public/posts?locale=&amp;term_id=&amp;author_id=&amp;q=</code></td><td>Published posts, newest first, paged (<code>q</code>: at most 200 characters)</td></tr>
+<tr><td><code>GET /public/menus/{key}?locale=</code></td><td>A menu with computed <code>href</code>s; deprecated, use <code>GET /api/v1/menus/public/{key}</code></td></tr>
+<tr><td><code>GET /public/terms/{taxonomy}/{slug}?locale=</code></td><td>A category or tag page</td></tr>
+<tr><td><code>GET /public/authors/{slug}</code></td><td>An author page</td></tr>
+<tr><td><code>GET /public/sitemap?locale=</code></td><td>Every published address, with <code>hreflang</code> alternates, paged</td></tr>
+<tr><td><code>GET /public/feed?locale=&amp;limit=</code></td><td>The newest posts with body, for RSS, Atom or JSON Feed</td></tr>
+</tbody>
+</table>
+</div>
+<p>(All under <code>/api/v1/content</code>.)</p>
+<p>A category or tag is public only once an entry shown on the website carries it: the term page answers
+<code>404 content.term_not_found</code> before that, and the term list leaves it out. This is on purpose — a term
+being prepared is not revealed — so a menu item pointing to an empty category leads to a 404 page until
+a post carries the category.</p>
+<p><strong>Several sites on one server.</strong> On a server with several tenants, each tenant is its own site:
+the public endpoints answer for the tenant of the request — its own domain, or the
+<code>Autoxide-Tenant</code> header (its short name). Two tenants may use the same slugs, addresses,
+author and term slugs, menus and redirects; one never sees the other’s entries. An <code>ETag</code> from
+one tenant never matches in another.</p>
+<p><strong>Rendering an address.</strong> For each request, the website calls <code>resolve</code> with the language
+and the path, and acts on <code>type</code>:</p>
+<ul>
+<li><code>entry</code> → render <code>data.entry</code> (title, body JSON, images with their URLs, SEO, terms,
+authors, translations);</li>
+<li><code>redirect</code> → answer <code>data.status</code> with <code>Location: data.location</code>;</li>
+<li><code>gone</code> → answer <code>410</code>;</li>
+<li>a <code>404</code> response → answer <code>404</code>.</li>
+</ul>
+<p><strong>Caching.</strong> Public answers carry <code>Cache-Control: public, no-cache</code> and, where it makes sense,
+an <code>ETag</code>: a cache may keep them but must ask again; sending the <code>ETag</code> back in
+<code>If-None-Match</code> gets a cheap <code>304 Not Modified</code>.</p>
+<p><strong>Refreshing the cache when content changes.</strong> Subscribe a webhook
+(<code>POST /api/v1/webhooks</code>, see the webhooks section of the <a href="../README.html">README</a>) to
+<code>content.entry_published</code>, <code>content.entry_unpublished</code>, <code>content.entry_archived</code>,
+<code>content.entry_deleted</code> and <code>content.entry_moved</code>. Their <code>data.payload.published</code> gives what
+to purge:</p>
+<pre><code class="language-json">{
+  "entry_id": "…", "kind": "page", "locale": "en", "translation_group_id": "…",
+  "path": "/company/team",
+  "stale_paths": ["/about/team", "/about/team/jobs"],
+  "moved_subpages": [{"entry_id": "…", "old_path": "/about/team/jobs", "path": "/company/team/jobs"}]
+}
+</code></pre>
+<p><code>path</code> is the new address (<code>null</code> when no longer published), <code>stale_paths</code> every address
+that changed, subpages included. Menus, terms and authors send <code>content.menu_changed</code>,
+<code>content.term_changed</code> and <code>content.author_changed</code>; these carry no list of affected pages
+(a tag can be on thousands). Tag each cached page with its term and author ids (for example
+<code>term:&lt;id&gt;</code>, <code>author:&lt;id&gt;</code>) and revalidate those tags when such an event arrives — renaming or
+deleting a tag or an author, including when an account is deleted, then refreshes every page
+that shows it.</p>
+<p><strong>Sitemap and feed.</strong> Build <code>sitemap.xml</code> from <code>/public/sitemap</code> (follow <code>next_cursor</code>; skip
+items with <code>noindex: true</code>; <code>content_modified_at</code> is <code>lastmod</code>; <code>translations</code> gives the
+<code>hreflang</code> alternates). Build RSS, Atom or JSON Feed from <code>/public/feed</code>, using each post’s
+<code>id</code> (never changes) as the item id.</p>
+<h3 id="hidden-by-a-case-451"><a class="header" href="#hidden-by-a-case-451">Hidden by a case (451)</a></h3>
+<p>When the <code>compliance</code> module handles a report of an infringement (counterfeit, intellectual property…)
+about an entry and hides it, <code>content</code> receives the event <code>compliance.target_restricted</code>: the published
+entry answers <strong>451</strong> <code>content.restricted</code> at <code>GET /public/resolve</code> (answer 451 to the reader), and is
+left out of <code>/public/posts</code>, the sitemap, the feed, search and other modules (resource directory). It
+stays hidden when published again. <code>compliance.target_restored</code> shows it as before. See
+<a href="COMPLIANCE.html#reports-of-infringements-and-consumer-complaints"><code>COMPLIANCE.md</code></a>.</p>
+<h2 id="banners-and-display-placements"><a class="header" href="#banners-and-display-placements">Banners and display placements</a></h2>
+<p>A <strong>placement</strong> is a named spot of the website (<code>home_hero</code>, <code>top_strip</code>…) that tells the
+website <strong>how to draw</strong> what is in it and tells editors <strong>what picture fits</strong>, so changing a
+banner never breaks the layout. A <strong>banner</strong> is the content shown there, with a time window and an
+order. Changing banners is a data change (REST or MCP), not a change of the website’s code.</p>
+<h3 id="placements-contentmanage"><a class="header" href="#placements-contentmanage">Placements (<code>content.manage</code>)</a></h3>
+<p><code>GET/POST /placements</code>, <code>GET/PUT/DELETE /placements/{key}</code> (<code>PUT</code> needs <code>If-Match</code>; deleting a
+placement that still has banners answers 409 <code>content.placement_in_use</code>). Each has:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>display</code></td><td><code>single</code>, <code>carousel</code>, <code>grid</code> (2–4 cells), <code>stack</code> (vertical, for side columns), <code>strip</code> (a thin text bar), <code>popup</code></td></tr>
+<tr><td><code>display_settings</code></td><td><code>carousel</code>: <code>autoplay_seconds</code> (0 = off, else ≥ 4); <code>grid</code>: <code>columns</code> (2–4); <code>popup</code>: <code>frequency</code> (<code>once_per_session</code>, <code>once_per_day</code>, <code>once_per_week</code>), <code>delay_seconds</code> (0–60)</td></tr>
+<tr><td><code>accepts</code></td><td><code>image</code>, <code>text</code> or <code>any</code>; a <code>strip</code> takes only <code>text</code></td></tr>
+<tr><td><code>ratio</code>, <code>mobile_ratio</code>, <code>min_width</code>, <code>min_height</code></td><td>picture rules, checked when a banner is saved (2% leeway on the ratio), from the size the media library stored</td></tr>
+<tr><td><code>devices</code></td><td><code>all</code>, <code>desktop</code>, <code>mobile</code>: call the placement only on these</td></tr>
+<tr><td><code>page_kinds</code></td><td>kinds of pages it is used on: <code>home</code>, <code>category</code>, <code>collection</code>, <code>product</code>, <code>search</code>, <code>cart</code>, <code>content_entry</code>, <code>content_type</code>, <code>landing</code>, or <code>any</code></td></tr>
+<tr><td><code>max_items</code></td><td>most banners at once (1–50) per store and language</td></tr>
+</tbody>
+</table>
+</div>
+<p>New tenants get a <strong>standard set</strong>: <code>top_strip</code> (strip, text), <code>home_hero</code> (carousel, 3:1, at least
+1800×600; phones 4:5), <code>home_middle</code> (grid of 3, 1:1), <code>category_top</code> (4:1), <code>sidebar_left</code> and
+<code>sidebar_right</code> (stack, 1:2), <code>inline</code> (4:1, image or text), <code>above_footer</code> (4:1), <code>popup</code> (once a day,
+after 5 s, 4:5). Edit, switch off or delete them like your own. A tenant created before this
+feature adds the missing ones with <code>POST /placements/presets</code> (it never brings back one you
+deleted unless you call it).</p>
+<h3 id="banners-contentbanners"><a class="header" href="#banners-contentbanners">Banners (<code>content.banners</code>)</a></h3>
+<p><code>GET/POST /banners</code>, <code>GET/PATCH/DELETE /banners/{id}</code> (<code>PATCH</code> needs <code>If-Match</code>), and
+<code>PUT /placements/{key}/order</code> with <code>{"banner_ids": [...]}</code> and the placement’s <code>ETag</code> in <code>If-Match</code>
+to order a whole placement at once. <code>content.banners</code> is given per organization unit: the staff of
+a store manage only that store’s banners; <code>org_id</code> left out means every store of the tenant.</p>
+<ul>
+<li><code>kind</code>: <code>image</code> (needs <code>media_id</code>, a <strong>public</strong> picture; optional <code>mobile_media_id</code>) or <code>text</code>
+(<code>title</code> required, <code>tone</code> = <code>primary</code>, <code>secondary</code>, <code>accent</code> or <code>neutral</code> — never a colour code, so
+a new theme recolours it).</li>
+<li><code>link</code>: <code>{"url": "https://…"}</code> or a path <code>/…</code>, or <code>{"kind": "catalog.product", "id": "…"}</code> — any type
+of the object directory (<code>GET /api/v1/kernel/resources</code>). Saving checks the object exists; the
+public read leaves the banner out once the object is no longer public (product off sale, promotion
+over). A banner linking to a <code>promotions.promotion</code> is <strong>archived</strong> when the promotion ends or is
+cancelled: advertising must not promise an offer that is over (Vietnam’s Law on Consumer Protection
+19/2023/QH15, Law on Advertising — check the original texts).</li>
+<li><code>page_kinds</code> (within the placement’s) and <code>page_targets</code> (<code>[{"kind": "catalog.category", "id": "…"}]</code>,
+at most 50): show the banner only on those pages. Example: a left-column banner only on the
+“Phones” category.</li>
+<li><code>starts_at</code> / <code>ends_at</code>, <code>status</code> (<code>draft</code>, <code>active</code>, <code>archived</code>), <code>ai_assisted</code>.</li>
+</ul>
+<h3 id="reading-on-the-website-public"><a class="header" href="#reading-on-the-website-public">Reading on the website (public)</a></h3>
+<p>One call for every placement of a page:</p>
+<pre><code class="language-http">GET /api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&amp;locale=vi&amp;page_kind=home
+GET /api/v1/content/public/placements?keys=category_top,sidebar_left&amp;page_kind=category&amp;page_ref=catalog.category:0190…
+</code></pre>
+<p>Each placement comes with <code>display</code>, <code>display_settings</code>, <code>accepts</code>, ratios, <code>devices</code> and its
+<code>banners</code>: active, inside their time window now, of the website (<code>site</code>, or the domain) and the
+units above it, in the page’s language, in a <strong>fixed order</strong> (<code>position</code>). Images come with
+<code>variants</code> and <code>webp_url</code> for <code>srcset</code> / <code>&lt;picture&gt;</code>; links come ready as <code>href</code>. Banners not limited
+to some pages always show; without <code>page_kind</code> only those show. <code>Cache-Control: public, max-age=…</code>
+lasts until the next banner starts or ends (at most 60 s), so a CDN never keeps an expired banner;
+<code>ETag</code> gives 304. <code>GET /public/placements/{key}</code> reads one placement.</p>
+<p><strong>Rules for the website</strong> (part of the contract):</p>
+<ul>
+<li>Draw banners in the order given; never shuffle them (it breaks caching and the page jumps on reload).</li>
+<li>A <code>popup</code> always has a visible close button, respects <code>frequency</code>, and never shows on cart, checkout,
+sign-in or account pages.</li>
+<li>A <code>carousel</code> does not autoplay when the viewer asks for reduced motion
+(<code>prefers-reduced-motion</code>), and has controls to pause and move.</li>
+<li>Label banners with <code>ai_assisted: true</code> as written with AI help.</li>
+</ul>
+<p>Example of a home page:</p>
+<pre><code class="language-js">const res = await fetch(`/api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&amp;page_kind=home&amp;locale=${lang}`);
+const { data } = await res.json();
+for (const p of data.placements) render(p.key, p.display, p.display_settings, p.banners);
+</code></pre>
+<h3 id="store-information-header-and-footer"><a class="header" href="#store-information-header-and-footer">Store information (header and footer)</a></h3>
+<p><code>GET /api/v1/organizations/public/storefront</code> (public; the website from <code>site</code> or the domain) gives the
+<strong>brand</strong> — name, logo and site icon (ids of public media items: <code>/api/v1/media/{id}/content</code>), phone, email,
+social profiles — inherited down the organization tree (a chain sets it, a store overrides what it
+wants), the <strong>location</strong> (address, opening hours, special days, pickup, cover picture of the unit’s
+public profile), the unit’s time zone and <code>open_now</code>. Manage the brand with the unit settings
+<code>organizations.brand_name</code>, <code>organizations.brand_logo</code>, <code>organizations.brand_icon</code>,
+<code>organizations.contact_phone</code>, <code>organizations.contact_email</code>, <code>organizations.social_links</code>
+(<code>PUT /api/v1/organizations/units/{id}/settings/{key}</code>). For the legal footer of a shop in Vietnam,
+also show <code>GET /api/v1/compliance/public/owner</code> and the badge of <code>GET /api/v1/compliance/public/badge</code>.</p>
+<h3 id="mcp-tools"><a class="header" href="#mcp-tools">MCP tools</a></h3>
+<p><code>content.list_banners</code>, <code>content.save_banner</code> (drafts only: a person sets a banner <code>active</code>; text
+from a tool is marked <code>ai_assisted</code> unless told otherwise), <code>content.order_placement</code>.</p>
+<h2 id="draft-preview"><a class="header" href="#draft-preview">Draft preview</a></h2>
+<p>Editors can show a draft to someone without an account:</p>
+<ol>
+<li>Set <code>AUTOXIDE_CONTENT_PREVIEW_SECRET</code> (a random string of at least 32 characters). Without
+it, previews are off (<code>503</code>, code <code>content.preview_disabled</code>).</li>
+<li><code>POST /api/v1/content/entries/{id}/preview-token</code> (permission <code>content.write</code>) returns a
+signed <code>token</code> and its <code>expires_at</code> (<code>AUTOXIDE_CONTENT_PREVIEW_TTL_SECONDS</code>, default 10
+minutes).</li>
+<li>The website’s preview page calls <code>GET /api/v1/content/public/preview?token=…</code> and renders
+the draft. The answer is <code>Cache-Control: no-store</code>; it always shows the latest draft, and
+holds only its content — not who created it or asked for a review. An invalid or expired
+token is <code>404</code> (<code>content.preview_token_invalid</code>). Changing the secret revokes every token.</li>
+</ol>
+<p>On a server with several tenants, a token only opens the draft of the tenant it was made in: it
+names its tenant, so the preview page works on the main domain without a tenant header, and the
+same token sent to another tenant (by domain or header) is <code>404</code> as an invalid token.</p>
+<h2 id="ai-agents"><a class="header" href="#ai-agents">AI agents</a></h2>
+<p><strong>AI helpers</strong> (guide: <a href="AI.html"><code>AI.md</code></a>): <code>GET /entries/{id}/seo-check</code> (no AI),
+<code>POST /entries/{id}/seo-suggestions</code>, <code>POST /entries/{id}/translate</code> (into the draft of the
+translation, never published; follow <code>GET /translation-requests/{id}</code>), and <code>GET /search</code> /
+<code>GET /public/search</code> (by meaning and words). Entries made by the server’s translation carry
+<code>translated_from_revision_id</code>, and <code>translation_outdated</code> once the source changes.</p>
+<p><strong>MCP tools.</strong> <code>content.list</code>, <code>content.get</code>, <code>content.create_draft</code>, <code>content.update</code>,
+<code>content.publish</code>, <code>content.unpublish</code>, <code>content.list_revisions</code>, <code>content.restore_revision</code>,
+<code>content.request_review</code>, <code>content.seo_check</code>, <code>content.suggest_seo</code>, <code>content.translate</code>,
+<code>content.get_translation_request</code>, <code>content.search</code> and <code>content.resolve</code>, with the same
+permissions as the REST endpoints. Results that contain an entry include its <code>version</code>; the tools that change an entry
+require it back in their <code>version</code> argument, exactly like <code>If-Match</code>.</p>
+<p><strong>Give an agent its own API key</strong> (<code>POST /api/v1/auth/api-keys</code>) with a short <code>expires_at</code> and
+only the permissions it needs:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>The agent may…</th><th>Permissions</th></tr>
+</thead>
+<tbody>
+<tr><td>write drafts, a person publishes</td><td><code>content.read</code>, <code>content.write_own</code></td></tr>
+<tr><td>write and publish its own posts</td><td><code>content.read</code>, <code>content.write_own</code>, <code>content.publish_own</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>With the <code>_own</code> permissions an agent only touches the entries it created with that same key:
+another key — even of the same user — gets <code>403 content.not_owner</code>. It can never archive,
+schedule or delete (deleting needs <code>content.delete</code>), nor move a published page; it can move
+its own unpublished pages, under pages it created. More limits keep it from going around an
+editor:</p>
+<ul>
+<li><code>content.write_own</code> without <code>content.write</code>: a new page, a moved page or a translated subpage
+goes only under a parent page the agent created (<code>403 content.not_owner</code>), so it cannot block
+someone else’s page from being taken down or deleted; the entry is always marked
+<code>ai_generated: true</code>, whatever is sent; on <code>PUT …/authors</code> it may add only author profiles
+linked to its own account (<code>user_id</code>) — profiles already on the entry may stay.</li>
+<li><code>content.publish_own</code> without <code>content.publish</code>: it cannot publish an entry an editor
+archived (<code>403 content.archived</code>); it cannot set <code>published_at</code> (422, <code>not_allowed</code>; the
+server uses the current time, or keeps the date of an earlier publish); it cannot publish at
+an address where an editor made a redirect (<code>409 content.path_has_redirect</code>), since the
+published entry would hide it.</li>
+</ul>
+<p>Every change is in the audit log with the API key that made it, and requests with an API key
+are rate limited per key (<code>AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE</code>, default 120).</p>
+<p><strong>Review.</strong> When the agent is done, it calls <code>POST /entries/{id}/request-review</code> (tool
+<code>content.request_review</code>): the draft gets <code>review_requested_at</code> and the event
+<code>content.review_requested</code> goes out — subscribe a webhook to tell your editors.
+<code>DELETE /entries/{id}/request-review</code> withdraws it; publishing clears it.</p>
+<p><strong>AI-generated content.</strong> Send <code>"ai_generated": true</code> when creating or editing content written
+by AI (agents should always do so; with only <code>content.write_own</code> the server sets it anyway).
+When a person — signed in, not with an API key — publishes
+such an entry after reviewing it, they send <code>{"ai_reviewed": true}</code> to
+<code>POST /entries/{id}/publish</code>; the published version records who and when. Public endpoints
+return <code>ai_generated</code> and <code>ai_reviewed</code>, so the website can show readers a notice where the
+rules ask for one (for example Article 50 of the EU AI Act, which applies from 2 August 2026;
+its exception for human-reviewed text is read narrowly). Autoxide records the facts; it does
+not give legal advice. The admin API also tells how an entry was created: <code>created_via</code> is
+<code>session</code> or <code>api_key</code>.</p>
+<p><strong>AI-assisted content.</strong> When a person writes or edits content from AI suggestions (applies
+<code>seo-suggestions</code>, rewrites an AI draft), send <code>"ai_assisted": true</code> on <code>POST /entries</code> or
+<code>PATCH /entries/{id}</code> (MCP: <code>create_draft</code>, <code>update_draft</code>). The flag is copied to the published
+version on publish; the admin, preview and public endpoints return <code>ai_assisted</code>, so the website
+labels the content (Vietnam’s Law on Artificial Intelligence 134/2025/QH15, from 1 March 2026 —
+the form of the label and what counts as “edited” still need checking against the decree).
+Anyone who may write sets it; removing it (<code>false</code> while it is <code>true</code>) needs <code>content.publish</code>
+(else 403 <code>content.ai_label_requires_publish</code>), and restoring an older revision never removes
+it. <code>ai_generated</code> (the whole text written by AI) is unchanged. Images: the media library’s
+<code>alt_ai_assisted</code> (<a href="MEDIA.html"><code>MEDIA.md</code></a>) comes with each public image as <code>alt_ai_assisted</code>.</p>
+<h2 id="when-an-account-is-deleted"><a class="header" href="#when-an-account-is-deleted">When an account is deleted</a></h2>
+<p>Posts and pages belong to the site, not to the person who wrote them: they stay. Author
+profiles linked to the account are deleted (and removed from entries), schedules the person
+made are canceled, and <code>created_by</code> becomes <code>null</code>, as do <code>review_requested_by</code> (who asked
+for a review) and the record of who confirmed an AI review — the time of that confirmation
+stays, so readers still see <code>ai_reviewed</code>. The personal data export lists the person’s author
+profiles and the entries they created.</p>
+<h2 id="settings"><a class="header" href="#settings">Settings</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Setting</th><th>Default</th></tr>
+</thead>
+<tbody>
+<tr><td><code>AUTOXIDE_CONTENT_LOCALES</code></td><td><code>en,vi</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_DEFAULT_LOCALE</code></td><td><code>en</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_POST_PATH_PREFIX</code></td><td><code>blog</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_MAX_REVISIONS</code></td><td><code>50</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_MAX_BODY_BYTES</code></td><td><code>524288</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_WORDS_PER_MINUTE</code></td><td><code>238</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_EMBED_HOSTS</code></td><td><code>youtube.com,youtu.be,youtube-nocookie.com,vimeo.com</code></td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_PREVIEW_SECRET</code></td><td>none (previews off)</td></tr>
+<tr><td><code>AUTOXIDE_CONTENT_PREVIEW_TTL_SECONDS</code></td><td><code>600</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>All are described in <a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/.env.example"><code>.env.example</code></a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/COMPLIANCE.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/CONVERSATIONS.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/COMPLIANCE.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/CONVERSATIONS.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

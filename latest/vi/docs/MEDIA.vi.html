@@ -1,0 +1,454 @@
+<!DOCTYPE HTML>
+<html lang="vi" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Thư viện media - Tài liệu Autoxide v0.20.0</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7bb75c3b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-d5f8d92e.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Tài liệu Autoxide v0.20.0</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/thuongtamduy/autoxide" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="thư-viện-media"><a class="header" href="#thư-viện-media">Thư viện media</a></h1>
+<p><em>English: <a href="MEDIA.html">MEDIA.md</a></em></p>
+<p>Module <code>media</code> giữ ảnh, video, âm thanh và tài liệu của một website hay ứng dụng trong
+thư mục lồng nhau, và phục vụ chúng — công khai, hoặc cho người đã đăng nhập. Module nằm
+dưới <code>/api/v1/media</code>. Hợp đồng đầy đủ, với mọi tham số và mã lỗi, ở
+<a href="https://github.com/thuongtamduy/autoxide/blob/v0.20.0/docs/openapi.json"><code>openapi.json</code></a> (và ở <code>/api/docs</code> khi <code>AUTOXIDE_HTTP_API_DOCS=true</code>).</p>
+<p>Nội dung lưu ở nơi module <code>files</code> lưu file (<code>AUTOXIDE_FILES_DIR</code> trên ổ đĩa, hoặc một
+bucket S3), dưới các khoá bắt đầu bằng <code>media/</code>. Thông tin (tên, loại, kích thước, kích
+thước ảnh, chữ mô tả, thư mục) nằm trong database. <code>autoxide backup</code> và <code>autoxide restore</code>
+mang theo cả hai.</p>
+<h2 id="permission"><a class="header" href="#permission">Permission</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Permission</th><th>Cho phép</th></tr>
+</thead>
+<tbody>
+<tr><td><code>media.read</code></td><td>Liệt kê và đọc item (kể cả item riêng tư), thư mục và thùng rác</td></tr>
+<tr><td><code>media.write</code></td><td>Tải lên, sửa, thay nội dung, chuyển, công khai, cho vào thùng rác; thư mục</td></tr>
+<tr><td><code>media.purge</code></td><td>Xoá hẳn item trong thùng rác</td></tr>
+</tbody>
+</table>
+</div>
+<p>Gán cho một role bằng <code>PUT /api/v1/auth/roles/{id}</code>. Role <code>admin</code> có đủ.</p>
+<h2 id="cửa-hàng-và-người-bán"><a class="header" href="#cửa-hàng-và-người-bán">Cửa hàng và người bán</a></h2>
+<p>Ở khách có cây tổ chức (module <code>organizations</code>), mỗi item thuộc một nút: <code>org_id</code> khi tải lên (bỏ
+trống: nút duy nhất của bạn, hay nút gốc khi role của bạn phủ cả khách). Permission áp theo độ sâu
+của role — người bán có <code>media.write</code> ở gian hàng của mình (<code>subtree</code>) chỉ thấy và sửa item của
+gian hàng đó; <code>own</code> là item bạn tải lên. Item ngoài phạm vi trả 404, kể cả link tải riêng tư. Lọc
+danh sách bằng <code>owner_org</code>. Thư mục và nhãn dùng chung cả khách.</p>
+<h2 id="tải-lên"><a class="header" href="#tải-lên">Tải lên</a></h2>
+<p>Gửi file thô làm thân request (không phải form multipart), loại của nó trong
+<code>Content-Type</code> và tên trong <code>name</code>:</p>
+<pre><code class="language-bash">curl -X POST "http://localhost:8080/api/v1/media?name=team.jpg" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: image/jpeg" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  --data-binary @team.jpg
+</code></pre>
+<ul>
+<li>Máy chủ kiểm nội dung có thật đúng loại đã khai không, theo các byte đầu file. Trang
+HTML gửi dưới tên <code>image/png</code> bị từ chối (<code>415</code>, mã <code>media.content_mismatch</code>). Không gửi
+<code>Content-Type</code> (hay gửi <code>application/octet-stream</code>) thì máy chủ tự nhận loại.</li>
+<li>Loại được nhận đặt bằng <code>AUTOXIDE_MEDIA_ALLOWED_TYPES</code> (mặc định: JPEG, PNG, GIF, WebP,
+AVIF, SVG, MP4, WebM, mọi loại âm thanh, PDF); kích thước tối đa bằng
+<code>AUTOXIDE_MEDIA_MAX_BYTES</code> (mặc định 100 MiB).</li>
+<li>Ảnh raster (JPEG, PNG, GIF, WebP, AVIF) có <code>width</code> và <code>height</code>. Ảnh JPEG, PNG, GIF và
+WebP còn có ảnh thu nhỏ (xem bên dưới).</li>
+<li>Kết quả (<code>201</code>, kèm <code>Location</code>) có <code>duplicates</code>: các item đã có trong thư viện với nội
+dung y hệt (cùng SHA-256). Bản vừa tải lên vẫn được giữ.</li>
+<li><code>folder_id=&lt;id&gt;</code> đặt item vào một thư mục, <code>tags=brand,logo</code> gắn nhãn. Item mới là
+<code>private</code>.</li>
+</ul>
+<h2 id="đọc-liệt-kê-tìm"><a class="header" href="#đọc-liệt-kê-tìm">Đọc, liệt kê, tìm</a></h2>
+<ul>
+<li><code>GET /api/v1/media/{id}</code> — một item, kèm <code>ETag</code>.</li>
+<li><code>GET /api/v1/media</code> — một trang item. Bộ lọc: <code>folder_id</code> (<code>root</code> hay một ID; chỉ thư
+mục đó, không gồm thư mục con), <code>type</code> (<code>image/png</code> hay <code>image/*</code>), <code>visibility</code>
+(<code>public</code> / <code>private</code>), <code>trashed=true</code> (thùng rác), <code>q</code> (tên chứa chuỗi, không phân biệt
+hoa thường), <code>tag</code> (mang nhãn này, không phân biệt hoa thường), <code>alt_missing=true</code> (ảnh
+chưa có alt và không đánh dấu <code>decorative</code>). Thứ tự:
+<code>sort=created_at|name|size</code> với <code>order=asc|desc</code>. Lật trang theo
+<code>pagination.next_cursor</code>, giữ nguyên bộ lọc. <code>include=uploader</code> thêm <code>uploaded_by_name</code>, tên
+người tải lên từng item.</li>
+<li><code>GET /api/v1/media/summary</code> — số liệu cả thư viện: <code>items</code>, <code>bytes</code>, <code>images_missing_alt</code>,
+<code>trashed_items</code>.</li>
+</ul>
+<h2 id="sửa"><a class="header" href="#sửa">Sửa</a></h2>
+<p>Lệnh sửa cần <code>ETag</code> đã đọc, gửi trong <code>If-Match</code> (<code>*</code> để sửa bất kể phiên bản). Không gửi
+thì nhận <code>428</code> (mã <code>precondition_required</code>); ai đó vừa sửa trước thì <code>412</code> (mã
+<code>precondition_failed</code>) — đọc lại rồi thử lại.</p>
+<ul>
+<li><code>PATCH /api/v1/media/{id}</code> — <code>name</code>, <code>alt</code>, <code>title</code>, <code>caption</code>, <code>decorative</code> (<code>true</code> cho ảnh
+chỉ để trang trí: alt để trống có chủ ý), <code>folder_id</code> (<code>null</code> là
+thư mục gốc), <code>visibility</code>, <code>tags</code> (thay cả bộ nhãn; <code>[]</code> gỡ hết).</li>
+<li><code>PUT /api/v1/media/{id}/content</code> — thay nội dung, GIỮ ID (mọi chỗ đang dùng item vẫn
+đúng). Kiểm như khi tải lên. <code>url</code>, <code>version_id</code> và <code>ETag</code> đổi; nội dung cũ bị xoá.</li>
+<li><code>PUT /api/v1/media/{id}/alts/{locale}</code> với <code>{"alt": "…"}</code> — alt bằng một ngôn ngữ (vd <code>vi</code> trên
+website hai ngôn ngữ); <code>DELETE /api/v1/media/{id}/alts/{locale}</code> gỡ nó. <code>alt</code> của item vẫn là bản
+mặc định cho mọi ngôn ngữ chưa có bản dịch; item trả mọi bản dịch trong <code>alts</code>. Ngôn ngữ được
+phép: <code>AUTOXIDE_MEDIA_ALT_LOCALES</code> (mặc định <code>en,vi</code>), hoặc cấu hình <code>media.alt_locales</code> riêng
+của khách khi khách đã đặt (quản trị của khách gọi <code>PUT /api/v1/kernel/settings/media.alt_locales</code>,
+nhân sự nền tảng gọi <code>PUT /api/v1/kernel/tenants/{id}/settings/media.alt_locales</code>; <code>alt_locales</code>
+trong <code>GET /api/v1/kernel/client-config</code> cho thấy danh sách của khách); ngôn ngữ khác bị từ chối
+với <code>media.unsupported_locale</code>. Xoá hẳn item thì xoá luôn bản dịch.</li>
+</ul>
+<h2 id="phục-vụ-nội-dung"><a class="header" href="#phục-vụ-nội-dung">Phục vụ nội dung</a></h2>
+<p>Mỗi item có <code>url</code>: <code>/api/v1/media/{id}/content?v=&lt;version_id&gt;</code>.</p>
+<ul>
+<li><strong>Ai xem được</strong>: item <code>visibility: public</code> (và không ở thùng rác) tải được không cần
+đăng nhập — dùng thẳng <code>url</code> trong <code>&lt;img src&gt;</code> hay <code>&lt;video src&gt;</code>. Item khác cần
+<code>media.read</code>; không có thì nhận <code>404</code>, như thể item không tồn tại.</li>
+<li><strong>Cache</strong>: kèm đúng <code>v</code> hiện tại thì được cache một năm (<code>immutable</code>): thay nội dung là
+<code>v</code> đổi, tức địa chỉ đổi. Không kèm <code>v</code>, hay <code>v</code> cũ, thì cache một phút (công khai) hoặc
+hỏi lại máy chủ mỗi lần (riêng tư). Chuyển item sang riêng tư không xoá được bản đã nằm
+trong cache (trình duyệt, CDN); cần vậy thì thay nội dung của nó.</li>
+<li><strong>An toàn</strong>: chỉ ảnh raster được mở ngay trong trình duyệt (<code>Content-Disposition: inline</code>); mọi loại khác, kể cả SVG và PDF, là tải về (<code>attachment</code>). Mọi response có
+<code>X-Content-Type-Options: nosniff</code> và <code>Content-Security-Policy: default-src 'none'; sandbox</code>, nên nội dung không chạy được script trên tên miền của bạn. Thêm nữa, SVG chứa
+bất cứ thứ gì chạy được (<code>&lt;script&gt;</code>, thuộc tính <code>on…=</code>, liên kết <code>javascript:</code>, HTML nhúng),
+ở bất cứ đâu trong file, bị từ chối khi tải lên (<code>415 media.svg_active_content</code>).</li>
+<li><strong>Metadata</strong>: file gốc được trả đúng như lúc tải lên, kể cả metadata — EXIF của ảnh chụp
+có thể chứa nơi chụp và số máy. Cần thì xoá trước khi tải lên; các bản thu nhỏ bên dưới
+không mang metadata nào.</li>
+<li><strong>Video và file lớn</strong>: một <code>Range: bytes=…</code> được trả <code>206</code> (tua video được); khoảng nằm
+ngoài nội dung thì <code>416</code>. <code>HEAD</code> chỉ trả header. <code>If-None-Match</code> với <code>ETag</code> thì <code>304</code>.</li>
+</ul>
+<h2 id="ảnh-thu-nhỏ"><a class="header" href="#ảnh-thu-nhỏ">Ảnh thu nhỏ</a></h2>
+<p>Vài giây sau khi tải lên (hay thay nội dung), một job nền làm các bản nhỏ hơn của mọi ảnh
+JPEG, PNG, GIF và WebP, theo các chiều rộng trong <code>AUTOXIDE_MEDIA_IMAGE_WIDTHS</code> (mặc định
+<code>320,640,1280,1920</code>; chỉ những cỡ nhỏ hơn ảnh; <code>off</code> để tắt). Ảnh được xoay đúng chiều (theo
+EXIF), giữ tỉ lệ, lưu dạng JPEG — hoặc PNG khi ảnh có phần trong suốt. Item liệt kê chúng
+trong <code>variants</code>, mỗi bản có <code>url</code> riêng (<code>url</code> của item thêm <code>&amp;w=&lt;rộng&gt;</code>), dùng ngay cho
+<code>srcset</code>:</p>
+<pre><code class="language-html">&lt;img src="/api/v1/media/…/content?v=…&amp;w=640"
+     srcset="…&amp;w=320 320w, …&amp;w=640 640w, …&amp;w=1280 1280w" sizes="100vw" alt="…"&gt;
+</code></pre>
+<p>Khi bản thu nhỏ chưa làm xong, xin nó thì nhận bản gốc, cache ngắn. Ảnh hơn 40 triệu pixel,
+ảnh AVIF và SVG không có bản thu nhỏ. Thay nội dung thì làm bản mới và xoá bản cũ. Bản thu
+nhỏ theo chế độ công khai và thùng rác của item.</p>
+<p>Đổi <code>AUTOXIDE_MEDIA_IMAGE_WIDTHS</code> chỉ áp cho ảnh tải lên sau đó. Để ảnh đã tải lên trước cũng
+có đúng các cỡ mới, chạy lệnh này một lần sau khi khởi động lại với cấu hình mới; worker làm
+bản thu nhỏ ở nền (<code>dry_run=true</code> thì chỉ đếm):</p>
+<pre><code class="language-bash">autoxide task media.refresh_variants
+</code></pre>
+<h3 id="bản-webp"><a class="header" href="#bản-webp">Bản WebP</a></h3>
+<p>Bên cạnh mỗi bản JPEG hay PNG, job còn làm một bản WebP cùng cỡ, thường nhẹ hơn nhiều: với
+một ảnh chụp thử, nhẹ hơn bản JPEG khoảng 55–60%, và với ảnh có phần trong suốt thì nhẹ hơn
+bản PNG trên 90% (3,3 MB xuống 80 KB ở 1920 px). Mỗi mục của <code>variants</code> cho địa chỉ của nó ở
+<code>webp_url</code> (<code>url</code> của bản đó thêm <code>&amp;format=webp</code>) và dung lượng ở <code>webp_size</code>. Để trình duyệt
+tự chọn: trình duyệt đọc được WebP lấy <code>&lt;source&gt;</code>, trình duyệt khác lấy <code>&lt;img&gt;</code>:</p>
+<pre><code class="language-html">&lt;picture&gt;
+  &lt;source type="image/webp"
+          srcset="…&amp;w=320&amp;format=webp 320w, …&amp;w=640&amp;format=webp 640w" sizes="100vw"&gt;
+  &lt;img src="…&amp;w=640" srcset="…&amp;w=320 320w, …&amp;w=640 640w" sizes="100vw" alt="…"&gt;
+&lt;/picture&gt;
+</code></pre>
+<p>Bản công khai của module nội dung (<code>featured_media</code>, <code>body_media</code>) mang cùng <code>webp_url</code>.
+<code>webp_url</code> là <code>null</code> khi bản WebP chưa làm xong; xin địa chỉ có <code>&amp;format=webp</code> trước lúc đó thì
+nhận bản JPEG hay PNG, cache ngắn. Ảnh có bản thu nhỏ làm từ trước khi có bản WebP nhận chúng
+bằng đúng lệnh trên: <code>autoxide task media.refresh_variants</code> (lệnh cũng xếp những ảnh chỉ thiếu
+bản WebP). Làm bản WebP tốn thời gian của job nền gấp khoảng ba lần bản JPEG (thêm chừng một
+phần tư giây cho mỗi ảnh chụp với các cỡ mặc định); request không bị chậm đi.</p>
+<h3 id="bản-avif"><a class="header" href="#bản-avif">Bản AVIF</a></h3>
+<p>Đặt <code>AUTOXIDE_MEDIA_AVIF=true</code> (mặc định tắt) thì máy chủ làm thêm một bản AVIF cho mỗi ảnh thu
+nhỏ, bằng một job nền riêng sau khi ảnh thu nhỏ đã lưu — không bao giờ trong lúc tải lên. Cùng
+chất lượng nhìn, bản AVIF nhẹ hơn bản WebP khoảng một phần ba (28–44% trên bộ ảnh thử,
+<code>docs/BENCHMARKS.md</code>), nhưng làm nó tốn vài giây CPU mỗi ảnh (tới khoảng 8 giây cho bốn cỡ mặc
+định của một ảnh chụp 4000 × 2250), nên chỉ bật khi máy chủ dư CPU. Bộ mã hoá AVIF không có trong bản
+build mặc định (nó kéo một thư viện lúc biên dịch đã ngừng bảo trì): trước hết build máy chủ bằng
+<code>cargo build --release --features avif</code>; bản build mặc định từ chối khởi động khi
+<code>AUTOXIDE_MEDIA_AVIF=true</code> và nói rõ lý do. Khi đó mỗi mục của <code>variants</code>
+có <code>avif_url</code> (<code>url</code> thêm <code>&amp;format=avif</code>) và <code>avif_size</code>; đặt nó lên đầu:</p>
+<pre><code class="language-html">&lt;picture&gt;
+  &lt;source type="image/avif" srcset="…&amp;w=320&amp;format=avif 320w, …&amp;w=640&amp;format=avif 640w" sizes="100vw"&gt;
+  &lt;source type="image/webp" srcset="…&amp;w=320&amp;format=webp 320w, …&amp;w=640&amp;format=webp 640w" sizes="100vw"&gt;
+  &lt;img src="…&amp;w=640" srcset="…&amp;w=320 320w, …&amp;w=640 640w" sizes="100vw" alt="…"&gt;
+&lt;/picture&gt;
+</code></pre>
+<p><code>avif_url</code> là <code>null</code> khi bản đó chưa làm xong (hay máy chủ không làm); xin địa chỉ có
+<code>&amp;format=avif</code> trước lúc đó thì nhận bản WebP (hay bản JPEG / PNG), cache ngắn. Sau khi bật, lệnh
+<code>autoxide task media.refresh_variants</code> xếp việc làm bản AVIF cho các ảnh đã tải lên trước đó. Tắt
+thì không làm bản mới; bản đã làm vẫn được phục vụ.</p>
+<h2 id="nhãn"><a class="header" href="#nhãn">Nhãn</a></h2>
+<p>Ngoài một thư mục, item mang được tối đa 20 nhãn (mỗi nhãn 1 tới 50 ký tự, không có <code>,</code>).
+Nhãn được tạo khi lần đầu gắn cho một item. <code>/api/v1/media/tags</code> liệt kê nhãn, kèm số item
+(ngoài thùng rác) mang mỗi nhãn, đổi tên (<code>PATCH</code>, kèm <code>If-Match</code>) hay xoá nhãn (<code>DELETE</code>,
+gỡ khỏi mọi item). Tên nhãn không trùng, không phân biệt hoa thường.</p>
+<h2 id="thư-mục"><a class="header" href="#thư-mục">Thư mục</a></h2>
+<p><code>/api/v1/media/folders</code>: tạo (<code>POST</code>, <code>name</code> và <code>parent_id</code>), liệt kê (<code>GET</code>, lọc
+<code>parent_id=root|&lt;id&gt;</code>, <code>sort=created_at|name</code>), đọc, đổi tên hay chuyển (<code>PATCH</code>, kèm
+<code>If-Match</code>), xoá (<code>DELETE</code>). Mỗi thư mục có <code>item_count</code>: số item nằm thẳng trong nó, không
+tính thùng rác. Thư mục lồng nhau được. Tên không trùng trong cùng thư mục
+cha, không phân biệt hoa thường. Không chuyển được thư mục vào chính nó hay thư mục con
+của nó (<code>409</code>, <code>media.folder_cycle</code>). Chỉ xoá được thư mục trống — item trong thùng rác
+cũng tính (<code>409</code>, <code>media.folder_not_empty</code>).</p>
+<h2 id="thùng-rác"><a class="header" href="#thùng-rác">Thùng rác</a></h2>
+<ul>
+<li><code>DELETE /api/v1/media/{id}</code> cho item vào thùng rác: link công khai thôi chạy, người có
+<code>media.read</code> vẫn thấy (<code>GET /api/v1/media?trashed=true</code>).</li>
+<li><code>POST /api/v1/media/{id}/restore</code> lấy ra.</li>
+<li><code>POST /api/v1/media/{id}/purge</code> (permission <code>media.purge</code>) xoá hẳn.</li>
+<li>Item nằm trong thùng rác <code>AUTOXIDE_MEDIA_TRASH_DAYS</code> ngày (mặc định 30), rồi một job
+hằng ngày xoá hẳn. Một job hằng ngày khác xoá nội dung không còn item nào trỏ tới (vd do
+tải lên bị ngắt), chỉ khi nó cũ hơn một ngày.</li>
+</ul>
+<h2 id="gợi-ý-alt-text"><a class="header" href="#gợi-ý-alt-text">Gợi ý alt text</a></h2>
+<p><code>POST /api/v1/media/{id}/alt-suggestions</code> với <code>{"locale": "vi", "context": "…"}</code> (permission
+<code>media.write</code>) nhờ mô hình AI của máy chủ gợi ý alt text cho một ảnh JPEG, PNG, GIF hay WebP
+bằng ngôn ngữ đó. Gửi một bản nhỏ (tối đa 1280 px), làm lại không kèm metadata kể cả khi ảnh
+gốc đã nhỏ, không bao giờ gửi file gốc; ảnh riêng tư chỉ
+gửi khi <code>AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true</code>. Không lưu gì: người xem rồi lưu bằng <code>PATCH</code> (ngôn
+ngữ mặc định) hay <code>PUT /api/v1/media/{id}/alts/{locale}</code> (ngôn ngữ khác). <code>decorative: true</code> nghĩa là
+ảnh không thêm thông tin — để alt trống. Thân bài cũng có thể đặt alt riêng trên node ảnh của nó, và
+alt đó được ưu tiên hơn alt của item. Bật AI: <a href="AI.vi.html"><code>AI.vi.md</code></a>.</p>
+<p>Khi alt mặc định đã lưu lấy từ gợi ý, gửi kèm <code>"alt_ai_assisted": true</code> (<code>PATCH /api/v1/media/{id}</code>,
+MCP <code>media.update</code>); gửi <code>false</code> khi một người đã viết lại. Item trả <code>alt_ai_assisted</code>, ảnh của bài
+công khai cũng vậy (chỉ khi ảnh dùng alt của thư viện), để giao diện gắn nhãn (Luật Trí tuệ nhân tạo
+134/2025/QH15, từ 1/3/2026 — hình thức nhãn còn cần đối chiếu nghị định hướng dẫn).</p>
+<h2 id="ai-agent-mcp"><a class="header" href="#ai-agent-mcp">AI agent (MCP)</a></h2>
+<p>Tool <code>media.list</code>, <code>media.get</code>, <code>media.update</code>, <code>media.set_alt</code>, <code>media.trash</code>,
+<code>media.list_tags</code>, <code>media.upload</code> và <code>media.suggest_alt</code>, cùng permission với endpoint REST.
+<code>media.update</code> và <code>media.set_alt</code> nhận <code>updated_at</code> đã đọc thay cho <code>If-Match</code>. <code>media.upload</code> nhận nội dung dạng base64, tối đa 1 MiB sau khi giải mã —
+nhưng cả lời gọi tool còn phải lọt <code>AUTOXIDE_HTTP_BODY_LIMIT_BYTES</code> (mặc định 1 MiB), mà
+base64 dài hơn một phần ba, nên với giới hạn mặc định chỉ file tới khoảng 750 KiB là vừa; file
+lớn hơn thì tải lên qua REST.</p>
+<p><code>media.write</code> cho người giữ nó thấy mọi item nó thay đổi — ví dụ bằng cách đổi item riêng tư
+thành công khai — nên chỉ cấp cho người cũng được xem thư viện.</p>
+<h2 id="cho-người-viết-module"><a class="header" href="#cho-người-viết-module">Cho người viết module</a></h2>
+<p>Module khác đọc media qua trait <code>autoxide_media::api::Media</code> (đăng ký sau <code>media</code>):
+<code>find_many(&amp;ids)</code> trả về, trong hai câu query cho bao nhiêu ID cũng được, ID, visibility,
+loại, kích thước ảnh, <code>alt</code>, <code>url</code> và ảnh thu nhỏ của mỗi item không ở thùng rác.
+<code>find_many_in(&amp;ids, locale)</code> làm như vậy, với <code>alt</code> bằng ngôn ngữ đó khi item có bản dịch (thêm một
+câu query), không thì bản mặc định. Bảng của module mình chỉ giữ ID của item.</p>
+<h2 id="khi-một-tài-khoản-bị-xoá"><a class="header" href="#khi-một-tài-khoản-bị-xoá">Khi một tài khoản bị xoá</a></h2>
+<p>Item thuộc về thư viện, không thuộc người tải lên: item vẫn còn, <code>uploaded_by</code> thành
+<code>null</code>. Bản xuất dữ liệu cá nhân liệt kê các item người đó đã tải lên.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../docs/INVENTORY.vi.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../docs/MENUS.vi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../docs/INVENTORY.vi.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../docs/MENUS.vi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../version-switcher-28847120.js"></script>
+
+
+
+    </div>
+    </body>
+</html>
