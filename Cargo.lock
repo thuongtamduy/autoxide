@@ -469,6 +469,7 @@ name = "autoxide-catalog"
 version = "0.19.0"
 dependencies = [
  "async-trait",
+ "autoxide-compliance",
  "autoxide-files",
  "autoxide-kernel",
  "autoxide-media",

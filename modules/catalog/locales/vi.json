@@ -17,6 +17,7 @@
   "catalog.documents_required": "Hàng kinh doanh có điều kiện cần giấy tờ còn hạn: {documents}.",
   "catalog.invalid_status_transition": "Không chuyển được sản phẩm từ `{from}` sang `{to}`.",
   "catalog.last_variant": "Sản phẩm phải còn ít nhất một biến thể; hãy xoá sản phẩm thay vì biến thể cuối.",
+  "catalog.seller_verification_unavailable": "Khách này là sàn nhưng chưa bật định danh người bán (module `compliance`), nên hàng của người bán chưa mở bán được. Bật module `compliance`, hoặc đăng hàng ở nút gốc của khách.",
   "catalog.listing_denied": "Sản phẩm này chưa mở bán được ({reason}): {detail}",
   "catalog.media_not_public": "Media `{id}` không công khai (hay không có): ảnh sản phẩm phải là media công khai.",
   "catalog.option_combination_taken": "Sản phẩm đã có biến thể với tổ hợp tuỳ chọn này.",

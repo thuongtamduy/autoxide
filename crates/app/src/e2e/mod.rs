@@ -39,6 +39,7 @@ pub(crate) mod restore_drill;
 pub(crate) mod sandbox;
 pub(crate) mod sandbox_copy;
 pub(crate) mod sandbox_isolation;
+pub(crate) mod seller_kyc;
 pub(crate) mod sepay;
 pub(crate) mod shop;
 pub(crate) mod signup;
