@@ -960,6 +960,12 @@ endpoints are marked deprecated with a sunset date first.
   or moves to another tenant, mail links stop going there — on other servers within
   `AUTOXIDE_TENANCY_CACHE_SECONDS` (default 10 seconds).
 
+### Breaking (Rust)
+
+- `autoxide-compliance` — pub trait removed or renamed (`trait_missing`)
+- `autoxide-kernel` — enum marked #[non_exhaustive] (`enum_marked_non_exhaustive`)
+- `autoxide-kernel` — pub fn removed or renamed (`function_missing`)
+
 ## [0.19.0] - 2026-11-24
 
 ### Added
