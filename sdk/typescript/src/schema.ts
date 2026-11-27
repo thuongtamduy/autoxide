@@ -17423,6 +17423,13 @@ export type LedgerSealStatus = {
 /** Debit or credit. */
 export type LedgerSide = "debit" | "credit";
 
+/** The partner's answer to simulate. */
+export type LedgerSimulatePaymentRequest = {
+  amount?: Money | null;
+  /** `succeeded` (the partner collected the money) or `failed` (the buyer did not pay). */
+  outcome: string;
+};
+
 /** A trial balance. */
 export type LedgerTrialBalanceResponse = {
   accounts: LedgerTrialBalanceRow[];
@@ -45704,6 +45711,22 @@ export interface paths {
         409: Problem;
         422: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/payments/{id}/simulate": {
+    /** Simulate the partner's answer for a sandbox payment. */
+    post: {
+      parameters: { header: { "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: LedgerSimulatePaymentRequest;
+      responses: {
+        200: Data_LedgerPayment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

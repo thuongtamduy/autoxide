@@ -32,6 +32,8 @@ async fn app(test: &TestDatabase, enabled: bool) -> TestApp {
     builder
         .module(autoxide_mail::module())
         .module(autoxide_auth::module())
+        // Kho `Idempotency-Key` (lệnh ghi chạm tiền đi qua lớp idempotency của kernel).
+        .module(autoxide_idempotency::module())
         .contribute::<dyn PaymentGateway>(Arc::new(FakePaymentGateway::new()))
         .module(autoxide_ledger::module())
         .build()
