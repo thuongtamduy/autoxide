@@ -306,7 +306,13 @@ async fn simulate_payment(
 ) -> Result<Data<Payment>, Error> {
     let outcome = crate::simulate::Outcome::parse(&input.outcome)?;
     let payment = service
-        .simulate_payment(&tenant, &principal, id, outcome, input.amount.map(crate::simulate::Reported::Money))
+        .simulate_payment(
+            &tenant,
+            &principal,
+            id,
+            outcome,
+            input.amount.map(crate::simulate::Reported::Money),
+        )
         .await?;
     Ok(Data { data: payment })
 }
