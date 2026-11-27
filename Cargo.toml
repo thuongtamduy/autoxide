@@ -220,7 +220,7 @@ sha2 = "0.11"
 # Macro thủ tục của kernel (`autoxide-macros`, D-20261126-kernel-data-layer): đọc cú pháp Rust và sinh mã.
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
-syn = { version = "2.0.119", features = ["full"] }
+syn = { version = "3.0.10", features = ["full"] }
 base64 = "0.23"
 getrandom = "0.4"
 # Mã hoá secret khi lưu (AES-256-GCM, bước 33, D-257). Cả hai đã có trong cây phụ thuộc (`ring` qua
