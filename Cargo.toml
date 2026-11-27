@@ -94,7 +94,7 @@ axum = { version = "0.8", features = ["ws"] }
 # Bộ khớp route của axum, cùng bản lớn với bản axum dùng (cargo gộp về một bản): kernel hỏi nó trước khi ghép router
 # để báo route xung đột bằng lỗi rõ thay vì để axum dừng tiến trình. Luật `single-copy` của `xtask check` đỏ khi
 # Cargo.lock có hai bản; test `matchit_khop_voi_axum` của kernel đỏ khi luật khớp lệch (D-20261127-http-layer-choices).
-matchit = "0.8"
+matchit = "0.9"
 tower-http = { version = "0.7", features = [
   "catch-panic",
   "compression-br",
