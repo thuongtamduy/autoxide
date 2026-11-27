@@ -54,29 +54,28 @@ impl LedgerService {
         let found = Self::find_payment(tenant.database().read(), tenant, input.payment)
             .await?
             .ok_or_else(payment_not_found)?;
-        match self.refund_found(tenant, &found, &input, &reference, &reason).await {
-            // Từ chối hẳn ở bất cứ bước nào sau khi đã có thanh toán (chưa cấu hình đối tác, đối tác không hoàn,
-            // sai tiền tệ, vượt số còn lại, đối tác từ chối): tiền có thể vẫn ở đối tác — mở `refund_failed`
-            // (rà #591 C2). 409 / 429 / 5xx không phải từ chối: bên gọi gửi lại cùng mã.
-            Err(error) if crate::api::refund_refused(&error) => {
+        // Không ai hoàn được khoản này qua đối tác (chưa cấu hình đối tác — vd khoản chuyển khoản —, đối tác
+        // không hoàn / không hoàn một phần): tiền vẫn phải trả lại — mở `refund_failed` (rà #591 C2). Chỉ những
+        // lỗi này: lỗi của chính yêu cầu (vượt số còn lại, sai tiền tệ, mã dùng lại) chỉ trả lỗi, không mở mục
+        // bảo hoàn tay một số sai (rà #591 V-mới). Đối tác từ chối lúc gửi thì `fail_refund` mở mục.
+        let gateway = match self.refund_gateway(&found, &input) {
+            Ok(gateway) => gateway,
+            Err(error) => {
                 let details = json!({"payment_id": found.id, "reference": reference.as_str(),
                     "amount": input.amount, "reason": reason, "code": error.code()});
                 self.open_refund_failed(tenant, found.id, reference.as_str(), &details).await?;
-                Err(error)
+                return Err(error);
             }
-            other => other,
-        }
+        };
+        self.refund_found(tenant, &found, gateway, &input, &reference, &reason).await
     }
 
-    /// Phần của [`LedgerService::refund`] sau khi đã tìm thấy thanh toán `found`.
-    async fn refund_found(
+    /// Cổng hoàn được `input` cho thanh toán `found`, hay lỗi khi không đối tác nào hoàn được.
+    fn refund_gateway(
         &self,
-        tenant: &TenantContext,
         found: &payment::Model,
         input: &NewRefund,
-        reference: &Reference,
-        reason: &String,
-    ) -> Result<Submitted<Refund>, Error> {
+    ) -> Result<std::sync::Arc<dyn autoxide_kernel::payment::PaymentGateway>, Error> {
         let gateway = self.gateway(Some(&found.provider))?;
         let capabilities = gateway.capabilities();
         if !capabilities.refunds
@@ -84,6 +83,19 @@ impl LedgerService {
         {
             return Err(autoxide_kernel::payment::not_supported(gateway.provider()));
         }
+        Ok(gateway)
+    }
+
+    /// Phần của [`LedgerService::refund`] sau khi đã tìm thấy thanh toán `found`.
+    async fn refund_found(
+        &self,
+        tenant: &TenantContext,
+        found: &payment::Model,
+        gateway: std::sync::Arc<dyn autoxide_kernel::payment::PaymentGateway>,
+        input: &NewRefund,
+        reference: &Reference,
+        reason: &String,
+    ) -> Result<Submitted<Refund>, Error> {
         if input.amount.currency().code() != found.amount_currency {
             return Err(crate::service::currency_mixed());
         }

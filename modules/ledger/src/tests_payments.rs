@@ -639,3 +639,74 @@ async fn muc_cho_ghi_thu_duoc_cho_thanh_toan_da_hong() {
     .await
     .unwrap();
 }
+
+/// Rà #591 V-mới: lỗi của chính yêu cầu hoàn (vượt số còn lại, sai tiền tệ) chỉ trả lỗi — không mở mục bảo
+/// người vận hành hoàn tay một số sai.
+#[tokio::test]
+async fn loi_cua_yeu_cau_hoan_khong_mo_muc_cho() {
+    TestDatabase::run(async |test| {
+        let (app, gateway) = app(test).await;
+        let tenant = app.default_tenant();
+        let payment = pay(&app, 300_000, "OV").await;
+        assert_eq!(
+            webhook(&app, gateway.paid(payment.id, vnd(300_000), "evt-p")).await,
+            StatusCode::OK
+        );
+        drain(&app).await;
+        let over = NewRefund::new(payment.id, vnd(400_000), "typo", "R-over");
+        let refused = ledger(&app).refund(&tenant, Actor::system(), over).await.unwrap_err();
+        assert_eq!(refused.code(), "ledger.refund_exceeds_payment");
+        let usd = NewRefund::new(payment.id, Money::new(100, Currency::USD), "typo", "R-usd");
+        let refused = ledger(&app).refund(&tenant, Actor::system(), usd).await.unwrap_err();
+        assert!(crate::api::refund_refused(&refused), "{}", refused.code());
+        assert!(exceptions(&app).await.is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Rà #591 N-a: module nguồn báo giữ khoản về muộn (`keep_late_payment`) đóng mục `late_payment` (`kept`) —
+/// trừ khi khoản đã có lượt hoàn đang chờ hay hỏng (nguồn vừa đổi ý): mục còn mở.
+#[tokio::test]
+async fn giu_khoan_ve_muon_dong_muc_tru_khi_dang_hoan() {
+    TestDatabase::run(async |test| {
+        let (app, gateway) = app(test).await;
+        let tenant = app.default_tenant();
+        let late = |payment: &crate::api::Payment, event: &str| {
+            let provider_ref = gateway.provider_ref(payment.id).unwrap();
+            gateway.webhook(&json!({
+                "event_id": event, "kind": "payment_failed", "provider_ref": provider_ref,
+                "payment_id": payment.id, "amount": 100_000, "currency": "VND", "reason": "declined",
+            }))
+        };
+        // Hai khoản về sau khi đối tác đã báo hỏng: hai mục `late_payment`.
+        let kept = pay(&app, 100_000, "K").await;
+        let refunding = pay(&app, 100_000, "N").await;
+        for (payment, n) in [(&kept, "1"), (&refunding, "2")] {
+            assert_eq!(webhook(&app, late(payment, &format!("evt-f{n}"))).await, StatusCode::OK);
+            drain(&app).await;
+            let paid = gateway.paid(payment.id, vnd(100_000), &format!("evt-p{n}"));
+            assert_eq!(webhook(&app, paid).await, StatusCode::OK);
+            drain(&app).await;
+        }
+        assert_eq!(exceptions(&app).await.len(), 2);
+        // Khoản thứ hai đang được hoàn (đối tác chưa trả lời).
+        gateway.refunds_pending(true);
+        let refund = NewRefund::new(refunding.id, vnd(100_000), "late_payment", "R-n");
+        ledger(&app).refund(&tenant, Actor::system(), refund).await.unwrap();
+
+        for _ in 0..2 {
+            ledger(&app).keep_late_payment(&tenant, kept.id).await.unwrap();
+            ledger(&app).keep_late_payment(&tenant, refunding.id).await.unwrap();
+        }
+        let open = exceptions(&app).await;
+        assert_eq!(open.len(), 1, "{open:?}");
+        assert_eq!(open[0]["subject"], format!("ledger.payment:{}", refunding.id));
+        let (_, closed) = call(&app, "GET", "/exceptions?status=resolved", None).await;
+        assert_eq!(closed["data"].as_array().unwrap().len(), 1, "{closed}");
+        assert_eq!(closed["data"][0]["subject"], format!("ledger.payment:{}", kept.id));
+        assert_eq!(closed["data"][0]["resolution"], "kept");
+    })
+    .await
+    .unwrap();
+}

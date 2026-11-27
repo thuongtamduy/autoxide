@@ -454,9 +454,10 @@ impl NewPayment {
 /// sending the same refund again will never work (not supported, more than what is left, not configured,
 /// not found…). A server error (5xx), a conflict with work still in progress (409) and a rate limit (429)
 /// are not final: send the same refund again later, with the same `reference` (it is never refunded twice).
-/// When a refund of a payment the ledger knows is refused, the ledger opens a `refund_failed` item in its
-/// reconciliation queue (once per `reference`), unless nothing is left to refund or a `late_payment` item of
-/// the payment is still open.
+/// When no partner can make a refund (no partner configured for the payment, the partner does not refund
+/// it, or the partner refused it), the ledger opens a `refund_failed` item in its reconciliation queue (once
+/// per `reference`), unless nothing is left to refund or a `late_payment` item of the payment is still open.
+/// A mistake in the request itself (more than what is left, another currency) only returns the error.
 pub fn refund_refused(error: &Error) -> bool {
     use autoxide_kernel::error::ErrorKind;
     let kind = error.kind();

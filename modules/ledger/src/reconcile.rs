@@ -149,17 +149,35 @@ impl LedgerService {
     ) -> Result<(), Error> {
         // Handle `tenant.db()` của kernel (luật raw-database); lỗi tạm thì bên gọi (event) thử lại.
         let db = tenant.db();
+        // Gọi cho mọi khoản thu xong: tra theo khoá chống trùng (index unique), không có mục mở thì thôi (rà
+        // #591 N-b). Tra trong transaction ghi, không ở kết nối đọc: mục vừa mở ngay trước event, bản sao đọc
+        // có thể chưa thấy — bỏ sót thì mục bảo hoàn tay tiền của đơn đang đi tiếp.
         let transaction = db.begin_write().await?;
-        close_payment_items(
-            &transaction,
-            tenant,
-            &self.outbox,
-            payment,
-            &[LATE_PAYMENT],
-            "kept",
-            CLOSED_BY_SOURCE,
-        )
-        .await?;
+        let Some(item) = exception::Entity::find()
+            .filter(exception::Column::DedupeKey.eq(late_payment_key(payment)))
+            .filter(exception::Column::Status.eq("open"))
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+        else {
+            transaction.rollback().await?;
+            return Ok(());
+        };
+        // Đã có lượt hoàn đang chờ hay hỏng: nguồn vừa đổi ý (vd đơn bị huỷ ngay sau khi tính tiền) — mục còn
+        // phải mở để người vận hành thấy, không đóng `kept` (rà #591 N-a).
+        let refunding = refund::Entity::find()
+            .filter(refund::Column::PaymentId.eq(payment))
+            .filter(refund::Column::Status.is_in(["pending", "failed"]))
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .is_some();
+        if refunding {
+            transaction.rollback().await?;
+            return Ok(());
+        }
+        close_items(&transaction, tenant, &self.outbox, vec![item], "kept", CLOSED_BY_SOURCE)
+            .await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -220,7 +238,20 @@ pub(crate) async fn close_payment_items(
         .scoped(tenant)
         .all(transaction)
         .await?;
-    for row in open {
+    close_items(transaction, tenant, outbox, open, resolution, note).await
+}
+
+/// Trong `transaction`: đóng các mục `items` còn mở (`resolved`, `resolution`, không người xử lý), mỗi mục phát
+/// `ledger.exception_resolved` một lần.
+async fn close_items(
+    transaction: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    outbox: &autoxide_kernel::event::Outbox,
+    items: Vec<exception::Model>,
+    resolution: &str,
+    note: &str,
+) -> Result<(), Error> {
+    for row in items {
         let closed = exception::Entity::update_many()
             .col_expr(exception::Column::Status, Expr::value("resolved"))
             .col_expr(exception::Column::Resolution, Expr::value(resolution))
