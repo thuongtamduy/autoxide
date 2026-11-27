@@ -189,7 +189,11 @@ pub(crate) async fn create(
 fn stamp(row: &mut order::ActiveModel, to: OrderStatus, now: Timestamp) {
     match to {
         Confirmed => row.confirmed_at = Set(Some(now)),
-        Delivered => row.delivered_at = Set(Some(now)),
+        Delivered => {
+            row.delivered_at = Set(Some(now));
+            // Hàng đã tới tay người mua (kho ghi `sale` theo `orders.order_delivered`, UT-1).
+            row.fulfillment_status = Set("fulfilled".to_owned());
+        }
         Completed => row.completed_at = Set(Some(now)),
         Cancelled => row.cancelled_at = Set(Some(now)),
         PendingPayment | Preparing | Shipping | DeliveryFailed => {}

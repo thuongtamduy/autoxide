@@ -7,6 +7,8 @@
 //! | `orders.order_confirmed` | `confirm(order_id)` | `order_id` |
 //! | `orders.order_cancelled` | `release(order_id, Cancelled)` | `order_id` |
 //! | `orders.preorder_cancelled` | `release_lines(order_id, reference = event id)` — trả riêng các dòng | `order_id`, `lines[{line_key, quantity}]` (phần huỷ lần đó) |
+//! | `orders.fulfillment_delivered` | `fulfil`, `fulfilment_key = fulfillment:<fulfillment_id>` — một lần giao lẻ tới tay người mua | `order_id`, `fulfillment_id`, `lines[{line_key, quantity}]` |
+//! | `orders.order_delivered` | `fulfil` phần còn giữ, `fulfilment_key = order:<order_id>:delivered` (UT-1) | `order_id` |
 //! | `orders.return_received` | `restock`, `reference = return:<return_id>` | `return_id`, `order_id`, `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]` |
 
 use std::sync::Arc;
@@ -18,7 +20,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::{ReleaseReason, RestockLine, RestockRequest};
+use crate::api::{FulfilLine, FulfilRequest, ReleaseReason, RestockLine, RestockRequest};
 use crate::partial::CancelledLine;
 use crate::service::InventoryService;
 
@@ -26,6 +28,8 @@ pub(crate) const ORDER_CONFIRMED: &str = "orders.order_confirmed";
 pub(crate) const ORDER_CANCELLED: &str = "orders.order_cancelled";
 pub(crate) const RETURN_RECEIVED: &str = "orders.return_received";
 pub(crate) const PREORDER_CANCELLED: &str = "orders.preorder_cancelled";
+pub(crate) const ORDER_DELIVERED: &str = "orders.order_delivered";
+pub(crate) const FULFILLMENT_DELIVERED: &str = "orders.fulfillment_delivered";
 
 pub(crate) fn subscriptions(service: &Arc<InventoryService>) -> Vec<Subscription> {
     let listener = Arc::new(OrderEvents(service.clone()));
@@ -33,7 +37,10 @@ pub(crate) fn subscriptions(service: &Arc<InventoryService>) -> Vec<Subscription
         Subscription::optional(ORDER_CONFIRMED, listener.clone()),
         Subscription::optional(ORDER_CANCELLED, listener.clone()),
         Subscription::optional(RETURN_RECEIVED, listener.clone()),
-        Subscription::optional(PREORDER_CANCELLED, listener),
+        Subscription::optional(PREORDER_CANCELLED, listener.clone()),
+        // Hàng tới tay người mua thì rời kho: ghi dòng `sale` (UT-1).
+        Subscription::optional(FULFILLMENT_DELIVERED, listener.clone()),
+        Subscription::optional(ORDER_DELIVERED, listener),
     ]
 }
 
@@ -70,6 +77,14 @@ struct Returned {
 struct CancelledLineIn {
     line_key: String,
     quantity: i64,
+}
+
+/// `after` của `orders.fulfillment_delivered`.
+#[derive(Debug, Deserialize)]
+struct Arrived {
+    order_id: Uuid,
+    fulfillment_id: Uuid,
+    lines: Vec<CancelledLineIn>,
 }
 
 /// `after` của `orders.preorder_cancelled`.
@@ -140,6 +155,29 @@ impl EventHandler for OrderEvents {
                 let outcome = self.0.restock(tenant, &request).await;
                 settle(event, outcome)
             }
+            ORDER_DELIVERED => {
+                let Some(order) = order_id(after) else { return Ok(()) };
+                let request =
+                    FulfilRequest::new(order, format!("order:{order}:delivered"), Vec::new());
+                let outcome = self.0.fulfil(tenant, &request).await.map(|_| ());
+                Self::issued(event, outcome)
+            }
+            FULFILLMENT_DELIVERED => {
+                let Ok(arrived) = serde_json::from_value::<Arrived>(after.clone()) else {
+                    tracing::warn!(event_id = %event.id, "orders.fulfillment_delivered without the fields inventory reads; ignored");
+                    return Ok(());
+                };
+                let lines = arrived
+                    .lines
+                    .into_iter()
+                    .filter(|line| line.quantity > 0)
+                    .map(|line| FulfilLine::new(line.line_key, line.quantity))
+                    .collect();
+                let key = format!("fulfillment:{}", arrived.fulfillment_id);
+                let request = FulfilRequest::new(arrived.order_id, key, lines);
+                let outcome = self.0.fulfil(tenant, &request).await.map(|_| ());
+                Self::issued(event, outcome)
+            }
             PREORDER_CANCELLED => {
                 let Ok(cancelled) = serde_json::from_value::<Cancelled>(after.clone()) else {
                     tracing::warn!(event_id = %event.id, "orders.preorder_cancelled without the fields inventory reads; ignored");
@@ -160,5 +198,18 @@ impl EventHandler for OrderEvents {
             }
             _ => Ok(()),
         }
+    }
+}
+
+impl OrderEvents {
+    /// Kết quả xuất kho theo event giao hàng: đơn không có chỗ giữ (hàng số, dịch vụ) là xong, không cảnh báo;
+    /// lỗi nghiệp vụ khác như [`settle`] (vd hàng theo serial cần nhân viên nhập số serial — xuất tay qua REST).
+    fn issued(event: &Delivered, outcome: Result<(), Error>) -> Result<(), Error> {
+        if let Err(error) = &outcome
+            && error.code() == "inventory.reservation_not_found"
+        {
+            return Ok(());
+        }
+        settle(event, outcome)
     }
 }

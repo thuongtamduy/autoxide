@@ -45,8 +45,12 @@ pub mod events {
     pub const ORDER_STATUS_CHANGED: &str = "orders.order_status_changed";
     /// An order cancelled: holders release their holds. `after`: `order_id`, `hold_reference`, `cause`.
     pub const ORDER_CANCELLED: &str = "orders.order_cancelled";
-    /// An order fully delivered.
+    /// An order fully delivered. `inventory` issues the stock still held for it (`sale` lines).
     pub const ORDER_DELIVERED: &str = "orders.order_delivered";
+    /// One shipment of an order split in several reached the buyer while other units are still on the way:
+    /// `after.order_id`, `after.fulfillment_id`, `after.lines` (`line_key`, `quantity`). `inventory` issues
+    /// these units (`sale` lines); the rest goes with `orders.order_delivered`.
+    pub const FULFILLMENT_DELIVERED: &str = "orders.fulfillment_delivered";
     /// An order completed (return window over, no longer deferred): the trigger for commission, points, seller payout.
     pub const ORDER_COMPLETED: &str = "orders.order_completed";
     /// A request to ship a parcel: `after.shipment` is the `ShipmentRequest` of `shipping`.

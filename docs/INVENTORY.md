@@ -68,6 +68,11 @@ Module `orders` holds stock through `autoxide_inventory::api::Inventory`:
    are skipped. Variants sold as `backorder` or `preorder` may take `available` below 0 (`backordered`).
 2. `confirm` — the order was placed: the reservation no longer expires.
 3. `fulfil` — ship some or all reserved units (`fulfilment_key` makes it safe to retry); writes `sale` lines.
+   With module `orders`, stock leaves when the goods reach the buyer: `inventory` listens to
+   `orders.fulfillment_delivered` (one shipment of a split order; key `fulfillment:<id>`) and
+   `orders.order_delivered` (the rest; key `order:<id>:delivered`), so `on_hand` and `reserved` drop and the
+   order becomes `fulfilled`. Units on the way stay reserved (already out of `available`). Serial-tracked
+   goods need their serial numbers: issue them through `fulfil` yourself (the event logs a warning).
 4. `release` — give back what was not shipped (cancelled, payment failed…). Releasing twice adds back once.
 5. `restock` — returned goods come back in (`reference` such as `return:<id>`); unsellable lines are only recorded.
 

@@ -801,6 +801,11 @@ impl InventoryService {
                     return load(&transaction, tenant, row).await;
                 }
                 let status = status_of(&row)?;
+                // "Xuất phần còn lại" khi đã xuất hết: không còn gì để xuất (vd lần giao lẻ tới trước phần còn
+                // lại của đơn, UT-1).
+                if request.lines.is_empty() && status == ReservationStatus::Fulfilled {
+                    return load(&transaction, tenant, row).await;
+                }
                 if !matches!(status, ReservationStatus::Held | ReservationStatus::Confirmed) {
                     return Err(expired(order));
                 }

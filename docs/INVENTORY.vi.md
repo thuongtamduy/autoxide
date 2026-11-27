@@ -67,6 +67,10 @@ Module `orders` giữ hàng qua `autoxide_inventory::api::Inventory`:
    (`backordered`).
 2. `confirm` — đơn đã đặt: chỗ giữ không còn hạn.
 3. `fulfil` — xuất một phần hay hết số đã giữ (`fulfilment_key` để gọi lại an toàn); ghi dòng sổ `sale`.
+   Có module `orders` thì hàng rời kho khi tới tay người mua: `inventory` nghe `orders.fulfillment_delivered`
+   (một lần giao của đơn chia nhiều lần; khoá `fulfillment:<id>`) và `orders.order_delivered` (phần còn lại; khoá
+   `order:<id>:delivered`), nên `on_hand` và `reserved` giảm, đơn thành `fulfilled`. Hàng đang trên đường vẫn
+   giữ (đã trừ khỏi `available`). Hàng theo serial cần số serial: tự xuất qua `fulfil` (event ghi cảnh báo).
 4. `release` — trả phần chưa xuất (huỷ đơn, thanh toán lỗi…). Trả hai lần chỉ cộng lại một lần.
 5. `restock` — nhập lại hàng trả về (`reference` như `return:<id>`); dòng không bán lại được chỉ được ghi nhận.
 

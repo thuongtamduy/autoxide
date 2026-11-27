@@ -23,7 +23,7 @@ use crate::api::OrderStatus;
 use crate::carts::ShipTo;
 use crate::entity::{fulfillment, line, order};
 use crate::errors;
-use crate::events::{Change, FulfillmentRequested};
+use crate::events::{Change, FulfillmentDelivered, FulfillmentRequested};
 use crate::lifecycle::{self, Cause, Transition};
 use crate::payments;
 use crate::permissions::MANAGE;
@@ -263,6 +263,18 @@ impl OrdersService {
             OrderStatus::DeliveryFailed => FAILED,
             _ => return Ok(false),
         };
+        // Lần giao vừa tới tay người mua (chưa ghi `delivered` trước đó): báo `inventory` xuất kho phần này.
+        let arrived: Vec<fulfillment::Model> = if status == DELIVERED {
+            fulfillment::Entity::find()
+                .filter(fulfillment::Column::OrderId.eq(order_id))
+                .filter(fulfillment::Column::RequestKey.eq(request_key))
+                .filter(fulfillment::Column::Status.ne(DELIVERED))
+                .scoped(tenant)
+                .all(transaction)
+                .await?
+        } else {
+            Vec::new()
+        };
         fulfillment::Entity::update_many()
             .col_expr(fulfillment::Column::Status, status.into())
             .col_expr(fulfillment::Column::UpdatedAt, crate::service::now().into())
@@ -280,7 +292,39 @@ impl OrdersService {
             .await?;
         let rows = fulfillments_of(transaction, tenant, order_id).await?;
         // Đơn cũ chưa có lần giao nào (yêu cầu trước khi có bảng này): theo vận đơn như trước.
-        Ok(rows.is_empty() || all_delivered(&lines, &rows))
+        let complete = rows.is_empty() || all_delivered(&lines, &rows);
+        // Đơn giao xong hết thì `orders.order_delivered` mang phần còn lại; chỉ lần giao lẻ cần event riêng.
+        if !complete {
+            for row in arrived {
+                let delivered: Vec<Value> = lines_of(&row)
+                    .iter()
+                    .filter_map(|shipped| {
+                        let line = lines.iter().find(|line| line.id == shipped.line_id)?;
+                        Some(json!({"line_key": line.line_key, "quantity": shipped.quantity}))
+                    })
+                    .collect();
+                let event = FulfillmentDelivered(Change::after(json!({
+                    "order_id": order_id, "fulfillment_id": row.id, "lines": delivered,
+                })));
+                self.outbox
+                    .record(
+                        transaction,
+                        tenant,
+                        Actor::system(),
+                        Some(format!("orders.order:{order_id}")),
+                        &event,
+                    )
+                    .await?;
+            }
+            order::Entity::update_many()
+                .col_expr(order::Column::FulfillmentStatus, "partial".into())
+                .filter(order::Column::Id.eq(order_id))
+                .filter(order::Column::FulfillmentStatus.eq("unfulfilled"))
+                .scoped(tenant)
+                .exec(transaction)
+                .await?;
+        }
+        Ok(complete)
     }
 }
 
