@@ -20,16 +20,33 @@ Thay bằng chỉ mục đảo `content_published_words` — bảng thường c�
   `entry_id IN (…)` trên chỉ mục); từ từ 3 ký tự trở lên khớp **tiền tố** bằng khoảng `word >= w AND word < w_next`
   (`next_prefix`: tăng ký tự cuối lên ký tự kế tiếp, bỏ qua vùng surrogate, ký tự cuối là `char::MAX` thì tăng ký tự
   trước), từ 1–2 ký tự khớp nguyên từ. Câu không còn từ nào thì không có kết quả.
-- **Hai bước**: (1) `matching_ids` lấy tối đa `MATCH_CAP` (1 000) ID khớp, mới đăng trước, trong khách, ngôn ngữ,
-  loại, bỏ bài bị ẩn, chỉ bài ở các nút của website người gọi (`org_id` thuộc chuỗi nút) và bỏ bài `noindex` khi là
-  gợi ý — câu duy nhất chạm chỉ mục; (2) câu thường như cũ (điều kiện "hiện trên website" đầy đủ `reading::on_site`
-  với bài bị che ở nút gần hơn, phân loại, tác giả, keyset pagination) thêm `entry_id IN (…)`. Lọc nút ở bước (1): nếu
-  không, 1 000 bài khớp mới hơn ở website khác của cùng khách lấp hết trần và website này không thấy gì.
+- **Các bước của một lần tìm** (`matching_ids`), mỗi bước đọc có trần số dòng để từ rất phổ biến không làm câu đọc hết
+  chỉ mục của khách (review của #573):
+  1. Mỗi từ: ID bài có từ đó, tối đa `TERM_ROWS_MAX` (5 000) dòng chỉ mục. Từ không có dòng nào: không có kết quả. Từ
+     vượt trần là "phổ biến".
+  2. Có ít nhất một từ không phổ biến: giao các tập đủ (từ nhỏ nhất), kiểm từ phổ biến bằng khoá chính
+     `(tenant_id, entry_id, word)` trên chính các bài còn lại (danh sách `IN` tối đa 500 ID mỗi câu), rồi lọc bài theo
+     website / ngôn ngữ / loại / bị ẩn / `noindex`, lấy tối đa `MATCH_CAP` (1 000) bài mới đăng trước.
+  3. Mọi từ đều phổ biến: duyệt bài hiện trên website, mới đăng trước, từng trang 1 000 bài (keyset theo ngày đăng và
+     ID), kiểm mọi từ bằng khoá chính, tới khi đủ `MATCH_CAP` bài hay đã duyệt `SCAN_ENTRIES_MAX` (5 000) bài. Kết quả
+     là các bài khớp trong chừng ấy bài mới nhất — từ phổ biến vốn khớp phần lớn bài.
+
+  Lọc website trước khi cắt trần: nếu không, 1 000 bài khớp mới hơn ở website khác của cùng khách lấp hết trần và
+  website này không thấy gì. Sau bước này, câu thường như cũ (điều kiện "hiện trên website" đầy đủ `reading::on_site`
+  với bài bị che ở nút gần hơn, phân loại, tác giả, keyset pagination) thêm `entry_id IN (…)`. Số câu tối đa một lần
+  tìm: chừng 100 (bước 2) / 85 (bước 3), mỗi câu đi theo index; mọi câu chung một hạn.
 - **Không SQL viết tay**: bước (1) dựng bằng bộ dựng câu của lớp `db` của kernel (`tenant.db().read()`, `Record`
   `PublishedHit` và `IndexedWord` chỉ để đọc; ghi vẫn qua entity SeaORM của module cho tới khi chuyển cả module), nên
   lọc khách do handle của kernel làm, cả trong subquery của từng từ.
-- **Trần thời gian** (điểm còn lại của #548): `Find::within(2 s)` của kernel (D-20261127-db-read-within) — database
-  dừng câu khi quá trần và khi người gọi thôi chờ; quá hạn → `503 content.public_search_timeout` (mã đã có).
+- **Trần thời gian** (điểm còn lại của #548): `Find::within` của kernel (D-20261127-db-read-within), mọi câu của một
+  lần tìm chung hạn 2 s — database dừng câu khi quá hạn và khi người gọi thôi chờ; quá hạn → `503
+  content.public_search_timeout` (mã đã có).
+- **Chốt tìm công khai**: danh sách bài có `q` và gợi ý tìm đi qua cùng chốt với `GET /public/search`
+  (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, `…_PER_ADDRESS_PER_MINUTE`): 429 khi vượt. Gợi ý không biết địa chỉ
+  người đọc nên chỉ tính số lượt cùng lúc; hết chỗ thì bộ gợi ý bỏ nguồn `content`.
+- **Ghi**: mỗi câu `INSERT` tối đa 200 dòng (800 tham số bind), cả khi đăng lẫn trong backfill, dưới trần của SQLite
+  (999 ở bản cũ) và Postgres (65 535). Migration xoá bảng nếu còn từ lần chạy hỏng trước rồi dựng lại (dữ liệu dẫn
+  xuất), nên chạy lại được.
 - Tìm bản nháp (người biên tập, cần `content.read`) giữ `LIKE` như mọi ô tìm trong module (bảng nháp nhỏ hơn và
   không công khai).
 
@@ -62,5 +79,6 @@ làm cho cả hai database), không cần ngoại lệ hay SQL viết tay.
 - Trần ở tầng task (`tokio::time::timeout`): câu còn chạy nốt ở nền sau khi trả lỗi, không phải trần thật.
 
 Hệ quả: tìm chữ công khai khớp **theo từ** (tiền tố), không còn theo chuỗi con: `lat` vẫn tìm thấy `Đà Lạt`
-nhưng `alat` thì không. Ghi ở changelog. Module khác cần tìm chữ công khai trên bảng lớn thì đưa mẫu chỉ mục đảo lên
+nhưng `alat` thì không. Chữ viết liền không có khoảng trắng (tiếng Trung, Nhật, Thái…) thành một "từ" dài: đoạn dài
+quá 64 ký tự không vào chỉ mục và không tìm được; tìm được bằng phần đầu của đoạn (tiền tố). Ghi ở changelog. Module khác cần tìm chữ công khai trên bảng lớn thì đưa mẫu chỉ mục đảo lên
 kernel thay vì chép.

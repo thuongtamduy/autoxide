@@ -240,6 +240,21 @@ pub(crate) fn on_site(lineage: &[Uuid]) -> sea_orm::Condition {
 }
 
 impl ContentService {
+    /// Như [`public_posts`](Self::public_posts), cho người đọc ở địa chỉ `ip` qua endpoint công khai: có tìm theo chữ
+    /// (`search`) thì giữ một chỗ của chốt tìm công khai (số lượt cùng lúc, số lượt mỗi phút theo địa chỉ; 429 khi
+    /// vượt) tới khi trả lời. Client ngắt thì chỗ được trả và database dừng câu đang chạy (`within`).
+    pub(crate) async fn public_posts_for(
+        &self,
+        tenant: &TenantContext,
+        filter: &PostFilter,
+        page: &PageRequest,
+        ip: Option<std::net::IpAddr>,
+    ) -> Result<Page<Published>, Error> {
+        let searching = filter.search.as_deref().is_some_and(|search| !search.trim().is_empty());
+        let _slot = if searching { Some(self.admit_public_search(ip)?) } else { None };
+        self.public_posts(tenant, filter, page).await
+    }
+
     /// Bài đã đăng của một ngôn ngữ, mới nhất trước (theo ngày đăng hiển thị).
     pub(crate) async fn public_posts(
         &self,

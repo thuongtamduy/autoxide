@@ -53,35 +53,49 @@ async fn backfill(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
         if rows.is_empty() {
             return Ok(());
         }
-        let mut insert = Query::insert();
-        insert.into_table(TABLE).columns(["tenant_id", "entry_id", "word", "locale"]);
-        let mut any = false;
+        let mut pending: Vec<[sea_orm::Value; 4]> = Vec::new();
         for row in &rows {
             let tenant: uuid::Uuid = row.try_get("", "tenant_id")?;
             let entry: uuid::Uuid = row.try_get("", "entry_id")?;
             let locale: String = row.try_get("", "locale")?;
             let key: String = row.try_get("", "search_key")?;
             for word in crate::publishing::words::words(&key) {
-                insert.values_panic([
-                    tenant.into(),
-                    entry.into(),
-                    word.into(),
-                    locale.clone().into(),
-                ]);
-                any = true;
+                pending.push([tenant.into(), entry.into(), word.into(), locale.clone().into()]);
+                if pending.len() == crate::publishing::words::INSERT_ROWS {
+                    insert(connection, &mut pending).await?;
+                }
             }
             after = Some((tenant, entry));
         }
-        if any {
-            connection.execute(&insert).await?;
-        }
+        insert(connection, &mut pending).await?;
     }
+}
+
+/// Chèn `rows` bằng một câu rồi làm rỗng; số dòng mỗi câu do bên gọi giữ dưới
+/// [`INSERT_ROWS`](crate::publishing::words::INSERT_ROWS) (trần số tham số bind của SQLite và Postgres).
+async fn insert(
+    connection: &impl ConnectionTrait,
+    rows: &mut Vec<[sea_orm::Value; 4]>,
+) -> Result<(), DbErr> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let mut insert = Query::insert();
+    insert.into_table(TABLE).columns(["tenant_id", "entry_id", "word", "locale"]);
+    for row in rows.drain(..) {
+        insert.values(row.map(Expr::val)).map_err(|error| DbErr::Custom(error.to_string()))?;
+    }
+    connection.execute(&insert).await?;
+    Ok(())
 }
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let backend = manager.get_database_backend();
+        // Chạy lại được: lần trước hỏng giữa chừng (SQLite không bọc DDL của migration trong một transaction chung)
+        // có thể để lại bảng thiếu dòng. Bảng chỉ chứa dữ liệu dẫn xuất, dựng lại từ đầu.
+        manager.drop_table(Table::drop().table(TABLE).if_exists().to_owned()).await?;
         manager
             .create_table(
                 Table::create()

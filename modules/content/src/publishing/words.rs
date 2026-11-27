@@ -11,9 +11,9 @@
 //!   (`Find::within` của kernel), kể cả khi người gọi thôi chờ.
 
 use std::collections::HashSet;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use autoxide_kernel::db::{Queries as _, Record, TenantKey, is_query_timeout};
+use autoxide_kernel::db::{Cond, QUERY_TIMEOUT, Queries as _, Record, TenantKey, is_query_timeout};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
 use autoxide_kernel::time::Timestamp;
@@ -37,6 +37,9 @@ const WORD_MAX: usize = 64;
 pub(crate) const DISTINCT_WORDS_MAX: usize = 4_000;
 /// Tổng số byte tối đa các từ của một bài trong chỉ mục.
 pub(crate) const WORDS_BYTES_MAX: usize = 64 * 1024;
+/// Số dòng tối đa của một câu `INSERT` vào chỉ mục: 4 tham số mỗi dòng, 800 tham số một câu — dưới trần tham số bind
+/// của SQLite (999 ở bản cũ, 32 766 từ 3.32) và của Postgres (65 535).
+pub(crate) const INSERT_ROWS: usize = 200;
 
 /// Các từ của `text` để đưa vào chỉ mục: [`fold`](autoxide_kernel::search::fold) (bỏ dấu, chữ thường), cắt ở mọi ký
 /// tự không phải chữ hay số, bỏ từ dài quá [`WORD_MAX`], mỗi từ một lần (theo lần đầu xuất hiện), tối đa
@@ -47,13 +50,19 @@ pub(crate) fn words(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut bytes = 0;
     for word in split(&folded) {
-        if out.len() == DISTINCT_WORDS_MAX || bytes + word.len() > WORDS_BYTES_MAX {
+        if out.len() == DISTINCT_WORDS_MAX {
             break;
         }
-        if seen.insert(word) {
-            bytes += word.len();
-            out.push(word.to_owned());
+        // Từ đã có không tốn thêm byte: kiểm trần byte sau khi bỏ trùng.
+        if seen.contains(word) {
+            continue;
         }
+        if bytes + word.len() > WORDS_BYTES_MAX {
+            break;
+        }
+        seen.insert(word);
+        bytes += word.len();
+        out.push(word.to_owned());
     }
     out
 }
@@ -157,8 +166,18 @@ pub(crate) struct IndexedWord {
 }
 
 /// ID của tối đa [`MATCH_CAP`] bài công khai (không bị ẩn) của khách `tenant` khớp `query`, mới đăng trước, theo
-/// `filter`. Câu rỗng thì không chạm database. Database dừng câu ở [`DEADLINE`]: lỗi `503
-/// content.public_search_timeout`.
+/// `filter`. Câu rỗng thì không chạm database. Mọi câu của một lần tìm chung trần [`DEADLINE`], database dừng câu
+/// quá trần: lỗi `503 content.public_search_timeout`.
+///
+/// Mỗi bước đọc có trần số dòng, để từ rất phổ biến không làm câu đọc hết chỉ mục của khách:
+///
+/// 1. Mỗi từ của câu: ID bài có từ đó, tối đa [`TERM_ROWS_MAX`] dòng chỉ mục (index `(tenant_id, locale, word,
+///    entry_id)`). Từ nào không có dòng nào: không có kết quả. Từ nào vượt trần là "phổ biến".
+/// 2. Có ít nhất một từ không phổ biến: giao các tập đã đủ, rồi kiểm từ phổ biến bằng khoá chính `(tenant_id,
+///    entry_id, word)` trên chính các bài còn lại; cuối cùng lọc bài theo `filter`, mới đăng trước.
+/// 3. Mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, từng trang [`SCAN_PAGE`] bài, kiểm mọi từ bằng khoá
+///    chính, tới khi đủ [`MATCH_CAP`] bài hay đã duyệt [`SCAN_ENTRIES_MAX`] bài — kết quả là các bài khớp trong chừng
+///    ấy bài mới nhất (từ phổ biến khớp phần lớn bài).
 pub(crate) async fn matching_ids(
     tenant: &TenantContext,
     filter: Matching<'_>,
@@ -167,55 +186,213 @@ pub(crate) async fn matching_ids(
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let db = tenant.db();
-    let read = db.read();
-    let mut find = read
-        .find::<PublishedHit>()
-        .filter(PublishedHit::LOCALE.eq(filter.locale.to_owned()))
-        .filter(PublishedHit::RESTRICTED_AT.is_null());
-    if let Some(kind) = filter.kind {
-        find = find.filter(PublishedHit::KIND.eq(kind.to_owned()));
-    }
-    if filter.indexable_only {
-        find = find.filter(PublishedHit::NOINDEX.eq(false));
-    }
-    if let Some(lineage) = filter.site {
-        find = find.filter(PublishedHit::ORG_ID.is_in(lineage.iter().copied().map(Some)));
-    }
-    // Mỗi từ của câu một điều kiện `entry_id IN (…)`: mọi từ phải có (AND).
-    for term in &query.terms {
-        let words = read
-            .sub(IndexedWord::ENTRY_ID)
-            .filter(IndexedWord::LOCALE.eq(filter.locale.to_owned()));
-        let words = if term.prefix {
-            let from = words.filter(IndexedWord::WORD.gte(term.word.clone()));
-            match next_prefix(&term.word) {
-                Some(next) => from.filter(IndexedWord::WORD.lt(next)),
-                None => from,
-            }
-        } else {
-            words.filter(IndexedWord::WORD.eq(term.word.clone()))
-        };
-        find = find.filter(PublishedHit::ENTRY_ID.in_sub(words));
-    }
-    let found = find
-        .order_desc(PublishedHit::PUBLISHED_AT)
-        .order_desc(PublishedHit::ENTRY_ID)
-        .limit(MATCH_CAP)
-        .within(DEADLINE)
-        .select((PublishedHit::ENTRY_ID,))
-        .all()
-        .await;
-    match found {
-        Ok(rows) => Ok(rows.into_iter().map(|(id,)| id).collect()),
+    let search = Search { tenant, filter, deadline: Instant::now() + DEADLINE };
+    match search.run(query).await {
         Err(error) if is_query_timeout(&error) => {
             tracing::warn!("public word search stopped at its deadline");
             Err(crate::ai::public_limits::timed_out())
         }
-        Err(error) => Err(error),
+        other => other,
     }
 }
 
+/// Số dòng chỉ mục tối đa đọc cho một từ của câu tìm; từ có nhiều dòng hơn là từ phổ biến.
+pub(crate) const TERM_ROWS_MAX: u64 = 5_000;
+/// Số bài mỗi trang khi duyệt bài mới nhất (mọi từ đều phổ biến).
+const SCAN_PAGE: u64 = 1_000;
+/// Số bài mới nhất tối đa duyệt khi mọi từ đều phổ biến.
+pub(crate) const SCAN_ENTRIES_MAX: u64 = 5_000;
+/// Số ID tối đa của một danh sách `IN (…)`: dưới trần tham số bind của cả hai database.
+const IDS_PER_QUERY: usize = 500;
+
+/// Một lần tìm: khách, bộ lọc và hạn chung cho mọi câu.
+struct Search<'a> {
+    tenant: &'a TenantContext,
+    filter: Matching<'a>,
+    deadline: Instant,
+}
+
+impl Search<'_> {
+    async fn run(&self, query: &WordQuery) -> Result<Vec<Uuid>, Error> {
+        // Bước 1: tập ID của từng từ (None: từ phổ biến, tập chưa đủ).
+        let mut complete: Vec<HashSet<Uuid>> = Vec::new();
+        let mut common: Vec<&Term> = Vec::new();
+        for term in &query.terms {
+            let ids = self.term_ids(term).await?;
+            if ids.is_empty() {
+                return Ok(Vec::new());
+            }
+            if ids.len() as u64 > TERM_ROWS_MAX {
+                common.push(term);
+            } else {
+                complete.push(ids.into_iter().collect());
+            }
+        }
+        // Bước 2: giao các tập đủ (bắt đầu từ tập nhỏ nhất), kiểm từ phổ biến trên bài còn lại.
+        complete.sort_by_key(HashSet::len);
+        let mut sets = complete.into_iter();
+        if let Some(first) = sets.next() {
+            let mut candidates: Vec<Uuid> =
+                sets.fold(first, |kept, set| kept.intersection(&set).copied().collect()).into_iter().collect();
+            for term in &common {
+                candidates = self.having(term, &candidates).await?;
+            }
+            return self.newest(&candidates).await;
+        }
+        // Bước 3: mọi từ đều phổ biến.
+        self.scan(&common).await
+    }
+
+    /// Thời gian còn lại của lần tìm; hết thì là lỗi quá hạn như khi database dừng câu.
+    fn remaining(&self) -> Result<Duration, Error> {
+        let left = self.deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(Error::unavailable(QUERY_TIMEOUT, "The query ran longer than its time limit."));
+        }
+        Ok(left)
+    }
+
+    fn word(&self, term: &Term) -> Cond<IndexedWord> {
+        let locale = IndexedWord::LOCALE.eq(self.filter.locale.to_owned());
+        let word = if term.prefix {
+            let from = IndexedWord::WORD.gte(term.word.clone());
+            match next_prefix(&term.word) {
+                Some(next) => Cond::all().with(from).with(IndexedWord::WORD.lt(next)),
+                None => from,
+            }
+        } else {
+            IndexedWord::WORD.eq(term.word.clone())
+        };
+        Cond::all().with(locale).with(word)
+    }
+
+    /// ID bài có từ `term`, tối đa `TERM_ROWS_MAX + 1` dòng chỉ mục (một bài có thể có nhiều từ cùng tiền tố).
+    async fn term_ids(&self, term: &Term) -> Result<Vec<Uuid>, Error> {
+        let db = self.tenant.db();
+        let rows: Vec<(Uuid,)> = db
+            .read()
+            .find::<IndexedWord>()
+            .filter(self.word(term))
+            .limit(TERM_ROWS_MAX + 1)
+            .within(self.remaining()?)
+            .select((IndexedWord::ENTRY_ID,))
+            .all()
+            .await?;
+        if rows.len() as u64 > TERM_ROWS_MAX {
+            // Từ phổ biến: báo bằng một tập dài hơn trần, không cần bỏ trùng.
+            return Ok(rows.into_iter().map(|(id,)| id).collect());
+        }
+        let unique: HashSet<Uuid> = rows.into_iter().map(|(id,)| id).collect();
+        Ok(unique.into_iter().collect())
+    }
+
+    /// Các bài trong `ids` có từ `term` (khoá chính của chỉ mục), giữ thứ tự của `ids`.
+    async fn having(&self, term: &Term, ids: &[Uuid]) -> Result<Vec<Uuid>, Error> {
+        let mut found = HashSet::new();
+        for chunk in ids.chunks(IDS_PER_QUERY) {
+            let db = self.tenant.db();
+            let rows: Vec<(Uuid,)> = db
+                .read()
+                .find::<IndexedWord>()
+                .filter(IndexedWord::ENTRY_ID.is_in(chunk.iter().copied()))
+                .filter(self.word(term))
+                .within(self.remaining()?)
+                .select((IndexedWord::ENTRY_ID,))
+                .all()
+                .await?;
+            found.extend(rows.into_iter().map(|(id,)| id));
+        }
+        Ok(ids.iter().copied().filter(|id| found.contains(id)).collect())
+    }
+
+    /// Bài công khai theo `filter`: đúng ngôn ngữ, không bị ẩn, đúng loại, ở các nút của website, bỏ `noindex` khi là
+    /// gợi ý.
+    fn visible(&self) -> Cond<PublishedHit> {
+        let mut visible = Cond::all()
+            .with(PublishedHit::LOCALE.eq(self.filter.locale.to_owned()))
+            .with(PublishedHit::RESTRICTED_AT.is_null());
+        if let Some(kind) = self.filter.kind {
+            visible = visible.with(PublishedHit::KIND.eq(kind.to_owned()));
+        }
+        if self.filter.indexable_only {
+            visible = visible.with(PublishedHit::NOINDEX.eq(false));
+        }
+        if let Some(lineage) = self.filter.site {
+            visible = visible.with(PublishedHit::ORG_ID.is_in(lineage.iter().copied().map(Some)));
+        }
+        visible
+    }
+
+    /// Trong `ids`, tối đa `MATCH_CAP` bài hiện theo `filter`, mới đăng trước.
+    async fn newest(&self, ids: &[Uuid]) -> Result<Vec<Uuid>, Error> {
+        let mut found: Vec<(Timestamp, Uuid)> = Vec::new();
+        for chunk in ids.chunks(IDS_PER_QUERY) {
+            let db = self.tenant.db();
+            let rows: Vec<(Uuid, Timestamp)> = db
+                .read()
+                .find::<PublishedHit>()
+                .filter(self.visible())
+                .filter(PublishedHit::ENTRY_ID.is_in(chunk.iter().copied()))
+                .order_desc(PublishedHit::PUBLISHED_AT)
+                .order_desc(PublishedHit::ENTRY_ID)
+                .limit(MATCH_CAP)
+                .within(self.remaining()?)
+                .select((PublishedHit::ENTRY_ID, PublishedHit::PUBLISHED_AT))
+                .all()
+                .await?;
+            found.extend(rows.into_iter().map(|(id, at)| (at, id)));
+        }
+        found.sort_unstable_by(|a, b| b.cmp(a));
+        found.truncate(usize::try_from(MATCH_CAP).unwrap_or(usize::MAX));
+        Ok(found.into_iter().map(|(_, id)| id).collect())
+    }
+
+    /// Mọi từ đều phổ biến: duyệt bài theo `filter`, mới đăng trước, giữ bài có mọi từ.
+    async fn scan(&self, terms: &[&Term]) -> Result<Vec<Uuid>, Error> {
+        let cap = usize::try_from(MATCH_CAP).unwrap_or(usize::MAX);
+        let mut found = Vec::new();
+        let mut after: Option<(Timestamp, Uuid)> = None;
+        let mut scanned = 0;
+        while scanned < SCAN_ENTRIES_MAX && found.len() < cap {
+            let db = self.tenant.db();
+            let read = db.read();
+            let mut page = read
+                .find::<PublishedHit>()
+                .filter(self.visible())
+                .order_desc(PublishedHit::PUBLISHED_AT)
+                .order_desc(PublishedHit::ENTRY_ID)
+                .limit(SCAN_PAGE);
+            if let Some((at, id)) = after {
+                // Keyset: sau bài cuối của trang trước theo (ngày đăng, ID) giảm dần.
+                page = page.filter(
+                    Cond::any().with(PublishedHit::PUBLISHED_AT.lt(at)).with(
+                        Cond::all()
+                            .with(PublishedHit::PUBLISHED_AT.eq(at))
+                            .with(PublishedHit::ENTRY_ID.lt(id)),
+                    ),
+                );
+            }
+            let rows: Vec<(Uuid, Timestamp)> = page
+                .within(self.remaining()?)
+                .select((PublishedHit::ENTRY_ID, PublishedHit::PUBLISHED_AT))
+                .all()
+                .await?;
+            let Some(&(last_id, last_at)) = rows.last() else { break };
+            scanned += rows.len() as u64;
+            let mut kept: Vec<Uuid> = rows.iter().map(|(id, _)| *id).collect();
+            for term in terms {
+                kept = self.having(term, &kept).await?;
+            }
+            found.extend(kept);
+            if (rows.len() as u64) < SCAN_PAGE {
+                break;
+            }
+            after = Some((last_at, last_id));
+        }
+        found.truncate(cap);
+        Ok(found)
+    }
+}
 /// Ghi lại chỉ mục của bài `entry_id` (ngôn ngữ `locale`) theo `search_key` của bản đăng — cùng transaction với bản
 /// đăng: xoá dòng cũ của bài rồi chèn các từ mới.
 pub(crate) async fn write<C: ConnectionTrait>(
@@ -235,9 +412,11 @@ pub(crate) async fn write<C: ConnectionTrait>(
             locale: Set(locale.to_owned()),
         })
         .collect();
-    // Tối đa `DISTINCT_WORDS_MAX` dòng × 4 tham số: dưới trần tham số của cả hai database.
-    if !rows.is_empty() {
-        published_word::Entity::insert_many(rows).exec_without_returning(connection).await?;
+    // Chia câu theo `INSERT_ROWS`: một bài tới `DISTINCT_WORDS_MAX` từ, mỗi từ 4 tham số bind.
+    let mut rows = rows.into_iter().peekable();
+    while rows.peek().is_some() {
+        let chunk: Vec<_> = rows.by_ref().take(INSERT_ROWS).collect();
+        published_word::Entity::insert_many(chunk).exec_without_returning(connection).await?;
     }
     Ok(())
 }

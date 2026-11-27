@@ -164,7 +164,8 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
     }
 
     /// Stops the query when it runs longer than `limit`, or when the caller stops waiting: the database ends it
-    /// and [`all`](Self::all) returns [`QUERY_TIMEOUT`](super::QUERY_TIMEOUT). For reads on a read handle only
+    /// and [`all`](Self::all) returns [`QUERY_TIMEOUT`](super::QUERY_TIMEOUT). Every way of reading honours it
+    /// (`all`, `one`, `exists`, `count`, `select`, and `page`, whose count and rows each get `limit`). For reads on a read handle only
     /// (on a write transaction the read fails). Use it for queries whose cost depends on what a caller sends
     /// (public search).
     #[must_use]
@@ -222,7 +223,7 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
             let mut counted = self.statement.clone();
             counted.clear_selects();
             counted.expr(sea_query::Expr::cust("COUNT(*)"));
-            let rows = read_all(self.handle, &counted, <(i64,)>::from_row).await?;
+            let rows = read_rows(self.handle, &counted, self.within, <(i64,)>::from_row).await?;
             Some(rows.first().map_or(0, |(n,)| u64::try_from(*n).unwrap_or_default()))
         } else {
             None
@@ -244,7 +245,7 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
         statement.order_by_expr(id.sq(), direction);
         // Lấy dư MỘT dòng để biết còn trang sau mà không cần câu đếm.
         statement.limit(u64::from(request.limit()) + 1);
-        let mut rows = read_all(self.handle, &statement, R::read).await?;
+        let mut rows = read_rows(self.handle, &statement, self.within, R::read).await?;
         let limit = request.limit() as usize;
         let has_more = rows.len() > limit;
         rows.truncate(limit);
@@ -381,15 +382,7 @@ impl<H: Handle, R: Record, Out: FromRow> Grouped<'_, H, R, Out> {
     }
 }
 
-pub(crate) async fn read_all<H: Handle, T>(
-    handle: &H,
-    statement: &SelectStatement,
-    read: impl Fn(&Row<'_>) -> Result<T, Error>,
-) -> Result<Vec<T>, Error> {
-    read_rows(handle, statement, None, read).await
-}
-
-// Như `read_all`, có trần thời gian khi `within` có giá trị (`super::bounded`).
+// Đọc mọi dòng của câu, có trần thời gian khi `within` có giá trị (`super::bounded`).
 async fn read_rows<H: Handle, T>(
     handle: &H,
     statement: &SelectStatement,

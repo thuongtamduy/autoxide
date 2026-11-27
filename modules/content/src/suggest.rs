@@ -15,8 +15,8 @@ use crate::entity::published;
 use crate::publishing::reading::on_site;
 use crate::publishing::words;
 
-/// Bài viết và trang đang công khai.
-pub(crate) struct Entries;
+/// Bài viết và trang đang công khai. Giữ service để dùng chung chốt số lượt tìm công khai cùng lúc.
+pub(crate) struct Entries(pub(crate) std::sync::Arc<crate::service::ContentService>);
 
 #[async_trait::async_trait]
 impl SuggestSource for Entries {
@@ -32,6 +32,9 @@ impl SuggestSource for Entries {
         q: &str,
         limit: u16,
     ) -> Result<Vec<Suggestion>, Error> {
+        // Chung chốt số lượt cùng lúc với tìm công khai (nguồn gợi ý không biết địa chỉ người đọc nên không đếm theo
+        // địa chỉ). Hết chỗ thì lỗi: bộ gợi ý bỏ nguồn này, không chờ.
+        let _slot = self.0.admit_public_search(None)?;
         // Lấy dư một ít để tầng "khớp đúng dấu" có chỗ chen lên trước khi cắt còn `limit`.
         let fetch = u64::from(limit).saturating_mul(2);
         let read = tenant.database().read();

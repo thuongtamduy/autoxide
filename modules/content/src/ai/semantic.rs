@@ -404,6 +404,19 @@ impl ContentService {
         Ok(missing.len())
     }
 
+    /// Giữ một chỗ của tìm công khai cho người đọc ở địa chỉ `ip` (không biết địa chỉ: chỉ tính số lượt cùng lúc): 429
+    /// khi vượt. Dùng cho mọi đường tìm theo chữ công khai (danh sách bài với `q`, gợi ý tìm).
+    pub(crate) fn admit_public_search(
+        &self,
+        ip: Option<std::net::IpAddr>,
+    ) -> Result<super::public_limits::Slot, Error> {
+        self.search_cache.public_limits.admit(
+            ip,
+            self.config.public_search_per_address,
+            self.config.public_search_concurrency,
+        )
+    }
+
     /// Tìm công khai trên website `site` của người đọc ở địa chỉ `ip`, qua các chốt của
     /// [`public_limits`](super::public_limits): tìm công khai tắt thì 404 như [`search`](Self::search); bật thì giới hạn
     /// theo địa chỉ, số lượt cùng lúc, trần thời gian trả lời, và trần riêng cho phần tìm theo ý nghĩa.
@@ -418,11 +431,7 @@ impl ContentService {
         if !self.config.public_semantic_search {
             return self.search(tenant, principal, query, Some(site)).await;
         }
-        let slot = self.search_cache.public_limits.admit(
-            ip,
-            self.config.public_search_per_address,
-            self.config.public_search_concurrency,
-        )?;
+        let slot = self.admit_public_search(ip)?;
         // Lượt tìm chạy trong task riêng giữ `slot` tới khi việc xong thật: hết giờ trả lời hay client ngắt chỉ bỏ phần
         // chờ ở đây; câu truy vấn và việc tính vector đang chạy vẫn chiếm chỗ cho tới khi xong (`tokio::spawn` cần dữ
         // liệu sở hữu: chép `Arc` của service và các tham số).

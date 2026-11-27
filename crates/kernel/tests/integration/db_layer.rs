@@ -683,8 +683,19 @@ async fn doc_co_tran_tren_bo_dung_cau() {
         let ids: Vec<(Uuid,)> = query().within(limit).select((Line::ID,)).all().await.unwrap();
         assert_eq!(ids, vec![(id(0x1012),), (id(0x1011),)]);
 
+        // `page` cũng đi qua trần (cả câu đếm lẫn câu lấy dòng), không bỏ qua lặng lẽ.
+        let request = PageRequest::first(2, Order::Desc).counted();
+        let page = read.find::<Line>().within(limit).page(Line::ID, &request).await.unwrap();
+        assert_eq!(page.data.iter().map(|line| line.id).collect::<Vec<_>>(), plain);
+
+        // Trên transaction ghi, `within` là lỗi ở mọi cách đọc — bằng chứng cách đọc đó đi qua trần.
         let tx = a.db().begin_write().await.unwrap();
         assert!(tx.find::<Line>().within(limit).all().await.is_err());
+        assert!(tx.find::<Line>().within(limit).count().await.is_err());
+        let rows = tx.find::<Line>().within(limit).page(Line::ID, &PageRequest::first(2, Order::Desc));
+        assert!(rows.await.is_err(), "page honours within");
+        let counted = tx.find::<Line>().within(limit).page(Line::ID, &request);
+        assert!(counted.await.is_err(), "the page count honours within");
         tx.rollback().await.unwrap();
     })
     .await

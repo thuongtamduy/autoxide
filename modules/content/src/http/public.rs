@@ -509,6 +509,7 @@ pub(crate) struct PostsQuery {
     responses(
         (status = 200, description = "One page of published posts.", body = Page<PublicEntryResponse>),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
+        (status = 429, description = "With `q`: too many searches from your network this minute (`content.public_search_rate_limited`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE`), or too many searches running on the server (`content.public_search_busy`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`); wait `Retry-After` seconds.", body = Problem),
         (status = 503, description = "The search by `q` took longer than 2 seconds and was stopped (`content.public_search_timeout`); try more specific words.", body = Problem),
     )
 )]
@@ -517,6 +518,7 @@ pub(crate) async fn list_posts(
     tenant: TenantContext,
     site: Site,
     _principal: Option<Principal>,
+    client: autoxide_kernel::http::ClientInfo,
     Query(query): Query<PostsQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
@@ -548,7 +550,7 @@ pub(crate) async fn list_posts(
         search: query.q,
     };
     let page =
-        views(&service, &tenant, service.public_posts(&tenant, &filter, &page).await?).await?;
+        views(&service, &tenant, service.public_posts_for(&tenant, &filter, &page, client.ip).await?).await?;
     Ok(public_cache(page.into_response()))
 }
 

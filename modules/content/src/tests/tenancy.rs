@@ -251,9 +251,6 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
     .unwrap();
 }
 
-/// Lịch đăng của khách `b` (database riêng) chạy bằng job của khách đó: đăng ở `b`, event ghi ở
-/// database của `b`; khách `a` không có gì. Job định kỳ dọn revision và lập index bù chạy theo
-/// từng database.
 /// Single-flight của việc nạp vector (`loaded`): nhiều lượt tìm cùng lúc thấy cache cũ thì chỉ một lượt đọc
 /// database, các lượt kia chờ rồi dùng cache — kết quả của mọi lượt như nhau.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -297,6 +294,9 @@ async fn tim_dong_thoi_chi_nap_vector_mot_lan() {
     .unwrap();
 }
 
+/// Lịch đăng của khách `b` (database riêng) chạy bằng job của khách đó: đăng ở `b`, event ghi ở
+/// database của `b`; khách `a` không có gì. Job định kỳ dọn revision và lập index bù chạy theo
+/// từng database.
 #[tokio::test]
 async fn lich_dang_chay_dung_khach() {
     TestDatabase::run(async |test| {

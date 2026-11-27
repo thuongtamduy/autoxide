@@ -20,6 +20,10 @@ Database tự dừng câu khi nó chạy quá `limit` và khi người gọi th�
   thực, chuỗi, byte, UUID, ngày giờ của kernel (biến thể `Enum` mang kiểu, bind là chuỗi). Kiểu khác là lỗi nội bộ,
   không đoán.
 - `within` trên transaction ghi là lỗi: câu ghi không bị cắt giữa chừng.
+- Mọi cách đọc của bộ dựng câu tôn trọng `within`: `all`, `one`, `exists`, `count`, `select`, và `page` (câu đếm và
+  câu lấy dòng, mỗi câu một trần `limit`).
+- Kiểu ngày giờ của `chrono` / `time` (biến thể riêng của SeaORM) không bind được trên SQLite: kernel dùng ngày giờ
+  của chính nó (đi qua biến thể `Enum`), nên lớp `db` không sinh ra chúng; gặp thì lỗi nội bộ rõ ràng.
 
 Test: `crates/kernel/tests/integration/db_within.rs` và `db_layer.rs` (`doc_co_tran_tren_bo_dung_cau`), cả hai
 database. Câu quá trần bị dừng và mọi kết nối của pool

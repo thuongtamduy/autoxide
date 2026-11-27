@@ -228,6 +228,66 @@ async fn tim_cong_khai_co_cho_va_gioi_han_theo_dia_chi() {
     .unwrap();
 }
 
+/// PT-15: danh sách bài công khai có `q` và gợi ý tìm dùng chung chốt của tìm công khai — hết chỗ chạy thì 429
+/// `content.public_search_busy` (gợi ý: nguồn `content` bị bỏ), một địa chỉ quá số lượt mỗi phút thì 429
+/// `content.public_search_rate_limited`. Danh sách không có `q` không bị tính.
+#[tokio::test]
+async fn danh_sach_co_q_va_goi_y_qua_cung_chot() {
+    TestDatabase::run(async |test| {
+        use autoxide_kernel::suggest::SuggestSource as _;
+        let (content, _, database) = service_with(
+            test,
+            config(&[
+                ("AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY", "2"),
+                ("AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE", "2"),
+            ]),
+            Arc::new(FakeTextModel::disabled()),
+            Arc::new(FakeEmbedder::disabled()),
+        )
+        .await;
+        let tenant = TenantContext::default_on(database.clone());
+        let site = Site::whole(&tenant);
+        let ada = editor();
+        let entry = content.create(&tenant, &ada, post("Đà Lạt mùa hoa")).await.unwrap();
+        content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
+        let filter = crate::publishing::reading::PostFilter {
+            locale: "en".into(),
+            site: site.lineage_ids(),
+            ..Default::default()
+        };
+        let searching = crate::publishing::reading::PostFilter {
+            search: Some("da lat".into()),
+            ..filter.clone()
+        };
+        let first = PageRequest::first(10, Order::Desc);
+        let reader: Option<std::net::IpAddr> = "203.0.113.7".parse().ok();
+        let suggest = crate::suggest::Entries(content.clone());
+
+        // Hết chỗ chạy: danh sách có `q` và gợi ý bị từ chối ngay; danh sách không có `q` vẫn chạy.
+        let limits = &content.search_cache.public_limits;
+        let held = (limits.admit(None, 100, 2).unwrap(), limits.admit(None, 100, 2).unwrap());
+        let busy = content.public_posts_for(&tenant, &searching, &first, reader).await;
+        assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
+        let busy = suggest.suggest(&tenant, &site, "en", "da lat", 5).await;
+        assert_eq!(busy.unwrap_err().code(), "content.public_search_busy");
+        let plain = content.public_posts_for(&tenant, &filter, &first, reader).await.unwrap();
+        assert_eq!(plain.data.len(), 1);
+        drop(held);
+
+        // Có chỗ: tìm được; theo địa chỉ, 2 lượt mỗi phút (lượt bị từ chối vì hết chỗ không tính).
+        for _ in 0..2 {
+            let page = content.public_posts_for(&tenant, &searching, &first, reader).await.unwrap();
+            assert_eq!(page.data.len(), 1);
+        }
+        let limited = content.public_posts_for(&tenant, &searching, &first, reader).await;
+        assert_eq!(limited.unwrap_err().code(), "content.public_search_rate_limited");
+        let found = suggest.suggest(&tenant, &site, "en", "da lat", 5).await.unwrap();
+        assert_eq!(found.len(), 1, "suggestions do not count per address");
+    })
+    .await
+    .unwrap();
+}
+
 /// Mô hình vector chậm khi tính vector của câu tìm (nhà cung cấp quá tải); vector của bài thì tính ngay.
 struct SlowQueries(FakeEmbedder);
 
