@@ -134,7 +134,8 @@ pub async fn copy_modules(
     let mut copied = Vec::with_capacity(tables.len());
     for (table, from, to) in plans {
         let rows = copy_table(&snapshot, &transaction, table, &from, &to, None).await?;
-        tracing::info!(table, rows, "table copied");
+        // Hàng trăm bảng: từng bảng ở mức debug, kết quả tóm tắt do lệnh gọi in ra.
+        tracing::debug!(table, rows, "table copied");
         copied.push(CopiedTable { table: table.clone(), rows });
     }
     transaction.commit().await?;
@@ -151,21 +152,17 @@ pub async fn copy_modules(
     Ok(copied)
 }
 
-/// The tables of `modules` in creation order, leaving out the `<module>_migrations` tables and, on SQLite,
-/// virtual tables and their shadow tables (derived data a module rebuilds with triggers).
+/// The tables of `modules` in creation order, leaving out the `<module>_migrations` tables.
 pub(crate) async fn module_tables<C: ConnectionTrait>(
     connection: &C,
     modules: &[&str],
 ) -> Result<Vec<String>, TransferError> {
     let backend = connection.get_database_backend();
     let sql = match backend {
-        // `rowid` của `sqlite_master` tăng theo thứ tự tạo. Bảng ảo (FTS5…) và bảng phụ của chúng không chép: là
-        // dữ liệu dẫn xuất, trigger của module dựng lại khi chép bảng gốc (D-20261126-content-word-index).
+        // `rowid` của `sqlite_master` tăng theo thứ tự tạo.
         DatabaseBackend::Sqlite => {
-            "SELECT m.name AS name FROM sqlite_master m WHERE m.type = 'table' \
-             AND m.name NOT LIKE 'sqlite_%' AND NOT EXISTS (SELECT 1 FROM pragma_table_list t \
-             WHERE t.schema = 'main' AND t.name = m.name AND t.type IN ('virtual', 'shadow')) \
-             ORDER BY m.rowid"
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' \
+             ORDER BY rowid"
         }
         // `oid` của `pg_class` tăng theo thứ tự tạo.
         DatabaseBackend::Postgres => {

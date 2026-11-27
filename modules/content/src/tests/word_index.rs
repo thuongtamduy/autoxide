@@ -263,7 +263,7 @@ async fn tim_khong_dau_tieng_viet() {
     .unwrap();
 }
 
-/// Bài rất dài vẫn đăng được (nội dung chỉ mục có trần số từ và số byte, dưới trần `tsvector` của Postgres) và vẫn
+/// Bài rất dài vẫn đăng được (chỉ mục có trần số từ và số byte mỗi bài) và vẫn
 /// tìm được theo từ ở đầu bài.
 #[tokio::test]
 async fn bai_rat_dai_van_dang_va_tim_duoc() {

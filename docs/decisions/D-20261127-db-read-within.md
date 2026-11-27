@@ -9,7 +9,9 @@ Database tự dừng câu khi nó chạy quá `limit` và khi người gọi th�
 
 - Postgres: transaction chỉ đọc với `SET LOCAL statement_timeout` (chỉ trong transaction đó, kết nối về pool không
   đổi); mã `57014`. Future bị drop giữa chừng: gửi `pg_cancel_backend(pid)` của kết nối đó trên một kết nối khác của
-  pool (sqlx không tự huỷ câu khi future bị drop).
+  pool (sqlx không tự huỷ câu khi future bị drop), chỉ khi `pg_stat_activity` cho thấy tiến trình đó vẫn ở đúng
+  transaction đã mở (cùng `xact_start`): lệnh huỷ đến trễ, khi kết nối đã về pool và chạy câu của người khác, không
+  huỷ nhầm.
 - SQLite: lấy một kết nối của pool đọc, gắn progress handler bằng API an toàn của sqlx
   (`LockedSqliteHandle::set_progress_handler`). Handler trả `false` khi quá hạn hay khi cờ dừng bật, SQLite dừng
   câu với `SQLITE_INTERRUPT` (mã `9`). Gỡ handler trước khi trả kết nối về pool. Future bị drop: bật cờ dừng và đóng

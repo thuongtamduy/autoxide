@@ -64,14 +64,19 @@ async fn postgres(
     // `SET LOCAL`: chỉ trong transaction này; kết nối về pool với cấu hình cũ. Số nguyên do kernel tính, không
     // phải dữ liệu người dùng.
     transaction.execute_unprepared(&format!("SET LOCAL statement_timeout = {millis}")).await?;
-    // Tiến trình server của kết nối này: người gọi thôi chờ thì huỷ câu của nó (sqlx không tự huỷ khi future bị
-    // drop; không huỷ thì câu chạy tới trần).
-    let pid = transaction
-        .query_one_raw(Statement::from_string(DbBackend::Postgres, "SELECT pg_backend_pid()"))
+    // Tiến trình server của kết nối này và giờ bắt đầu transaction (micro giây): người gọi thôi chờ thì huỷ câu của
+    // nó (sqlx không tự huỷ khi future bị drop; không huỷ thì câu chạy tới trần). Giờ bắt đầu để lệnh huỷ đến trễ
+    // không trúng câu của người khác khi kết nối đã về pool và được dùng lại.
+    let row = transaction
+        .query_one_raw(Statement::from_string(
+            DbBackend::Postgres,
+            format!("SELECT pg_backend_pid(), {XACT_START_MICROS}"),
+        ))
         .await?
-        .ok_or_else(|| Error::internal("pg_backend_pid() returned no row"))?
-        .try_get_by_index::<i32>(0)?;
-    let mut cancel = CancelOnDrop { connection: Some(connection.clone()), pid };
+        .ok_or_else(|| Error::internal("pg_backend_pid() returned no row"))?;
+    let pid = row.try_get_by_index::<i32>(0)?;
+    let started = row.try_get_by_index::<i64>(1)?;
+    let mut cancel = CancelOnDrop { connection: Some(connection.clone()), pid, started };
     let rows = transaction.query_all_raw(statement).await;
     cancel.connection = None;
     transaction.rollback().await?;
@@ -84,19 +89,29 @@ async fn postgres(
     })
 }
 
+// Giờ bắt đầu transaction hiện tại, micro giây từ epoch (`now()` là giờ bắt đầu transaction, cũng là
+// `pg_stat_activity.xact_start`).
+const XACT_START_MICROS: &str = "(extract(epoch FROM now()) * 1000000)::bigint";
+
 // Drop khi câu Postgres còn chạy (người gọi thôi chờ): gửi `pg_cancel_backend` cho tiến trình của nó trên một
-// kết nối khác của pool.
+// kết nối khác của pool — chỉ khi tiến trình đó vẫn ở đúng transaction đã bắt đầu lúc `started`.
 struct CancelOnDrop {
     connection: Option<DatabaseConnection>,
     pid: i32,
+    started: i64,
 }
 
 impl Drop for CancelOnDrop {
     fn drop(&mut self) {
         let Some(connection) = self.connection.take() else { return };
         let Ok(runtime) = tokio::runtime::Handle::try_current() else { return };
-        // `pid` là số nguyên server trả, không phải dữ liệu người dùng.
-        let sql = format!("SELECT pg_cancel_backend({})", self.pid);
+        // `pid`, `started` là số nguyên server trả, không phải dữ liệu người dùng. Lọc theo giờ bắt đầu transaction:
+        // câu đã xong và kết nối đang chạy transaction khác (của người khác) thì không huỷ gì.
+        let sql = format!(
+            "SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE pid = {} \
+             AND (extract(epoch FROM xact_start) * 1000000)::bigint = {}",
+            self.pid, self.started
+        );
         runtime.spawn(async move {
             if let Err(error) = connection.execute_unprepared(&sql).await {
                 tracing::warn!(%error, "could not cancel a time-limited read");

@@ -89,6 +89,5 @@ mod time;
 mod tokens;
 mod transfer;
 mod transfer_export;
-mod transfer_fts;
 mod user_flags;
 mod work_inbox;
