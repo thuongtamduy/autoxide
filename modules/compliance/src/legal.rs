@@ -4,8 +4,8 @@
 //! thông tin chủ sở hữu và bộ hồ sơ Bộ Công Thương dùng hồ sơ của nút gần nhất (chính nút của
 //! website, rồi các nút cấp trên). Địa chỉ kiểm bằng `autoxide_address::api::AdministrativeUnits`.
 //!
-//! Căn cứ (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý): NĐ 52/2013/NĐ-CP sửa bởi NĐ
-//! 85/2021/NĐ-CP — thông tin chủ sở hữu phải công khai trên website thương mại điện tử.
+//! Căn cứ (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý): Luật Thương mại điện tử 122/2025/QH15
+//! và NĐ 248/2026/NĐ-CP (từ 01/7/2026, thay NĐ 52/2013/NĐ-CP, NĐ 85/2021/NĐ-CP) — thông tin chủ sở hữu phải công khai trên website thương mại điện tử.
 
 use autoxide_address::api::{Address, AddressInput};
 use autoxide_kernel::access::{OrgTarget, Principal};
