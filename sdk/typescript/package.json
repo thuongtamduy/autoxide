@@ -1,6 +1,6 @@
 {
   "name": "@autoxide/sdk",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "private": true,
   "description": "Typed TypeScript client for the Autoxide HTTP API, generated from docs/openapi.json.",
   "license": "MIT OR Apache-2.0",
