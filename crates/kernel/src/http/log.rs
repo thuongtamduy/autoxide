@@ -68,7 +68,7 @@ pub(super) async fn log_requests(
         // qua `RequestSpan`. Để tra một khách bằng log và trace — KHÔNG làm nhãn số đo.
         tenant_id = tracing::field::Empty,
     );
-    request.extensions_mut().insert(RequestSpan(span.clone()));
+    request.extensions_mut().insert(RequestSpan(span.clone(), Default::default()));
     // Request mang `traceparent` thì span này nối vào trace của bên gọi. Không bật
     // xuất trace thì lời gọi này không có tác dụng.
     let _ = span.set_parent(crate::telemetry::remote_context(request.headers()));
@@ -111,6 +111,11 @@ pub(super) async fn log_requests(
     span.record("http.response.status_code", status);
     span.in_scope(|| match response.extensions().get::<Arc<Error>>() {
         // Lỗi phía máy chủ: ghi cả nguyên nhân gốc — thứ client không được thấy.
+        // Rút máy chủ: `/health/ready` trả 503 `shutting_down` cho mỗi lần hỏi, là điều bình thường chứ không phải lỗi:
+        // ghi ở mức debug để log của người vận hành không đầy ERROR lúc dừng êm.
+        Some(error) if error.code() == "shutting_down" => {
+            tracing::debug!(status, elapsed_ms, route, "request refused: shutting down");
+        }
         Some(error) if status >= 500 => {
             tracing::error!(status, elapsed_ms, route, error = %error, "request failed");
         }
@@ -127,7 +132,12 @@ pub(super) async fn log_requests(
 /// The `request` span of the log layer, kept in extensions so the tenant lookup can record `tenant_id` on
 /// it (step 39 B7).
 #[derive(Clone)]
-pub(crate) struct RequestSpan(pub(crate) tracing::Span);
+pub(crate) struct RequestSpan(
+    pub(crate) tracing::Span,
+    // Đã ghi `tenant_id` chưa: extractor của người gọi và của khách có thể cùng chạy trong một request, mà ghi hai lần
+    // thì bộ định dạng log in `tenant_id=` hai lần trên mỗi dòng.
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+);
 
 impl RequestSpan {
     /// Records the tenant on the request's span in `extensions` (if present).
@@ -135,7 +145,9 @@ impl RequestSpan {
         extensions: &axum::http::Extensions,
         tenant: crate::tenancy::TenantId,
     ) {
-        if let Some(span) = extensions.get::<RequestSpan>() {
+        if let Some(span) = extensions.get::<RequestSpan>()
+            && !span.1.swap(true, std::sync::atomic::Ordering::Relaxed)
+        {
             span.0.record("tenant_id", tracing::field::display(tenant));
         }
     }
