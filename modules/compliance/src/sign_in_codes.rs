@@ -12,7 +12,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use autoxide_auth::api::{PhoneCodeSent, PhoneCodes};
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::rows;
 use autoxide_kernel::secret::sha256;
@@ -79,6 +79,8 @@ impl ComplianceService {
         raw: &str,
         ip: Option<IpAddr>,
     ) -> Result<PhoneCodeSent, Error> {
+        // Một chỗ lấy database của khách cho cả hàm (luật `raw-database`: bảng SeaORM chưa chuyển sang lớp `db`).
+        let database = tenant.database();
         let phone = self.allowed_phone(tenant, raw).await?;
         let Some(sender) = self.sms.clone() else {
             return Err(sms_disabled());
@@ -97,11 +99,11 @@ impl ComplianceService {
             .filter(phone_challenge::Column::Phone.eq(phone.as_str()))
             .filter(phone_challenge::Column::CreatedAt.gt(now() - WRONG_WINDOW))
             .scoped(tenant)
-            .all(tenant.database().read())
+            .all(database.read())
             .await?;
         let phone_key = self.phone_key_of(tenant, &phone).await?;
         let known = self.known_client(tenant, &phone_key, block.as_deref()).await?;
-        let failures = phone_lock::failures(tenant.database().read(), tenant, &phone_key).await?;
+        let failures = phone_lock::failures(database.read(), tenant, &phone_key).await?;
         Self::check_not_locked(failures, known)?;
         self.check_wrong_today(&recent, block.as_deref(), known, now())?;
         // Số mã mỗi giờ theo cặp (số, client): người lạ xin hết lượt của họ không làm chủ số hết lượt. Thêm trần chung
@@ -149,7 +151,7 @@ impl ComplianceService {
             created_at: Set(at),
             requester_block: Set(block),
         })
-        .exec_without_returning(tenant.database().write())
+        .exec_without_returning(database.write())
         .await?;
         // Gửi NGOÀI transaction, chờ có hạn; lỗi thì xoá mã vừa tạo để người dùng xin lại.
         let minutes = Ord::max(otp.ttl_seconds.div_euclid(60), 1);
@@ -168,10 +170,7 @@ impl ComplianceService {
             )),
         };
         if let Err(error) = outcome {
-            phone_challenge::Entity::delete_by_id(id)
-                .scoped(tenant)
-                .exec(tenant.database().write())
-                .await?;
+            phone_challenge::Entity::delete_by_id(id).scoped(tenant).exec(database.write()).await?;
             tracing::warn!(phone = %phone.masked(), code = error.code(), "sign-in code sms failed");
             return Err(error);
         }
@@ -186,10 +185,11 @@ impl ComplianceService {
         id: Uuid,
         code: &str,
     ) -> Result<PhoneNumber, Error> {
+        let database = tenant.database();
         let found = phone_challenge::Entity::find_by_id(id)
             .filter(phone_challenge::Column::UserId.eq(NOBODY))
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(database.read())
             .await?
             .ok_or_else(challenge_not_found)?;
         let pepper = self.secret.derive_for(tenant.id(), OTP_PURPOSE).await?;
@@ -198,7 +198,7 @@ impl ComplianceService {
             .ok_or_else(|| Error::internal("stored phone is not E.164"))?;
         let phone_key = self.phone_key_of(tenant, &phone).await?;
         let known = self.known_client(tenant, &phone_key, found.requester_block.as_deref()).await?;
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = database.begin_write().await?;
         // Khoá mọi mã của cùng số: hai lần nhập cùng mã nối đuôi nhau, bên sau thấy mã đã dùng.
         let locked = rows::lock(
             &transaction,
@@ -263,6 +263,32 @@ impl ComplianceService {
         }
         transaction.commit().await?;
         Ok(phone)
+    }
+
+    /// Như `unlock_phone` (`phone_locks.rs`), với người làm `actor` đã được kiểm (lệnh CLI chạy bằng quyền người
+    /// vận hành máy chủ).
+    pub(crate) async fn unlock_phone_as(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        raw: &str,
+    ) -> Result<bool, Error> {
+        let phone = PhoneNumber::parse(raw, "84").ok_or_else(|| {
+            Error::validation(vec![FieldError::new("phone", "invalid", "is not a phone number")])
+        })?;
+        let phone_key = self.secret.phone_key(tenant.id(), &phone).await?;
+        let transaction = tenant.database().begin_write().await?;
+        let unlocked = crate::phone_lock::clear(&transaction, tenant, &phone_key).await?;
+        if unlocked {
+            // Không ghi số vào event: chỉ khoá của số (HMAC theo khách).
+            let event = events::PhoneUnlocked(json!({"phone_key": phone_key}));
+            self.outbox.record(&transaction, tenant, actor, None, &event).await?;
+        }
+        transaction.commit().await?;
+        if unlocked {
+            tracing::info!(phone = %phone.masked(), "sign-in codes of a phone number unlocked");
+        }
+        Ok(unlocked)
     }
 
     /// Khoá của số (`SecretKey::phone_key`, HMAC theo khách) cho trạng thái chống đoán mã.

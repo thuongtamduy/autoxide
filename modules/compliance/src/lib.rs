@@ -52,6 +52,8 @@ mod verification;
 mod websites;
 
 #[cfg(test)]
+mod sign_in_codes_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod tests_cases;
@@ -61,8 +63,6 @@ mod tests_moit;
 mod tests_pages;
 #[cfg(test)]
 mod tests_privacy;
-#[cfg(test)]
-mod tests_sign_in_codes;
 #[cfg(test)]
 mod tests_sms_templates;
 #[cfg(test)]

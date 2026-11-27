@@ -6,22 +6,19 @@
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::response::{Data, Problem};
-use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use validator::Validate;
 
-use crate::events;
 use crate::permissions::PHONE_LOCKS_MANAGE;
 use crate::service::ComplianceService;
 
@@ -51,32 +48,6 @@ impl ComplianceService {
     ) -> Result<bool, Error> {
         principal.require(&PHONE_LOCKS_MANAGE)?;
         self.unlock_phone_as(tenant, Actor::from(principal), raw).await
-    }
-
-    /// Như [`unlock_phone`](Self::unlock_phone), với người làm `actor` đã được kiểm (lệnh CLI chạy bằng quyền người
-    /// vận hành máy chủ).
-    pub(crate) async fn unlock_phone_as(
-        &self,
-        tenant: &TenantContext,
-        actor: Actor,
-        raw: &str,
-    ) -> Result<bool, Error> {
-        let phone = PhoneNumber::parse(raw, "84").ok_or_else(|| {
-            Error::validation(vec![FieldError::new("phone", "invalid", "is not a phone number")])
-        })?;
-        let phone_key = self.secret.phone_key(tenant.id(), &phone).await?;
-        let transaction = tenant.database().begin_write().await?;
-        let unlocked = crate::phone_lock::clear(&transaction, tenant, &phone_key).await?;
-        if unlocked {
-            // Không ghi số vào event: chỉ khoá của số (HMAC theo khách).
-            let event = events::PhoneUnlocked(json!({"phone_key": phone_key}));
-            self.outbox.record(&transaction, tenant, actor, None, &event).await?;
-        }
-        transaction.commit().await?;
-        if unlocked {
-            tracing::info!(phone = %phone.masked(), "sign-in codes of a phone number unlocked");
-        }
-        Ok(unlocked)
     }
 }
 
