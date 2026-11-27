@@ -69,18 +69,29 @@ Module `orders` holds stock through `autoxide_inventory::api::Inventory`:
 2. `confirm` — the order was placed: the reservation no longer expires.
 3. `fulfil` — ship some or all reserved units (`fulfilment_key` makes it safe to retry); writes `sale` lines.
    With module `orders`, stock leaves when the goods reach the buyer: `inventory` listens to
-   `orders.fulfillment_delivered` (one shipment; key `fulfillment:<id>`) and `orders.order_delivered` (the units no
-   shipment carried, `after.delivered_lines`; key `order:<id>:delivered`), so `on_hand` and `reserved` drop and the
-   order becomes `fulfilled`. Units on the way stay reserved (already out of `available`). Each line issues at most
-   what is still held, so events arriving twice, late or in any order never issue more; an event for a reservation
-   already `fulfilled` is done. Because the goods are already gone, this path may take units from an expired lot
-   when the lots still in date are not enough (logged as a warning); a manual `fulfil` never does.
-   Serial-tracked goods issue with the serial numbers recorded on the order line
-   (`POST /api/v1/orders/{id}/lines/{line_id}/serials`) that are still in stock; units without a recorded serial
-   stay reserved (logged as a warning) while the other lines are issued, and recording the serials later
-   (`orders.line_serials_recorded`) issues them. Limitation: when one line is reserved in several warehouses,
-   serials are matched warehouse by warehouse in order; a serial held in another warehouse makes that issue fail
-   (logged) and the line stays reserved — issue it yourself through `fulfil`.
+   `orders.fulfillment_delivered` (one shipment; key `fulfillment:<id>`) and `orders.order_delivered` (key
+   `order:<id>:delivered`), so `on_hand` and `reserved` drop and the order becomes `fulfilled`. Units on the way
+   stay reserved (already out of `available`). Each event line carries `delivered_quantity`, the units of the line
+   that reached the buyer so far, and `inventory` issues the line **up to** that total, capped by what is still held:
+   events arriving twice, late or in any order, or after units were already issued by hand with `fulfil` when the
+   parcel left, never issue more. Because the goods are already gone, this path also:
+   - takes units from an expired lot when the lots still in date are not enough (logged as a warning);
+   - issues units whose reservation had already expired or been released (for example a bank transfer that
+     arrived after the hold ran out): the `sale` line takes them straight from `on_hand` and `available`;
+   - issues serial-tracked goods with the serial numbers recorded on the order line
+     (`POST /api/v1/orders/{id}/lines/{line_id}/serials`), each serial from the warehouse that holds it. Units
+     without a usable serial (not recorded yet, or not in stock in a warehouse holding the line) stay reserved
+     (logged as a warning) while the other lines are issued; recording the serials later
+     (`orders.line_serials_recorded`) issues them.
+   A manual `fulfil` does none of these three. When a delivered order cannot be issued at all (no reservation for
+   goods that track stock, or stock already gone), `inventory` logs a warning with the error `code` and counts
+   `inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}`: reconcile that stock level by hand
+   with an adjustment.
+   Upgrading from an earlier version: orders delivered before this version keep their reservation `confirmed`
+   (their units stay `reserved`). List them with `GET /api/v1/inventory/reservations?status=confirmed`, and for
+   each order already delivered release the hold (`POST /api/v1/inventory/reservations/{id}/release`) and record
+   the units sold with an adjustment (`POST /api/v1/inventory/adjustments`, negative quantity, reason
+   `data_entry_fix`).
 4. `release` — give back what was not shipped (cancelled, payment failed…). Releasing twice adds back once.
 5. `restock` — returned goods come back in (`reference` such as `return:<id>`); unsellable lines are only recorded.
 

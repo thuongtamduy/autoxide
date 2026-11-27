@@ -307,3 +307,244 @@ async fn giao_hang_dong_thoi_xuat_dung_mot_lan() {
     .await
     .unwrap();
 }
+
+/// Nhập `serials` của biến thể theo serial vào kho `org`.
+async fn serials_in(
+    shop: &super::Shop,
+    org: autoxide_kernel::tenancy::OrgId,
+    variant: Uuid,
+    serials: &[&str],
+) {
+    let body = json!({"org_id": org.as_uuid(), "reference": format!("in-{}", Uuid::now_v7().simple()), "lines": [
+        {"variant_id": variant, "quantity": serials.len(), "reason_code": "found", "serials": serials},
+    ]});
+    let (_, made) = call(shop, "POST", "/adjustments", "boss", Some(body)).await;
+    assert!(made["data"].is_object(), "{made}");
+}
+
+/// Event mới nêu tổng đã giao (`delivered_quantity`): phần đã `fulfil` tay lúc gửi kiện không bị xuất lại;
+/// lần `fulfil` tay sau đó vẫn được phần còn giữ.
+#[tokio::test]
+async fn giao_hang_sau_khi_xuat_tay_khong_xuat_them() {
+    TestDatabase::run(async |test| {
+        let (orders, outbox) = Emitter::new("orders", &EVENTS);
+        let shop = shop_with(test, |builder, _| builder.module(orders)).await;
+        let item = shop.catalog.item();
+        stock_in(&shop, shop.tree.a, item, 10, None).await;
+        let order = Uuid::now_v7();
+        reserve(&shop, order, vec![ReserveLine::new("1", item, 5)]).await;
+        let api = shop.api::<dyn Inventory>().unwrap();
+        let tenant = shop.default_tenant();
+        let by_hand = |key: &str, quantity: i64| {
+            crate::api::FulfilRequest::new(order, key, vec![crate::api::FulfilLine::new("1", quantity)])
+        };
+        // Gửi kiện: nhân viên xuất tay 2; kiện tới tay người mua (tổng đã giao 2) → không xuất thêm.
+        api.fulfil(&tenant, &by_hand("ship-1", 2)).await.unwrap();
+        let first = FulfillmentDelivered(json!({"after": {
+            "order_id": order, "fulfillment_id": Uuid::now_v7(),
+            "lines": [{"line_key": "1", "variant_id": item, "quantity": 2, "delivered_quantity": 2, "serials": []}],
+        }}));
+        twice(&shop, &outbox, &first).await;
+        assert_eq!(stock(&shop, item).await, (8, 3));
+        // Kiện thứ hai chưa xuất tay: tổng đã giao 3 → xuất thêm 1; lần xuất tay sau vẫn được 2 còn lại.
+        let second = FulfillmentDelivered(json!({"after": {
+            "order_id": order, "fulfillment_id": Uuid::now_v7(),
+            "lines": [{"line_key": "1", "variant_id": item, "quantity": 1, "delivered_quantity": 3, "serials": []}],
+        }}));
+        twice(&shop, &outbox, &second).await;
+        assert_eq!(stock(&shop, item).await, (7, 2));
+        api.fulfil(&tenant, &by_hand("ship-3", 2)).await.unwrap();
+        assert_eq!(stock(&shop, item).await, (5, 0));
+        // Đơn giao xong (tổng 5) tới sau cùng: không còn gì để xuất.
+        let done = OrderDelivered(json!({"after": {
+            "order_id": order, "lines": [{"line_key": "1"}],
+            "delivered_lines": [{"line_key": "1", "variant_id": item, "quantity": 0, "delivered_quantity": 5, "serials": []}],
+        }}));
+        twice(&shop, &outbox, &done).await;
+        assert_eq!(stock(&shop, item).await, (5, 0));
+        assert_eq!(status(&shop, order).await, "fulfilled");
+        assert_consistent(&shop).await;
+    })
+    .await
+    .unwrap();
+}
+
+/// Một dòng giữ ở hai kho (A rồi B), số serial ghi theo thứ tự bất kỳ: mỗi số xuất ở kho đang giữ nó. Số ở
+/// kho không giữ dòng bị bỏ qua (phần đó chờ), các dòng khác của event vẫn xuất.
+#[tokio::test]
+async fn giao_hang_serial_hai_kho() {
+    TestDatabase::run(async |test| {
+        let (orders, outbox) = Emitter::new("orders", &EVENTS);
+        let shop = shop_with(test, |builder, _| builder.module(orders)).await;
+        let phone = shop.catalog.add(|variant| variant.serial_tracked = true);
+        let item = shop.catalog.item();
+        serials_in(&shop, shop.tree.a, phone, &["SA"]).await;
+        serials_in(&shop, shop.tree.b, phone, &["SB", "SB2"]).await;
+        stock_in(&shop, shop.tree.a, item, 3, None).await;
+        let store = shop.tree.store.as_uuid();
+        let sources = json!({"sources": [
+            {"warehouse_org_id": shop.tree.a.as_uuid(), "priority": 1, "active": true},
+            {"warehouse_org_id": shop.tree.b.as_uuid(), "priority": 2, "active": true},
+        ]});
+        let (status_code, saved) =
+            call(&shop, "PUT", &format!("/sources/{store}"), "boss", Some(sources)).await;
+        assert!(status_code.is_success(), "{saved}");
+        let body = json!({"prefer_nearby": false, "allow_split": true});
+        call(&shop, "PUT", &format!("/settings/{store}"), "boss", Some(body)).await;
+        let api = shop.api::<dyn Inventory>().unwrap();
+        let tenant = shop.default_tenant();
+        let order = Uuid::now_v7();
+        let request = ReserveRequest::new(
+            order,
+            shop.tree.store,
+            Timestamp::now() + SignedDuration::from_mins(30),
+            vec![ReserveLine::new("p", phone, 2), ReserveLine::new("i", item, 1)],
+        );
+        let held = api.reserve(&tenant, &request).await.unwrap().into_inner();
+        let phone_orgs: Vec<_> =
+            held.lines.iter().filter(|line| line.line_key == "p").map(|line| line.warehouse_org_id).collect();
+        assert_eq!(phone_orgs, [shop.tree.a, shop.tree.b], "{held:?}");
+        api.confirm(&tenant, order).await.unwrap();
+
+        // Số của B ghi trước số của A; thêm một số không có ở kho nào: vẫn xuất đúng mỗi kho một số.
+        let delivered = OrderDelivered(json!({"after": {
+            "order_id": order, "lines": [{"line_key": "p"}, {"line_key": "i"}],
+            "delivered_lines": [
+                {"line_key": "p", "variant_id": phone, "quantity": 2, "delivered_quantity": 2, "serials": ["SB", "ZZ", "SA"]},
+                {"line_key": "i", "variant_id": item, "quantity": 1, "delivered_quantity": 1, "serials": []},
+            ],
+        }}));
+        twice(&shop, &outbox, &delivered).await;
+        let at = |org| level(&shop, org, phone);
+        assert_eq!(at(shop.tree.a).await["on_hand"], 0);
+        assert_eq!(at(shop.tree.b).await["on_hand"], 1);
+        assert_eq!(stock(&shop, item).await, (2, 0));
+        assert_eq!(status(&shop, order).await, "fulfilled");
+        assert_consistent(&shop).await;
+
+        // Đơn khác giữ ở B mà số ghi là của A (đã bán): dòng serial chờ, dòng thường vẫn xuất.
+        let other = Uuid::now_v7();
+        let request = ReserveRequest::new(
+            other,
+            shop.tree.store,
+            Timestamp::now() + SignedDuration::from_mins(30),
+            vec![ReserveLine::new("p", phone, 1), ReserveLine::new("i", item, 1)],
+        );
+        api.reserve(&tenant, &request).await.unwrap();
+        api.confirm(&tenant, other).await.unwrap();
+        let wrong = OrderDelivered(json!({"after": {
+            "order_id": other, "lines": [{"line_key": "p"}, {"line_key": "i"}],
+            "delivered_lines": [
+                {"line_key": "p", "variant_id": phone, "quantity": 1, "delivered_quantity": 1, "serials": ["SA"]},
+                {"line_key": "i", "variant_id": item, "quantity": 1, "delivered_quantity": 1, "serials": []},
+            ],
+        }}));
+        twice(&shop, &outbox, &wrong).await;
+        assert_eq!(stock(&shop, item).await, (1, 0));
+        assert_eq!(at(shop.tree.b).await["on_hand"], 1);
+        assert_eq!(status(&shop, other).await, "confirmed");
+        assert_consistent(&shop).await;
+    })
+    .await
+    .unwrap();
+}
+
+/// Combo hai thành phần cùng theo serial: mỗi thành phần lấy đúng số của nó.
+#[tokio::test]
+async fn giao_hang_combo_hai_thanh_phan_serial() {
+    TestDatabase::run(async |test| {
+        let (orders, outbox) = Emitter::new("orders", &EVENTS);
+        let shop = shop_with(test, |builder, _| builder.module(orders)).await;
+        let phone = shop.catalog.add(|variant| variant.serial_tracked = true);
+        let watch = shop.catalog.add(|variant| variant.serial_tracked = true);
+        serials_in(&shop, shop.tree.a, phone, &["P1"]).await;
+        serials_in(&shop, shop.tree.a, watch, &["W1"]).await;
+        let combo = shop.catalog.bundle(&[(phone, 1), (watch, 1)]);
+        let order = Uuid::now_v7();
+        reserve(&shop, order, vec![ReserveLine::new("c", combo, 1)]).await;
+        let delivered = OrderDelivered(json!({"after": {
+            "order_id": order, "lines": [{"line_key": "c"}],
+            "delivered_lines": [{"line_key": "c", "variant_id": combo, "quantity": 1, "delivered_quantity": 1, "serials": ["W1", "P1"]}],
+        }}));
+        twice(&shop, &outbox, &delivered).await;
+        assert_eq!(stock(&shop, phone).await, (0, 0));
+        assert_eq!(stock(&shop, watch).await, (0, 0));
+        assert_eq!(status(&shop, order).await, "fulfilled");
+        assert_consistent(&shop).await;
+    })
+    .await
+    .unwrap();
+}
+
+/// Chỗ giữ đã trả (vd quá hạn chờ chuyển khoản) mà hàng vẫn tới tay người mua: kho vẫn ghi `sale`, trừ thẳng
+/// tồn (`available` cùng giảm); event tới lại không trừ thêm.
+#[tokio::test]
+async fn giao_hang_khi_cho_giu_da_tra_van_tru_ton() {
+    TestDatabase::run(async |test| {
+        let (orders, outbox) = Emitter::new("orders", &EVENTS);
+        let shop = shop_with(test, |builder, _| builder.module(orders)).await;
+        let item = shop.catalog.item();
+        stock_in(&shop, shop.tree.a, item, 10, None).await;
+        let api = shop.api::<dyn Inventory>().unwrap();
+        let tenant = shop.default_tenant();
+        let order = Uuid::now_v7();
+        let request = ReserveRequest::new(
+            order,
+            shop.tree.a,
+            Timestamp::now() + SignedDuration::from_mins(30),
+            vec![ReserveLine::new("1", item, 3)],
+        );
+        api.reserve(&tenant, &request).await.unwrap();
+        api.release(&tenant, order, crate::api::ReleaseReason::PaymentFailed).await.unwrap();
+        assert_eq!(stock(&shop, item).await, (10, 0));
+        let delivered = OrderDelivered(json!({"after": {
+            "order_id": order, "lines": [{"line_key": "1"}],
+            "delivered_lines": [{"line_key": "1", "variant_id": item, "quantity": 3, "delivered_quantity": 3, "serials": []}],
+        }}));
+        twice(&shop, &outbox, &delivered).await;
+        let found = level(&shop, shop.tree.a, item).await;
+        assert_eq!(
+            (found["on_hand"].as_i64(), found["reserved"].as_i64(), found["available"].as_i64()),
+            (Some(7), Some(0), Some(7)),
+            "{found}"
+        );
+        assert_eq!(status(&shop, order).await, "released");
+        assert_consistent(&shop).await;
+    })
+    .await
+    .unwrap();
+}
+
+/// Event giao hàng của khách khác cùng mã đơn không chạm chỗ giữ của khách này.
+#[tokio::test]
+async fn giao_hang_khong_cham_khach_khac() {
+    TestDatabase::run(async |test| {
+        let (orders, outbox) = Emitter::new("orders", &EVENTS);
+        let shop = shop_with(test, |builder, _| builder.module(orders).tenant("other")).await;
+        let item = shop.catalog.item();
+        stock_in(&shop, shop.tree.a, item, 10, None).await;
+        let order = Uuid::now_v7();
+        reserve(&shop, order, vec![ReserveLine::new("1", item, 2)]).await;
+        let delivered = OrderDelivered(json!({"after": {
+            "order_id": order, "lines": [{"line_key": "1"}],
+            "delivered_lines": [{"line_key": "1", "variant_id": item, "quantity": 2, "delivered_quantity": 2, "serials": []}],
+        }}));
+        let other = shop.tenant("other").await.unwrap();
+        let outbox_handle = outbox.lock().unwrap().clone().unwrap();
+        let transaction = other.database().begin_write().await.unwrap();
+        outbox_handle
+            .record(&transaction, &other, autoxide_kernel::event::Actor::system(), None, &delivered)
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+        drain(&shop).await;
+        assert_eq!(stock(&shop, item).await, (10, 2));
+        assert_eq!(status(&shop, order).await, "confirmed");
+        // Cùng event ở đúng khách: xuất.
+        twice(&shop, &outbox, &delivered).await;
+        assert_eq!(stock(&shop, item).await, (8, 0));
+        assert_consistent(&shop).await;
+    })
+    .await
+    .unwrap();
+}

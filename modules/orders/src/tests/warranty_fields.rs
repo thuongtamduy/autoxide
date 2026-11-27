@@ -206,7 +206,8 @@ async fn bao_hanh_theo_serial_va_theo_dong_phieu_bao_hanh() {
         let delivered = last_event(&shop, "orders.order_delivered").await;
         assert_eq!(
             delivered["delivered_lines"],
-            json!([{"line_key": delivered["lines"][0]["line_key"], "quantity": 2, "serials": ["SN-001", "SN-002"]}]),
+            json!([{"line_key": delivered["lines"][0]["line_key"], "variant_id": delivered["delivered_lines"][0]["variant_id"],
+                "quantity": 2, "delivered_quantity": 2, "serials": ["SN-001", "SN-002"]}]),
             "{delivered}"
         );
         assert_eq!(super::lifecycle::count_events(&shop, "orders.line_serials_recorded").await, 0);

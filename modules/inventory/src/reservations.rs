@@ -99,14 +99,6 @@ fn expired(order: Uuid) -> Error {
     .with_param("order_id", order)
 }
 
-fn over_fulfilment(line_key: &str) -> Error {
-    Error::conflict(
-        "inventory.over_fulfilment",
-        "Line `{line_key}` ships more than what is reserved for it.",
-    )
-    .with_param("line_key", line_key.to_owned())
-}
-
 fn status_of(row: &reservation::Model) -> Result<ReservationStatus, Error> {
     ReservationStatus::parse(&row.status)
         .ok_or_else(|| Error::internal(format!("unknown reservation status `{}`", row.status)))
@@ -821,7 +813,12 @@ impl InventoryService {
                     tracing::debug!(order_id = %order, "reservation already fulfilled; nothing to issue");
                     return load(&transaction, tenant, row).await;
                 }
-                if !matches!(status, ReservationStatus::Held | ReservationStatus::Confirmed) {
+                // Chỗ giữ đã hết hạn / đã trả mà hàng vẫn tới tay người mua (vd chờ chuyển khoản quá hạn giữ):
+                // hàng vật lý đã đi, nên event giao hàng vẫn xuất phần đã trả lại, trừ thẳng tồn (`available`
+                // cùng giảm). `fulfil` gọi tay thì không.
+                let lapsed = delivery.is_some()
+                    && matches!(status, ReservationStatus::Expired | ReservationStatus::Released);
+                if !lapsed && !matches!(status, ReservationStatus::Held | ReservationStatus::Confirmed) {
                     return Err(expired(order));
                 }
                 let lines = reservation_line::Entity::find()
@@ -830,46 +827,47 @@ impl InventoryService {
                     .order_by_asc(reservation_line::Column::Id)
                     .all(&transaction)
                     .await?;
-                let planned;
-                let request = match delivery {
+                let plan = match delivery {
                     Some(wanted) => {
-                        let lines =
-                            crate::delivery::plan(&transaction, tenant, order, &lines, variants, wanted)
-                                .await?;
-                        if lines.is_empty() {
+                        let plan = crate::delivery::plan(
+                            &transaction,
+                            tenant,
+                            order,
+                            &lines,
+                            variants,
+                            wanted,
+                            lapsed,
+                        )
+                        .await?;
+                        if plan.is_empty() {
                             return load(&transaction, tenant, row).await;
                         }
-                        planned = FulfilRequest::new(order, key.as_str(), lines);
-                        &planned
+                        if lapsed {
+                            tracing::warn!(
+                                order_id = %order,
+                                status = status.as_str(),
+                                "issuing delivered goods whose reservation had lapsed; stock is taken from available"
+                            );
+                        }
+                        plan
                     }
-                    None => request,
+                    None => crate::fulfil_plan::manual_plan(&lines, request, variants)?,
                 };
-                let takes = takes(&lines, request)?;
-                let mut ordered: Vec<(&reservation_line::Model, i64)> =
-                    takes.iter().map(|(index, quantity)| (&lines[*index], *quantity)).collect();
-                ordered.sort_by_key(|(line, _)| line.level_id);
+                let mut ordered: Vec<&crate::fulfil_plan::Take> = plan.iter().collect();
+                ordered.sort_by_key(|take| lines[take.index].level_id);
                 let mut touched = Touched::default();
-                let mut serials_used: HashMap<&str, usize> = HashMap::new();
-                for (line, quantity) in &ordered {
+                // Một dòng giữ có thể có nhiều phần (`manual_plan` theo từng dòng yêu cầu): cộng dồn.
+                let mut fulfilled: HashMap<usize, i64> = HashMap::new();
+                for take in ordered {
+                    let line = &lines[take.index];
+                    let quantity = take.quantity;
                     let wanted =
                         request.lines.iter().find(|wanted| wanted.line_key == line.line_key);
                     let variant = variants.get(&line.variant_id);
-                    let serials = if variant.is_some_and(|v| v.serial_tracked) {
-                        let all: &[String] = wanted.map_or(&[], |wanted| wanted.serials.as_slice());
-                        let used = serials_used.entry(line.line_key.as_str()).or_default();
-                        let count = usize::try_from(*quantity).unwrap_or(usize::MAX);
-                        let Some(part) = all.get(*used..used.saturating_add(count)) else {
-                            return Err(crate::lots::serials_required(&line.line_key, *quantity));
-                        };
-                        *used += count;
-                        Some(part)
-                    } else {
-                        None
-                    };
                     let tracking = crate::lots::Tracking {
                         lot_tracked: variant.is_some_and(|v| v.lot_tracked),
                         lot_code: wanted.and_then(|wanted| wanted.lot_code.as_deref()),
-                        serials,
+                        serials: take.serials.as_deref(),
                         serial_status: "sold",
                         order: Some(order),
                         allow_expired,
@@ -879,7 +877,7 @@ impl InventoryService {
                         variant: line.variant_id,
                         kind: MovementKind::Sale,
                         quantity: -quantity,
-                        touches_available: false,
+                        touches_available: lapsed,
                         unit_cost: None,
                         lot_id: None,
                         reason_code: None,
@@ -890,11 +888,19 @@ impl InventoryService {
                     };
                     crate::lots::record_out(&transaction, tenant, &mut touched, new, &tracking)
                         .await?;
-                    reservation_line::Entity::update_many()
-                        .col_expr(
-                            reservation_line::Column::FulfilledQuantity,
-                            Expr::value(line.fulfilled_quantity + quantity),
-                        )
+                    let done = fulfilled.entry(take.index).or_default();
+                    *done += quantity;
+                    let mut update = reservation_line::Entity::update_many().col_expr(
+                        reservation_line::Column::FulfilledQuantity,
+                        Expr::value(line.fulfilled_quantity + *done),
+                    );
+                    if lapsed {
+                        update = update.col_expr(
+                            reservation_line::Column::ReleasedQuantity,
+                            Expr::value(line.released_quantity - *done),
+                        );
+                    }
+                    update
                         .filter(reservation_line::Column::Id.eq(line.id))
                         .scoped(tenant)
                         .exec(&transaction)
@@ -910,19 +916,17 @@ impl InventoryService {
                 })
                 .exec_without_returning(&transaction)
                 .await?;
-                let mut taken: HashMap<usize, i64> = HashMap::new();
-                for (index, quantity) in &takes {
-                    *taken.entry(*index).or_default() += quantity;
-                }
                 let finished = lines.iter().enumerate().all(|(index, line)| {
-                    remaining(line) - taken.get(&index).copied().unwrap_or(0) == 0
+                    remaining(line) - fulfilled.get(&index).copied().unwrap_or(0) == 0
                 });
                 let to = if finished {
                     ReservationStatus::Fulfilled
                 } else {
                     ReservationStatus::Confirmed
                 };
-                if to.as_str() != row.status
+                // Chỗ giữ đã hết hạn / đã trả giữ nguyên trạng thái (lịch sử); dòng `sale` vẫn ghi ở trên.
+                if !lapsed
+                    && to.as_str() != row.status
                     && !set_status(&transaction, tenant, &row, to, None).await?
                 {
                     return Err(Error::internal("a locked reservation changed under its lock"));
@@ -1144,52 +1148,4 @@ fn plan(
         return Err(errors::insufficient_stock(&lines.join(", ")));
     }
     Err(errors::insufficient_stock(&short.join(", ")))
-}
-
-/// Phần lấy từ từng dòng chỗ giữ cho lần xuất `request` (chỉ số dòng, số lượng). Dòng đơn trống:
-/// mọi phần còn giữ.
-fn takes(
-    lines: &[reservation_line::Model],
-    request: &FulfilRequest,
-) -> Result<Vec<(usize, i64)>, Error> {
-    if request.lines.is_empty() {
-        return Ok(lines
-            .iter()
-            .enumerate()
-            .filter(|(_, line)| remaining(line) > 0)
-            .map(|(index, line)| (index, remaining(line)))
-            .collect());
-    }
-    let mut left: Vec<i64> = lines.iter().map(remaining).collect();
-    let mut takes = Vec::new();
-    for wanted in &request.lines {
-        let own: Vec<usize> =
-            (0..lines.len()).filter(|index| lines[*index].line_key == wanted.line_key).collect();
-        if own.is_empty() {
-            return Err(over_fulfilment(&wanted.line_key));
-        }
-        // Mỗi biến thể thật (thành phần combo) cần `số đơn vị × per_unit`, lấy lần lượt qua các kho.
-        let mut variants: Vec<(Uuid, i64)> =
-            own.iter().map(|index| (lines[*index].variant_id, lines[*index].per_unit)).collect();
-        variants.sort_unstable();
-        variants.dedup();
-        for (variant, per_unit) in variants {
-            let mut need = wanted
-                .quantity
-                .checked_mul(per_unit)
-                .ok_or_else(|| over_fulfilment(&wanted.line_key))?;
-            for index in own.iter().copied().filter(|index| lines[*index].variant_id == variant) {
-                let take = need.min(left[index]);
-                if take > 0 {
-                    takes.push((index, take));
-                    left[index] -= take;
-                    need -= take;
-                }
-            }
-            if need > 0 {
-                return Err(over_fulfilment(&wanted.line_key));
-            }
-        }
-    }
-    Ok(takes)
 }

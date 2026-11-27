@@ -87,15 +87,29 @@ struct CancelledLineIn {
 #[derive(Debug, Deserialize)]
 struct ArrivedLine {
     line_key: String,
+    #[serde(default)]
+    variant_id: Option<Uuid>,
     quantity: i64,
+    /// Tổng đơn vị của dòng đã tới tay người mua (event từ vòng sửa 3 của UT-1). Event cũ không có: `quantity`.
+    #[serde(default)]
+    delivered_quantity: Option<i64>,
     #[serde(default)]
     serials: Vec<String>,
 }
 
 impl ArrivedLine {
     fn wanted(self) -> DeliveredLine {
-        DeliveredLine::new(self.line_key, Want::More(self.quantity), self.serials)
+        let want = match self.delivered_quantity {
+            Some(total) => Want::UpTo(total),
+            None => Want::More(self.quantity),
+        };
+        DeliveredLine::new(self.line_key, want, self.serials)
     }
+}
+
+/// Biến thể nêu trong các dòng đã giao (để biết đơn không có chỗ giữ có hàng theo dõi tồn không).
+fn variants_of(lines: &[ArrivedLine]) -> Vec<Uuid> {
+    lines.iter().filter_map(|line| line.variant_id).collect()
 }
 
 /// `after` của `orders.fulfillment_delivered`.
@@ -116,7 +130,7 @@ struct OrderLine {
 #[derive(Debug, Deserialize)]
 struct OrderArrived {
     order_id: Uuid,
-    /// Có từ bản sửa UT-1: phần mỗi dòng chưa đi theo lần giao lẻ nào.
+    /// Có từ bản sửa UT-1: mọi dòng của đơn, kèm tổng đã giao (`delivered_quantity`).
     delivered_lines: Option<Vec<ArrivedLine>>,
     #[serde(default)]
     lines: Vec<OrderLine>,
@@ -204,6 +218,8 @@ impl EventHandler for OrderEvents {
                     tracing::warn!(event_id = %event.id, "orders.order_delivered without the fields inventory reads; ignored");
                     return Ok(());
                 };
+                let variants =
+                    arrived.delivered_lines.as_deref().map(variants_of).unwrap_or_default();
                 let wanted: Vec<DeliveredLine> = match arrived.delivered_lines {
                     Some(lines) => lines.into_iter().map(ArrivedLine::wanted).collect(),
                     // Event cũ: phần còn giữ của mọi dòng.
@@ -215,17 +231,18 @@ impl EventHandler for OrderEvents {
                         .collect(),
                 };
                 let key = format!("order:{}:delivered", arrived.order_id);
-                self.issue(event, arrived.order_id, key, &wanted).await
+                self.issue(event, arrived.order_id, key, &wanted, &variants).await
             }
             FULFILLMENT_DELIVERED => {
                 let Ok(arrived) = serde_json::from_value::<Arrived>(after.clone()) else {
                     tracing::warn!(event_id = %event.id, "orders.fulfillment_delivered without the fields inventory reads; ignored");
                     return Ok(());
                 };
+                let variants = variants_of(&arrived.lines);
                 let wanted: Vec<DeliveredLine> =
                     arrived.lines.into_iter().map(ArrivedLine::wanted).collect();
                 let key = format!("fulfillment:{}", arrived.fulfillment_id);
-                self.issue(event, arrived.order_id, key, &wanted).await
+                self.issue(event, arrived.order_id, key, &wanted, &variants).await
             }
             LINE_SERIALS_RECORDED => {
                 let Ok(recorded) = serde_json::from_value::<SerialsRecorded>(after.clone()) else {
@@ -241,7 +258,7 @@ impl EventHandler for OrderEvents {
                     Want::UpTo(recorded.delivered_quantity),
                     recorded.serials,
                 )];
-                self.issue(event, recorded.order_id, key, &wanted).await
+                self.issue(event, recorded.order_id, key, &wanted, &[]).await
             }
             PREORDER_CANCELLED => {
                 let Ok(cancelled) = serde_json::from_value::<Cancelled>(after.clone()) else {
@@ -267,25 +284,56 @@ impl EventHandler for OrderEvents {
 }
 
 impl OrderEvents {
-    /// Xuất kho theo event giao hàng (`delivery`): đơn không có chỗ giữ (hàng số, dịch vụ) là xong, không cảnh
-    /// báo; lỗi nghiệp vụ khác như [`settle`].
+    /// Xuất kho theo event giao hàng (`delivery`). Hàng đã đi rồi, nên lần xuất không được cũng không thử lại
+    /// được: ghi cảnh báo có mã ổn định (`code`) và số đo `inventory_delivery_unissued_total` để người vận hành
+    /// đối soát (vd chỉnh tồn tay). Đơn không có chỗ giữ mà không có hàng theo dõi tồn (hàng số, dịch vụ) là xong.
     async fn issue(
         &self,
         event: &Delivered,
         order: Uuid,
         key: String,
         wanted: &[DeliveredLine],
+        variants: &[Uuid],
     ) -> Result<(), Error> {
         if wanted.is_empty() {
             return Ok(());
         }
         let request = FulfilRequest::new(order, key, Vec::new());
         let outcome = self.0.fulfil_with(&event.tenant, &request, Some(wanted)).await.map(|_| ());
-        if let Err(error) = &outcome
-            && error.code() == "inventory.reservation_not_found"
-        {
-            return Ok(());
+        let Err(error) = outcome else { return Ok(()) };
+        if error.kind().status() >= 500 {
+            return Err(error);
         }
-        settle(event, outcome)
+        let reason = if error.code() == "inventory.reservation_not_found" {
+            if !self.tracks_stock(event, variants).await? {
+                return Ok(());
+            }
+            "no_reservation"
+        } else {
+            "rejected"
+        };
+        metrics::counter!("inventory_delivery_unissued_total", "reason" => reason).increment(1);
+        tracing::warn!(
+            event_id = %event.id,
+            event = %event.name,
+            order_id = %order,
+            code = error.code(),
+            reason,
+            "delivered goods were not issued from stock; reconcile the stock level by hand"
+        );
+        Ok(())
+    }
+
+    /// Có biến thể nào trong `variants` theo dõi tồn không (event cũ không nêu biến thể: không biết, coi là không).
+    async fn tracks_stock(&self, event: &Delivered, variants: &[Uuid]) -> Result<bool, Error> {
+        if variants.is_empty() {
+            return Ok(false);
+        }
+        match self.0.variants(&event.tenant, variants).await {
+            Ok(found) => Ok(found.values().any(|variant| variant.track_inventory)),
+            // Biến thể không còn ở `catalog`: không biết, cảnh báo cho chắc.
+            Err(error) if error.kind().status() < 500 => Ok(true),
+            Err(error) => Err(error),
+        }
     }
 }

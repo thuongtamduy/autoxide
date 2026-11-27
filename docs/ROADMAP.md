@@ -315,9 +315,6 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
   - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
         `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
-    - [ ] Nợ của UT-1 (rà #589): hàng theo serial của một dòng giữ ở nhiều kho — số serial chia theo thứ tự kho, số
-          nằm ở kho khác thì lần xuất theo event giao hàng lỗi (ghi log) và dòng còn giữ; cần lần giao mang kho và
-          serial của từng kiện (orders ghi kho xuất theo lần giao)
   - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
         chạm bảo mật nên qua kiểm độc lập
   - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước

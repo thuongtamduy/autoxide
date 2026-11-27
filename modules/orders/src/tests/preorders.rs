@@ -142,7 +142,7 @@ async fn don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao() {
         assert_eq!(count_events(&shop, "orders.fulfillment_delivered").await, 1);
         let shirt_line = line_of(&shop, id, shirt).await;
         let arrived = fulfillment_delivered(&shop).await;
-        assert_eq!(arrived["lines"], json!([{"line_key": shirt_line.line_key, "quantity": 1, "serials": []}]), "{arrived}");
+        assert_eq!(arrived["lines"], json!([{"line_key": shirt_line.line_key, "variant_id": shirt, "quantity": 1, "delivered_quantity": 1, "serials": []}]), "{arrived}");
         assert_eq!(found["data"]["fulfillment_status"], "partial");
         // Hàng chưa về: không có gì để giao.
         let (status, error) = ship(&shop, id).await;

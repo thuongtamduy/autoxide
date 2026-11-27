@@ -68,16 +68,25 @@ Module `orders` giữ hàng qua `autoxide_inventory::api::Inventory`:
 2. `confirm` — đơn đã đặt: chỗ giữ không còn hạn.
 3. `fulfil` — xuất một phần hay hết số đã giữ (`fulfilment_key` để gọi lại an toàn); ghi dòng sổ `sale`.
    Có module `orders` thì hàng rời kho khi tới tay người mua: `inventory` nghe `orders.fulfillment_delivered`
-   (một lần giao; khoá `fulfillment:<id>`) và `orders.order_delivered` (các đơn vị không đi theo lần giao nào,
-   `after.delivered_lines`; khoá `order:<id>:delivered`), nên `on_hand` và `reserved` giảm, đơn thành `fulfilled`.
-   Hàng đang trên đường vẫn giữ (đã trừ khỏi `available`). Mỗi dòng chỉ xuất tối đa phần còn giữ, nên event tới
-   hai lần, tới muộn hay sai thứ tự cũng không xuất thừa; event cho chỗ giữ đã `fulfilled` là xong. Vì hàng đã đi
-   rồi, đường này được lấy lô đã quá hạn khi lô còn hạn không đủ (ghi cảnh báo trong log); `fulfil` gọi tay thì không.
-   Hàng theo serial xuất bằng các số serial đã ghi ở dòng đơn
-   (`POST /api/v1/orders/{id}/lines/{line_id}/serials`) còn trong kho; đơn vị chưa có serial vẫn giữ (ghi cảnh báo
-   trong log) trong khi các dòng khác được xuất, và ghi serial sau đó (`orders.line_serials_recorded`) sẽ xuất nốt.
-   Giới hạn: một dòng giữ ở nhiều kho thì serial được ghép lần lượt theo từng kho; số serial nằm ở kho khác làm lần
-   xuất đó lỗi (ghi log) và dòng vẫn giữ — tự xuất qua `fulfil`.
+   (một lần giao; khoá `fulfillment:<id>`) và `orders.order_delivered` (khoá `order:<id>:delivered`), nên `on_hand`
+   và `reserved` giảm, đơn thành `fulfilled`. Hàng đang trên đường vẫn giữ (đã trừ khỏi `available`). Mỗi dòng của
+   event mang `delivered_quantity` — số đơn vị của dòng đã tới tay người mua tính tới lúc đó — và `inventory` xuất
+   dòng **tới đúng** tổng đó, không quá phần còn giữ: event tới hai lần, tới muộn, sai thứ tự, hay sau khi đã xuất
+   tay bằng `fulfil` lúc gửi kiện cũng không xuất thừa. Vì hàng đã đi rồi, đường này còn:
+   - lấy lô đã quá hạn khi lô còn hạn không đủ (ghi cảnh báo trong log);
+   - xuất cả đơn vị mà chỗ giữ đã hết hạn hay đã trả (vd chuyển khoản tới sau khi hết hạn giữ): dòng `sale` trừ
+     thẳng `on_hand` và `available`;
+   - xuất hàng theo serial bằng các số serial đã ghi ở dòng đơn
+     (`POST /api/v1/orders/{id}/lines/{line_id}/serials`), mỗi số ở đúng kho đang giữ số đó. Đơn vị chưa có số dùng
+     được (chưa ghi, hay số không còn ở kho nào đang giữ dòng) vẫn giữ (ghi cảnh báo trong log) trong khi các dòng
+     khác được xuất; ghi serial sau đó (`orders.line_serials_recorded`) sẽ xuất nốt.
+   `fulfil` gọi tay không làm ba điều trên. Đơn đã giao mà không xuất được gì (không có chỗ giữ cho hàng theo dõi
+   tồn, hay tồn đã hết) thì `inventory` ghi cảnh báo kèm `code` của lỗi và đếm
+   `inventory_delivery_unissued_total{reason="no_reservation"|"rejected"}`: chỉnh tay dòng tồn đó bằng lệnh điều chỉnh.
+   Nâng cấp từ bản trước: đơn đã giao trước bản này giữ chỗ `confirmed` mãi (đơn vị vẫn `reserved`). Liệt kê bằng
+   `GET /api/v1/inventory/reservations?status=confirmed`; với mỗi đơn đã giao, trả chỗ giữ
+   (`POST /api/v1/inventory/reservations/{id}/release`) rồi ghi số đã bán bằng lệnh điều chỉnh
+   (`POST /api/v1/inventory/adjustments`, số âm, lý do `data_entry_fix`).
 4. `release` — trả phần chưa xuất (huỷ đơn, thanh toán lỗi…). Trả hai lần chỉ cộng lại một lần.
 5. `restock` — nhập lại hàng trả về (`reference` như `return:<id>`); dòng không bán lại được chỉ được ghi nhận.
 

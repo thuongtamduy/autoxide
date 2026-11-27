@@ -12,6 +12,7 @@ mod delivery;
 mod entity;
 mod errors;
 mod events;
+mod fulfil_plan;
 mod http;
 mod levels;
 mod lots;

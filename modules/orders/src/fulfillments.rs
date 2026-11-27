@@ -118,8 +118,9 @@ pub(crate) fn delivered_units(rows: &[fulfillment::Model]) -> HashMap<Uuid, i64>
     shipped(rows, &[DELIVERED])
 }
 
-/// `delivered_lines` của `orders.order_delivered`: phần mỗi dòng (trừ đã huỷ) chưa đi theo lần giao nào đã
-/// tới tay người mua — các lần đó đã có `orders.fulfillment_delivered` riêng. Kho xuất đúng phần này.
+/// `delivered_lines` của `orders.order_delivered`: mọi dòng còn đơn vị (trừ đã huỷ). `quantity`: phần chưa đi
+/// theo lần giao nào (các lần đó đã có `orders.fulfillment_delivered`); `delivered_quantity`: tổng đơn vị của
+/// dòng đã tới tay người mua — đơn đã giao xong nên là mọi đơn vị chưa huỷ. Kho xuất tới đúng tổng đó.
 pub(crate) async fn undelivered_lines(
     connection: &impl ConnectionTrait,
     tenant: &TenantContext,
@@ -135,10 +136,11 @@ pub(crate) async fn undelivered_lines(
     let serials = serials_by_line(connection, tenant, order_id).await?;
     Ok(lines
         .iter()
-        .map(|line| (line, remaining(line, &delivered)))
-        .filter(|(_, quantity)| *quantity > 0)
-        .map(|(line, quantity)| {
-            json!({"line_key": line.line_key, "quantity": quantity,
+        .filter(|line| line.quantity - line.cancelled_quantity > 0)
+        .map(|line| {
+            json!({"line_key": line.line_key, "variant_id": line.variant_id,
+                "quantity": remaining(line, &delivered).max(0),
+                "delivered_quantity": line.quantity - line.cancelled_quantity,
                 "serials": serials.get(&line.id).cloned().unwrap_or_default()})
         })
         .collect())
@@ -344,8 +346,10 @@ impl OrdersService {
         let rows = fulfillments_of(transaction, tenant, order_id).await?;
         // Đơn cũ chưa có lần giao nào (yêu cầu trước khi có bảng này): theo vận đơn như trước.
         let complete = rows.is_empty() || all_delivered(&lines, &rows);
-        // Mỗi lần giao tới tay người mua có event riêng (kể cả lần cuối): kho xuất đúng phần của nó;
-        // `orders.order_delivered` chỉ mang phần chưa đi theo lần giao nào.
+        // Mỗi lần giao tới tay người mua có event riêng (kể cả lần cuối). `delivered_quantity` là TỔNG đơn vị
+        // của dòng đã tới tay người mua (sau lần này): kho xuất tới đúng tổng đó, nên phần đã xuất tay
+        // (`fulfil` lúc gửi kiện) hay event tới lại / sai thứ tự không làm xuất thừa.
+        let delivered_total = delivered_units(&rows);
         let serials = if arrived.is_empty() {
             HashMap::new()
         } else {
@@ -356,7 +360,9 @@ impl OrdersService {
                 .iter()
                 .filter_map(|shipped| {
                     let line = lines.iter().find(|line| line.id == shipped.line_id)?;
-                    Some(json!({"line_key": line.line_key, "quantity": shipped.quantity,
+                    Some(json!({"line_key": line.line_key, "variant_id": line.variant_id,
+                        "quantity": shipped.quantity,
+                        "delivered_quantity": delivered_total.get(&line.id).copied().unwrap_or(0),
                         "serials": serials.get(&line.id).cloned().unwrap_or_default()}))
                 })
                 .collect();

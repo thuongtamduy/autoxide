@@ -45,11 +45,15 @@ pub mod events {
     pub const ORDER_STATUS_CHANGED: &str = "orders.order_status_changed";
     /// An order cancelled: holders release their holds. `after`: `order_id`, `hold_reference`, `cause`.
     pub const ORDER_CANCELLED: &str = "orders.order_cancelled";
-    /// An order fully delivered. `after.delivered_lines` (`line_key`, `quantity`, `serials`) are the units no
-    /// shipment carried (`orders.fulfillment_delivered` covers those); `inventory` issues them (`sale` lines).
+    /// An order fully delivered. `after.delivered_lines` lists every line with units left after cancellations:
+    /// `line_key`, `variant_id`, `quantity` (units no shipment carried; `orders.fulfillment_delivered` covers the
+    /// others), `delivered_quantity` (every unit of the line, now with the buyer) and `serials`. `inventory`
+    /// issues each line up to `delivered_quantity` (`sale` lines).
     pub const ORDER_DELIVERED: &str = "orders.order_delivered";
     /// One shipment of an order reached the buyer: `after.order_id`, `after.fulfillment_id`, `after.lines`
-    /// (`line_key`, `quantity`, `serials` recorded for the line). `inventory` issues these units (`sale` lines).
+    /// (`line_key`, `variant_id`, `quantity` carried by this shipment, `delivered_quantity` = units of the line
+    /// delivered so far by every shipment, `serials` recorded for the line). `inventory` issues each line up to
+    /// `delivered_quantity` (`sale` lines), so units already issued by hand are not issued again.
     pub const FULFILLMENT_DELIVERED: &str = "orders.fulfillment_delivered";
     /// Serial numbers were recorded for a line whose goods already reached the buyer: `after.order_id`,
     /// `after.line_id`, `after.line_key`, `after.delivered_quantity`, `after.serials` (every serial of the
