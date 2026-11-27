@@ -211,9 +211,7 @@ async fn restore_into(
         let modules = runtime.modules.names();
         // Bản backup có dữ liệu của module mà bản cài này đang tắt: dừng, không bỏ sót nó.
         let tables =
-            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "backup restore")
-                .await
-            {
+            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "restore").await {
                 Ok(()) => copy_modules(&source, &target, &modules)
                     .await
                     .map_err(|error| error.to_string()),

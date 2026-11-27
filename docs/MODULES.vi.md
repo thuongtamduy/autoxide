@@ -172,7 +172,7 @@ không tool MCP, không job, không nhận event khác, nhưng:
   `modules_turned_off`, khi database còn dòng của một module đang tắt — kèm đúng dòng
   `AUTOXIDE_MODULES=…` để bật lại. (Khi bạn tự đặt `AUTOXIDE_MODULES` thì câu này chỉ là thông
   tin: bạn đã chọn.)
-- `autoxide copy`, `autoxide backup create` và `autoxide backup restore` từ chối chạy khi còn dữ
+- `autoxide copy`, `autoxide backup` và `autoxide restore` từ chối chạy khi còn dữ
   liệu như vậy, vì chúng chỉ xử lý module đang bật. Chạy chúng với module đó bật, hoặc với
   `AUTOXIDE_MODULES=all`.
 

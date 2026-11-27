@@ -160,6 +160,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `compliance.set_website_status` | `compliance.legal.manage` | writes |
 | `compliance.subject_requests` | `compliance.privacy.manage` | read-only |
 | `compliance.tracking_tags` | `compliance.tracking.manage` | writes |
+| `compliance.unlock_phone` | `compliance.phone_locks.manage` | writes |
 | `compliance.verification_status` | — | read-only |
 | `compliance.website_checklist` | `compliance.legal.read` | read-only |
 | `compliance.website_dossier` | `compliance.legal.read` | read-only |

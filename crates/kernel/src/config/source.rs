@@ -5,6 +5,32 @@ use std::path::Path;
 
 use super::{ConfigError, ConfigErrors};
 
+/// What is wrong in the `.env` file, WITHOUT echoing the line: it often holds a password. Names the variable (the text
+/// before the first `=`) so the reader knows which line to fix; `dotenvy` alone only gives a character index.
+fn dotenv_error_text(error: &dotenvy::Error) -> String {
+    match error {
+        dotenvy::Error::LineParse(line, index) => {
+            // Chỉ khi dòng CÓ dấu `=` thì phần trước nó mới là tên biến; dòng trần không có `=` (một mật khẩu
+            // lỡ xuống dòng, kết quả của `openssl rand …`) có thể chính là bí mật nên không bao giờ được in.
+            let name = line.split_once('=').map(|(name, _)| name.trim()).filter(|name| {
+                name.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                    && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            });
+            match name {
+                Some(name) => format!(
+                    "the line of `{name}` cannot be read (problem near character {index}); a value with spaces or \
+                     special characters must be in double quotes, for example {name}=\"my value\""
+                ),
+                None => format!(
+                    "a line cannot be read (problem near character {index}); every line is NAME=value, and a value \
+                     with spaces or special characters must be in double quotes"
+                ),
+            }
+        }
+        other => other.to_string(),
+    }
+}
+
 /// The set of raw configuration values (name to string), merged from every source.
 ///
 /// Configuration-reading code does not call `std::env::var` directly but goes through this type, so tests
@@ -40,7 +66,7 @@ impl ConfigSource {
             })?;
             for pair in dotenvy::from_read_iter(file) {
                 let (name, value) = pair.map_err(|error| {
-                    ConfigErrors::single(ConfigError::file(dotenv_path, error.to_string()))
+                    ConfigErrors::single(ConfigError::file(dotenv_path, dotenv_error_text(&error)))
                 })?;
                 values.insert(name, value);
             }
@@ -82,6 +108,12 @@ impl ConfigSource {
         self
     }
 
+    /// Names of every variable that has a value (even an empty one), sorted by name. For checks such as "is this
+    /// `AUTOXIDE_…` name one the program reads?".
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.values.keys().map(String::as_str)
+    }
+
     /// The value of `name`, trimmed of surrounding whitespace. An empty string counts as unset: `VAR=` in a
     /// `.env` file or compose means "use the default".
     pub fn get(&self, name: &str) -> Option<&str> {
@@ -100,6 +132,31 @@ mod tests {
         assert_eq!(source.get("B"), None);
         assert_eq!(source.get("C"), Some("x"));
         assert_eq!(source.get("MISSING"), None);
+    }
+
+    #[test]
+    fn dong_tran_khong_co_dau_bang_khong_bi_in_ra() {
+        for line in [
+            "0123abcdef",
+            "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+            "openssl",
+        ] {
+            let text = dotenv_error_text(&dotenvy::Error::LineParse(line.to_owned(), 10));
+            assert!(!text.contains(line), "{text}");
+        }
+        // Có `=` nhưng tên không hợp lệ: cũng không in.
+        let text = dotenv_error_text(&dotenvy::Error::LineParse("1ST=value".to_owned(), 3));
+        assert!(!text.contains("1ST"), "{text}");
+    }
+
+    #[test]
+    fn loi_dotenv_nem_ten_bien_khong_lo_mat_khau() {
+        let error = dotenvy::Error::LineParse("ADMIN_PASSWORD=pass word secret".to_owned(), 18);
+        let text = dotenv_error_text(&error);
+        assert!(text.contains("ADMIN_PASSWORD"), "{text}");
+        assert!(!text.contains("secret"), "{text}");
+        let nameless = dotenvy::Error::LineParse("???".to_owned(), 1);
+        assert!(!dotenv_error_text(&nameless).contains("???"));
     }
 
     #[test]

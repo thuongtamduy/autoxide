@@ -110,8 +110,7 @@ pub(crate) async fn run_backup(
         let behind = migrations_behind(&migrator, &runtime.database).await?;
         // Module đang tắt còn dữ liệu: vẫn từ chối (bản backup chỉ chứa module đang bật) cho tới khi backup mang theo
         // được bảng của module tắt (bước 70 P9).
-        crate::modules::refuse_dormant_data(&runtime.modules, &runtime.database, "backup create")
-            .await?;
+        crate::modules::refuse_dormant_data(&runtime.modules, &runtime.database, "backup").await?;
         let names = runtime.modules.names();
         // `--all`: các placement trước, manifest của database chính SAU CÙNG kèm danh sách placement — manifest chính
         // có mặt nghĩa là mọi placement nó nêu đã xong.
@@ -255,9 +254,7 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
         let names = runtime.modules.names();
         // Bản backup có dữ liệu của module mà bản cài này đang tắt: dừng, không bỏ sót nó.
         let tables =
-            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "backup restore")
-                .await
-            {
+            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "restore").await {
                 Ok(()) => copy_modules(&source, &runtime.database, &names)
                     .await
                     .map_err(|error| error.to_string()),
