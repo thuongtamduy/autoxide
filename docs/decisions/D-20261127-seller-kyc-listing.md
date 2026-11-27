@@ -1,6 +1,6 @@
 ## D-20261127-seller-kyc-listing · Sàn chặn mở bán hàng của người bán chưa định danh — 2026-11-27 — agent quyết
 
-Chủ đề: Tuân thủ pháp luật
+Chủ đề: Pháp luật và tuân thủ
 
 Quyết định: Khi khách đặt `kernel.business_model = marketplace` và có module `compliance`, `catalog` hỏi
 `KycGate::require_verified(khách, Subject::Org(nút sở hữu sản phẩm), Activity::Sell)` trước khi chuyển sản phẩm sang

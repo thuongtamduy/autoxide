@@ -99,11 +99,9 @@ impl autoxide_compliance::api::KycGate for FakeKyc {
         if verified {
             Ok(())
         } else {
-            Err(Error::new(
-                autoxide_kernel::error::ErrorKind::Forbidden,
-                "compliance.kyc_required",
-                "Verify your identity first.",
-            ))
+            // `compliance.kyc_required` thật là mã của `compliance`; bản giả dùng một mã sẵn có của `catalog` — test chỉ kiểm
+            // lỗi của cổng đi thẳng ra người gọi.
+            Err(Error::forbidden("catalog.listing_denied", "Verify your identity first."))
         }
     }
 
@@ -167,7 +165,7 @@ async fn san_chan_hang_cua_nguoi_ban_chua_dinh_danh() {
         let (app, tree, kyc, seller) = kyc_app(test, "marketplace").await;
         let (status, problem) = publish(&app, &seller).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
-        assert_eq!(problem["code"], "compliance.kyc_required");
+        assert_eq!(problem["code"], "catalog.listing_denied");
         let (_, still) = call(&app, "GET", &format!("/products/{seller}"), "boss", None).await;
         assert_eq!(still["data"]["status"], "draft");
         assert_eq!(*kyc.1.lock().unwrap(), [format!("{}:sell", tree.a.as_uuid())]);
