@@ -451,3 +451,55 @@ async fn hong_roi_lai_bao_da_thu_thi_vao_hang_cho() {
     .await
     .unwrap();
 }
+
+/// UT-6 (rà #591): `expires_by` rút hạn của lượt thu (không kéo dài); đã qua thì từ chối. Tiền về sau hạn
+/// khi lượt thu còn `pending` (job hết hạn chưa chạy) vẫn mở `late_payment`.
+#[tokio::test]
+async fn expires_by_rut_han_va_tien_ve_sau_han_vao_hang_cho() {
+    use crate::entity::payment;
+    use autoxide_kernel::tenancy::ScopeExt as _;
+    use jiff::SignedDuration;
+    use sea_orm::sea_query::Expr;
+    use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+
+    TestDatabase::run(async |test| {
+        let (app, gateway) = app(test).await;
+        let tenant = app.default_tenant();
+        let soon = Timestamp::now() + SignedDuration::from_mins(5);
+        let capped = NewPayment::new(root_of(DEFAULT_TENANT), "card", vnd(100_000), "Order", "demo", "C")
+            .expires_by(soon);
+        let made = ledger(&app).create_payment(&tenant, Actor::system(), capped).await.unwrap();
+        let made = made.into_inner();
+        assert!(made.expires_at <= soon, "{} > {soon}", made.expires_at);
+        let later = Timestamp::now() + SignedDuration::from_hours(24 * 30);
+        let long = NewPayment::new(root_of(DEFAULT_TENANT), "card", vnd(1), "Order", "demo", "L")
+            .expires_by(later);
+        let long = ledger(&app).create_payment(&tenant, Actor::system(), long).await.unwrap();
+        assert!(long.into_inner().expires_at < later, "không kéo dài quá hạn thường");
+        let past = NewPayment::new(root_of(DEFAULT_TENANT), "card", vnd(1), "Order", "demo", "P")
+            .expires_by(Timestamp::now() - SignedDuration::from_mins(1));
+        let refused = ledger(&app).create_payment(&tenant, Actor::system(), past).await.unwrap_err();
+        assert_eq!(refused.code(), "validation_failed");
+
+        // Hạn đã qua mà job hết hạn chưa chạy (còn `pending`): tiền về vẫn là muộn.
+        payment::Entity::update_many()
+            .col_expr(
+                payment::Column::ExpiresAt,
+                Expr::value(Timestamp::now() - SignedDuration::from_mins(1)),
+            )
+            .filter(payment::Column::Id.eq(made.id))
+            .scoped(&tenant)
+            .exec(tenant.database().write())
+            .await
+            .unwrap();
+        assert_eq!(status(&app, made.id).await, "pending");
+        assert_eq!(webhook(&app, gateway.paid(made.id, vnd(100_000), "evt-c")).await, StatusCode::OK);
+        drain(&app).await;
+        assert_eq!(status(&app, made.id).await, "succeeded");
+        let open = exceptions(&app).await;
+        assert_eq!(open.len(), 1, "{open:?}");
+        assert_eq!(open[0]["kind"], "late_payment");
+    })
+    .await
+    .unwrap();
+}

@@ -153,7 +153,11 @@ pub(crate) struct ExceptionItem {
     subject: String,
     #[schema(value_type = Object)]
     details: serde_json::Value,
+    /// `open`, `resolved` or `ignored`.
     status: String,
+    /// How it was closed: `match`, `accept_received`, `ignore`, `refunded_outside` (by a person), or
+    /// `refunded` (closed by the ledger once the payment was refunded in full through the partner;
+    /// `resolved_by` is empty). Empty while `open`.
     resolution: Option<String>,
 }
 

@@ -227,6 +227,8 @@ async fn mo_lai_nhieu_lan_khong_keo_dai_han_cua_don() {
             assert_ne!(shop.ledger.last_payment().unwrap().id, last.id);
             assert_eq!(due_of(shop, &order).await, due, "lần thử {attempt} kéo dài hạn");
             assert_eq!(opened["data"][0]["expires_at"], due);
+            // Link ở `ledger` (và ở đối tác) hết hạn đúng hạn của đơn, không muộn hơn.
+            assert_eq!(json!(shop.ledger.last_payment().unwrap().expires_at), due);
         }
     })
     .await
@@ -245,8 +247,10 @@ async fn quyet_dinh_da_bi_thay_doc_sau_khoa_don() {
         let shop = &guests.shop;
         let (order, _, _) = card_order(shop).await;
         let lot = shop.ledger.payments()[0].clone();
-        // Khoản chuyển `superseded` ngay trước khi thông báo đã thu được xử lý (như một lần thay lượt
-        // commit giữa lúc đọc và lúc khoá): chỉ dòng đọc sau khoá đơn quyết định.
+        // Khoản chuyển `superseded` ngay trước khi thông báo đã thu được xử lý. Không còn bước quyết định
+        // nào ngoài khoá (`payment_succeeded` chỉ quyết trên dòng đọc sau `lifecycle::lock`), nên bài này
+        // giữ đường rẽ `Recorded::Superseded` trong transaction; thứ tự với lần thay lượt do khoá dòng đơn
+        // bảo đảm (cả hai bên đều khoá nó trước).
         payment::Entity::update_many()
             .col_expr(payment::Column::Status, Expr::value(crate::payment_attempts::SUPERSEDED))
             .filter(payment::Column::LedgerPaymentId.eq(lot.id))

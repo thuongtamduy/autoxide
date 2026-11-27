@@ -126,6 +126,9 @@ pub(crate) async fn close_late_payment_if_refunded(
     outbox: &autoxide_kernel::event::Outbox,
     paid: &payment::Model,
 ) -> Result<(), Error> {
+    // Khoá dòng thanh toán trước khi cộng: hai lượt hoàn một phần xong cùng lúc chạy nối đuôi, lượt sau
+    // thấy lượt trước đã `succeeded` (Postgres READ COMMITTED không tự bảo đảm điều đó).
+    rows::lock_one(transaction, payment::Entity::find_by_id(paid.id).scoped(tenant)).await?;
     let refunded: i64 = refund::Entity::find()
         .filter(refund::Column::PaymentId.eq(paid.id))
         .filter(refund::Column::Status.eq("succeeded"))
@@ -138,9 +141,9 @@ pub(crate) async fn close_late_payment_if_refunded(
     if refunded < paid.captured_minor.unwrap_or(paid.amount_minor) {
         return Ok(());
     }
+    // Mục do `capture` mở, tra đúng theo khoá chống trùng (`late_payment:<id>`, unique theo khách).
     let open = exception::Entity::find()
-        .filter(exception::Column::Kind.eq("late_payment"))
-        .filter(exception::Column::Subject.eq(format!("ledger.payment:{}", paid.id)))
+        .filter(exception::Column::DedupeKey.eq(format!("late_payment:{}", paid.id)))
         .filter(exception::Column::Status.eq("open"))
         .scoped(tenant)
         .all(transaction)

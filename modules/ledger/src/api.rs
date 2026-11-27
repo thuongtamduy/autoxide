@@ -396,6 +396,9 @@ pub struct NewPayment {
     pub source_module: String,
     pub source_id: Option<String>,
     pub reference: String,
+    /// Latest moment the payment may be paid: the payment (and the link at the partner) expires at this
+    /// moment or after the server's usual time, whichever comes first. Must be in the future.
+    pub expires_by: Option<Timestamp>,
 }
 
 impl NewPayment {
@@ -417,7 +420,15 @@ impl NewPayment {
             source_module: source_module.into(),
             source_id: None,
             reference: reference.into(),
+            expires_by: None,
         }
+    }
+
+    /// See [`NewPayment::expires_by`].
+    #[must_use]
+    pub fn expires_by(mut self, at: Timestamp) -> Self {
+        self.expires_by = Some(at);
+        self
     }
 
     #[must_use]
@@ -731,6 +742,8 @@ pub struct NewTransferPayment {
     pub source_module: String,
     pub source_id: Option<String>,
     pub reference: String,
+    /// Latest moment the transfer may arrive: see [`NewPayment::expires_by`].
+    pub expires_by: Option<Timestamp>,
 }
 
 impl NewTransferPayment {
@@ -749,7 +762,15 @@ impl NewTransferPayment {
             source_module: source_module.into(),
             source_id: None,
             reference: reference.into(),
+            expires_by: None,
         }
+    }
+
+    /// See [`NewTransferPayment::expires_by`].
+    #[must_use]
+    pub fn expires_by(mut self, at: Timestamp) -> Self {
+        self.expires_by = Some(at);
+        self
     }
 
     #[must_use]

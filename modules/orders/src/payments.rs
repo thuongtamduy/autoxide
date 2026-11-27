@@ -162,6 +162,9 @@ impl OrdersService {
         }
         let amount = Money::from_columns(row.amount_minor, &row.currency)?;
         let org = OrgId::from_uuid(order.org_id);
+        // Lần thử lại (UT-6 L4) không sống quá hạn cũ của đơn: `ledger` cho lượt thu — và link ở đối tác —
+        // hết hạn đúng lúc đó; tiền về sau đó đi đường `late_payment` của `ledger`.
+        let cap = order.payment_due_at.filter(|_| crate::payment_attempts::is_retry(&row));
         let description = format!("Order {}", order.number);
         let created =
             match Method::parse(&row.method) {
@@ -174,6 +177,10 @@ impl OrdersService {
                         row.reference.clone(),
                     )
                     .source_id(order_id.to_string());
+                    let request = match cap {
+                        Some(cap) => request.expires_by(cap),
+                        None => request,
+                    };
                     ledger.create_transfer_payment(tenant, Actor::system(), request).await
                 }
                 Method::Gateway => {
@@ -194,6 +201,9 @@ impl OrdersService {
                     }
                     if let Some(url) = return_url {
                         request = request.return_url(url);
+                    }
+                    if let Some(cap) = cap {
+                        request = request.expires_by(cap);
                     }
                     ledger.create_payment(tenant, Actor::system(), request).await
                 }
@@ -333,7 +343,7 @@ impl OrdersService {
                 }
                 // Quyết định "đã bị thay" đọc trên dòng sau khoá đơn (UT-6 L4): lần thay lượt cũng khoá
                 // dòng đơn, nên không có khe giữa lúc đọc và lúc ghi. Không tính vào đơn; hoàn sau commit.
-                if stored.status == crate::payment_attempts::SUPERSEDED {
+                if crate::payment_attempts::superseded(&stored) {
                     return Ok(Recorded::Superseded);
                 }
                 let now = crate::service::now();
@@ -448,9 +458,23 @@ impl OrdersService {
                 "late_payment",
                 format!("orders:{}:late", row.order_id),
             );
-            if let Err(error) = ledger.refund(tenant, Actor::system(), refund).await {
-                tracing::warn!(order_id = %row.order_id, code = error.code(), "late payment not refunded yet");
-                return Err(error);
+            match ledger.refund(tenant, Actor::system(), refund).await {
+                Ok(_) => {}
+                // Đối tác / sổ từ chối hẳn: gửi lại không bao giờ được, không để event thử lại tới
+                // dead-letter. `ledger` đã mở mục `late_payment` (lượt thu hết hạn hay hỏng) ở hàng chờ đối
+                // soát: người vận hành thấy và hoàn tay. Tiền về khi lượt thu còn `pending` thì `ledger`
+                // không mở mục — hạn của lượt thu không vượt hạn của đơn nên trường hợp đó không xảy ra.
+                Err(error) if error.kind().status() < 500 => {
+                    tracing::warn!(
+                        order_id = %row.order_id,
+                        code = error.code(),
+                        "late payment refused by the partner; left to the reconciliation queue"
+                    );
+                }
+                Err(error) => {
+                    tracing::warn!(order_id = %row.order_id, code = error.code(), "late payment not refunded yet");
+                    return Err(error);
+                }
             }
         }
         Ok(())

@@ -345,6 +345,7 @@ impl FakeLedger {
         }
         let id = Uuid::now_v7();
         let now = Timestamp::now();
+        let usual = now + SignedDuration::from_mins(PAYMENT_TTL_MINUTES);
         let number = state.payments.len() + 1;
         let payment = Payment {
             id,
@@ -361,7 +362,8 @@ impl FakeLedger {
             qr_payload: transfer.then(|| format!("000201-{id}")),
             transfer_code: transfer.then(|| format!("AX{number:04}")),
             bank_account_id: None,
-            expires_at: now + SignedDuration::from_mins(PAYMENT_TTL_MINUTES),
+            // Như `ledger` thật: hạn thường hay `expires_by` của bên tạo, cái nào sớm hơn.
+            expires_at: request.expires_by.map_or(usual, |cap| cap.min(usual)),
             captured_at: None,
             source_module: request.source_module,
             source_id: request.source_id,
@@ -384,6 +386,7 @@ struct PaymentRequest {
     source_module: String,
     source_id: Option<String>,
     reference: String,
+    expires_by: Option<Timestamp>,
 }
 
 #[async_trait::async_trait]
@@ -550,6 +553,7 @@ impl Ledger for FakeLedger {
             source_module: payment.source_module,
             source_id: payment.source_id,
             reference: payment.reference,
+            expires_by: payment.expires_by,
         };
         Ok(self.create_payment_of(org, request, false))
     }
@@ -684,6 +688,7 @@ impl Ledger for FakeLedger {
             source_module: payment.source_module,
             source_id: payment.source_id,
             reference: payment.reference,
+            expires_by: payment.expires_by,
         };
         Ok(self.create_payment_of(org, request, true))
     }

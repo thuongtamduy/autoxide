@@ -27,6 +27,7 @@ use sea_orm::{
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::api::OrderStatus;
 use crate::entity::payment;
 use crate::events::{Change, PaymentRecorded};
 use crate::payments::{self, PENDING};
@@ -80,6 +81,19 @@ impl OrdersService {
         let transaction = db.begin_write().await?;
         let current = crate::lifecycle::lock(&transaction, tenant, order_id).await?;
         let at = crate::service::now();
+        // Kiểm lại trên dòng đã khoá (bên gọi kiểm trên bản đọc trước đó): đơn vừa được trả, bị huỷ hay vừa
+        // quá hạn thì không mở lần thử mới.
+        if current.status != OrderStatus::PendingPayment.as_str() {
+            transaction.rollback().await?;
+            return Err(crate::errors::invalid_transition(
+                OrderStatus::parse(&current.status).unwrap_or(OrderStatus::Cancelled),
+                OrderStatus::Confirmed,
+            ));
+        }
+        if current.payment_due_at.is_some_and(|due| due <= at) {
+            transaction.rollback().await?;
+            return Err(crate::errors::payment_expired());
+        }
         let moved = payment::Entity::update_many()
             .col_expr(payment::Column::Status, Expr::value(SUPERSEDED))
             .col_expr(payment::Column::UpdatedAt, Expr::value(at))
@@ -196,6 +210,13 @@ impl OrdersService {
             }
         }
     }
+}
+
+/// Khoản `row` đã bị thay bằng lần thử mới: `superseded`, hay khoản phần còn lại `expired` mà
+/// `reopen_balance` đặt trước khi có trạng thái `superseded` — tiền về cho nó không tính vào đơn mà được hoàn.
+pub(crate) fn superseded(row: &payment::Model) -> bool {
+    row.status == SUPERSEDED
+        || (row.purpose == crate::advance::PURPOSE_BALANCE && row.status == "expired")
 }
 
 /// Khoản `row` là lần thử lại do [`OrdersService::replace_ended_attempt`] mở (lần thử thứ hai trở đi của

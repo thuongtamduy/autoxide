@@ -308,6 +308,8 @@ impl LedgerService {
                     .with_param("values", gateway.capabilities().methods.join(", ")),
             );
         }
+        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
+        let deadline = crate::service::payment_deadline(now() + expiry, input.expires_by, &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -325,7 +327,6 @@ impl LedgerService {
             "amount": input.amount.minor(), "currency": input.amount.currency().code(),
             "description": description, "source_id": input.source_id, "return_url": input.return_url,
         }))?;
-        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
         let (database, outbox) = (tenant.database(), &self.outbox);
         let (reference, fingerprint, input, book, description, provider) =
             (&reference, &fingerprint, &input, &book, &description, gateway.provider());
@@ -361,7 +362,7 @@ impl LedgerService {
                 checkout_url: Set(None),
                 qr_payload: Set(None),
                 return_url: Set(input.return_url.clone()),
-                expires_at: Set(at + expiry),
+                expires_at: Set(deadline),
                 captured_at: Set(None),
                 source_module: Set(input.source_module.clone()),
                 source_id: Set(input.source_id.clone()),
@@ -730,9 +731,7 @@ impl LedgerService {
         )
         .source_id(id.to_string());
         self.post(tenant, Actor::system(), entry).await?;
-        // Hết hạn, hay đối tác đã báo hỏng rồi lại báo đã thu (thông báo sai thứ tự): tiền về khi nguồn
-        // có thể đã mở lượt thu khác — người vận hành phải thấy.
-        let late = matches!(current.status.as_str(), "expired" | "failed");
+        let late = arrived_late(&current);
         if late {
             // Tiền về sau khi đã hết hạn / đã hỏng: vẫn ghi (tiền đã ở đối tác), mở hàng chờ để người
             // quyết giữ hay hoàn. Mở TRƯỚC khi chuyển `succeeded` (event tới module nguồn): lượt hoàn tự
@@ -758,6 +757,11 @@ impl LedgerService {
                 };
                 if row.status == "succeeded" {
                     return Ok(());
+                }
+                // Trạng thái đổi giữa lần đọc trên và lúc khoá (vd vừa báo hỏng): chưa mở mục mà giờ phải
+                // mở thì dừng — job chạy lại, đọc lại, mở mục rồi mới ghi thu.
+                if !late && arrived_late(&row) {
+                    return Err(payment_state(&row.status));
                 }
                 let at = now();
                 let mut active: payment::ActiveModel = row.into();
@@ -984,7 +988,16 @@ impl LedgerService {
             let provider_ref = found.provider_ref.clone().unwrap_or_default();
             let amount = money(row.amount_minor, &row.amount_currency)?;
             let intent = RefundIntent::new(row.id, provider_ref, amount, &row.reason);
-            let answer = gateway.refund(tenant.id(), &intent).await?;
+            let answer = match gateway.refund(tenant.id(), &intent).await {
+                Ok(answer) => answer,
+                // Đối tác từ chối hẳn (4xx): lượt hoàn `failed`, trả lại phần đã giữ chỗ — không để dòng
+                // `pending` giữ `refunded_minor` mãi. Lỗi tạm (5xx) giữ `pending` để gửi lại cùng mã.
+                Err(error) if error.kind().status() < 500 => {
+                    self.fail_refund(tenant, row.id).await?;
+                    return Err(error);
+                }
+                Err(error) => return Err(error),
+            };
             refund::Entity::update_many()
                 .scoped(tenant)
                 .col_expr(refund::Column::ProviderRef, Some(answer.provider_ref.clone()).into())
@@ -1158,6 +1171,12 @@ impl JobHandler for ExpirePaymentsJob {
 /// Số đã thu của thanh toán: số thực thu lúc ghi thu, thanh toán ghi thu trước m0012 thì số phải thu.
 /// Trần của tổng số hoàn — nhận thiếu rồi hoàn theo số phải thu là trả ra nhiều hơn đã vào (rà soát
 /// bảo mật 2026-11).
+/// Tiền về muộn (UT-6): sau hạn của lượt thu, hay sau khi đối tác đã báo hỏng (thông báo sai thứ tự) —
+/// module nguồn có thể đã huỷ chứng từ hay mở lượt thu khác, người vận hành phải thấy (`late_payment`).
+fn arrived_late(row: &payment::Model) -> bool {
+    matches!(row.status.as_str(), "expired" | "failed") || row.expires_at <= now()
+}
+
 fn collected(row: &payment::Model) -> i64 {
     row.captured_minor.unwrap_or(row.amount_minor)
 }

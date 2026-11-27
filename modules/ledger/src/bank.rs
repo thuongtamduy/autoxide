@@ -384,6 +384,8 @@ impl LedgerService {
                 "must be 1 to 100 visible ASCII characters",
             ));
         }
+        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
+        let deadline = crate::service::payment_deadline(now() + expiry, input.expires_by, &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -420,7 +422,6 @@ impl LedgerService {
             "org": input.org.as_uuid(), "bank_account": account.id, "amount": input.amount.minor(),
             "description": description, "source_id": input.source_id,
         }))?;
-        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
         let (database, outbox) = (tenant.database(), &self.outbox);
         let (reference, fingerprint, input, book, description, account) =
             (&reference, &fingerprint, &input, &book, &description, &account);
@@ -461,7 +462,7 @@ impl LedgerService {
                 checkout_url: Set(None),
                 qr_payload: Set(Some(qr)),
                 return_url: Set(None),
-                expires_at: Set(at + expiry),
+                expires_at: Set(deadline),
                 captured_at: Set(None),
                 source_module: Set(input.source_module.clone()),
                 source_id: Set(input.source_id.clone()),
