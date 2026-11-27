@@ -1,9 +1,10 @@
 # Hợp đồng tool MCP đầy đủ (bước 71, G4 mục 4 + G13 phần tool + UT-5)
 
-Thiết kế trước khi code; rà độc lập rồi mới làm PR (1). Ngày 27/11/2026. Căn cứ: đặc tả MCP 2026-07-28 (tools, pagination,
-progress, cancellation, extension `io.modelcontextprotocol/tasks`, elicitation theo nhiều lượt request — "MRTR"), bản
-2025-11-25 cho client cũ; hợp đồng kernel `docs/research/kernel-contract-1-0.md` (§5 đăng ký trong `start`, §13 đánh phiên
-bản, §14.1 bước egress); báo cáo dùng thử `docs/trials/rc-trial-r1/` (UT-5, nhánh `claude/user-trial-r1`, #564).
+Thiết kế trước khi code; rà độc lập rồi mới làm PR (1). Ngày 27/11/2026, bản 2 (sau lượt rà thứ nhất). Căn cứ: đặc tả MCP
+2026-07-28 (tools, pagination, progress, cancellation, elicitation theo nhiều lượt request — "MRTR"), extension
+`io.modelcontextprotocol/tasks` (repo ext-tasks), bản 2025-11-25 cho client cũ; hợp đồng kernel
+`docs/research/kernel-contract-1-0.md` (§5 đăng ký trong `start`, §13 đánh phiên bản, §14.1 bước egress); D-157
+(idempotency), D-213 (job theo dõi được, bước 51 P15); báo cáo dùng thử `docs/trials/rc-trial-r1/` (UT-5, #564).
 
 ## 0. Hiện trạng (đo trên `main`, `docs/mcp-tools.json`)
 
@@ -14,6 +15,9 @@ bản, §14.1 bước egress); báo cáo dùng thử `docs/trials/rc-trial-r1/` 
 - 1.248 tham số đầu vào, **143 tham số ở 63 tool không có mô tả** (UT-5 điểm 9).
 - `tools/list` trả một lần cả danh sách (không `nextCursor`); không progress, không huỷ, không task, không elicitation.
 - Lỗi tool: `isError: true`, `structuredContent` = `{code, message, reason?, errors?}`.
+- Job theo dõi được (`kernel_job_runs`, D-213): trạng thái `queued|running|succeeded|failed`, progress, kết quả;
+  `GET /api/v1/kernel/jobs/{id}`; principal của job là `PrincipalSnapshot`. Không job nào dọn dòng `kernel_job_runs` (chỉ
+  có hạn giữ file của job).
 
 ## 1. Khai tool: `Tool::typed` (phần A)
 
@@ -27,34 +31,38 @@ Tool::typed("list_price_lists", "List the price lists of the tenant, …", list_
     .read_only()                      // readOnlyHint = true, idempotentHint = true
     // .idempotent()                  // lệnh ghi gọi lại cùng tham số không đổi thêm gì (vd đặt giá trị)
     // .destructive()                 // destructiveHint
-    // .open_world()                  // tool chạm thế giới ngoài: gửi mail/SMS, gọi nhà cung cấp, gọi mô hình AI
-    // .long_running()                // được chạy thành task (§3)
+    // .open_world()                  // tool chạm thế giới ngoài: gửi mail/SMS, gọi nhà cung cấp, gọi mô hình AI, webhook
+    // .long_running()                // service của tool enqueue job có theo dõi (§3)
+    // .ask_for("price_list_id", "Which price list?", price_list_choices)   // §4
 
 async fn list_price_lists(call: ToolCall, input: ListPriceLists) -> Result<Page<PriceListView>, Error>
 ```
 
 - `Tool::typed::<I, O>`: `I: Deserialize + Validate + Schema`, **`O: Schema + Serialize`**. `ToolCall` là struct
-  `#[non_exhaustive]` của kernel: `tenant()`, `principal()`, `progress()`, `cancelled()`, `elicit()` (§3, §4). Gom vào một
-  tham số để thêm khả năng sau này không đổi chữ ký của 312 handler lần nữa.
-- `Tool::new` giữ nguyên tới khi chuyển hết, rồi `#[deprecated]` (gỡ ở PR 16 của G1 cùng các đường cũ).
-- **Annotations** sinh từ khai báo: `readOnlyHint`, `destructiveHint`, `idempotentHint` (mặc định `true` khi `read_only`,
-  `false` với lệnh ghi trừ khi gọi `.idempotent()`), `openWorldHint` (mặc định `false`). Kiểm lúc khởi động
-  (`Tool::problems`): `read_only` + `destructive` là lỗi; `title` rỗng là lỗi; tool `typed` thiếu `title` là lỗi.
-- **`outputSchema`** = schema của đúng thứ nằm trong `structuredContent` lúc thành công: `Data<O>` → `{data: O}`, `Page<O>`
-  → `{data: [O], pagination}`. Schema tự đứng được: kiểu lồng vào `$defs` cục bộ với `$ref: "#/$defs/…"` (bộ kiểm JSON
-  Schema nào cũng giải được; khác với đầu vào, nơi giữ luật "không `$ref`" vì client dựng form từ nó). Gốc luôn là
-  `type: object`.
-- **Lỗi** (`isError: true`) giữ hình dạng hiện có (`{code, message, reason?, errors?}`, không phá client đang đọc). Đã kiểm
-  mã của SDK TypeScript 1.32.2 (`client/index.js`, `callTool`): nó kiểm `structuredContent` theo `outputSchema` **cả khi**
-  `isError` — nên `outputSchema` khai cả hai dạng: `{"type": "object", "oneOf": [<thành công>, {"$ref":
-  "#/$defs/ToolError"}]}` (thành công đòi `data`, lỗi đòi `code` + `message`, hai nhánh loại trừ nhau). Job CI `mcp-client`
-  (PR 3 của G4) thêm một ca gọi tool thành công và một ca lỗi qua SDK để giữ điều này.
+  `#[non_exhaustive]` của kernel: `tenant()`, `principal()`, `progress()`, `cancelled()`. Gom vào một tham số để thêm khả
+  năng sau này không đổi chữ ký của 312 handler lần nữa.
+- **`ToolCall` cho người gọi không phải MCP** (automations, bước 58, gọi qua `call_tool`): `progress()` không làm gì,
+  `cancelled()` luôn `false`, tool `.long_running()` chạy tại chỗ như mọi tool (service vẫn enqueue job của nó), trường
+  `.ask_for` thiếu thì trả `kernel.choice_required` (§4) — không bao giờ treo.
+- `Tool::new` không gắn `#[deprecated]`: gỡ thẳng trước 1.0 khi chuyển hết, theo dõi bằng baseline của gate
+  `mcp-output-schema` (D-20261127-transition-paths, #580).
+- **Annotations** sinh từ khai báo và **luôn phát đủ bốn hint tường minh**: `readOnlyHint`, `destructiveHint`,
+  `idempotentHint` (`true` khi `read_only`; lệnh ghi `false` trừ khi gọi `.idempotent()`), `openWorldHint` (`false` trừ khi
+  `.open_world()`). Kiểm lúc khởi động (`Tool::problems`): `read_only` + `destructive` là lỗi; `title` rỗng hay thiếu (tool
+  `typed`) là lỗi; `.long_running()` cùng `.returns_secret()` là lỗi (kết quả bí mật không nằm lại trong bảng job).
+- **`outputSchema`** = schema của đúng thứ nằm trong `structuredContent`: `{"type": "object", "anyOf": [<thành công>,
+  {"$ref": "#/$defs/ToolError"}]}`. Thành công: `Data<O>` → `{data: O}`, `Page<O>` → `{data: [O], pagination}` (đòi `data`);
+  lỗi: hình dạng hiện có `{code, message, reason?, errors?}` (đòi `code` + `message`, không phá client đang đọc). Lý do khai cả
+  lỗi: mã SDK TypeScript 1.32.2 (`client/index.js`, `callTool`) kiểm `structuredContent` theo `outputSchema` **cả khi**
+  `isError`. Kiểu lồng nằm trong `$defs` cục bộ với `$ref: "#/$defs/…"` (bộ kiểm JSON Schema nào cũng giải được; đầu vào vẫn
+  giữ luật "không `$ref`" vì client dựng form từ nó).
 - **Egress** (hợp đồng kernel dòng 755, §14.1): kernel không gọi `serde_json::to_value(output)` trần nữa mà đưa `O` qua bước
-  egress chung với REST (`Data`/`Page`): `egress(&principal, &output) -> Value`, che trường đã phân loại theo quyền của
-  người gọi. Tool và REST dùng **một** hàm, nên không lối nào lộ hơn lối kia. Kết quả của task (§3) đi qua egress lúc trả
-  (`tasks/get`), không lúc lưu.
-- Không kiểm `structuredContent` với `outputSchema` lúc chạy (tốn mỗi lần gọi); kiểm trong test: bộ kiểm hợp đồng của
-  testkit (đã kiểm response REST theo OpenAPI) thêm kiểm kết quả tool theo `outputSchema` cho mọi lời gọi tool trong test.
+  egress chung với REST (`Data`/`Page`): `egress(&principal, &output) -> Value`, che trường đã phân loại theo quyền của người
+  gọi. **Thân lỗi và bản text** của kết quả cũng đi qua egress (giá trị trong `params` của lỗi, như `Problem` của REST). Tool
+  và REST dùng **một** hàm, nên không lối nào lộ hơn lối kia. Kết quả của task (§3) đi qua egress lúc trả, không lúc lưu.
+- Không kiểm `structuredContent` với `outputSchema` lúc chạy (tốn mỗi lần gọi); kiểm trong test: bộ kiểm hợp đồng của testkit
+  (đã kiểm response REST theo OpenAPI) thêm kiểm kết quả tool theo `outputSchema` cho mọi lời gọi tool trong test. Job CI
+  `mcp-client` (PR 3 của G4) thêm một ca thành công và một ca lỗi qua SDK, với output có `uuid`, số nguyên 64 bit và `$defs`.
 
 **Phụ thuộc G1** (báo phiên "Hợp đồng kernel"):
 
@@ -63,102 +71,147 @@ async fn list_price_lists(call: ToolCall, input: ListPriceLists) -> Result<Page<
 | Ràng buộc `O: Schema` | PR 4 (`#[derive(Schema)]`) | Được: trước PR 4 ràng buộc là `utoipa::ToSchema`; `Schema` của PR 4 cài `ToSchema` nên đổi ràng buộc không làm module sửa gì |
 | Egress che theo lớp | PR 4 (`data_class`, trait `Redact`) + bước 54 (hành vi che) | Được: PR (1) đưa tool qua **cùng hàm** egress mà `Data`/`Page` dùng (hôm nay là `to_value`); khi G1/54 thêm che, tool có ngay |
 | Đăng ký `context.tools(…)` trong `start` | PR 5 (`Manifest` + `StartContext`) | Được: `Tool::typed` dùng với `Module::tools` hôm nay; PR 5 chỉ dời chỗ gọi |
-| Bảng `kernel_mcp_tasks`, nonce của `requestState` | PR 3 (migration `Plan`) chỉ đổi cách khai | Được: migration kernel kiểu hiện có; PR 3 chuyển cùng các migration khác, giữ tên |
+| Cột `cancel_requested_at` của `kernel_job_runs` | PR 3 (migration `Plan`) chỉ đổi cách khai | Được: migration kernel kiểu hiện có; PR 3 chuyển cùng các migration khác, giữ tên |
 
 ## 2. `tools/list` chia trang (phần B)
 
-- Sắp theo tên đầy đủ; trang 100 tool; `nextCursor` = base64url của `{after: "<tên tool cuối>", v: 1}`. Cursor chỉ chứa
-  tên tool người gọi đã thấy, nên không cần ký; cursor hỏng → JSON-RPC `-32602` kèm câu "gọi lại không có `cursor`".
-- Danh sách lọc theo quyền **trước** khi chia trang, nên đổi quyền giữa hai trang chỉ làm trang sau ngắn đi, không lộ tool.
-- Áp cho mọi bản giao thức (cursor có từ 2024-11-05). Endpoint theo module `/mcp/<module>` vẫn là cách khuyên cho client
-  chỉ đọc một trang (đa số module dưới 100 tool). `ttlMs: 0`, `cacheScope: private` giữ như hiện có.
-- `resources/list`, `prompts/list` dùng cùng cách.
+- Sắp theo tên đầy đủ; lọc theo quyền **trước** khi chia trang, nên đổi quyền giữa hai trang chỉ làm trang sau ngắn đi, không
+  lộ tool.
+- **Bản mới (2026-07-28):** trang mặc định 500 tool (lớn hơn 312 hiện có), để client bỏ qua `nextCursor` không mất tool;
+  `nextCursor` = base64url của `{after: "<tên tool cuối>", v: 1}`. Cursor chỉ chứa tên tool người gọi đã thấy, nên không cần
+  ký; cursor hỏng → JSON-RPC `-32602` kèm câu "gọi lại không có `cursor`".
+- **Bản cũ:** một trang duy nhất (không `nextCursor`), như hôm nay.
+- `ttlMs: 0`, `cacheScope: private` giữ như hiện có. `resources/list`, `prompts/list` dùng cùng cách.
 
 ## 3. Việc dài: progress, huỷ, task (phần C)
 
-**Progress.** Request có `_meta.progressToken` và client nhận SSE: `call.progress().report(done, total, message)` gửi
-`notifications/progress` trên chính stream trả lời (đặc tả 2026-07-28). Không có token hay client chỉ nhận JSON: hàm không
-làm gì. Tần suất giới hạn trong kernel (tối đa 1 thông báo / 250 ms) để handler gọi thoải mái.
+### 3.1 Progress qua SSE (lời gọi thường)
 
-**Huỷ khi client đóng stream** (2026-07-28; bản cũ: `notifications/cancelled` — kernel ánh xạ về cùng một tín hiệu):
+- Chỉ trả SSE khi request có `_meta.progressToken` **và không có** `Idempotency-Key` (kết quả lưu lại cho idempotency là một
+  response JSON; không trộn hai thứ). Còn lại trả JSON như hôm nay; `call.progress().report(done, total, message)` không làm
+  gì.
+- Có SSE: `notifications/progress` gửi trên chính stream trả lời, tối đa 1 thông báo / 250 ms; header `X-Accel-Buffering:
+  no` để proxy không gom; timeout của request (`enforce_timeout`) áp **bên trong** stream (hết giờ thì gửi kết quả lỗi rồi
+  đóng, như JSON).
+- Việc chạy **bên trong** future của body stream, không `tokio::spawn` tách rời: client đóng thì future bị bỏ, không có việc
+  mồ côi.
 
-- Lời gọi thường (không phải task): hyper bỏ future của request khi kết nối đóng. Transaction ghi đang mở bị **rollback**
-  (transaction của lớp `db` rollback khi drop — có test cho cả hai database), nên không có ghi nửa chừng **trong** transaction
-  đó. Transaction đã commit trước đó vẫn còn (giống REST khi client ngắt). Job đã enqueue (ghi cùng transaction đã commit)
-  **vẫn chạy**, không bị huỷ theo: job là việc đã cam kết, chịu được chạy lại (D-054). Bản ghi idempotency "đang chạy" của
-  request bị bỏ được nhả để lần gọi lại chạy được (test ở PR (3)).
-- `call.cancelled()` trả `true` sau khi stream đóng, cho handler dài tự dừng giữa hai bước (không bao giờ giữa transaction).
-- Tool `long_running` chạy thành task (dưới) không bị huỷ khi stream đóng: task sống tách khỏi stream; huỷ bằng
-  `tasks/cancel`.
+### 3.2 Huỷ khi client đóng kết nối
 
-**Task** (extension `io.modelcontextprotocol/tasks`, khai trong `capabilities.extensions` và trong tool:
-`execution.taskSupport: "optional"` cho tool `.long_running()`):
+- Bản 2026-07-28: huỷ = client đóng stream. `notifications/cancelled` (bản cũ) **không** ánh xạ: vẫn trả 202 và bỏ qua (server
+  stateless không biết request nào đang chạy ở đâu).
+- Future của request bị bỏ: transaction ghi đang mở bị **rollback** khi drop (có test cho cả hai database). Transaction đã
+  commit vẫn còn (như REST khi client ngắt). Job đã enqueue cùng transaction đã commit **vẫn chạy** (D-054).
+- **Idempotency khi bị bỏ (theo D-157, không nhả bản ghi):** drop guard của lớp idempotency ghi `idempotency_result_unknown`
+  như khi hết giờ — lần gửi lại cùng key nhận 409 và lời khuyên tra kết quả trước. Chỉ được xoá bản ghi "đang chạy" khi cờ
+  gắn với request (đặt bởi lớp `db` lúc commit transaction ghi đầu tiên của request) cho thấy **chưa có** lần ghi nào commit.
+  Test trên cả hai database: bỏ giữa transaction (bản ghi bị xoá, gửi lại chạy được) và bỏ sau commit (409
+  `idempotency_result_unknown`).
+- `call.cancelled()` trả `true` sau khi kết nối đóng (nếu future còn chạy tới điểm kiểm), cho handler dài dừng giữa hai bước,
+  không bao giờ giữa transaction.
+- **Best-effort sau proxy:** proxy có thể giữ kết nối tới server sau khi client đóng; khi đó server không thấy huỷ và lời gọi
+  chạy xong. Tài liệu `mcp.md` ghi rõ: huỷ không đảm bảo, dùng idempotency key cho lệnh ghi.
 
-- Client xin chạy thành task → kernel kiểm quyền, gói, khách chỉ đọc **như lời gọi thường** rồi ghi một dòng
-  `kernel_mcp_tasks` (UUIDv7, `tenant_id`, `created_by` = user + credential, `tool`, `arguments_hash`, `status`
-  `working|input_required|completed|failed|cancelled`, `result`, `error`, `created_at`, `expires_at`, `cancel_requested_at`)
-  và enqueue job `kernel.mcp_task` **trong cùng transaction**; trả `resultType: "task"` kèm `taskId`, `pollIntervalMs`.
-- Job chạy handler với `principal` dựng lại từ credential lúc chạy (grant OAuth bị thu hồi hay key bị khoá → task `failed`
-  với `unauthenticated`, không chạy bằng quyền cũ). Kết quả lưu dạng chưa egress, chỉ người tạo đọc được.
-- `tasks/get`, `tasks/update`, `tasks/cancel`: tra theo `(tenant_id, id)` **và** `created_by` của người gọi; không khớp thì
-  trả **đúng lỗi như task không tồn tại** (JSON-RPC `-32602` "Unknown task", HTTP 404 ở bản mới) — không 403, để không lộ
-  task của người khác có tồn tại. Kết quả trả qua egress với `principal` hiện tại.
-- `tasks/cancel`: đặt `cancel_requested_at`; `call.cancelled()` của job thấy `true`; job dừng ở điểm an toàn kế tiếp, trạng
-  thái `cancelled`. Phần đã commit giữ nguyên, job con đã enqueue vẫn chạy (như trên). Task đã xong thì `cancel` không đổi gì.
-- Hạn: kết quả giữ 24 giờ rồi bị dọn bằng job dọn sẵn có; `ttlMs` trong trả lời nêu hạn.
-- Chạy trên cả hai database: chỉ bảng thường + job queue sẵn có, không cú pháp riêng. Test đồng thời: hai `tasks/cancel` cùng
-  lúc, `cancel` đua với lúc job xong — trên SQLite và PostgreSQL.
+### 3.3 Task (extension `io.modelcontextprotocol/tasks`)
+
+Task chỉ là **cách nhìn theo giao thức lên một dòng `kernel_job_runs`** (D-213) — không có bảng mới.
+
+- `.long_running()` chỉ đánh dấu tool mà service **vốn đã** enqueue job có theo dõi (xuất file, dời, nhập — đã có sẵn) và trả
+  id của dòng `kernel_job_runs`. Không có tool nào được "biến thành" job bởi kernel.
+- Không có `taskSupport` trên tool. Server tự quyết: chỉ khi request **khai extension** (trong `_meta` của request theo bản
+  2026-07-28) và tool là `.long_running()`, kết quả là `CreateTaskResult` phẳng: `taskId` (= id của job run), `status`,
+  `createdAt`, `lastUpdatedAt`, `ttlMs`, `pollIntervalMs`. Request không khai extension: trả kết quả thường như hôm nay (id
+  của job trong `data`).
+- Ánh xạ trạng thái: `queued`/`running` → `working`; `succeeded` → `completed`; job lỗi (lỗi của tool) → `completed` kèm kết
+  quả `isError: true`; `failed` của task chỉ dùng cho lỗi JSON-RPC; huỷ xong → `cancelled`. Task không có progress: progress
+  của job đổ vào `statusMessage`.
+- Các method `tasks/*` của extension (đọc trạng thái, lấy kết quả, huỷ — đúng tên và hình dạng của extension; **không** có
+  `tasks/update` và `input_required` trong 1.0):
+  - Client không khai extension mà gọi `tasks/*` → `-32021`.
+  - Header `Mcp-Name` được kiểm cho `tasks/*` như cho `tools/call` (mở rộng bảng kiểm header của transport).
+  - Tra theo `(tenant_id, id)` **và** người tạo (job run của chính người gọi, như `GET /api/v1/kernel/jobs/{id}` không có
+    `kernel.jobs.read`); rồi chạy lại `authorize` của tool và kiểm gói với principal **hiện tại**. Không khớp hay không đạt →
+    **đúng lỗi như task không tồn tại**: `-32602` "Unknown task", ánh xạ HTTP như "Unknown tool" — không 403, để không lộ task
+    của người khác có tồn tại.
+  - Kết quả trả qua egress với principal hiện tại; chịu trần kích thước như kết quả lưu của idempotency (256 KiB); quá trần
+    thì kết quả trỏ tới REST `GET /api/v1/kernel/jobs/{id}` (file của job tải qua đó).
+- **Huỷ:** thêm cột `cancel_requested_at` vào `kernel_job_runs` và `POST /api/v1/kernel/jobs/{id}/cancel` (người tạo, hoặc
+  `kernel.jobs.manage`) để REST làm được như MCP (luật 8); `tasks/cancel` gọi cùng service. Worker đọc cờ qua
+  `call.cancelled()` / hàm tương ứng của job, dừng ở điểm an toàn kế tiếp, không giữa transaction. Trạng thái cuối ghi bằng
+  compare-and-set: `UPDATE … SET status = 'cancelled' WHERE id = ? AND status IN ('queued', 'running')` (và tương tự cho
+  `succeeded`/`failed`), nên cancel đua với lúc job xong chỉ một bên thắng. Phần đã commit giữ nguyên; job con đã enqueue vẫn
+  chạy.
+- **Principal của job:** `PrincipalSnapshot` như hiện có (D-213: quyền tại lúc yêu cầu). Kiểm credential còn sống (OAuth grant
+  bị thu hồi, key bị khoá) trước khi job chạy đi qua một trait của kernel có cài mặc định "không kiểm"; module `auth` cài nó.
+  Ghi thành decision khi làm PR (3).
+- **Hạn giữ và vòng đời dữ liệu:** `kernel_job_runs` hôm nay không có job dọn dòng (chỉ dọn file) — PR (3) thêm việc dọn của
+  kernel xoá dòng đã xong quá hạn (`ttlMs` báo đúng hạn đó) và kiểm bảng nằm trong luồng xoá, dời (đã có trong
+  `relocate/kernel_tables.rs`) và xuất dữ liệu của khách.
+- Chạy trên cả hai database: chỉ cột mới + câu `UPDATE` có điều kiện. Test đồng thời: hai `cancel` cùng lúc, `cancel` đua với
+  lúc job xong — SQLite và PostgreSQL.
 
 ## 4. Elicitation (phần D)
 
-Dùng khi tool cần người chọn một điều mà tham số không đủ để quyết (vd nhiều bảng giá khớp, "áp cho bảng nào?"). Theo
-2026-07-28 không giữ kết nối: tool trả `resultType: "input_required"` kèm `inputRequests` và `requestState`; client gọi lại
-`tools/call` cùng `inputResponses` và `requestState`.
+Dùng khi một trường đầu vào **tuỳ chọn** thiếu mà cần người chọn (vd nhiều bảng giá, "áp cho bảng nào?"). Chỉ theo danh sách
+cho phép tĩnh:
 
 ```rust
-let list = call.elicit().choose("price_list_id", "Which price list?", options).await?; // trả Answer hoặc dừng lượt
+Tool::typed("add_prices", "…", add_prices)
+    .ask_for("price_list_id", "Which price list?", price_list_choices) // câu hỏi `&'static str`
+
+/// Hàm đọc-chỉ: các lựa chọn hợp lệ cho người gọi (kernel chạy trước handler).
+async fn price_list_choices(call: &ToolCall, input: &AddPrices) -> Result<Vec<Choice>, Error>
 ```
 
-Luật cứng (kernel ép, không để module tự giữ):
-
+- Tool khai **những trường tuỳ chọn của chính nó** được hỏi lại (`ask_for`), kèm hàm đọc-chỉ trả danh sách lựa chọn.
+  `Tool::problems` kiểm lúc khởi động: trường phải có trong schema đầu vào, phải tuỳ chọn, không khớp mẫu bí mật
+  (`password`, `secret`, `token`, `otp`, `card`, `cvv`, `pin`).
+- Kernel chạy hàm lựa chọn **trước** handler khi trường thiếu: một lựa chọn → dùng luôn; nhiều → hỏi. Câu trả lời thành đối số
+  và đi qua **cùng** `Validate` + kiểm của service như khi agent tự gửi.
+- Chỉ có dạng chọn (enum): câu hỏi là `&'static str` (tiếng Anh, của code); nhãn lựa chọn là dữ liệu của khách, chỉ xuất hiện
+  làm `title` của giá trị enum, được đánh dấu dữ liệu chưa tin cậy (mục prompt injection của G4 mục 3). Không có `text` tự do,
+  không `format: password`, không elicitation dạng URL trong 1.0.
 - **Không bao giờ thay `x-approval`.** Tool `requires_approval_for_agent` vẫn trả `approval_required` và trỏ về REST; câu trả
-  lời elicitation không được tính là người duyệt (agent có thể tự trả lời thay người).
-- **Không bao giờ hỏi mật khẩu, token, mã OTP hay số thẻ.** API chỉ có `choose` (enum), `confirm` (boolean), `text` ngắn;
-  không có `format: password`, không có elicitation dạng URL; tên trường khớp mẫu bí mật (`password`, `secret`, `token`,
-  `otp`, `card`, `cvv`, `pin`) bị `Tool::problems` từ chối lúc khởi động.
-- **`requestState`**: `axs1.` + base64url(payload) + HMAC-SHA256 bằng khoá dẫn xuất riêng của kernel
-  `SecretKey::derive_for(tenant, "autoxide/mcp/request-state/v1")`. Payload: tenant, người gọi (user + credential), tên
-  tool, SHA-256 của `arguments` dạng chuẩn hoá, các câu trả lời trước, `nonce`, `expires_at` = phát hành + **10 phút**. Kiểm:
+  lời elicitation không được tính là người duyệt.
+- **Chỉ bản 2026-07-28:** trả `resultType: "input_required"` kèm `inputRequests` và `requestState`; client gọi lại
+  `tools/call` cùng `inputResponses` và `requestState`. Client bản cũ, request không khai elicitation, lời gọi từ automation,
+  và tool chạy thành task: **không bao giờ** nhận `input_required` (server stateless không biết capability), mà nhận lỗi
+  kernel `kernel.choice_required` với `params.field` và `params.options` (qua egress, nhãn đánh dấu chưa tin cậy) để gọi lại
+  với đối số đủ.
+- **`requestState`** dùng lại bộ ký sẵn có của antispam (`security/antispam/token.rs`: `sign` / `open`), không thêm định dạng
+  token mới; khoá dẫn xuất riêng `SecretKey::derive_for(tenant, "autoxide/mcp/request-state/v1")`. Nội dung: tenant, người gọi
+  theo **định danh ổn định** (id của API key, id của OAuth grant, id của session — không bao giờ là access token đang xoay),
+  tên tool, SHA-256 của `arguments` chuẩn hoá theo JCS (RFC 8785), các câu trả lời trước, hạn = phát hành + **10 phút**. Kiểm:
   chữ ký, hạn, tenant, người gọi, tool, hash tham số — sai bất kỳ thì `-32602` "requestState is invalid or expired, call the
-  tool again without it". **Dùng một lần**: `nonce` ghi vào bảng token một lần sẵn có của kernel (`OneTimeTokens`, chạy trên
-  cả hai database) khi được nhận; gửi lại cùng `requestState` bị từ chối.
-- Client không khai khả năng elicitation: không hỏi, trả lỗi tool `<module>.choice_required` kèm danh sách lựa chọn trong
-  `params` để agent gọi lại với tham số đủ — không bao giờ treo.
-- Câu hỏi và nhãn lựa chọn là dữ liệu của khách (tên bảng giá…): đánh dấu như mọi dữ liệu người dùng (mục prompt injection
-  của G4 mục 3), không trộn vào câu chỉ dẫn.
+  tool again without it". Không ép dùng một lần: TTL ngắn + các ràng buộc trên đủ, vì `requestState` chỉ chở câu trả lời
+  chọn trong danh sách mà hàm lựa chọn tính lại mỗi lượt, và lệnh ghi vẫn đi qua idempotency.
 
 ## 5. Gate mới (phần A)
 
 - `mcp-output-schema`: tool trong `docs/mcp-tools.json` thiếu `output_schema` hay `title` → đỏ, trừ tên trong
   `xtask/mcp-output-baseline.txt` (312 dòng lúc đầu, **chỉ giảm**: gate đỏ khi baseline có tên không còn thiếu, để xoá dòng).
-- `mcp-param-description`: mọi thuộc tính của `input_schema` có `description` (kiểu enum Rust tự có `enum`); thiếu → đỏ,
-  trừ `tool.param` trong `xtask/mcp-param-baseline.txt` (143 dòng lúc đầu, chỉ giảm). PR (1) điền hết mô tả cho các tool UT-5
-  nêu tên.
+  Baseline rỗng là điều kiện gỡ `Tool::new`.
+- `mcp-param-description`: mọi thuộc tính của `input_schema` có `description` (kiểu enum Rust tự có `enum`); thiếu → đỏ, trừ
+  `tool.param` trong `xtask/mcp-param-baseline.txt` (143 dòng lúc đầu, chỉ giảm). PR (1) điền hết mô tả cho các tool UT-5 nêu
+  tên.
 - Mỗi gate một dòng cách sửa trong `xtask/src/hints.rs` ("chuyển tool sang `Tool::typed` và thêm `.title(…)`"; "thêm `///`
   cho trường của kiểu đầu vào").
 
 ## 6. Đánh phiên bản tool (G13, phần E)
 
-Tên và schema tool là hợp đồng như REST (quy tắc chung §13 hợp đồng kernel):
+Tên và schema tool là hợp đồng như REST (quy tắc chung §13 hợp đồng kernel). Mở rộng luật `tool.*` sẵn có trong
+`xtask/src/api_diff.rs` (`tool.removed`, `tool.parameter_*`, `tool.constraint_tightened`, `tool.no_longer_read_only`,
+`tool.approval_added`, `tool.result_*`):
 
 - **Không phá vỡ:** thêm tool; thêm tham số tuỳ chọn; thêm trường vào kết quả; thêm giá trị enum ở enum khai mở; nới quyền
-  (thêm quyền thay thế); thêm annotation còn thiếu.
-- **Phá vỡ:** bỏ/đổi tên tool hay tham số; đổi kiểu; thêm tham số bắt buộc; bỏ trường kết quả; đổi nghĩa; siết quyền;
-  `readOnlyHint` từ `true` sang `false`; `idempotentHint` từ `true` sang `false`; thêm `destructiveHint` hay `openWorldHint`.
-  Làm tool mới hậu tố `_v2` (tên tool chỉ cho `[a-z0-9_]`, nên không dùng `.v2` như event), chạy song song; tool cũ khai
-  `Deprecation::tool(since, sunset, "<module>.<tên>_v2")` (đã có, D-240), gỡ ở bản lớn.
-- `api-diff` (sau này `contract-diff`) so `docs/mcp-tools.json` với bản phát hành gần nhất theo luật trên; tool của module hạng
-  thử nghiệm: báo, không chặn. Mỗi tool có `_meta["io.autoxide/stability"]` để client biết hạng.
+  (thêm quyền thay thế).
+- **Phá vỡ** (luật mới thêm vào `api_diff.rs`): tool bắt đầu trả `input_required` hay task cho client không khai extension
+  (không được xảy ra theo §3–§4, luật giữ điều đó); thêm `session_only`; trường kết quả thành nullable hay tuỳ chọn; siết quyền;
+  thêm `openWorldHint`; `idempotentHint` từ `true` sang `false`; thêm `destructiveHint`; thêm `ask_for` vào tool đã có (lời
+  gọi cũ thiếu trường đó trước chạy theo mặc định, nay nhận `kernel.choice_required`). Làm tool mới hậu tố `_v2` (tên tool
+  chỉ cho `[a-z0-9_]`, nên không dùng `.v2` như event), chạy song song; tool cũ khai `Deprecation::tool(since, sunset,
+  "<module>.<tên>_v2")` (D-240), gỡ ở bản lớn.
+- Tool của module hạng thử nghiệm: báo, không chặn. Mỗi tool có `_meta["autoxide/stability"]` để client biết hạng.
 
 ## 7. UT-5 và #564 (phần A + PR 4)
 
@@ -181,10 +234,15 @@ Khách và đơn nháp bằng tool (vai 3, việc thứ ba) là tính năng nghi
 
 Cùng nhánh, nối tiếp, mỗi PR qua kiểm độc lập:
 
-1. `Tool::typed` + `ToolCall` + `title`/annotations + `outputSchema` qua egress + kiểm hợp đồng kết quả tool trong testkit + hai
-   gate có baseline + `hints.rs` + `catalog.list_price_lists` + mô tả tham số; chuyển `notes` và các tool UT-5 nêu tên làm mẫu.
-2. Chuyển 300 tool còn lại sang `Tool::typed` theo cụm module (baseline giảm dần) — **giao được cho phiên khác**.
-3. `tools/list` chia trang; progress; huỷ; task (`kernel_mcp_tasks`, job, `tasks/*`), test cả hai database.
-4. Elicitation (MRTR, `requestState`), luật G13 trong `api-diff`, phần còn lại của UT-5.
+1. `Tool::typed` + `ToolCall` (cả nhánh không phải MCP) + `title` / bốn hint + `outputSchema` (`anyOf`) qua egress (cả lỗi) +
+   kiểm hợp đồng kết quả tool trong testkit + hai gate có baseline + `hints.rs` + `catalog.list_price_lists` + mô tả tham số;
+   chuyển `notes` và các tool UT-5 nêu tên làm mẫu.
+2. Chuyển 300 tool còn lại sang `Tool::typed` theo cụm module (baseline giảm dần) — **giao được cho phiên khác**. Checklist:
+   rà `openWorldHint` từng module (mail/SMS, nhà cung cấp, AI, webhook, job gọi nhà cung cấp) trước 1.0.
+3. `tools/list` chia trang; SSE + progress; huỷ khi đóng kết nối + drop guard idempotency; task trên `kernel_job_runs`
+   (`cancel_requested_at`, `POST …/jobs/{id}/cancel`, `tasks/*`, dọn dòng quá hạn, trait kiểm credential + decision), test cả
+   hai database.
+4. Elicitation (`ask_for`, MRTR, `requestState`, `kernel.choice_required`), luật G13 mới trong `api_diff.rs`, phần còn lại của
+   UT-5.
 
 Tài liệu `docs/guides/mcp.md` + `.vi.md` cập nhật trong PR nào đổi hành vi người gọi thấy.
