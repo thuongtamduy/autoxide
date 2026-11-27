@@ -36,8 +36,10 @@ impl SuggestSource for Entries {
         let fetch = u64::from(limit).saturating_mul(2);
         let read = tenant.database().read();
         // Chỉ mục từ (PT-15, D-20261126-content-word-index) thay `LIKE '%q%'` trên mọi bài.
-        let matching = words::Matching { tenant: tenant.id().as_uuid(), locale, kind: None };
-        let ids = words::matching_ids(tenant.database(), matching, &words::WordQuery::parse(q)).await?;
+        let lineage = site.lineage_ids();
+        let matching =
+            words::Matching { locale, kind: None, site: Some(&lineage), indexable_only: true };
+        let ids = words::matching_ids(tenant, matching, &words::WordQuery::parse(q)).await?;
         if ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -46,7 +48,7 @@ impl SuggestSource for Entries {
             .filter(published::Column::RestrictedAt.is_null())
             .filter(published::Column::Noindex.eq(false))
             .filter(published::Column::Locale.eq(locale))
-            .filter(on_site(&site.lineage_ids()))
+            .filter(on_site(&lineage))
             .filter(published::Column::EntryId.is_in(ids))
             .order_by_desc(published::Column::PublishedAt)
             .limit(fetch)

@@ -263,13 +263,13 @@ impl ContentService {
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
             // Chỉ mục từ (PT-15): tối đa `MATCH_CAP` bài khớp mới nhất, rồi lọc tiếp như mọi trang.
             let matching = super::words::Matching {
-                tenant: tenant.id().as_uuid(),
                 locale: &filter.locale,
                 kind: Some("post"),
+                site: Some(&filter.site),
+                indexable_only: false,
             };
-            let ids =
-                super::words::matching_ids(tenant.database(), matching, &super::words::WordQuery::parse(search))
-                    .await?;
+            let query = super::words::WordQuery::parse(search);
+            let ids = super::words::matching_ids(tenant, matching, &query).await?;
             select = select.filter(published::Column::EntryId.is_in(ids));
         }
         let key = |row: &Published| SortValue::Time(row.published_at);

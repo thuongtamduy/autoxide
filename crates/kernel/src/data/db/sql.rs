@@ -19,11 +19,12 @@ pub struct Sql<'h, H> {
     handle: &'h H,
     text: String,
     binds: Vec<(String, sea_query::Value)>,
+    limit: Option<std::time::Duration>,
 }
 
 impl<'h, H: Handle> Sql<'h, H> {
     pub(crate) fn new(handle: &'h H, text: &str) -> Self {
-        Sql { handle, text: text.to_owned(), binds: Vec::new() }
+        Sql { handle, text: text.to_owned(), binds: Vec::new(), limit: None }
     }
 
     /// Binds `:name` to `value`.
@@ -33,11 +34,24 @@ impl<'h, H: Handle> Sql<'h, H> {
         self
     }
 
+    /// Stops the query when it runs longer than `limit`, or when the caller stops waiting: the database ends it
+    /// (Postgres `statement_timeout`, SQLite interrupt) and [`all`](Self::all) returns
+    /// [`QUERY_TIMEOUT`](super::QUERY_TIMEOUT). For reads on a read handle only; on a write transaction `all`
+    /// fails. Use it for queries whose cost depends on what a caller sends (public search).
+    #[must_use]
+    pub fn within(mut self, limit: std::time::Duration) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
     /// Runs a query; every row read as `Out` (a tuple).
     pub async fn all<Out: FromRow>(self) -> Result<Vec<Out>, Error> {
         let connection = self.handle.connection();
         let statement = self.render(connection.backend())?;
-        let rows = connection.all(statement).await?;
+        let rows = match self.limit {
+            Some(limit) => connection.all_within(statement, limit).await?,
+            None => connection.all(statement).await?,
+        };
         rows.iter().map(|row| Out::from_row(&Row(row))).collect()
     }
 

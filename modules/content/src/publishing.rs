@@ -542,7 +542,7 @@ impl ContentService {
             body_schema_version: version.body_schema_version,
             plain_text: version.plain_text.clone(),
             search_key: version.search_key.clone(),
-            search_words: words::words(&version.search_key),
+            search_words: words::words(tenant.id().as_uuid(), &version.search_key),
             word_count: version.word_count,
             reading_time_minutes: version.reading_time_minutes,
             featured_media_id: version.featured_media_id,

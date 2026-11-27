@@ -78,7 +78,7 @@ async fn backfill(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
             let key: String = row.try_get("", "search_key")?;
             let update = Query::update()
                 .table(TABLE)
-                .value("search_words", crate::publishing::words::words(&key))
+                .value("search_words", crate::publishing::words::words(tenant, &key))
                 .and_where(Expr::col("tenant_id").eq(tenant))
                 .and_where(Expr::col("entry_id").eq(entry))
                 .to_owned();

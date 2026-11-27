@@ -87,7 +87,7 @@ impl Job for IndexJob {
 }
 
 /// Vector của một (`scope`, `locale`) đã nạp vào bộ nhớ.
-struct Loaded {
+pub(crate) struct Loaded {
     version: i64,
     model: String,
     chunks: Vec<(Uuid, i32, Vec<f32>)>,
@@ -114,6 +114,9 @@ pub(crate) struct SearchCache {
     public_budget: Mutex<HashMap<TenantId, (Instant, u32)>>,
     /// Chốt của tìm công khai: số lượt cùng lúc, số lượt mỗi phút theo địa chỉ (PT-15).
     pub(crate) public_limits: super::public_limits::PublicLimits,
+    /// Số lần thật sự đọc vector từ database (cho test single-flight).
+    #[cfg(test)]
+    pub(crate) loads: std::sync::atomic::AtomicUsize,
 }
 
 impl SearchCache {
@@ -518,7 +521,9 @@ impl ContentService {
             return Err(invalid(problems));
         }
         let scope = if public { Scope::Published } else { Scope::Draft };
-        let by_text = self.text_candidates(tenant, scope, q, &locale, query.kind).await?;
+        let lineage = site.map(autoxide_kernel::tenancy::Site::lineage_ids);
+        let by_text =
+            self.text_candidates(tenant, scope, q, &locale, query.kind, lineage.as_deref()).await?;
         let mut unloaded = None;
         let by_meaning = if self.embedder.enabled() && (!public || self.spend_public_budget(tenant))
         {
@@ -608,6 +613,7 @@ impl ContentService {
         q: &str,
         locale: &str,
         kind: Option<Kind>,
+        site: Option<&[Uuid]>,
     ) -> Result<Vec<Uuid>, Error> {
         let read = tenant.database().read();
         let limit = CANDIDATES as u64;
@@ -631,13 +637,15 @@ impl ContentService {
             }
             // Bản công khai: chỉ mục từ (PT-15), đã mới đăng trước.
             Scope::Published => {
+                // Website của người đọc lọc ngay trong câu chạm chỉ mục: trần số bài khớp tính trên bài họ thấy.
                 let matching = words::Matching {
-                    tenant: tenant.id().as_uuid(),
                     locale,
                     kind: kind.map(Kind::as_str),
+                    site,
+                    indexable_only: false,
                 };
                 let mut ids =
-                    words::matching_ids(tenant.database(), matching, &words::WordQuery::parse(q)).await?;
+                    words::matching_ids(tenant, matching, &words::WordQuery::parse(q)).await?;
                 ids.truncate(CANDIDATES);
                 ids
             }
@@ -700,7 +708,7 @@ impl ContentService {
     }
 
     /// Vector của (`scope`, `locale`) trong bộ nhớ; nạp lại khi `version` trong database đổi.
-    async fn loaded(
+    pub(crate) async fn loaded(
         &self,
         tenant: &TenantContext,
         scope: Scope,
@@ -733,6 +741,8 @@ impl ContentService {
         if let Some(cached) = fresh(&self.search_cache) {
             return Ok(cached);
         }
+        #[cfg(test)]
+        self.search_cache.loads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let dimensions = i32::try_from(self.embedder.dimensions()).unwrap_or(0);
         let rows = embedding::Entity::find()
             .scoped(tenant)

@@ -202,6 +202,23 @@ impl Connection<'_> {
         }
     }
 
+    // Như `all`, database dừng câu sau `limit` (`super::bounded`). Chỉ trên handle đọc: transaction
+    // ghi không mở được transaction chỉ đọc riêng, và câu ghi không nên bị cắt giữa chừng.
+    pub(crate) async fn all_within(
+        &self,
+        statement: Statement,
+        limit: std::time::Duration,
+    ) -> Result<Vec<QueryResult>, Error> {
+        match self.0 {
+            Inner::Read(connection) => {
+                super::bounded::all_within(connection, statement, limit).await
+            }
+            Inner::Write(_) => {
+                Err(Error::internal("a time limit applies to reads on a read handle"))
+            }
+        }
+    }
+
     pub(crate) async fn execute(&self, statement: Statement) -> Result<u64, DbErr> {
         Ok(match self.0 {
             Inner::Read(connection) => connection.execute_raw(statement).await?,
@@ -236,6 +253,11 @@ impl<'a> TenantDb<'a> {
     /// Opens a write transaction (`BEGIN IMMEDIATE` on SQLite).
     pub async fn begin_write(&self) -> Result<TenantTx, Error> {
         Ok(Tx { transaction: self.database.begin_write().await?, access: InTenant(self.tenant) })
+    }
+    /// Which database this tenant is on, for the few queries written per database behind a module's own trait
+    /// (hand-written SQL, Rule one).
+    pub fn backend(&self) -> crate::config::DatabaseBackend {
+        self.database.backend()
     }
 }
 

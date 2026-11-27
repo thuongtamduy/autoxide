@@ -181,6 +181,12 @@ tên. Không gì bị xoá, và log khởi động lẫn `autoxide doctor` báo 
 module đang tắt, kèm dòng cần thêm — xem
 [MODULES.vi.md](MODULES.vi.md#nâng-cấp-từ-017-trở-về-trước). Điều này áp dụng cả cho cách B và C.
 
+**Cập nhật lên bản có chỉ mục từ của content** (migration `content.m0036_word_index`): migration tính
+từ của mọi bài đã đăng theo từng lô 500 bài, rồi dựng chỉ mục — trên PostgreSQL là index GIN, chặn ghi
+vào `content_published` trong lúc dựng (đăng bài phải chờ; đọc thì không). Thời gian tăng theo số bài
+đã đăng: website lớn thì cập nhật vào giờ vắng. Trên SQLite bảng tìm chữ được nạp ngay
+trong migration đó. Điều này áp dụng cả cho cách B và C.
+
 ### 6. Backup và khôi phục
 
 ```bash
