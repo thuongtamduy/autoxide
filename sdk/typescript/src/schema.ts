@@ -1964,8 +1964,12 @@ export type CatalogPriceGuard = {
   org_id: string;
 };
 
-/** A price to add. */
+/** A price to add. `amount` is in the currency of the list and not negative. */
 export type CatalogPriceInput = {
+  /**
+   * A sum of money: an integer number of the currency's minor units (cents for `USD`, dong for
+   * `VND`) plus the currency.
+   */
   amount: {
     /**
      * Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above
@@ -1974,7 +1978,7 @@ export type CatalogPriceInput = {
      */
     amount: string;
     currency: Currency;
-  } & Record<string, unknown>;
+  };
   /** Struck-through price, higher than `amount`; display only. */
   compare_at?: {
     /**
@@ -10715,6 +10719,77 @@ export type Data_NotificationWebPushKey = {
 };
 
 /** Envelope of a single result. */
+export type Data_OAuthDecisionResult = {
+  /** Where to send the browser after a decision. */
+  data: {
+    /** Open this address in the browser: the client's `redirect_uri` with `code` (or `error`), `state` and `iss`. */
+    redirect_to: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OAuthGrant = {
+  /** A person's approval of an MCP client. */
+  data: {
+    /** Host of `client_id`. */
+    client_host: string;
+    /** The client: for a metadata-document client, the URL of the document. */
+    client_id: string;
+    /** Name the client gave itself when approved (unverified). */
+    client_name: string;
+    created_at: string;
+    expires_at: string;
+    id: string;
+    /** Last time the client used it (to the minute); `null`: never. */
+    last_used_at?: string | null;
+    /** The permissions granted; the client never has more than the person currently has. */
+    permissions: string[];
+    /** `cimd` or `dynamic`. */
+    registration: string;
+    /** The resource the client uses the access for. */
+    resource: string;
+    /** When it was revoked; `null`: still active (until `expires_at`). */
+    revoked_at?: string | null;
+    /** The person who approved. */
+    user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OAuthRequest = {
+  /** An authorization request waiting for the signed-in person's decision. */
+  data: {
+    /** Host of `client_id`; show it next to the name, which the client chose itself and is not verified. */
+    client_host: string;
+    /** The client's identifier: for a metadata-document client, the URL of the document. */
+    client_id: string;
+    /** Name the client gave itself (unverified). */
+    client_name: string;
+    /** Permissions of the person's current approval of this client for this resource, if any. */
+    current_permissions?: string[] | null;
+    /** Until when the request waits. */
+    expires_at: string;
+    /**
+     * The redirect points to this device (`localhost`, a loopback address): another program on the device could
+     * pretend to be this client. Warn the person.
+     */
+    localhost_redirect: boolean;
+    /** Permissions the person can grant (those they hold, narrowed to what the client asked for). */
+    permissions: OAuthOfferedPermission[];
+    /** Host of `redirect_uri`; always show it. */
+    redirect_host: string;
+    /** Where the browser goes back to. */
+    redirect_uri: string;
+    /** `cimd` (client metadata document) or `dynamic` (self-registered). */
+    registration: string;
+    /** What the client asked for (empty: the person chooses). */
+    requested_scope: string[];
+    /** The resource the client will use the access for. */
+    resource: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OpsBacklog = {
   /** Backlogs of every database this server handles. */
   data: {
@@ -19085,6 +19160,177 @@ export type NotificationWebPushKey = {
   public_key: string;
 };
 
+/** Answer of dynamic registration (RFC 7591 §3.2.1). */
+export type OAuthClientRegistered = {
+  /** Use it as `client_id` in the authorization and token requests. */
+  client_id: string;
+  /** When it was issued (Unix seconds). */
+  client_id_issued_at: number;
+  client_name: string;
+  grant_types: string[];
+  redirect_uris: string[];
+  response_types: string[];
+  /** Always `none`: a public client proving itself with PKCE. */
+  token_endpoint_auth_method: string;
+};
+
+/** Dynamic client registration request (RFC 7591 §2). Unknown fields are ignored (RFC 7591 §3.1). */
+export type OAuthClientRegistration = {
+  /** Name shown to the person approving the client (at most 1000 characters; the first 200 are kept). */
+  client_name?: string | null;
+  /** `authorization_code` and optionally `refresh_token`. */
+  grant_types?: string[] | null;
+  /** Where the browser comes back with the code: `https` URLs, or `http` to a loopback address. 1 to 10. */
+  redirect_uris?: string[];
+  /** Only `code`. */
+  response_types?: string[] | null;
+  /** Only `none` (public client using PKCE). */
+  token_endpoint_auth_method?: string | null;
+};
+
+/** The person's approval. */
+export type OAuthDecision = {
+  /** How many days the approval lasts (1 to the server's maximum, default the maximum). */
+  days?: number | null;
+  /** The permissions to grant, chosen one by one from `permissions` of the request. */
+  permissions: string[];
+  /**
+   * A token from `POST /api/v1/auth/me/reauth`: required when a chosen permission is `destructive`,
+   * `sensitive_data` or `money`.
+   */
+  reauth_token?: string | null;
+};
+
+/** Where to send the browser after a decision. */
+export type OAuthDecisionResult = {
+  /** Open this address in the browser: the client's `redirect_uri` with `code` (or `error`), `state` and `iss`. */
+  redirect_to: string;
+};
+
+/** Error answer of the OAuth endpoints (RFC 6749 §5.2, RFC 7591 §3.2.2). */
+export type OAuthErrorResponse = {
+  /** Machine-readable error, e.g. `invalid_grant`, `invalid_request`, `invalid_client_metadata`. */
+  error: string;
+  /** What went wrong, for the developer. */
+  error_description: string;
+};
+
+/** A person's approval of an MCP client. */
+export type OAuthGrant = {
+  /** Host of `client_id`. */
+  client_host: string;
+  /** The client: for a metadata-document client, the URL of the document. */
+  client_id: string;
+  /** Name the client gave itself when approved (unverified). */
+  client_name: string;
+  created_at: string;
+  expires_at: string;
+  id: string;
+  /** Last time the client used it (to the minute); `null`: never. */
+  last_used_at?: string | null;
+  /** The permissions granted; the client never has more than the person currently has. */
+  permissions: string[];
+  /** `cimd` or `dynamic`. */
+  registration: string;
+  /** The resource the client uses the access for. */
+  resource: string;
+  /** When it was revoked; `null`: still active (until `expires_at`). */
+  revoked_at?: string | null;
+  /** The person who approved. */
+  user_id: string;
+};
+
+/** One permission the person can grant. */
+export type OAuthOfferedPermission = {
+  /** What it allows, for the person deciding. */
+  description: string;
+  /** Permission name, e.g. `notes.write`. */
+  name: string;
+  /** The client asked for it (directly or through a prefix). */
+  requested: boolean;
+  /**
+   * `read`, `write`, `destructive`, `sensitive_data` or `money`. The last three need a recent re-confirmation
+   * (`reauth_token`) to grant.
+   */
+  risk: string;
+};
+
+/** An authorization request waiting for the signed-in person's decision. */
+export type OAuthRequest = {
+  /** Host of `client_id`; show it next to the name, which the client chose itself and is not verified. */
+  client_host: string;
+  /** The client's identifier: for a metadata-document client, the URL of the document. */
+  client_id: string;
+  /** Name the client gave itself (unverified). */
+  client_name: string;
+  /** Permissions of the person's current approval of this client for this resource, if any. */
+  current_permissions?: string[] | null;
+  /** Until when the request waits. */
+  expires_at: string;
+  /**
+   * The redirect points to this device (`localhost`, a loopback address): another program on the device could
+   * pretend to be this client. Warn the person.
+   */
+  localhost_redirect: boolean;
+  /** Permissions the person can grant (those they hold, narrowed to what the client asked for). */
+  permissions: OAuthOfferedPermission[];
+  /** Host of `redirect_uri`; always show it. */
+  redirect_host: string;
+  /** Where the browser goes back to. */
+  redirect_uri: string;
+  /** `cimd` (client metadata document) or `dynamic` (self-registered). */
+  registration: string;
+  /** What the client asked for (empty: the person chooses). */
+  requested_scope: string[];
+  /** The resource the client will use the access for. */
+  resource: string;
+};
+
+/**
+ * Body of `POST /oauth/revoke` (`application/x-www-form-urlencoded`, RFC 7009 §2.1). `token_type_hint` is accepted
+ * and ignored.
+ */
+export type OAuthRevokeRequest = {
+  /** The client's `client_id`. */
+  client_id?: string | null;
+  /** The access token or refresh token to revoke. */
+  token?: string | null;
+};
+
+/** Thân `POST /oauth/token` (`application/x-www-form-urlencoded`, OAuth 2.1 §3.2.2). */
+export type OAuthTokenRequest = {
+  /** The client's `client_id`. */
+  client_id?: string | null;
+  /** The code from the redirect (`authorization_code`). */
+  code?: string | null;
+  /** The PKCE verifier of the request (`authorization_code`). */
+  code_verifier?: string | null;
+  /** `authorization_code` or `refresh_token`. */
+  grant_type?: string | null;
+  /** The same `redirect_uri` as in the authorization request (`authorization_code`). */
+  redirect_uri?: string | null;
+  /** The refresh token (`refresh_token`). */
+  refresh_token?: string | null;
+  /** The resource, as in the authorization request (RFC 8707). Optional; when sent it must match. */
+  resource?: string | null;
+  /** Ignored when it lists only permissions of the approval; a token never carries more than was approved. */
+  scope?: string | null;
+};
+
+/** Successful token response (OAuth 2.1 §3.2.3). */
+export type OAuthTokenResponse = {
+  /** Send it as `Authorization: Bearer <access_token>`. */
+  access_token: string;
+  /** Seconds until the access token expires. */
+  expires_in: number;
+  /** Use once with `grant_type=refresh_token` to get new tokens; every use returns a new one. */
+  refresh_token: string;
+  /** The permissions granted, space-separated. */
+  scope: string;
+  /** Always `Bearer`. */
+  token_type: string;
+};
+
 /**
  * A ticket from the website. Signed-in customers send only the question; guests also send
  * exactly one of `email` or `phone`, and the anti-spam fields of the form.
@@ -24035,6 +24281,35 @@ export type Page_NotificationTemplateVersion = {
 };
 
 /** One page of a list. */
+export type Page_OAuthGrant = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Host of `client_id`. */
+    client_host: string;
+    /** The client: for a metadata-document client, the URL of the document. */
+    client_id: string;
+    /** Name the client gave itself when approved (unverified). */
+    client_name: string;
+    created_at: string;
+    expires_at: string;
+    id: string;
+    /** Last time the client used it (to the minute); `null`: never. */
+    last_used_at?: string | null;
+    /** The permissions granted; the client never has more than the person currently has. */
+    permissions: string[];
+    /** `cimd` or `dynamic`. */
+    registration: string;
+    /** The resource the client uses the access for. */
+    resource: string;
+    /** When it was revoked; `null`: still active (until `expires_at`). */
+    revoked_at?: string | null;
+    /** The person who approved. */
+    user_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_OrdersCartSummary = {
   /** The items of this page, in the requested order. */
   data: {
@@ -28582,7 +28857,7 @@ export type ProviderPatch = {
   scopes?: string | null;
 };
 
-/** A new sign-in provider. */
+/** A new sign-in provider. `realm` is `staff` (default) or `customer`. */
 export type ProviderRequest = {
   /**
    * Let someone without an account get one by signing in (still needs registration open, or
@@ -28615,7 +28890,11 @@ export type ProviderRequest = {
   kind: string;
   /** Label for the "Sign in with …" button, 1 to 100 characters. */
   name: string;
-  realm?: ("staff" | "customer") & Record<string, unknown>;
+  /**
+   * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
+   * one tenant's shop, without permissions).
+   */
+  realm?: "staff" | "customer";
   /** Pages of the interface the provider may send the browser back to (1 to 20, exact match). */
   redirect_uris: string[];
   /** Space-separated scopes; default `openid email profile` (`read:user user:email` for GitHub). */
@@ -34920,6 +35199,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/me/oauth-grants": {
+    /** List the MCP / OAuth clients you approved. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OAuthGrant;
+        401: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/oauth-grants/{id}": {
+    /** Revoke a client you approved. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OAuthGrant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/me/passkeys": {
     /** List your passkeys. */
     get: {
@@ -35079,6 +35384,126 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth-grants": {
+    /** List every approval people gave to MCP / OAuth clients. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OAuthGrant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth-grants/{id}": {
+    /** Revoke any approval of an MCP / OAuth client. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OAuthGrant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth/authorize": {
+    /** Start connecting an MCP / OAuth client (OAuth 2.1 authorization endpoint). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { response_type?: string; client_id?: string; redirect_uri?: string; code_challenge?: string; code_challenge_method?: string; state?: string; scope?: string; resource?: string }; };
+      responses: {
+        302: void;
+        400: Problem;
+        404: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth/register": {
+    /** Register an MCP / OAuth client (RFC 7591, deprecated). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OAuthClientRegistration;
+      responses: {
+        201: OAuthClientRegistered;
+        400: OAuthErrorResponse;
+        404: OAuthErrorResponse;
+        429: OAuthErrorResponse;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth/requests/{token}": {
+    /** Read an authorization request waiting for your decision. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { token: string }; };
+      responses: {
+        200: Data_OAuthRequest;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth/requests/{token}/approve": {
+    /** Approve a client: grant it the permissions you choose. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { token: string }; };
+      requestBody: OAuthDecision;
+      responses: {
+        200: Data_OAuthDecisionResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth/requests/{token}/deny": {
+    /** Decline a client. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { token: string }; };
+      responses: {
+        200: Data_OAuthDecisionResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth/revoke": {
+    /** Revoke a token (RFC 7009). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: string;
+      responses: {
+        200: void;
+        400: OAuthErrorResponse;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/oauth/token": {
+    /** Exchange a code or a refresh token for tokens (OAuth 2.1 token endpoint). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: string;
+      responses: {
+        200: OAuthTokenResponse;
+        400: OAuthErrorResponse;
+        404: OAuthErrorResponse;
         default: Problem;
       };
     };
@@ -41281,6 +41706,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        503: Problem;
         default: Problem;
       };
     };

@@ -12,11 +12,13 @@ use autoxide_kernel::access::{OrgTarget, Principal, Scope};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::sms::PhoneNumber;
-use autoxide_kernel::storage::Storage;
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, ScopeExt, TenantId, root_of};
+use autoxide_kernel::storage::{Storage, TenantStorage};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, ScopeExt, TenantContext, TenantId, root_of};
 use autoxide_kernel::voice::{CallStatus, VoiceProvider};
 use autoxide_kernel::work::WorkSource;
-use autoxide_testkit::{FAKE_RECORDING, FakeVoiceProvider, MemoryStorage, TestApp, TestDatabase};
+use autoxide_testkit::{
+    FAKE_RECORDING, FakeVoiceProvider, MemoryStorage, TestApp, TestAppBuilder, TestDatabase,
+};
 use axum::http::StatusCode;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
@@ -55,14 +57,26 @@ struct Voice {
 }
 
 async fn voice(test: &TestDatabase, notice: bool, recording: bool) -> Voice {
+    voice_with(test, notice, recording, |builder| builder).await
+}
+
+/// Như [`voice`]; `extra` thêm vào app (vd thêm khách).
+async fn voice_with(
+    test: &TestDatabase,
+    notice: bool,
+    recording: bool,
+    extra: impl FnOnce(TestAppBuilder<'_>) -> TestAppBuilder<'_>,
+) -> Voice {
     let fake = Arc::new(FakeVoiceProvider::default().with_recording_notice(notice));
     let storage = Arc::new(MemoryStorage::new());
     let (provider, store) = (fake.clone(), storage.clone());
     let h = harness_with(test, false, move |builder| {
-        builder
-            .contribute::<dyn VoiceProvider>(provider)
-            .provide::<dyn AccountVerification>(Arc::new(Accounts))
-            .provide::<dyn Storage>(store)
+        extra(
+            builder
+                .contribute::<dyn VoiceProvider>(provider)
+                .provide::<dyn AccountVerification>(Arc::new(Accounts))
+                .provide::<dyn Storage>(store),
+        )
     })
     .await;
     let root = root_of(DEFAULT_TENANT).as_uuid();
@@ -514,6 +528,254 @@ async fn ban_ghi_het_han_thi_xoa() {
     })
     .await
     .unwrap();
+}
+
+/// Bản ghi còn ở nhà cung cấp mà bộ nối của nhà cung cấp đó tắt: không xoá dấu vết (`provider_recording_id`), báo
+/// lỗi để job thử lại, vẫn dọn các bản ghi khác cùng lượt; bật lại bộ nối thì lần sau xoá được
+/// (D-20261127-voice-recording-provider-off).
+#[tokio::test]
+async fn ban_ghi_o_nha_cung_cap_tat_thi_bao_loi_va_giu_dau_vet() {
+    TestDatabase::run(async |test| {
+        let v = voice(test, true, true).await;
+        let (_, call_id) = recorded_call(&v).await;
+        let tenant = v.h.app.default_tenant();
+        let past = Timestamp::now() - SignedDuration::from_hours(24);
+        let transaction = tenant.db().begin_write().await.unwrap();
+        call_entity::Entity::update_many()
+            .col_expr(call_entity::Column::RecordingExpiresAt, Expr::value(Some(past)))
+            .col_expr(call_entity::Column::ProviderRecordingId, Expr::value(Some("rec-left")))
+            .filter(call_entity::Column::Id.eq(call_id))
+            .scoped(&tenant)
+            .exec(&transaction)
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+        // Dòng quá hạn thứ hai chỉ có bản sao trong nơi lưu.
+        let other = copy_call(&v.h.app, &tenant, call_id, |row| {
+            row.provider_recording_id = None;
+            row.recording_ref = Some(format!("conversations/recordings/{}", row.id));
+            row.recording_expires_at = Some(past);
+        })
+        .await;
+        let store = TenantStorage::new(v.storage.clone(), &tenant);
+        let body = futures_util::stream::iter([Ok(bytes::Bytes::from_static(b"audio"))]);
+        store.put(&format!("conversations/recordings/{other}"), Box::pin(body)).await.unwrap();
+        assert_eq!(recordings(&v).await.len(), 2);
+        // Bộ nối tắt: lỗi, bản ghi của dòng lỗi trong nơi lưu chưa bị đụng tới; dòng kia vẫn được dọn.
+        let error = provider_off(&v).purge_recordings(&tenant, Timestamp::now()).await.unwrap_err();
+        assert_eq!(error.code(), "conversations.voice_provider_unavailable");
+        assert_eq!(
+            call_row(&tenant, call_id).await.provider_recording_id.as_deref(),
+            Some("rec-left")
+        );
+        assert_eq!(recordings(&v).await, [format!("conversations/recordings/{call_id}")]);
+        let purged = call_row(&tenant, other).await;
+        assert_eq!((purged.recording_ref, purged.recording_expires_at), (None, None));
+        // Bật lại: xoá ở nơi lưu và ở nhà cung cấp, xoá dấu vết.
+        assert_eq!(with_storage(&v).purge_recordings(&tenant, Timestamp::now()).await.unwrap(), 1);
+        assert_eq!(call_row(&tenant, call_id).await.provider_recording_id, None);
+        assert!(recordings(&v).await.is_empty());
+        assert!(!v.fake.has_recording("rec-left"));
+    })
+    .await
+    .unwrap();
+}
+
+/// Job dọn theo hạn: khách đầu lỗi (bộ nối tắt) không chặn khách sau trên cùng database; job báo lỗi để thử lại.
+/// Mỗi khách có một dòng lỗi và một dòng xoá được, nên khách nào đi trước thì dòng xoá được của khách kia vẫn phải
+/// được dọn.
+#[tokio::test]
+async fn job_don_ban_ghi_mot_khach_loi_khong_chan_khach_khac() {
+    TestDatabase::run(async |test| {
+        let v = voice_with(test, true, true, |builder| builder.tenant("b")).await;
+        let (_, call_id) = recorded_call(&v).await;
+        let past = Timestamp::now() - SignedDuration::from_hours(24);
+        let tenants = [v.h.app.default_tenant(), v.h.app.tenant("b").await.unwrap()];
+        let mut good = Vec::new();
+        let mut bad = Vec::new();
+        for tenant in &tenants {
+            let tenant_id = tenant.id().as_uuid();
+            let id = copy_call(&v.h.app, tenant, call_id, |row| {
+                row.tenant_id = tenant_id;
+                row.recording_ref = None;
+                row.provider_recording_id = Some(format!("rec-{}", row.id));
+                row.recording_expires_at = Some(past);
+            })
+            .await;
+            // Bản ghi có thật ở nhà cung cấp giả.
+            v.fake.emit(id, CallStatus::Completed, Some(1), true);
+            assert!(v.fake.has_recording(&format!("rec-{id}")));
+            good.push((tenant.clone(), id));
+            let id = copy_call(&v.h.app, tenant, call_id, |row| {
+                row.tenant_id = tenant_id;
+                row.provider = "absent".into();
+                row.recording_ref = None;
+                row.provider_recording_id = Some("rec-absent".into());
+                row.recording_expires_at = Some(past);
+            })
+            .await;
+            bad.push((tenant.clone(), id));
+        }
+        let purger = crate::voice::recordings::Purger(with_storage(&v), v.h.app.registry().clone());
+        let job = autoxide_kernel::job::JobContext::for_database(
+            v.h.app.database().clone(),
+            crate::voice::recordings::PURGE_RECORDINGS,
+            Value::Null,
+            1,
+        );
+        let error = autoxide_kernel::job::JobHandler::run(&purger, &job).await.unwrap_err();
+        assert_eq!(error.code(), "conversations.voice_provider_unavailable");
+        for (tenant, id) in &good {
+            assert_eq!(call_row(tenant, *id).await.provider_recording_id, None);
+            assert!(!v.fake.has_recording(&format!("rec-{id}")), "deleted at the provider");
+        }
+        for (tenant, id) in &bad {
+            assert_eq!(
+                call_row(tenant, *id).await.provider_recording_id.as_deref(),
+                Some("rec-absent")
+            );
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// REST: xoá bản ghi khi bộ nối của nhà cung cấp giữ nó tắt — 503 với mã ổn định, dòng còn nguyên.
+#[tokio::test]
+async fn xoa_ban_ghi_qua_rest_khi_bo_noi_tat_tra_503() {
+    TestDatabase::run(async |test| {
+        let v = voice(test, true, true).await;
+        let (_, call_id) = recorded_call(&v).await;
+        let tenant = v.h.app.default_tenant();
+        let transaction = tenant.db().begin_write().await.unwrap();
+        call_entity::Entity::update_many()
+            .col_expr(call_entity::Column::Provider, Expr::value("absent"))
+            .col_expr(call_entity::Column::ProviderRecordingId, Expr::value(Some("rec-left")))
+            .filter(call_entity::Column::Id.eq(call_id))
+            .scoped(&tenant)
+            .exec(&transaction)
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+        let before = call_row(&tenant, call_id).await;
+        let (status, body) =
+            call(&v.h.app, "DELETE", &format!("/calls/{call_id}/recording"), "agent", None).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
+        assert_eq!(body["code"], "conversations.voice_provider_unavailable");
+        assert_eq!(call_row(&tenant, call_id).await, before, "the row is left intact");
+        assert_eq!(recordings(&v).await.len(), 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Xoá tài khoản khi bộ nối của nhà cung cấp giữ bản ghi tắt: event không lỗi (lỗi chặn mọi module đăng ký sau),
+/// tin nhắn và yêu cầu gọi lại vẫn ẩn danh, bản sao trong nơi lưu bị xoá, `provider_recording_id` còn và hạn lưu về
+/// bây giờ; job tải bản ghi không tải lại; bật lại bộ nối thì job dọn theo hạn xoá ở nhà cung cấp
+/// (D-20261127-voice-recording-provider-off).
+#[tokio::test]
+async fn xoa_tai_khoan_khi_bo_noi_tat_van_an_danh_va_de_job_don() {
+    TestDatabase::run(async |test| {
+        let v = voice(test, true, true).await;
+        let (id, call_id) = recorded_call(&v).await;
+        let tenant = v.h.app.default_tenant();
+        // Bản ghi có thật ở nhà cung cấp giả, dòng còn giữ mã của nó.
+        v.fake.emit(call_id, CallStatus::Completed, Some(40), true);
+        let provider_id = format!("rec-{call_id}");
+        let transaction = tenant.db().begin_write().await.unwrap();
+        call_entity::Entity::update_many()
+            .col_expr(
+                call_entity::Column::ProviderRecordingId,
+                Expr::value(Some(provider_id.clone())),
+            )
+            .filter(call_entity::Column::Id.eq(call_id))
+            .scoped(&tenant)
+            .exec(&transaction)
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+        assert_eq!(recordings(&v).await.len(), 1);
+
+        let off = provider_off(&v);
+        let event = Delivered::new(
+            tenant.clone(),
+            "auth",
+            autoxide_kernel::privacy::USER_DELETED,
+            json!({"before": {"id": Uuid::from_u128(BUYER)}}),
+        );
+        off.handle(&event).await.unwrap();
+        off.handle(&event).await.unwrap();
+        assert!(recordings(&v).await.is_empty(), "the stored copy is deleted");
+        let row = call_row(&tenant, call_id).await;
+        assert_eq!(row.recording_ref, None);
+        assert_eq!(row.provider_recording_id.as_deref(), Some(provider_id.as_str()));
+        assert!(row.recording_expires_at.is_some_and(|at| at <= Timestamp::now()));
+        assert_eq!(row.caller_user_id, None);
+        let rows = callback::Entity::find().all(&tenant.db().read()).await.unwrap();
+        assert!(
+            rows.iter().all(|row| row.phone_sealed.is_none() && row.requester_user_id.is_none())
+        );
+        let (_, got) = call(&v.h.app, "GET", &format!("/threads/{id}"), "agent", None).await;
+        assert!(got["data"]["customer_user_id"].is_null(), "{got}");
+        let (_, page) =
+            call(&v.h.app, "GET", &format!("/threads/{id}/messages?order=asc"), "agent", None)
+                .await;
+        assert_eq!(page["data"][0]["body"], "", "the customer's text is gone");
+
+        // Job tải bản ghi (bộ nối đã bật lại) không tải lại dữ liệu của tài khoản đã xoá.
+        with_storage(&v).fetch_recording(&tenant, call_id).await.unwrap();
+        assert!(recordings(&v).await.is_empty());
+        // Bộ nối còn tắt: job dọn báo lỗi để thử lại; bật lại: xoá ở nhà cung cấp, xoá dấu vết.
+        let later = Timestamp::now() + SignedDuration::from_mins(1);
+        let error = off.purge_recordings(&tenant, later).await.unwrap_err();
+        assert_eq!(error.code(), "conversations.voice_provider_unavailable");
+        assert!(v.fake.has_recording(&provider_id));
+        assert_eq!(with_storage(&v).purge_recordings(&tenant, later).await.unwrap(), 1);
+        assert!(!v.fake.has_recording(&provider_id));
+        let row = call_row(&tenant, call_id).await;
+        assert_eq!((row.provider_recording_id, row.recording_expires_at), (None, None));
+    })
+    .await
+    .unwrap();
+}
+
+/// Như [`with_storage`] nhưng không có bộ nối thoại nào bật.
+fn provider_off(v: &Voice) -> crate::service::ConversationsService {
+    let mut off = Arc::try_unwrap(with_storage(v)).ok().unwrap();
+    off.parts.voice = Vec::new();
+    off
+}
+
+/// Dòng cuộc gọi `id` của khách `tenant`.
+async fn call_row(tenant: &TenantContext, id: Uuid) -> call_entity::Model {
+    call_entity::Entity::find_by_id(id)
+        .scoped(tenant)
+        .one(&tenant.db().read())
+        .await
+        .unwrap()
+        .unwrap()
+}
+
+/// Chép dòng cuộc gọi `from` của khách mặc định thành dòng mới (id mới), sửa bằng `edit` (đổi `tenant_id` nếu là
+/// khách khác), ghi qua `tenant`; trả id mới.
+async fn copy_call(
+    app: &TestApp,
+    tenant: &TenantContext,
+    from: Uuid,
+    edit: impl FnOnce(&mut call_entity::Model),
+) -> Uuid {
+    let mut row = call_row(&app.default_tenant(), from).await;
+    row.id = Uuid::now_v7();
+    row.callback_id = None;
+    row.provider_call_id = Some(format!("copy-{}", row.id));
+    edit(&mut row);
+    let id = row.id;
+    let transaction = tenant.db().begin_write().await.unwrap();
+    sea_orm::ActiveModelTrait::insert(call_entity::ActiveModel::from(row), &transaction)
+        .await
+        .unwrap();
+    transaction.commit().await.unwrap();
+    id
 }
 
 /// Khoá bản ghi âm trong nơi lưu.

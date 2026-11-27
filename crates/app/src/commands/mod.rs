@@ -6,6 +6,8 @@ pub mod config;
 pub mod copy;
 pub mod demo;
 pub mod doctor;
+pub mod healthcheck;
+pub mod initial_password;
 pub mod jobs;
 pub mod mcp_manifest;
 pub mod migrate;

@@ -31,6 +31,8 @@ curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $AGENT_KEY"
 
 ## 2. Nối client
 
+Khi máy chủ bật đăng nhập OAuth, client hỗ trợ nó (Claude, ChatGPT, Claude Code, IDE) kết nối chỉ bằng địa chỉ và người dùng duyệt nó trong giao diện của bạn: xem [Kết nối client MCP bằng đăng nhập OAuth](mcp-oauth.vi.md). Phần còn lại của mục này kết nối bằng API key, cách dùng được với mọi client.
+
 Claude Code:
 
 ```bash
@@ -434,7 +436,7 @@ curl -sS "$API/api/v1/openapi/content.json"
 
 Làm trọn trên máy của bạn, từ một thư mục trống tới một trợ lý trả lời được câu hỏi về tồn kho và doanh số. Bắt đầu từ mục [Chạy nhanh](../../README.vi.md#chạy-nhanh) (`compose.quickstart.yml`), nên máy chủ ở `http://127.0.0.1:8080`.
 
-**1. Đăng nhập và tạo key cho trợ lý.** Dùng mật khẩu của quản trị viên trong file máy chủ đã ghi (`docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password`). Chỉ cho key đúng thứ trợ lý cần — ở đây là đọc tồn kho, sản phẩm, giá, báo cáo và soạn hoá đơn nháp:
+**1. Đăng nhập và tạo key cho trợ lý.** Dùng mật khẩu của quản trị viên trong file máy chủ đã ghi (`docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password`). Chỉ cho key đúng thứ trợ lý cần — ở đây là đọc tồn kho, sản phẩm, giá, báo cáo và soạn hoá đơn nháp:
 
 ```bash
 API=http://127.0.0.1:8080

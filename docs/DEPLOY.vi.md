@@ -94,6 +94,12 @@ curl http://127.0.0.1:8080/health/ready
 
 `{"data":{"status":"ok"}}` nghĩa là máy chủ và database đã sẵn sàng.
 
+Image là distroless: không có shell, `curl` hay trình quản lý gói (bề mặt tấn công và số thứ cần vá nhỏ hơn), và chạy bằng user
+`10001`. Nó tự kiểm bằng chính binary: `autoxide healthcheck` hỏi máy chủ trên máy này ở `/health/ready` (`--live` cho
+`/health/live`) và thoát `0` khi nhận 200. `HEALTHCHECK` của image và service `app` trong `compose.yml` dùng lệnh này, nên
+`docker compose ps` hiện `healthy`. Muốn xem bên trong container đang chạy, dùng `docker debug` hay `kubectl debug`
+(container tạm có công cụ), không dùng `docker exec … sh`: không có `sh`.
+
 ### 3. Tạo quản trị viên đầu tiên
 
 ```bash

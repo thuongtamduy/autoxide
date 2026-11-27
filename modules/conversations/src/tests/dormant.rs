@@ -94,7 +94,8 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
             duration_seconds: Some(30),
             recording_enabled: true,
             recording_ack_at: Some(now),
-            provider_recording_id: None,
+            // Còn bản ghi ở nhà cung cấp mà không bộ nối thoại nào bật (D-20261127-voice-recording-provider-off).
+            provider_recording_id: Some("rec-dormant".into()),
             recording_ref: Some(key.clone()),
             recording_expires_at: None,
             created_at: now,
@@ -133,6 +134,11 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
             .unwrap()
             .unwrap();
         assert_eq!(call.recording_ref, None);
+        // Không bộ nối nào bật: event không lỗi, dấu vết ở nhà cung cấp còn, hạn lưu về bây giờ cho job dọn theo hạn
+        // (chạy khi module bật lại).
+        assert_eq!(call.provider_recording_id.as_deref(), Some("rec-dormant"));
+        assert!(call.recording_expires_at.is_some_and(|at| at <= Timestamp::now()));
+        assert_eq!(call.caller_user_id, None);
         let thread = crate::entity::thread::Entity::find_by_id(id)
             .scoped(&tenant)
             .one(app.database().read())
