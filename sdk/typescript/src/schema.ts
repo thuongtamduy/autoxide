@@ -11021,7 +11021,7 @@ export type Data_OrdersPaymentAction = {
     order_id: string;
     /**
      * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
-     * after a failed or expired payment gets a new id). Not an id of the `ledger` module: use
+     * after a failed payment gets a new id). Not an id of the `ledger` module: use
      * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
      */
     payment_id: string;
@@ -11029,8 +11029,8 @@ export type Data_OrdersPaymentAction = {
     qr_payload?: string | null;
     redirect_url?: string | null;
     /**
-     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its
-     * collection failed or expired; start the payment again from the order)…
+     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the
+     * partner reported its collection failed; start the payment again from the order)…
      */
     status: string;
     /** For `GET /public/payments/{token}`. */
@@ -14469,7 +14469,7 @@ export type Data_Vec_OrdersPaymentAction = {
     order_id: string;
     /**
      * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
-     * after a failed or expired payment gets a new id). Not an id of the `ledger` module: use
+     * after a failed payment gets a new id). Not an id of the `ledger` module: use
      * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
      */
     payment_id: string;
@@ -14477,8 +14477,8 @@ export type Data_Vec_OrdersPaymentAction = {
     qr_payload?: string | null;
     redirect_url?: string | null;
     /**
-     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its
-     * collection failed or expired; start the payment again from the order)…
+     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the
+     * partner reported its collection failed; start the payment again from the order)…
      */
     status: string;
     /** For `GET /public/payments/{token}`. */
@@ -19717,7 +19717,7 @@ export type OrdersPaymentAction = {
   order_id: string;
   /**
    * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
-   * after a failed or expired payment gets a new id). Not an id of the `ledger` module: use
+   * after a failed payment gets a new id). Not an id of the `ledger` module: use
    * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
    */
   payment_id: string;
@@ -19725,8 +19725,8 @@ export type OrdersPaymentAction = {
   qr_payload?: string | null;
   redirect_url?: string | null;
   /**
-   * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its
-   * collection failed or expired; start the payment again from the order)…
+   * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the
+   * partner reported its collection failed; start the payment again from the order)…
    */
   status: string;
   /** For `GET /public/payments/{token}`. */

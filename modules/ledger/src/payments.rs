@@ -1068,8 +1068,13 @@ impl LedgerService {
                 active.status = Set("succeeded".to_owned());
                 active.updated_at = Set(now());
                 refund::Entity::update(active).exec(&transaction).await?;
-                crate::reconcile::close_late_payment_if_refunded(&transaction, tenant, outbox, paid)
-                    .await?;
+                crate::reconcile::close_late_payment_if_refunded(
+                    &transaction,
+                    tenant,
+                    outbox,
+                    paid,
+                )
+                .await?;
                 let event = events::PaymentRefunded(json!({
                     "payment_id": row.payment_id, "refund_id": row.id,
                     "amount": money(row.amount_minor, &row.amount_currency)?,

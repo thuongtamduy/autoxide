@@ -33234,7 +33234,7 @@
                 "type": "string"
               },
               "payment_id": {
-                "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed or expired payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
+                "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
                 "format": "uuid",
                 "type": "string"
               },
@@ -33252,7 +33252,7 @@
                 ]
               },
               "status": {
-                "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its\ncollection failed or expired; start the payment again from the order)…",
+                "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the\npartner reported its collection failed; start the payment again from the order)…",
                 "type": "string"
               },
               "status_token": {
@@ -43862,7 +43862,7 @@
                   "type": "string"
                 },
                 "payment_id": {
-                  "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed or expired payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
+                  "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
                   "format": "uuid",
                   "type": "string"
                 },
@@ -43880,7 +43880,7 @@
                   ]
                 },
                 "status": {
-                  "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its\ncollection failed or expired; start the payment again from the order)…",
+                  "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the\npartner reported its collection failed; start the payment again from the order)…",
                   "type": "string"
                 },
                 "status_token": {
@@ -59274,7 +59274,7 @@
             "type": "string"
           },
           "payment_id": {
-            "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed or expired payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
+            "description": "Id of this payment of the order (it stays the same while the buyer pays it; a new attempt\nafter a failed payment gets a new id). Not an id of the `ledger` module: use\n`ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.",
             "format": "uuid",
             "type": "string"
           },
@@ -59292,7 +59292,7 @@
             ]
           },
           "status": {
-            "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its\ncollection failed or expired; start the payment again from the order)…",
+            "description": "`pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after the\npartner reported its collection failed; start the payment again from the order)…",
             "type": "string"
           },
           "status_token": {
@@ -233169,7 +233169,7 @@
             "description": "Same `Idempotency-Key` as an earlier checkout: its result.",
             "headers": {
               "Idempotent-Replayed": {
-                "description": "`true`: the result of the earlier checkout with this key; nothing was ordered again.",
+                "description": "`true`: the orders of the earlier checkout with this key, as they are now; nothing was ordered again.",
                 "schema": {
                   "type": "string"
                 }
@@ -234384,7 +234384,7 @@
             "description": "The payment actions of the order.",
             "headers": {
               "Idempotent-Replayed": {
-                "description": "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again.",
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
                 "schema": {
                   "type": "string"
                 }
@@ -236345,7 +236345,7 @@
             "description": "The order with the new address.",
             "headers": {
               "Idempotent-Replayed": {
-                "description": "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again.",
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
                 "schema": {
                   "type": "string"
                 }
@@ -236636,7 +236636,7 @@
             "description": "The cancelled order.",
             "headers": {
               "Idempotent-Replayed": {
-                "description": "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again.",
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
                 "schema": {
                   "type": "string"
                 }
@@ -237063,7 +237063,7 @@
             "description": "The payment actions of the order.",
             "headers": {
               "Idempotent-Replayed": {
-                "description": "`true` when the same `Idempotency-Key` was sent before: the result of that attempt; nothing was done again.",
+                "description": "`true` when the same `Idempotency-Key` was sent before: the current state; nothing was done again.",
                 "schema": {
                   "type": "string"
                 }

@@ -283,7 +283,8 @@ async fn doi_tac_tu_choi_hoan_luot_cu_thi_khong_thu_lai_mai() {
         let token = access_token(&guests, &number).await;
         let uri = format!("/public/orders/{order}/payment-link");
         let (status, _, opened) =
-            send(shop, &uri, &[("Order-Token", &token), ("Idempotency-Key", "x1")], json!({})).await;
+            send(shop, &uri, &[("Order-Token", &token), ("Idempotency-Key", "x1")], json!({}))
+                .await;
         assert_eq!(status, StatusCode::OK, "{opened}");
         // Lượt cũ báo đã thu, đối tác từ chối hoàn (4xx): event giao xong, không nằm chờ thử lại; người
         // vận hành thấy mục `late_payment` ở `ledger` (test ở module `ledger`).

@@ -250,10 +250,7 @@ impl OrdersService {
         let transaction = database.begin_write().await?;
         updated.update(&transaction).await?;
         order::Entity::update_many()
-            .col_expr(
-                order::Column::PaymentDueAt,
-                sea_orm::sea_query::Expr::value(due),
-            )
+            .col_expr(order::Column::PaymentDueAt, sea_orm::sea_query::Expr::value(due))
             .filter(order::Column::Id.eq(order_id))
             .scoped(tenant)
             .exec(&transaction)
@@ -442,7 +439,9 @@ impl OrdersService {
         if recorded == Recorded::Superseded {
             return self.refund_superseded(tenant, &row, ledger_payment, amount).await;
         }
-        if recorded == Recorded::Late && let Some(ledger) = &self.ledger {
+        if recorded == Recorded::Late
+            && let Some(ledger) = &self.ledger
+        {
             let refund = NewRefund::new(
                 ledger_payment,
                 amount,
