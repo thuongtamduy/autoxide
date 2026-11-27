@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::checkout::{body, checkout, ready_cart};
-use super::{Call, Shop, shop};
+use super::{Call, Shop, shop, shop_with};
 use crate::entity::warranty;
 use autoxide_kernel::tenancy::OrgId;
 
@@ -206,6 +206,31 @@ async fn tool_tra_bao_hanh_tra_dung_trang_nhu_rest() {
         ids.reverse();
         assert_eq!(walked, ids, "mới nhất trước");
         client.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Thiếu quyền thì 403 trước khi tham số trang sai thành 422 (luật `permission-first` của xtask,
+/// D-20261126-permission-before-page). Dựng không kèm lớp `x-permissions` của kernel để thấy chính handler kiểm.
+#[tokio::test]
+async fn thieu_quyen_la_403_truoc_tham_so_trang() {
+    TestDatabase::run(async |test| {
+        let shop =
+            shop_with(test, |builder, _| builder.without_permission_gate().user("nobody", 9, &[]))
+                .await;
+        let nobody = Call::as_user(&shop.app, "nobody");
+        for uri in ["/returns?limit=0", "/reviews?limit=0"] {
+            let (status, problem) = nobody.send("GET", uri, None).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{uri}: {problem}");
+            assert_eq!(problem["code"], "permission_denied", "{uri}: {problem}");
+        }
+        // Có quyền thì cùng tham số là lỗi tham số.
+        let boss = Call::as_user(&shop.app, "boss");
+        for uri in ["/returns?limit=0", "/reviews?limit=0"] {
+            let (status, problem) = boss.send("GET", uri, None).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}: {problem}");
+        }
     })
     .await
     .unwrap();

@@ -163,7 +163,7 @@ While it is off, the module still takes part in personal data and in the tenant 
   done while content remains).
 
 This is an obligation of personal data protection law (Vietnam: Law 91/2025/QH15, Decree
-13/2023/ND-CP), so it does not depend on whether you use the module any more. What it still does not
+356/2025/ND-CP), so it does not depend on whether you use the module any more. What it still does not
 do while off:
 
 - retention clean-up of its data does not run (the module's jobs do not run);

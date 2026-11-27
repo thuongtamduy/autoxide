@@ -64,7 +64,9 @@ Each unit has a **money-flow mode** (`PUT /ledger/flow-settings/{org_id}`, inher
 Holds are released by a job (every 5 minutes) or by hand (`POST /ledger/holds/{id}/release`). Payouts
 (`POST /ledger/payouts`) go through a `PayoutGateway` partner and never exceed the available balance,
 even when sent at the same time. Platform fees carry their own VAT; withholding for household
-businesses (Decree 117/2025/ND-CP — needs checking) only happens in the collect modes.
+businesses (Decree 117/2025/ND-CP — needs checking) only happens in the collect modes; core computes and
+books it, but does not yet withhold on each payout by itself, issue the withholding certificate or prepare
+the declaration (with the marketplace module, after 1.0 — see `TAX.md`).
 
 ## VietQR bank transfers
 
