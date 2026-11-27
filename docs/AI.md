@@ -135,6 +135,14 @@ and counted per server process) — past it, they match words only.
 | Translation | the text of the pinned revision in pieces — title, summary, SEO fields, image alt texts, paragraphs and headings with formatting as numbered tags; never links, image ids or code blocks |
 | Search | the text of each entry in passages (indexing), and each search query |
 
+Other modules send too: `conversations` sends the last messages of a conversation to draft a reply,
+`orders` sends product reviews to summarise them, `support` sends questions for suggested answers. These
+texts can hold **personal data**, and most providers process it outside Vietnam: that is a transfer of
+personal data abroad (Law 91/2025/QH15, Decree 356/2025/ND-CP — check with a legal professional). Name the
+provider as a recipient with its country in the purposes that use AI (`/api/v1/compliance/purposes`), keep an
+impact assessment for the transfer, or use a provider or a self-hosted model in Vietnam. The register does
+not list AI providers by itself yet (planned after 1.0).
+
 **Private images** are sent only with `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Logs never contain
 prompts, content, images or keys — only the task, the model, token counts and timing.
 
