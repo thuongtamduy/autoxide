@@ -778,13 +778,10 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
-        let gate = self.listing_gate.get();
-        if gate.is_none() && self.kyc.is_none() {
-            return Ok(());
-        }
+        // Luôn đọc sản phẩm (kể cả khi không có `compliance`): sàn thiếu `KycGate` cần được ghi log cảnh báo.
         let detail = self.get_product(tenant, principal, id).await?;
         self.check_seller_identity(tenant, detail.product.org_id).await?;
-        let Some(gate) = gate else { return Ok(()) };
+        let Some(gate) = self.listing_gate.get() else { return Ok(()) };
         let candidate = crate::api::ListingCandidate::new(
             id,
             autoxide_kernel::tenancy::OrgId::from_uuid(detail.product.org_id),
@@ -804,8 +801,9 @@ impl CatalogService {
     /// nền tảng trung gian xác thực danh tính người bán; áp dụng 01/01/2027, cần đối chiếu văn bản gốc).
     /// Có cần hay không do quy tắc `kyc.required_activities` của `compliance` (dữ liệu có ngày hiệu lực)
     /// quyết; thiếu thì `compliance.kyc_required` (403). Cửa hàng tự bán hàng của mình không qua bước này.
+    /// Không cài `compliance` (chỉ xảy ra khi tự ghép module, binary chính thức luôn có): không chặn được,
+    /// ghi log cảnh báo — người triển khai tự định danh người bán (`docs/COMPLIANCE.md`).
     async fn check_seller_identity(&self, tenant: &TenantContext, org: Uuid) -> Result<(), Error> {
-        let Some(kyc) = &self.kyc else { return Ok(()) };
         let root = autoxide_kernel::tenancy::root_of(tenant.id());
         if org == root.as_uuid() {
             return Ok(());
@@ -819,6 +817,14 @@ impl CatalogService {
         if model.as_ref().is_none_or(|value| value.as_str().trim() != "marketplace") {
             return Ok(());
         }
+        let Some(kyc) = &self.kyc else {
+            tracing::warn!(
+                tenant_id = %tenant.id(),
+                org_id = %org,
+                "catalog: marketplace without module compliance, seller identity not checked before listing"
+            );
+            return Ok(());
+        };
         let seller = autoxide_compliance::api::Subject::Org(OrgId::from_uuid(org));
         kyc.require_verified(tenant.id(), seller, autoxide_compliance::api::Activity::Sell).await
     }

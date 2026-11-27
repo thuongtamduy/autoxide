@@ -230,7 +230,10 @@ not handle yet. Until they are done, the deployer covers them:
   of sellers from 1 January 2027 — check the originals). When the tenant is a marketplace
   (`kernel.business_model = marketplace`), `catalog` asks `KycGate` before a product of a seller (any branch other
   than the tenant's root) goes `active`: an unverified seller gets `compliance.kyc_required` (403); goods of the
-  root and stores that sell their own goods are not asked. Still open: livestream and affiliate flows (no module
+  root and stores that sell their own goods are not asked. Only the change to `active` is checked: goods already on sale
+  stay on sale when the tenant becomes a marketplace, the rule starts to apply or a seller's verification expires or is
+  revoked — stop them yourself (`POST /api/v1/catalog/products/{id}/status`). Without module `compliance` (only when
+  you assemble modules yourself) nothing is checked and the server logs a warning on each listing. Still open: livestream and affiliate flows (no module
   yet), and the profile does not record every item Article 18 lists — individuals: full name, date of birth,
   personal identification number (one source adds residential address); organisations and household businesses:
   name, head office, identification number, legal representative; foreign individuals: passport (or equivalent)

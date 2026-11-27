@@ -19,6 +19,7 @@ mod readiness;
 mod recommend;
 mod resources;
 mod search;
+mod seller_kyc;
 mod statements;
 mod suggestions;
 mod transfers;
@@ -64,14 +65,23 @@ pub(crate) async fn app_with<'a>(
     test: &'a TestDatabase,
     extra: impl FnOnce(TestAppBuilder<'a>) -> TestAppBuilder<'a>,
 ) -> (TestApp, Tree) {
+    app_around(test, |builder| builder, extra).await
+}
+
+/// Như [`app_with`], thêm `first` cho module `catalog` cần đăng ký TRƯỚC nó (vd `compliance`).
+pub(crate) async fn app_around<'a>(
+    test: &'a TestDatabase,
+    first: impl FnOnce(TestAppBuilder<'a>) -> TestAppBuilder<'a>,
+    extra: impl FnOnce(TestAppBuilder<'a>) -> TestAppBuilder<'a>,
+) -> (TestApp, Tree) {
     let org = || OrgId::from_uuid(Uuid::now_v7());
     let tree = Tree { chain: org(), a: org(), b: org() };
     let scoped = |scope: Scope| ALL.map(|name| (name, scope));
     let builder = TestApp::builder(test)
         .member("boss", 1, root_of(DEFAULT_TENANT), &scoped(Scope::Tenant))
         .member("store_a", 2, tree.a, &scoped(Scope::Unit))
-        .member("store_b", 3, tree.b, &scoped(Scope::Unit))
-        .module(crate::module());
+        .member("store_b", 3, tree.b, &scoped(Scope::Unit));
+    let builder = first(builder).module(crate::module());
     let app = extra(builder).build().await.unwrap();
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();

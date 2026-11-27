@@ -222,7 +222,10 @@ chưa xử lý. Trong lúc chờ, người triển khai tự bù:
   người bán từ 01/01/2027 — cần đối chiếu văn bản gốc). Khi khách là sàn (`kernel.business_model = marketplace`),
   `catalog` hỏi `KycGate` trước khi sản phẩm của người bán (nút bất kỳ không phải nút gốc của khách) chuyển `active`:
   người bán chưa định danh nhận `compliance.kyc_required` (403); hàng của nút gốc và cửa hàng tự bán hàng của mình
-  không bị hỏi. Còn mở: luồng livestream và tiếp thị liên kết (chưa có module), và hồ sơ chưa ghi đủ mọi mục Điều 18
+  không bị hỏi. Chỉ bước chuyển sang `active` được kiểm: hàng đang bán vẫn bán khi khách chuyển thành sàn, quy tắc
+  bắt đầu áp dụng hay định danh của người bán hết hạn / bị thu hồi — tự dừng chúng
+  (`POST /api/v1/catalog/products/{id}/status`). Không có module `compliance` (chỉ khi tự ghép module) thì không kiểm
+  gì và máy chủ ghi log cảnh báo mỗi lần mở bán. Còn mở: luồng livestream và tiếp thị liên kết (chưa có module), và hồ sơ chưa ghi đủ mọi mục Điều 18
   nêu — cá nhân: họ tên, ngày sinh, số định danh cá nhân (một nguồn thêm địa chỉ cư trú); tổ chức, hộ kinh doanh:
   tên, trụ sở, số định danh, người đại diện theo pháp luật; cá nhân nước ngoài: số hộ chiếu (hay giấy tờ tương
   đương) và nước cấp, còn hiệu lực ít nhất 6 tháng lúc xét duyệt. Hồ sơ giữ tên đã xác thực, mã băm và 4 số cuối của

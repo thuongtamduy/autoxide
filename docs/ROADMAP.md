@@ -265,11 +265,8 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       từ 01/7/2026), chuyển tiếp tới 30/6/2027; sửa `COMPLIANCE.md` / `.vi.md` và mẫu trang
 - [ ] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
       31/12/2026 – 01/01/2027 giờ Việt Nam; xong trước 31/12/2026; qua kiểm độc lập
-- [x] LG-3: trên sàn (`kernel.business_model = marketplace`), `catalog` hỏi `KycGate` trước khi mở bán hàng của người
-      bán (nút không phải gốc) — D-20261127-seller-kyc-listing; đã đối chiếu trường KYC với NĐ 248 Điều 18 (COMPLIANCE.md)
-  - [ ] Nợ của LG-3: hồ sơ KYC chưa ghi ngày sinh, địa chỉ, người đại diện, nước cấp và hạn hộ chiếu (≥ 6 tháng lúc
-        xét duyệt) mà Điều 18 nêu — cần quyết giữ ở core hay để nhà cung cấp eKYC giữ, và kiểm hạn giấy tờ khi duyệt;
-        luồng livestream / tiếp thị liên kết chưa hỏi `KycGate` (chưa có module)
+- [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
+      sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
 - [x] LG-4: quy tắc `privacy.subject_requests` v2 theo NĐ 356/2025 Điều 5 (hạn xác nhận và hạn thực hiện, ngày làm việc)
 - [x] LG-5 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
 - [x] LG-6 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận

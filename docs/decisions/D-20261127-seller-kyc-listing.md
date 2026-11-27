@@ -24,5 +24,10 @@ biết khách là sàn qua `kernel.business_model`. Nút khác gốc trên sàn 
 - Hỏi định danh cho mọi khách: chặn cửa hàng độc lập không có nghĩa vụ này.
 - Cấu hình riêng `catalog.seller_kyc`: thêm một nút bật trùng nghĩa với mô hình kinh doanh.
 
-Còn mở: hồ sơ KYC chưa ghi đủ mục Điều 18 (ngày sinh, địa chỉ, người đại diện, nước cấp và hạn hộ chiếu); livestream và
-tiếp thị liên kết chưa hỏi `KycGate` — ghi ở ROADMAP mục LG-3.
+Không có `compliance` (chỉ khi tự ghép module; binary chính thức luôn có): không chặn, ghi log cảnh báo mỗi lần mở bán
+trên sàn — không chặn cứng vì `catalog` không tự định danh được, chặn thì sàn tự ghép không bán được gì.
+
+Còn mở (phiên điều phối chép vào ROADMAP mục LG-3): hồ sơ KYC chưa ghi đủ mục Điều 18 (ngày sinh, địa chỉ, người đại
+diện, nước cấp và hạn hộ chiếu ≥ 6 tháng lúc xét duyệt) — cần quyết giữ ở core hay để nhà cung cấp eKYC giữ; hàng đang
+bán không bị kiểm lại khi khách chuyển thành sàn, quy tắc bắt đầu áp dụng hay định danh hết hạn / bị thu hồi (cần job
+hay event của `compliance` dừng hàng); livestream và tiếp thị liên kết chưa hỏi `KycGate` (chưa có module).
