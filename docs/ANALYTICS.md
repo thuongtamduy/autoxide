@@ -75,7 +75,10 @@ addEventListener("visibilitychange", () => document.visibilityState === "hidden"
   `props` holds an undeclared name or a wrong type; `object` is missing or of the wrong kind for a
   type that names one; the caller is a known bot or sends no user agent; the page (its `Origin`,
   else `Referer`) is not on this website; more than `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` (120)
-  events came from the same network block in a minute.
+  events came from the same network block in a minute, or more than `AUTOXIDE_ANALYTICS_EVENTS_PER_DAY`
+  (20000) in a day. A client outside a browser can fake `Origin` and the user agent, so these
+  limits bound how much one network can skew the reports; treat the reports as estimates, not as
+  figures to pay or rank on.
 - The website is the one of the domain called. A page served from another host than the API (one
   tenant, no verified domain) is accepted when its host is listed in
   `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS`. Set `?site=<unit id>` when the API is not called on the
@@ -140,6 +143,7 @@ trending) and `recently_viewed` (empty without consent).
 | `AUTOXIDE_ANALYTICS_RAW_RETENTION_DAYS` | `7` | days single events are kept (2–90) |
 | `AUTOXIDE_ANALYTICS_RETENTION_DAYS` | `790` | days daily totals are kept (30–3650) |
 | `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` | `120` | events per network block per minute |
+| `AUTOXIDE_ANALYTICS_EVENTS_PER_DAY` | `20000` | events per network block per day |
 | `AUTOXIDE_ANALYTICS_ALLOWED_HOSTS` | empty | extra website hosts allowed to send |
 
 ## Legal notes
