@@ -14,6 +14,7 @@ mod e2e;
 mod modules;
 mod observability;
 mod registry;
+mod releases;
 mod runtime;
 mod settings;
 mod startup;
@@ -115,6 +116,14 @@ enum Command {
     /// `add` stores the connection URL encrypted; `check` compares each placement's migrations
     /// with the program. Run `autoxide migrate up --all` to bring placements up to date.
     Placement(commands::placement::Arguments),
+
+    /// Roll the main database and every tenant database back to the migrations of an earlier release.
+    ///
+    /// Run it with the binary of the CURRENT release, then start the servers of the earlier one.
+    /// `--dry-run` lists, per database, what would be reverted and the tables and columns that
+    /// would be dropped with the rows they hold. A rollback that drops data needs
+    /// `--accept-data-loss`; every real run needs `--yes` once the servers are stopped.
+    Rollback(commands::rollback::Arguments),
 
     /// Restore a backup made by `autoxide backup` into a new, empty database.
     ///
@@ -272,6 +281,7 @@ fn dispatch(command: Command) -> ExitCode {
         Command::Doctor(arguments) => commands::doctor::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
+        Command::Rollback(arguments) => commands::rollback::run(&arguments),
         Command::Modules(arguments) => commands::modules::run(&arguments),
         Command::Openapi => commands::openapi::run(),
         Command::McpManifest => commands::mcp_manifest::run(),

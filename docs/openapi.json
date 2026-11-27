@@ -31008,8 +31008,20 @@
                   "null"
                 ]
               },
+              "from_version": {
+                "description": "The release a rollback goes from; `null` for a placement run.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "id": {
                 "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).",
+                "example": "placements",
                 "type": "string"
               },
               "placement": {
@@ -31031,6 +31043,13 @@
                 "example": "done",
                 "type": "string"
               },
+              "to_version": {
+                "description": "The release a rollback goes to; `null` for a placement run.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "updated_at": {
                 "format": "date-time",
                 "type": "string"
@@ -31039,6 +31058,7 @@
             "required": [
               "id",
               "status",
+              "kind",
               "applied",
               "created_at",
               "updated_at"
@@ -54590,8 +54610,20 @@
               "null"
             ]
           },
+          "from_version": {
+            "description": "The release a rollback goes from; `null` for a placement run.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).",
+            "example": "placements",
             "type": "string"
           },
           "placement": {
@@ -54613,6 +54645,13 @@
             "example": "done",
             "type": "string"
           },
+          "to_version": {
+            "description": "The release a rollback goes to; `null` for a placement run.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "updated_at": {
             "format": "date-time",
             "type": "string"
@@ -54621,6 +54660,7 @@
         "required": [
           "id",
           "status",
+          "kind",
           "applied",
           "created_at",
           "updated_at"
@@ -72947,8 +72987,20 @@
                     "null"
                   ]
                 },
+                "from_version": {
+                  "description": "The release a rollback goes from; `null` for a placement run.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "id": {
                   "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).",
+                  "example": "placements",
                   "type": "string"
                 },
                 "placement": {
@@ -72970,6 +73022,13 @@
                   "example": "done",
                   "type": "string"
                 },
+                "to_version": {
+                  "description": "The release a rollback goes to; `null` for a placement run.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "updated_at": {
                   "format": "date-time",
                   "type": "string"
@@ -72978,6 +73037,7 @@
               "required": [
                 "id",
                 "status",
+                "kind",
                 "applied",
                 "created_at",
                 "updated_at"
