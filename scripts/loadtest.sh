@@ -31,6 +31,11 @@
 # của website: bài theo đường dẫn, danh sách, theo danh mục, sitemap, feed, tìm, ảnh và bản nhỏ,
 # bình luận. LOADTEST_ONLY=public chỉ chạy các bài đó.
 #
+# Đo hằng tuần trên CI (71-G9, `.github/workflows/load.yml`): LOADTEST_ONLY=hot chỉ chạy các đường nóng (đăng nhập,
+# list có pagination, tạo bản ghi, MCP tools/call, đọc có xác thực) và LOADTEST_JSON_OUT=<file> ghi thêm mỗi bài
+# một dòng JSON (name, connections, rps, p50/p95/p99 tính bằng mili giây, tỉ lệ 2xx) cho `scripts/load-compare.py`
+# so với `docs/quality/load-baseline.json`. Số liệu CI là số của runner chung, nhiễu: dùng ngưỡng rộng, không so tuyệt đối.
+#
 # Máy tạo tải và máy chủ chạy chung một máy nên tranh CPU: số đo là cận dưới, dùng để so
 # trước / sau một thay đổi trên cùng máy.
 
@@ -158,7 +163,7 @@ run() {
   shift 2
   oha --no-tui -z "$DURATION" -c "$connections" --output-format json "$@" >result.json
   python3 - "$name" "$connections" <<'PY'
-import json, sys
+import json, os, sys
 name, connections = sys.argv[1], sys.argv[2]
 r = json.load(open("result.json"))
 s, p = r["summary"], r["latencyPercentiles"]
@@ -169,6 +174,14 @@ errors = sum(dist.values())
 ok = sum(v for k, v in codes.items() if k.startswith("2"))
 total = sum(codes.values()) + errors
 ms = lambda v: f"{(v or 0) * 1000:8.2f}"
+out = os.environ.get("LOADTEST_JSON_OUT")
+if out:
+    with open(out, "a") as handle:
+        handle.write(json.dumps({
+            "name": name, "connections": int(connections), "rps": s["requestsPerSec"],
+            "p50_ms": (p.get("p50") or 0) * 1000, "p95_ms": (p.get("p95") or 0) * 1000,
+            "p99_ms": (p.get("p99") or 0) * 1000, "ok_ratio": ok / max(total, 1),
+        }) + "\n")
 bad = {k: v for k, v in codes.items() if not k.startswith("2")}
 note = (f"  non-2xx {bad}" if bad else "") + (f"  errors {dist}" if errors else "")
 print(f"| {name:<34} | {connections:>5} | {s['requestsPerSec']:>9.0f} | {ms(p.get('p50'))} | {ms(p.get('p95'))} | {ms(p.get('p99'))} | {100 * ok / max(total, 1):6.2f}% |{note}")
@@ -270,6 +283,17 @@ public_reads() {
 
 if [ -n "${LOADTEST_DATASET:-}" ] && [ "${LOADTEST_ONLY:-}" = public ]; then
   public_reads
+  exit 0
+fi
+if [ "${LOADTEST_ONLY:-}" = hot ]; then
+  # Đăng nhập chậm có chủ ý (Argon2id): 8 kết nối, tối đa 20 lần/giây — chạy hết công suất thì máy chủ trả 429 để tự bảo vệ,
+  # và p95 của một cuộc đăng nhập bình thường mới là thứ cần theo dõi.
+  run "login"          8 -q 20 -m POST -H 'autoxide-tenant: default' -T application/json -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" "$BASE/api/v1/auth/login"
+  run "read (auth/me)" "$CONNECTIONS" -H "$AUTH" "$BASE/api/v1/auth/me"
+  run "list (page of 50)" "$CONNECTIONS" -H "$AUTH" "$BASE/api/v1/auth/users?limit=50"
+  run "create (file, 4 KiB)" "$CONNECTIONS" -m POST -H "$AUTH" -T application/octet-stream -D small.bin "$BASE/api/v1/files?name=load.bin"
+  run "mcp tools/call" "$CONNECTIONS" -m POST -H "$AUTH" -H 'accept: application/json, text/event-stream' -T application/json -d "$MCP_BODY" "$BASE/mcp"
+  curl -sf "$BASE/health/ready" >/dev/null || { echo "Máy chủ không còn sẵn sàng sau tải" >&2; exit 1; }
   exit 0
 fi
 if [ "${LOADTEST_ONLY:-}" = api_key ]; then

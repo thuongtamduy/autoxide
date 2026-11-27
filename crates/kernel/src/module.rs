@@ -141,11 +141,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
-    /// The module's control-plane tables (step 33, D-253): tables with no `tenant_id` because they are
-    /// shared across the whole platform and live only in the control database. Every other table of the
-    /// module (except `<m>_migrations`) is a tenant-level table and must have `tenant_id` - the testkit and
-    /// `cargo xtask check` verify this. Empty by default: business modules have almost no tables of this
-    /// kind.
+    /// The module's control-plane tables (step 33, D-253): tables shared across the whole platform that live
+    /// only in the control database. Each must be one of the module's own tables (`<module>_…`), or the
+    /// modules do not build. A control-plane table may still carry `tenant_id` when it keeps platform data
+    /// about each tenant (subscriptions, domains), but a `scope = global` record never maps such a table.
+    /// Every other table of the module (except `<m>_migrations`) is a tenant-level table and must have
+    /// `tenant_id` - the testkit and `cargo xtask check` verify this. Empty by default: business modules
+    /// have almost no tables of this kind.
     fn control_plane_tables(&self) -> Vec<&'static str> {
         Vec::new()
     }
@@ -183,6 +185,13 @@ pub trait Module: Send + Sync {
     /// PLAN, this one is about the whole installation.
     fn essential(&self) -> bool {
         false
+    }
+
+    /// The records (`#[derive(Record)]`) of the module, as `RecordInfo::of::<Note>()`: at startup the kernel
+    /// checks each against the live schema (table, columns, `tenant_id` for a tenant record) and refuses to
+    /// start on a mismatch.
+    fn records(&self) -> Vec<crate::db::RecordInfo> {
+        Vec::new()
     }
 
     /// The names of modules that this module MUST have: every `context.require::<…>()?` to a trait of
@@ -478,6 +487,12 @@ pub struct StartContext<'a> {
 }
 
 impl StartContext<'_> {
+    /// The control-plane handles of this module (`crate::db`): global records only; sweeping every tenant
+    /// is `all_tenants("reason")`. Tenant data goes through `tenant.db()`.
+    pub fn control_plane(&self) -> crate::db::ControlPlane {
+        crate::db::ControlPlane::new(self.database.clone(), self.module)
+    }
+
     /// The database registry (step 33): the installation's mode and each tenant's database. A service gets
     /// the database for tenant-level data through [`TenantContext`](crate::tenancy::TenantContext), not
     /// through [`database`](Self::database).

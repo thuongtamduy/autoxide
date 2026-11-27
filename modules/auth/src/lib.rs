@@ -11,6 +11,8 @@
 mod access;
 pub mod api;
 mod api_key;
+#[cfg(test)]
+mod api_key_scope_tests;
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
 mod cleanup;
@@ -524,6 +526,13 @@ impl Module for AuthModule {
             )
             .sunset("2027-05-21")
             .successor("/api/v1/auth/registrations"),
+        ]
+    }
+
+    fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
+        vec![
+            autoxide_kernel::db::RecordInfo::of::<api_key::listing::KeyRow>(),
+            autoxide_kernel::db::RecordInfo::of::<api_key::listing::KeyPermissionRow>(),
         ]
     }
 

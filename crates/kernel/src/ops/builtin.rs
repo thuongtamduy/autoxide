@@ -320,6 +320,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::list_indexes::AddListIndexes),
             // Index cho danh sách của kernel có phân trang ở cụm 3: job, trường tự định nghĩa (bước 70 P9).
             Box::new(crate::ops::list_indexes::AddListIndexesKernel),
+            // Loại lượt và phiên bản đi / đến trên `kernel_migration_runs` (bước 71 G3, D-20261126-upgrade-rollback).
+            Box::new(crate::tenancy::migration_runs::kind::AddMigrationRunKind),
         ]
     }
 
@@ -778,14 +780,21 @@ impl Module for KernelModule {
 
     fn checks(&self) -> Vec<crate::doctor::Check> {
         match &self.registry {
-            Some(registry) => vec![crate::doctor::Check::new(
-                "backup_age",
-                "Every database has a recent scheduled backup.",
-                Arc::new(crate::backup::scheduled::BackupAge {
-                    registry: registry.clone(),
-                    config: self.backup_config,
-                }),
-            )],
+            Some(registry) => vec![
+                crate::doctor::Check::new(
+                    "backup_age",
+                    "Every database has a recent scheduled backup.",
+                    Arc::new(crate::backup::scheduled::BackupAge {
+                        registry: registry.clone(),
+                        config: self.backup_config,
+                    }),
+                ),
+                crate::doctor::Check::new(
+                    "placements",
+                    "Every placement (tenant database) has its migrations applied.",
+                    crate::tenancy::placement_health(registry.clone()),
+                ),
+            ],
             None => Vec::new(),
         }
     }
@@ -925,11 +934,15 @@ impl Module for KernelModule {
         ));
         self.backups = Some(backups.clone());
         context.provide::<crate::backup::scheduled::ScheduledBackups>(backups)?;
-        self.migration_runs = Some(Arc::new(crate::tenancy::migration_runs::MigrationRuns::new(
+        let runs = Arc::new(crate::tenancy::migration_runs::MigrationRuns::new(
             context.tenancy().clone(),
             self.move_setup.clone(),
             context.jobs(),
-        )));
+        ));
+        self.migration_runs = Some(runs.clone());
+        context.provide::<crate::tenancy::PlacementMigrationQueue>(Arc::new(
+            crate::tenancy::PlacementMigrationQueue::new(runs),
+        ))?;
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<crate::template::TemplateEngine>(Arc::new(self.templates.clone()))?;

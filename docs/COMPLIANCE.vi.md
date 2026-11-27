@@ -15,7 +15,7 @@ Module gồm:
 
 | Phần | Endpoint (dưới `/api/v1/compliance`) |
 | --- | --- |
-| Định danh (KYC) người bán, người livestream, người tiếp thị liên kết | `/kyc/…`, `/me/kyc…` |
+| Định danh (KYC) người bán, người livestream, người tiếp thị liên kết — hồ sơ, xác thực và cổng `KycGate`; **chưa chặn đăng bán** (xem dưới) | `/kyc/…`, `/me/kyc…` |
 | Xác thực tài khoản đăng nội dung (số điện thoại / định danh) | `/me/verification`, `/me/phone-verifications…` |
 | Văn bản pháp lý có phiên bản và bằng chứng chấp nhận | `/documents…`, `/me/acceptances`, `/public/documents/{kind}` |
 | Sổ đồng ý | `/me/consents` |
@@ -32,8 +32,12 @@ Hướng dẫn này nói về thủ tục với Bộ Công Thương cùng mẫu 
 
 ## Thủ tục với Bộ Công Thương
 
-Pháp luật Việt Nam (NĐ 52/2013/NĐ-CP sửa bởi NĐ 85/2021/NĐ-CP; từ 01/7/2026 thêm Luật Thương mại điện tử
-122/2025/QH15 và nghị định hướng dẫn — đối chiếu văn bản gốc) yêu cầu:
+Pháp luật Việt Nam (từ 01/7/2026 là Luật Thương mại điện tử 122/2025/QH15 và NĐ 248/2026/NĐ-CP, thay NĐ
+52/2013/NĐ-CP và NĐ 85/2021/NĐ-CP; trước đó là hai nghị định này — đối chiếu văn bản gốc) yêu cầu các mục dưới
+đây. Quy tắc `moit.checklist.*` phiên bản 2 áp dụng từ 01/7/2026. Website đã thông báo hay đăng ký trước ngày đó
+làm lại hồ sơ theo nghị định mới trong hạn chuyển tiếp (một bản tổng quan nêu 30/6/2027 — chưa xác nhận); định danh
+điện tử người bán, người livestream áp dụng từ 01/01/2027. Cơ quan tiếp nhận hồ sơ, việc còn dùng online.gov.vn và
+logo chưa xác nhận — cần đối chiếu.
 
 - **website bán hàng** (bạn bán hàng của mình) phải **thông báo** với Bộ — sau đó gắn logo xanh "Đã thông
   báo Bộ Công Thương";
@@ -208,10 +212,31 @@ thận trọng, không phải con số của luật. `autoxide doctor` cảnh b�
 `GET /processing-register` trả mục đích, căn cứ, loại dữ liệu, bên nhận, thời hạn lưu và nơi lưu dữ liệu — đầu
 vào cho hồ sơ đánh giá tác động xử lý dữ liệu cá nhân; mẫu hồ sơ chính thức cần người có chuyên môn pháp lý.
 
+### Chưa làm (trước 1.0)
+
+Phát hiện của đợt rà pháp lý vòng 1 (AI thực hiện, không phải ý kiến pháp lý; `docs/legal/review-2026-11-r1/`) mà core
+chưa xử lý. Trong lúc chờ, người triển khai tự bù:
+
+- **Định danh người bán trước khi bán.** Quy tắc `kyc.required_activities` đòi người bán, người livestream, người tiếp
+  thị liên kết đã định danh (Luật Thương mại điện tử 122/2025/QH15; NĐ 248/2026/NĐ-CP Điều 18, định danh điện tử
+  người bán từ 01/01/2027 — cần đối chiếu văn bản gốc). `compliance` giữ hồ sơ và có cổng `KycGate`, nhưng `catalog`
+  chưa hỏi nó: người bán chưa định danh vẫn đăng bán được. Nối `ListingGate` của `catalog` vào `KycGate` đã xếp
+  trước 1.0; trong lúc chờ, định danh người bán trước khi cấp `catalog.write`.
+- **Dữ liệu cá nhân của trẻ em.** Luật 91/2025/QH15 có quy định riêng cho trẻ em và người được giám hộ (đồng ý của
+  cha mẹ / người giám hộ; từ đủ 7 tuổi thêm đồng ý của trẻ — điều luật và độ tuổi cần đối chiếu). Core không có ngày
+  sinh, kiểm tuổi hay đồng ý của người giám hộ: dịch vụ hướng tới trẻ em phải tự thu và lưu đồng ý của người giám hộ.
+  Sau 1.0: cấu hình theo khách, tự khai tuổi khi đăng ký và sổ đồng ý ghi người đồng ý thay.
+- **Dữ liệu gửi ra nước ngoài qua nhà cung cấp.** Nhà cung cấp AI của module `ai`, mail, SMS và nơi lưu file có thể
+  xử lý dữ liệu cá nhân ngoài Việt Nam; họ không tự vào sổ xử lý. Thêm từng nhà cung cấp làm bên nhận (tên, nước) của
+  mục đích dùng nó (`POST /purposes`, `PATCH /purposes/{key}`) và lập hồ sơ đánh giá tác động chuyển dữ liệu ra nước
+  ngoài (NĐ 356/2025/NĐ-CP — mẫu và miễn trừ cho doanh nghiệp nhỏ cần đối chiếu). Sau 1.0: module khai bên xử lý
+  (`Module::processors`) và `autoxide doctor` cảnh báo bên nhận ở nước ngoài.
+
 ### Nơi lưu dữ liệu
 
-Có thể buộc một khách lưu dữ liệu ở một nước (Luật An ninh mạng 116/2025/QH15, NĐ 53/2022/NĐ-CP — ai bắt buộc
-lưu tại Việt Nam cần đối chiếu pháp lý):
+Có thể buộc một khách lưu dữ liệu ở một nước (Luật An ninh mạng 116/2025/QH15, hiệu lực 01/7/2026, thay Luật
+An ninh mạng 2018 và Luật An toàn thông tin mạng 2015 — nguồn thứ cấp, cần đối chiếu; nghị định hướng dẫn, theo nguồn thứ cấp là NĐ 333/2026/NĐ-CP,
+thay NĐ 53/2022/NĐ-CP — chưa xác nhận. Ai bắt buộc lưu tại Việt Nam cần đối chiếu pháp lý):
 
 ```bash
 autoxide placement country main VN          # ghi nước đặt máy chủ của một vị trí dữ liệu
@@ -256,7 +281,9 @@ cơ quan được ghi sổ để không bị sót:
 - `POST /subject-requests` với `kind` (`access`, `erasure`, `rectification`, `objection`, `restriction`,
   `withdrawal`), `channel` (`email`, `post`, `phone`, `authority`, `other`), `subject` (ID người dùng, địa chỉ
   email hay số điện thoại) và `received_at`. `due_at` lấy từ quy tắc `privacy.subject_requests` hiệu lực lúc
-  nhận (mặc định 72 giờ — cần đối chiếu văn bản gốc).
+  nhận: 72 giờ, chặt hơn hạn trả lời 2 ngày làm việc của NĐ 356/2025/NĐ-CP Điều 5 (thay NĐ 13/2023/NĐ-CP). Phiên
+  bản 2 của quy tắc ghi thêm số ngày thực hiện theo loại (`fulfil_within_days`, theo nguồn thứ cấp) để tham khảo;
+  Autoxide chưa tính hạn thứ hai này — cần đối chiếu văn bản gốc.
 - `POST /subject-requests/{id}/fulfil`: `access` của người dùng trả dữ liệu cá nhân của mọi module (gửi cho
   người đó; không lưu lại); `erasure` / `withdrawal` của email hay số điện thoại xoá giá trị đó khỏi sổ đồng ý
   (khoá băm và bản ghi giữ làm bằng chứng, để không gửi lại). Xoá cả tài khoản là `DELETE
@@ -273,8 +300,9 @@ trong thời gian luật yêu cầu. Bản xuất dữ liệu cá nhân của ng
 
 Vi phạm sở hữu trí tuệ, hàng giả, hàng cấm được báo dưới dạng **vụ việc**; khiếu nại của người tiêu
 dùng cũng vậy. Một vụ việc đi: tiếp nhận → (ẩn đối tượng) → phản hồi của bên bị phản ánh → quyết định,
-có hạn và lưu vết chỉ thêm. Căn cứ — cần đối chiếu văn bản gốc: Luật Thương mại điện tử 2025, Luật Sở
-hữu trí tuệ, NĐ 85/2021/NĐ-CP (gỡ khi cơ quan có thẩm quyền yêu cầu), Luật Bảo vệ quyền lợi người tiêu
+có hạn và lưu vết chỉ thêm. Căn cứ — cần đối chiếu văn bản gốc: Luật Thương mại điện tử 122/2025/QH15 và
+NĐ 248/2026/NĐ-CP (từ 01/7/2026; gỡ khi cơ quan có thẩm quyền yêu cầu, trước đó là NĐ 85/2021/NĐ-CP), Luật Sở
+hữu trí tuệ, Luật Bảo vệ quyền lợi người tiêu
 dùng 19/2023/QH15 và NĐ 55/2024/NĐ-CP (khiếu nại).
 
 | Ai | Endpoint (dưới `/api/v1/compliance`) |

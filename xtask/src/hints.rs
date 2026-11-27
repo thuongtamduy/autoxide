@@ -104,12 +104,32 @@ const FIXES: &[(&str, &str)] = &[
     ),
     ("metric-labels", "Use labels from a small fixed set (an enum), never ids or raw paths."),
     (
+        "permission-first",
+        "Call `principal.require(&PERMISSION)?` (or the same check the service runs first) before parsing the page request, so a caller without the permission gets 403, not 422; if the order is intended, add `// permission-first: <reason>` above the `fn`.",
+    ),
+    (
+        "private-paths",
+        "Use the public path (`autoxide_kernel::db::…`, `autoxide_kernel::http::…`); `__private` is only for code the kernel's macros generate.",
+    ),
+    (
         "publish-ready",
         "Fill the missing crates.io field in the crate's Cargo.toml (description, license, repository, readme…), and keep the `version` pins in [workspace.dependencies] equal to the workspace version.",
     ),
     (
+        "raw-database",
+        "Query through `tenant.db()` (the kernel `db` layer filters by tenant); control-plane tables through `context.control_plane()`. Old modules stay in xtask/library-baseline.txt until their cluster is converted.",
+    ),
+    (
+        "raw-sql",
+        "Express the query with the `autoxide_kernel::db` builder (`find`, `select`, `sub`, `group_by`); keep `db.sql` only where it is measured to be slow, with a recorded reason and a tenant-isolation test.",
+    ),
+    (
         "raw-statement",
         "Build hand-written SQL with `autoxide_kernel::database::statement`, not `Statement::from_sql_and_values`.",
+    ),
+    (
+        "record-registered",
+        "Add `RecordInfo::of::<Name>()` to the module's `Module::records()`, so the startup check compares the record with its table.",
     ),
     (
         "rust-free-paths",
@@ -128,8 +148,20 @@ const FIXES: &[(&str, &str)] = &[
         "Add the test file under tests/integration/ and a `mod <name>;` line in tests/integration/main.rs; do not create tests/<name>.rs.",
     ),
     (
+        "testing-feature",
+        "Remove `features = [\"testing\"]` from the dependency on `autoxide-kernel`; tests get direct table access through `autoxide_testkit::all_tenants`.",
+    ),
+    (
         "toolchain",
         "Change the Rust version in rust-toolchain.toml, `rust-version` in the root Cargo.toml, examples/external-module (channel and rust-version) and the Dockerfile `ARG RUST_VERSION` together.",
+    ),
+    (
+        "wrapped-libraries",
+        "Remove the dependency from the module's Cargo.toml and use the kernel layer instead (`autoxide_kernel::db` with `#[derive(Record)]` for queries; see docs/research/kernel-contract-1-0.md); a module not yet converted stays in xtask/library-baseline.txt until its cluster is converted.",
+    ),
+    (
+        "wrapped-paths",
+        "Use `autoxide_kernel::db` instead of `sea_orm`; keep `sea_orm` and `migration::prelude` only under src/migration/ (and import `MigrationTrait` from `autoxide_kernel::migration`).",
     ),
 ];
 

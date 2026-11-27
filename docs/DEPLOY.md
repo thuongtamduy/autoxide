@@ -333,7 +333,10 @@ The rules that matter after that, with `IMAGE` and `RUN` as defined there:
   autoxide migrate up first` (the count and the first few names, not the whole list; `autoxide
   migrate status` lists them all; error code `kernel.migrations_pending`): run `$RUN $IMAGE migrate up`, then start it.
   On a single server you may set `AUTOXIDE_MIGRATE_ON_START=true` instead: `serve` then applies
-  them on start, under a lock so that two servers starting together never both migrate. With
+  them on start (the main database before it opens its port; then every tenant database in the
+  background, as a migration run that `GET /api/v1/kernel/placements/migrations` shows; tenants of
+  a database not migrated yet get 503 until it is), under a lock so that two servers starting
+  together never both migrate. With
   `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` it also creates the first administrator, and with
   `AUTOXIDE_STARTUP_TASKS` it loads reference data — what `compose.quickstart.yml` does. For
   several servers, keep running `migrate up` once per deployment: you see what changes, and a
@@ -344,12 +347,14 @@ The rules that matter after that, with `IMAGE` and `RUN` as defined there:
 - `docker run -p 8080:8080` publishes the port on every network interface of the machine; use
   `-p 127.0.0.1:8080:8080` and a reverse proxy ([A.4](#4-put-it-on-the-internet)). Put more
   settings in `autoxide.env` (one `NAME=value` per line, no quotes).
-- Update: pull the new image, apply its migrations, replace the container.
+- Update: pull the new image, apply its migrations, replace the container. `--all` also migrates
+  every tenant database (placement) in multi-tenant mode and changes nothing otherwise; a placement
+  that fails does not stop the others, the command names it and exits with code 1.
 
 ```bash
 IMAGE=ghcr.io/thuongtamduy/autoxide:<new version>
 docker pull $IMAGE
-$RUN $IMAGE migrate up
+$RUN $IMAGE migrate up --all
 docker rm -f autoxide
 docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
   -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
@@ -1164,7 +1169,8 @@ rules and the dashboard take the largest value, not the sum.
 
 ## Runbook
 
-Each case: what you see, how to check, how to fix it.
+Each case: what you see, how to check, how to fix it. Incidents that need decisions and several steps (a leaked key,
+mass revocation, restoring one tenant, lost data) are in [`RUNBOOK.md`](RUNBOOK.md).
 
 ### Server errors
 
@@ -1267,6 +1273,22 @@ Each case: what you see, how to check, how to fix it.
   and prints its password. For an administrator who only lost their second factor or passkeys:
   `autoxide user reset-mfa` / `autoxide user remove-passkeys`.
 
+### Migration locks
+
+Only one process migrates at a time. There are two locks: one for the main database (`migrate up`, a
+server starting with `AUTOXIDE_MIGRATE_ON_START`) and one for the tenant databases (`migrate up --all`
+takes it after the first, the background migration runs and tenant moves take only it), so a long run
+over the tenant databases never holds up a server that starts. On PostgreSQL each lock is an advisory
+lock on its own connection; if a proxy or a failover cuts that connection the lock is gone, and the
+run stops before the next tenant database (run it again). Keep PgBouncer in session mode for the
+command, or point it straight at the database. On SQLite the locks are files next to the database
+(`.migrate-lock`, `.placements-lock`); an in-memory SQLite database has no lock (one process only).
+`migrate up --all` keeps the main lock while it waits (up to 15 minutes) for the tenant-database lock,
+so during that wait a server that starts with work to do on start (`AUTOXIDE_MIGRATE_ON_START`, the
+first administrator, start-up tasks) waits too.
+During a rolling update from a release older than this lock, servers of the old version may still run
+a migration run without it: let the update finish before starting runs from the API.
+
 ### Updating while two versions run
 
 During a rolling update, old and new servers run side by side on the same database, so a release
@@ -1278,9 +1300,43 @@ changes the database in two steps ("expand, then contract"):
 2. **Contract:** a later release, once no server of the old version runs, stops writing the old shape
    and drops it.
 
-`autoxide serve` refuses to start while migrations are missing, so run `autoxide migrate up` (with
-`--all` in multi-tenant mode) before starting the new servers, then replace the old ones as in
+`autoxide serve` refuses to start while migrations are missing, so run `autoxide migrate up --all`
+(the main database, then every tenant database; the same as `migrate up` in single-tenant mode)
+before starting the new servers, then replace the old ones as in
 "Updating without dropping requests".
+
+### Rolling back to an earlier release
+
+`autoxide rollback --to X.Y.Z` brings the main database and every tenant database back to the
+migrations of release `X.Y.Z` (0.14.0 or later), so the servers of that release start again. Run it
+with the binary of the release you are leaving: only it knows how to revert its own migrations.
+
+1. `autoxide rollback --to X.Y.Z --dry-run` lists, per database, the migrations it would revert, the
+   tables and columns it would drop with how many rows or values they hold (a column that only holds
+   its default value loses nothing), and the rows a revert deletes. It changes nothing. On SQLite it
+   works on a copy of the database, in a private directory (`.autoxide-rollback-…`, readable by the
+   server's user only) next to the database file, deleted when it is done: keep free space the size
+   of the database there. The real run, once the servers are stopped, measures without a copy. On
+   PostgreSQL it runs the reverts inside a transaction that is
+   rolled back, so for that time it holds locks on the tables it changes: it waits at most
+   `--lock-timeout-seconds` (default 2) for a busy table, then stops and says so — run it when the
+   load is low, or once the servers are stopped.
+2. Stop every server and worker of the current release. If the dry run shows data that would be
+   dropped, take a backup first (`autoxide backup`).
+3. `autoxide rollback --to X.Y.Z --yes`, adding `--accept-data-loss` when data is dropped. Tenant
+   databases go first, the main database last; if a tenant database fails, the main database is
+   left as it is: fix the cause and run the same command again.
+4. Start the servers of `X.Y.Z`.
+
+Modules your own binary adds (`.module(…)`) are not in the release table: the rollback leaves their
+migrations as they are and says so; `--revert-untracked` reverts them too. The rollback is recorded as
+a migration run of kind `rollback`; when the target release predates that record (0.19.0 and
+earlier), the run is closed before the main database is rolled back, and an error there is only
+printed.
+
+A migration that cannot give an earlier release its data back (the contract step of an expand–contract
+change) refuses the rollback; the changelog lists such migrations under the upgrade notes, and the way
+back across them is the backup taken before the upgrade.
 
 ## Checklist before going live
 

@@ -2,6 +2,7 @@
 
 mod approval;
 mod entity;
+pub(crate) mod listing;
 mod rotate;
 mod rules;
 mod service;

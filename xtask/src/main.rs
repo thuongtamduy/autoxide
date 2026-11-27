@@ -13,7 +13,8 @@
 //!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), doc comment tiếng Anh của phần công khai
 //!   (`doc_language.rs`), mục lục quyết định (`decisions.rs`), mảnh thay đổi
 //!   (`changelog.rs`), lọc theo khách (`tenant_scope.rs`), tool MCP theo phạm vi
-//!   (`mcp_principal.rs`; chỗ cũ chờ sửa ở `baseline.rs`) và độ dài
+//!   (`mcp_principal.rs`; chỗ cũ chờ sửa ở `baseline.rs`), handler kiểm quyền trước khi đọc tham số trang
+//!   (`permission_first.rs`) và độ dài
 //!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn), hình
 //!   dạng thống nhất của API trên `docs/openapi.json` (`api_shape.rs`: thân request đóng, lỗi
 //!   `Problem`, danh sách `Page<T>`).
@@ -24,6 +25,8 @@
 //! - `publish-check [--no-verify]` — đóng gói mọi crate như `cargo publish` rồi build thử
 //!   từng gói; chạy lúc phát hành, không đăng gì (xem `publish.rs`). Luật `publish-ready` của `check`
 //!   giữ metadata và phiên bản phụ thuộc nội bộ.
+//! - `migration-releases record <X.Y.Z> [--from <file>]` — ghi các migration lần đầu có ở bản X.Y.Z vào
+//!   `crates/app/migration-releases.json` cho `autoxide rollback`; chạy lúc phát hành (xem `migration_releases.rs`).
 //! - `changelog` — gộp các mảnh trong `changelog.d/` vào `## [Unreleased]` của `CHANGELOG.md` rồi
 //!   xoá chúng; chạy lúc phát hành (xem `changelog.rs`, D-20261119-changelog-fragments).
 //! - `coverage-api [--run]` — endpoint trong `docs/openapi.json` và tool trong `docs/mcp-tools.json` chưa
@@ -63,8 +66,11 @@ mod external;
 mod hints;
 mod i18n;
 mod lengths;
+mod library_layer;
 mod mcp_principal;
 mod metric_labels;
+mod migration_releases;
+mod permission_first;
 mod publish;
 mod regen;
 mod rust_free;
@@ -88,6 +94,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
        cargo xtask regen [--check]               regenerate every generated file (openapi, mcp-tools, .env.example, SDK, decisions index)
        cargo xtask changelog                     fold changelog.d/ fragments into CHANGELOG.md (at release)
+       cargo xtask migration-releases record <X.Y.Z> [--from <file>]   record the migrations of a release (at release)
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
        cargo xtask semver [--base <rev>] [--changed <rev>] [--deny] [--markdown] [--shard <k>/<n>]
        cargo xtask publish-check [--no-verify]   package every crate as for crates.io (publishes nothing)
@@ -137,6 +144,10 @@ fn main() -> ExitCode {
         ["regen"] => regen(false),
         ["regen", "--check"] => regen(true),
         ["changelog"] => changelog(),
+        ["migration-releases", "record", version] => migration_releases(version, None),
+        ["migration-releases", "record", version, "--from", file] => {
+            migration_releases(version, Some(file))
+        }
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
         ["semver", rest @ ..] => semver(rest, shard),
@@ -357,6 +368,15 @@ fn check() -> ExitCode {
             eprintln!("{warning}");
         }
         violations.extend(security.violations);
+        // Lớp kernel thay thư viện (D-20261126-library-isolation): chỗ cũ chờ chuyển ở `library-baseline.txt`.
+        let layer = library_layer::check(&workspace)?;
+        let layer = baseline::apply_file(&workspace.root, library_layer::BASELINE, layer)?;
+        for warning in &layer.warnings {
+            eprintln!("{warning}");
+        }
+        violations.extend(layer.violations);
+        violations.extend(library_layer::check_private_paths(&workspace)?);
+        violations.extend(library_layer::check_strict(&workspace)?);
         violations.extend(decisions::check(&workspace.root)?);
         violations.extend(changelog::check(&workspace.root)?);
         violations.extend(metric_labels::check(&workspace.root)?);
@@ -365,6 +385,8 @@ fn check() -> ExitCode {
         // Link giao diện trong thư theo khách (D-20261125-tenant-link-templates).
         violations.extend(site_links::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);
+        // Handler kiểm quyền trước khi đọc tham số trang (D-20261126-permission-before-page).
+        violations.extend(permission_first::check(&workspace.root)?);
         violations.extend(toolchain::check(&workspace.root)?);
         // Danh sách file mà PR chỉ đổi chúng thì CI bỏ phần Rust (D-20261125-ci-skip-rust).
         violations.extend(rust_free::check(&workspace)?);
@@ -409,6 +431,25 @@ fn decisions() -> ExitCode {
         }
         Err(error) => {
             eprintln!("xtask decisions: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn migration_releases(version: &str, from: Option<&str>) -> ExitCode {
+    let result = workspace::load()
+        .map_err(|error| error.to_string())
+        .and_then(|workspace| migration_releases::record(&workspace.root, version, from));
+    match result {
+        Ok(added) => {
+            println!(
+                "migration-releases: {version}: {added} new migration(s) in {}",
+                migration_releases::FILE
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask migration-releases: {error}");
             ExitCode::FAILURE
         }
     }

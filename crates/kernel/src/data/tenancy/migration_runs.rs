@@ -4,7 +4,8 @@
 //! - `dry_run: true`: immediately returns the pending migrations of each placement, changing nothing.
 //! - Otherwise: one `kernel_migration_runs` row (control plane) and one `kernel.migrate_placements` job of the
 //!   control database; the job runs like the placement part of `migrate up --all` (each placement by name,
-//!   `migrating` → `ready`, on failure `behind` and stop). Only one run at a time.
+//!   `migrating` → `ready`, on failure `behind`; the other placements still run and the run ends `failed`
+//!   naming every failed placement). Only one run at a time.
 //! - The control database (`main`) is not migrated through the API: `serve` does not run while `main` has
 //!   pending migrations, so when the server is answering the API, `main` is already done.
 
@@ -59,12 +60,20 @@ mod entity {
         /// `active` while the run is unfinished (`pending` / `running`), empty once finished; unique, so only
         /// one run at a time (m0039).
         pub active_key: Option<String>,
+        /// `placements`, `rollback` (m0043).
+        pub kind: String,
+        /// Release the run goes from / to (rollback, upgrade).
+        pub from_version: Option<String>,
+        pub to_version: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 use entity::{Column, Entity, Model};
+
+pub(crate) mod claim;
+pub(crate) mod kind;
 
 /// The `kernel_migration_runs` table.
 pub(crate) struct CreateMigrationRuns;
@@ -99,6 +108,13 @@ impl MigrationTrait for CreateMigrationRuns {
         manager.drop_table(Table::drop().table("kernel_migration_runs").to_owned()).await
     }
 }
+
+/// Attempts of the job of a run: only a busy lock or a control-database error makes it fail (a migration that
+/// fails is recorded in the run instead), so a few retries are enough.
+const RUN_ATTEMPTS: i32 = 10;
+
+/// How long the job waits for another process that holds the migration lock before trying again later.
+const JOB_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Value of `active_key` while the run is unfinished.
 const ACTIVE: &str = "active";
@@ -167,7 +183,9 @@ pub struct PlacementMigrationList {
     pub migrations: Vec<String>,
 }
 
-fn lists(found: Vec<super::placements::PlacementMigrations>) -> Vec<PlacementMigrationList> {
+pub(crate) fn lists(
+    found: Vec<super::placements::PlacementMigrations>,
+) -> Vec<PlacementMigrationList> {
     found
         .into_iter()
         .map(|entry| PlacementMigrationList {
@@ -190,6 +208,13 @@ pub struct MigrationRun {
     /// `pending`, `running`, `done` or `failed`.
     #[schema(example = "done")]
     pub status: String,
+    /// `placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).
+    #[schema(example = "placements")]
+    pub kind: String,
+    /// The release a rollback goes from; `null` for a placement run.
+    pub from_version: Option<String>,
+    /// The release a rollback goes to; `null` for a placement run.
+    pub to_version: Option<String>,
     pub requested_by: Option<Uuid>,
     /// Migrations applied, per placement done (also when a later placement failed).
     pub applied: Vec<PlacementMigrationList>,
@@ -206,6 +231,9 @@ impl From<Model> for MigrationRun {
             id: row.id,
             placement: row.placement,
             status: row.status,
+            kind: row.kind,
+            from_version: row.from_version,
+            to_version: row.to_version,
             requested_by: row.requested_by,
             applied: serde_json::from_str(&row.result).unwrap_or_default(),
             error: row.error,
@@ -257,7 +285,19 @@ impl MigrationRuns {
     /// Queues a run. If an unfinished run exists → `kernel.migration_run_busy` (409).
     async fn start(&self, actor: Actor, placement: Option<String>) -> Result<MigrationRun, Error> {
         // Placement phải có (báo ngay thay vì để job hỏng).
-        self.setup.placements()?.pending(placement.as_deref()).await?;
+        let placements = self.setup.placements()?;
+        if let Some(name) = &placement
+            && !placements.list().await?.iter().any(|found| found.name == *name)
+        {
+            return Err(super::errors::tenant_placement_not_found(name));
+        }
+        // Không ai đang migrate (lấy được khoá ngay) thì dọn lượt bỏ dở của tiến trình đã chết, để lượt mới
+        // không bị 409 mãi vì một lượt không còn ai chạy. Đang có người giữ khoá thì để yên.
+        if let Ok(lock) = placements.lock(std::time::Duration::ZERO).await {
+            let recovered = claim::recover(self.control(), None).await;
+            super::placements::release(lock).await;
+            recovered?;
+        }
         let transaction = self.control().begin_write().await?;
         let at = now();
         // Chèn kèm `active_key`: lượt chưa xong khác (kể cả lượt đang được chèn song song) giữ khoá
@@ -272,6 +312,9 @@ impl MigrationRuns {
             created_at: Set(at),
             updated_at: Set(at),
             active_key: Set(Some(ACTIVE.to_owned())),
+            kind: Set(kind::PLACEMENTS.to_owned()),
+            from_version: Set(None),
+            to_version: Set(None),
         }
         .insert(&transaction)
         .await;
@@ -300,8 +343,10 @@ impl MigrationRuns {
             }
             Err(error) => return Err(error.into()),
         };
-        // Một lần: migration hỏng thì sửa rồi chạy lượt mới, không tự thử lại.
-        let options = EnqueueOptions { max_attempts: Some(1), ..EnqueueOptions::default() };
+        // Migration hỏng không làm job hỏng (lượt ghi `failed`, sửa rồi chạy lượt mới); job chỉ hỏng khi chưa lấy
+        // được khoá migration hay database điều khiển lỗi — khi đó thử lại.
+        let options =
+            EnqueueOptions { max_attempts: Some(RUN_ATTEMPTS), ..EnqueueOptions::default() };
         self.jobs
             .enqueue_database(&transaction, &MigratePlacements { run_id: row.id }, options)
             .await?;
@@ -333,63 +378,96 @@ impl MigrationRuns {
         Ok(rows.map(Into::into))
     }
 
-    /// Runs the run `id` (the job runner).
+    /// Runs the run `id` (the job runner), holding the migration lock like every other path that migrates
+    /// placements. Lock busy (another process is migrating): an error, so the job runs again later.
     async fn run(&self, id: Uuid) -> Result<(), Error> {
+        let placements = self.setup.placements()?;
+        let mut lock = placements.lock(JOB_LOCK_WAIT).await?;
+        let outcome = self.run_locked(&placements, id, &mut lock).await;
+        super::placements::release(lock).await;
+        outcome
+    }
+
+    async fn run_locked(
+        &self,
+        placements: &super::Placements,
+        id: Uuid,
+        lock: &mut crate::migration::MigrationLock,
+    ) -> Result<(), Error> {
+        placements.recover_migrating().await?;
+        let Some(id) = claim::claim(self.control(), claim::Claim::Queued(id)).await? else {
+            return Ok(());
+        };
         let Some(row) = Entity::find_by_id(id).one(self.control().write()).await? else {
             return Ok(());
         };
-        if row.status != "pending" {
-            return Ok(());
-        }
-        self.set(id, "running", None, None).await?;
-        let placements = self.setup.placements()?;
         let mut applied = Vec::new();
-        let mut failure = None;
-        // Từng placement một, để lượt hỏng giữa chừng vẫn ghi phần đã xong.
+        let mut failures = Vec::new();
         let names: Vec<String> = match &row.placement {
             Some(name) => vec![name.clone()],
-            None => placements.pending(None).await?.into_iter().map(|entry| entry.name).collect(),
+            // Mọi placement trừ `main` (đã migrate trước khi máy chủ chạy). Không đọc trạng thái migration ở đây:
+            // placement không kết nối được thì `try_up_named` ghi lỗi của nó, không làm hỏng cả lượt.
+            None => placements
+                .list()
+                .await?
+                .into_iter()
+                .filter(|found| found.id != super::MAIN_PLACEMENT.as_uuid())
+                .map(|found| found.name)
+                .collect(),
         };
+        // Từng placement một: placement hỏng không chặn các placement sau (khách của chúng vẫn được nâng),
+        // và lượt vẫn ghi phần đã xong. Lỗi giữ chi tiết: người xem lượt là nhân sự vận hành, cần biết sửa gì.
         for name in names {
-            match placements.up_placements(Some(&name)).await {
-                Ok(done) => applied.extend(lists(done)),
-                Err(error) => {
-                    failure = Some(error.message());
-                    break;
-                }
+            // Khoá mất (kết nối Postgres đứt): dừng, ghi lại; lượt sau làm tiếp phần còn lại.
+            if let Err(error) = lock.verify().await {
+                failures.push(error.to_string());
+                break;
+            }
+            match placements.try_up_named(&name).await {
+                Ok(Ok(done)) => applied.extend(lists(vec![done])),
+                Ok(Err(error)) => failures.push(format!("placement `{name}`: {error}")),
+                // Placement bị xoá giữa chừng, hay database điều khiển hỏng: ghi lại, làm tiếp.
+                Err(error) => failures.push(format!("placement `{name}`: {error}")),
             }
         }
-        let result = serde_json::to_string(&applied).map_err(Error::internal)?;
-        let status = if failure.is_some() { "failed" } else { "done" };
-        tracing::info!(run_id = %id, status, "placement migration run finished");
-        self.set(id, status, Some(result), failure).await
+        let failure = (!failures.is_empty()).then(|| failures.join("\n"));
+        claim::finish(self.control(), id, Some(&applied), failure).await
+    }
+}
+
+/// Queues a migration run of every placement as a background job: what `autoxide serve` does on start with
+/// `AUTOXIDE_MIGRATE_ON_START=true`, after migrating the main database (migrating every placement before
+/// opening the port would hold up the start, and other servers waiting for the lock). Cheap to clone.
+#[derive(Clone)]
+pub struct PlacementMigrationQueue(Arc<MigrationRuns>);
+
+impl std::fmt::Debug for PlacementMigrationQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PlacementMigrationQueue").finish_non_exhaustive()
+    }
+}
+
+impl PlacementMigrationQueue {
+    pub(crate) fn new(runs: Arc<MigrationRuns>) -> Self {
+        PlacementMigrationQueue(runs)
     }
 
-    async fn set(
-        &self,
-        id: Uuid,
-        status: &str,
-        result: Option<String>,
-        error: Option<String>,
-    ) -> Result<(), Error> {
-        let mut active = entity::ActiveModel {
-            id: Set(id),
-            status: Set(status.to_owned()),
-            updated_at: Set(now()),
-            ..Default::default()
-        };
-        if let Some(result) = result {
-            active.result = Set(result);
+    /// Queues a run of every placement (the run skips quickly the ones with nothing pending). `None` when there is
+    /// no placement besides `main`, or a run is already queued or running.
+    pub async fn queue_pending(&self) -> Result<Option<Uuid>, Error> {
+        // Có placement nào (ngoài `main`) là xếp một lượt, không xét trạng thái đã lưu: sau khi nâng bản, trạng thái
+        // vẫn là `ready` do bản cũ ghi dù bản mới có migration mới. Lượt rẻ với placement không có việc (job đọc
+        // migration chờ trước, không lật `migrating`), và việc xếp không mở kết nối tới từng placement nên không làm
+        // chậm khởi động.
+        let placements = self.0.setup.placements()?.list().await?;
+        if placements.iter().all(|found| found.id == super::MAIN_PLACEMENT.as_uuid()) {
+            return Ok(None);
         }
-        if error.is_some() {
-            active.error = Set(error);
+        match self.0.start(Actor::system(), None).await {
+            Ok(run) => Ok(Some(run.id)),
+            Err(error) if error.code() == "kernel.migration_run_busy" => Ok(None),
+            Err(error) => Err(error),
         }
-        if matches!(status, "done" | "failed") {
-            // Lượt xong: nhả khoá cho lượt sau.
-            active.active_key = Set(None);
-        }
-        active.update(self.control().write()).await?;
-        Ok(())
     }
 }
 
@@ -551,7 +629,8 @@ pub(crate) struct MigrationRunRef {
 #[serde(untagged)]
 enum ToolAnswer {
     DryRun(MigrationDryRun),
-    Run(MigrationRun),
+    // `Box`: lượt lớn hơn nhiều so với kết quả chạy thử; serde in như không có `Box`.
+    Run(Box<MigrationRun>),
 }
 
 pub(crate) fn tools(runs: Arc<MigrationRuns>) -> Vec<crate::mcp::Tool> {
@@ -580,7 +659,9 @@ pub(crate) fn tools(runs: Arc<MigrationRuns>) -> Vec<crate::mcp::Tool> {
                             pending,
                         }));
                     }
-                    Ok(ToolAnswer::Run(runs.start(Actor::from(&principal), placement).await?))
+                    Ok(ToolAnswer::Run(Box::new(
+                        runs.start(Actor::from(&principal), placement).await?,
+                    )))
                 }
             },
         )

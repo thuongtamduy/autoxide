@@ -6,7 +6,7 @@ rebase), không phát hành. Gate đầy đủ (SQLite và Postgres) chỉ bắt
 (D-300): đỏ thì sửa trên nhánh làm việc, merge bản sửa, rồi mới phát hành. Agent tự phát hành, không hỏi, khi xong trọn một **giai đoạn** của
 `docs/ROADMAP.md` (A, B, C…: mọi bước của giai đoạn đã `[x]`). Ngoài lúc đó chỉ phát hành khi chủ
 dự án giao. Không phát hành giữa bước, không phát hành khi mục `[Unreleased]` của `CHANGELOG.md`
-trống sau khi gộp mảnh (bước 3).
+trống sau khi gộp mảnh (bước 4).
 
 Cần quyền đẩy lên GitHub: `gh` đã đăng nhập, hoặc biến môi trường `GH_TOKEN` (token
 fine-grained chỉ cho repo này, quyền Contents và Pull requests: Read and write). Thiếu quyền
@@ -38,7 +38,7 @@ Theo Semantic Versioning, một số cho cả workspace (`[workspace.package] ve
 đăng crates.io). Job `semver` của CI (`.github/workflows/ci.yml`, job riêng, không làm chậm gate):
 
 - **PR phát hành** (đổi `version` của workspace): mọi crate hợp đồng so với tag phát hành trước; mục `### Breaking
-  (Rust)` nằm ở tóm tắt của job để chép vào `CHANGELOG.md` (bước 3).
+  (Rust)` nằm ở tóm tắt của job để chép vào `CHANGELOG.md` (bước 4).
 - **PR khác** chạm phần công khai (`crates/kernel/`, `crates/testkit/`, `crates/app/src/lib.rs`,
   `modules/*/src/lib.rs`, `modules/*/src/api.rs`, `modules/*/src/api/`): chỉ crate bị chạm, so với nhánh gốc
   của PR (`--base <sha> --changed <sha>`). PR sửa chính bộ kiểm (`xtask/src/semver.rs`) chạy như PR phát hành. PR
@@ -78,6 +78,17 @@ Ghi cho người ngoài ở [`SECURITY.md`](../SECURITY.md#supported-versions) (
   cập nhật.
 - Hết hạn hỗ trợ của một dòng thì xoá nó khỏi bảng trong `SECURITY.md`.
 
+## Website tài liệu có phiên bản
+
+Mỗi bản phát hành tự đăng bộ tài liệu của đúng tag lên GitHub Pages (nhánh `gh-pages`, D-20261126-docs-site-mdbook): `Auto
+release` tạo tag bằng `GITHUB_TOKEN` (không kích hoạt workflow nào theo `push: tags`) nên gọi tường minh `release.yml` và
+`docs-site.yml` bằng `workflow_dispatch` ở cùng chỗ. Tag đẩy tay thì `docs-site.yml` chạy theo `push: tags`.
+
+- Đăng lại một tag: Actions → "Docs site" → Run workflow, chọn tag (ô `tag`). Chỉ làm được cho tag có `docs-site.yml` và
+  `scripts/build-docs-site.py` — **tag cũ hơn thay đổi này không có chúng**, nên tài liệu của bản cũ không đăng bù được bằng cách này.
+- Chưa bật GitHub Pages (Settings → Pages → nguồn: nhánh `gh-pages`) thì workflow vẫn đăng vào nhánh, chỉ chưa có trang.
+- `latest` luôn là bản chính thức cao nhất; bản thử (`-rc.N`) và bản vá của dòng cũ có thư mục riêng nhưng không giành `latest`.
+
 ## Khi làm việc hằng ngày
 
 Mỗi thay đổi hành vi mà người dùng thấy (API, cấu hình, CLI, migration, Docker) thêm một **file
@@ -95,8 +106,8 @@ D-175, D-197) chạy lại gate (chia nhiều máy như CI, chung `gate.yml`, D-
 `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
 và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
 repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag. **Repo đang riêng
-tư (D-199): workflow bị bỏ qua, làm bước 1–6 rồi theo "Khi repo còn riêng tư" bên dưới thay cho
-bước 7.**
+tư (D-199): workflow bị bỏ qua, làm bước 1–7 rồi theo "Khi repo còn riêng tư" bên dưới thay cho
+bước 8.**
 
 1. Đưa nhánh lên `main` mới nhất: `git fetch origin`, rồi `git rebase origin/main`. Phiên
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
@@ -107,7 +118,10 @@ bước 7.**
    `sdk/typescript/package-lock.json`, image mặc định trong `compose.quickstart.yml` — `cargo xtask sdk --check`
    của gate kiểm mấy chỗ này; bản phát hành mới
    nhất ở dòng "Trạng thái" của `docs/ROADMAP.md`.
-3. Chạy `cargo xtask changelog`: gộp mọi mảnh trong `changelog.d/` vào `## [Unreleased]` (mỗi mảnh vào
+3. Chạy `cargo xtask migration-releases record X.Y.Z` (sau khi đổi `version`): ghi các migration lần đầu có ở bản này
+   vào `crates/app/migration-releases.json` — `autoxide rollback --to X.Y.Z` của các bản sau dựa vào đó
+   (D-20261126-upgrade-rollback). Commit file cùng PR phát hành.
+4. Chạy `cargo xtask changelog`: gộp mọi mảnh trong `changelog.d/` vào `## [Unreleased]` (mỗi mảnh vào
    cuối mục của nó) và xoá các mảnh. Rồi trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
    mục `## [Unreleased]` trống ở trên, cập nhật hai dòng liên kết ở cuối file. Workflow kiểm
    có mục `## [X.Y.Z]` và tag khớp `version`, sai thì không phát hành.
@@ -118,12 +132,12 @@ bước 7.**
    của PR phát hành in sẵn mục này ở tóm tắt; chép vào mục `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn
    `0.x` thì chỉ báo cáo, không chặn (D-167, D-242); từ `1.0` có phá vỡ ở bản không tăng major thì không
    phát hành.
-4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này, rồi
+5. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này, rồi
    `cargo xtask publish-check` (các crate vẫn đóng gói và build được như trên crates.io, xem "Đăng lên crates.io"). Rồi
    chạy test nâng cấp: `cargo xtask upgrade-test` — bản phát hành trước (image Docker của nó; tải
    không được thì build từ tag, lâu) ghi dữ liệu, bản này đọc lại trên cùng database, cả SQLite lẫn
    Postgres (D-246). Cần Docker; đỏ thì không phát hành. Job `upgrade` của CI chạy cùng lệnh.
-5. Đẩy nhánh, mở PR vào `main`, merge kiểu rebase để commit `release: vX.Y.Z` nằm nguyên
+6. Đẩy nhánh, mở PR vào `main`, merge kiểu rebase để commit `release: vX.Y.Z` nằm nguyên
    trên `main`:
 
    ```bash
@@ -132,7 +146,7 @@ bước 7.**
    gh pr merge <số PR> --rebase --delete-branch
    ```
 
-6. **Tag tự gắn** (D-20261121-auto-release): khi workflow CI của push vào `main` trên commit chứa bản phát hành
+7. **Tag tự gắn** (D-20261121-auto-release): khi workflow CI của push vào `main` trên commit chứa bản phát hành
    (merge commit của PR, có `version = "X.Y.Z"` mới và mục `## [X.Y.Z]` trong `CHANGELOG.md`) kết thúc `success`,
    workflow `Auto release` tạo tag có chú thích `vX.Y.Z` trên **đúng commit đó** rồi gọi `Release` trên tag. Không
    đẩy tag tay, không nhờ chủ dự án bấm Publish. Tag `vX.Y.Z` đã có thì `Auto release` không làm gì, nên các lần
@@ -153,7 +167,7 @@ bước 7.**
    Workflow `Release` thấy trang Release đã có thì cập nhật ghi chú và đính kèm file chứ không báo lỗi. Ghi chú quá
    giới hạn của GitHub (125 000 ký tự) thì workflow thay bằng đoạn ngắn dẫn tới `CHANGELOG.md`.
 
-7. Theo dõi workflow `Auto release` rồi `Release` của tag (Actions) tới khi xanh, rồi kiểm image và file đã đăng
+8. Theo dõi workflow `Auto release` rồi `Release` của tag (Actions) tới khi xanh, rồi kiểm image và file đã đăng
    đúng như người dùng kiểm ([`docs/VERIFYING.md`](VERIFYING.md)):
 
    ```bash
@@ -169,8 +183,41 @@ bước 7.**
 
    Workflow đỏ thì sửa nguyên nhân rồi chạy lại trên cùng tag (Actions → Release → Run workflow,
    chọn tag); không xoá tag đã đẩy. Lỗi nằm ở code thì phát hành bản vá `X.Y.Z+1`.
-8. `cargo clean`: mỗi lần đổi phiên bản, cargo build lại cả workspace thành một bộ file mới
+9. `cargo clean`: mỗi lần đổi phiên bản, cargo build lại cả workspace thành một bộ file mới
    mà không xoá bộ cũ, `target/` phình thêm hàng chục GB.
+
+## Chỉ số của mỗi bản phát hành (ngưỡng cho 1.0, 71-G9)
+
+Mỗi bản phát hành có một bảng năm chỉ số, do workflow `Release metrics` (`.github/workflows/release-metrics.yml`, `release.yml` gọi như một job sau khi đăng bản; chạy tay cho tag đã có bằng `workflow_dispatch`) dựng, ghi vào trang tóm tắt của lần chạy và vào ghi chú bản phát hành (`scripts/release-metrics.py`). Chỉ số
+**đã đo mà không đạt** ghi "KHÔNG ĐẠT" trong bảng và báo cảnh báo (không làm đỏ workflow `Release`: bản đã đăng, đỏ cũng không rút lại được); **chưa đo** thì ghi "chưa đo" / "chờ …", không bịa số. Bản 1.0 chỉ phát hành khi
+cả năm đều đã đo và đạt (chủ dự án duyệt lúc chốt, D-20261126-road-to-1-0).
+
+| Chỉ số | Ngưỡng 1.0 | Đo bằng gì | Tự động? |
+| ------ | ---------- | ---------- | -------- |
+| Tải về → request đầu tiên | dưới 5 phút | `scripts/release-time-to-first-request.sh`: máy sạch làm đúng Quickstart của README (tải `compose.quickstart.yml` của tag, tạo `.env`, `docker compose up`, đọc mật khẩu admin, đăng nhập, `GET /auth/me`), tính giây | Có. Chỉ là **phần máy** (tải image, khởi động, một request): thời gian người đọc tài liệu không nằm ở đây |
+| Người mới xong module đầu tiên | dưới 30 phút | Hai số **riêng, không gộp** (bên dưới): người thật có bấm giờ; agent context sạch | Một phần: bảng đọc `docs/quality/first-module-timing.json`; việc đo thì làm tay mỗi bản |
+| Nâng cấp trong CI | 100% thành công | Job `upgrade` của `ci.yml` trên đúng commit phát hành (ma trận nhiều khách, bản cũ nhất, rollback do G3 dựng): báo cáo chỉ **đọc** kết quả, không dựng job riêng | Có |
+| Agent thật xong việc mẫu | trên 90% | Bộ eval agent của G4: báo cáo chỉ đọc file kết quả của một lần chạy (`docs/quality/agent-eval.json` tại commit phát hành, định dạng `docs/quality/agent-eval.schema.json`: model, ngày, số việc, số xong, chi phí, danh sách việc fail); chưa có thì "chờ G4" | Có, khi G4 xuất file |
+| p95 đường nóng không tệ đi | không vượt số gốc × 1.5 + 2 ms | Lần chạy gần nhất của `load.yml` trên `main` (đo tải hằng tuần, số gốc ở `docs/quality/load-baseline.json`) | Có |
+
+### Đo "người mới xong module đầu tiên" cho trung thực
+
+Số này không thể tự động hoàn toàn: người thật đọc, hiểu, gõ, vướng. Hai cách, ghi thành hai loại số khác nhau
+(`kind` = `human` hay `agent` trong `docs/quality/first-module-timing.json`):
+
+1. **Người thật có bấm giờ (`human`).** Người chưa từng đóng góp cho repo (người ngoài hay thành viên mới; chủ dự án
+   tính nếu chưa làm lần nào) làm theo hướng dẫn công khai (`docs/guides/`, module ngoài repo) và bấm giờ:
+   - **Bắt đầu:** lúc mở README, máy chỉ có Docker, Rust, Git.
+   - **Dừng:** khi module mới (một bảng, một route `GET`, một test) đã được đăng ký, chạy trong server của chính họ, và
+     `GET /api/v1/kernel/modules` liệt kê nó, test của module xanh.
+   - Ghi: số phút, các mốc (cài xong, build lần đầu xong, module chạy), chỗ vướng (mỗi chỗ vướng là một việc của core hay
+     tài liệu). Dừng đồng hồ khi chờ biên dịch **không** được trừ: người dùng thật cũng chờ.
+2. **Agent context sạch (`agent`).** Một agent mới, chỉ có README và các hướng dẫn công khai (không `CLAUDE.md` của repo,
+   không lịch sử trò chuyện), làm cùng việc theo cùng điều kiện dừng. Ghi số phút đồng hồ và số lượt gọi công cụ. Đây là
+   cận dưới của độ rõ của tài liệu cho máy, **không** thay cho số của người thật.
+
+Thêm một dòng vào `runs` của `docs/quality/first-module-timing.json` mỗi lần đo: `{"kind": "human", "version": "…", "date": "…",
+"minutes": N, "notes": "…"}`. Không sửa dòng cũ.
 
 ## Bản thử trước bản major (release candidate)
 
@@ -178,7 +225,14 @@ Bản major là cam kết dài hạn ([`docs/COMPATIBILITY.md`](COMPATIBILITY.md
 `X.0.0-rc.N` trước — lần đầu là `1.0.0-rc.1` (D-20261123-supply-chain). Mở `rc.1` và lên bản chính thức đều do **chủ
 dự án quyết** (`1.0` là lúc chủ dự án tuyên bố API ổn định); agent kiểm tiêu chí bên dưới và báo khi đạt.
 
-**Phát hành một bản thử** — đúng các bước 1–8 ở trên, với phiên bản `X.0.0-rc.N`:
+**Thời gian và kênh phản hồi** (D-20261126-release-1-0-readiness): giai đoạn bản thử kéo dài **2–4 tuần** (tối thiểu 14
+ngày kể từ bản thử cuối, tiêu chí 1 bên dưới; quá 4 tuần mà còn lỗi nghiêm trọng mở thì chủ dự án quyết kéo dài hay
+lùi). Người ngoài báo phản hồi ở GitHub Discussions (mục "Release candidate") hay mở issue gắn nhãn `rc-feedback`; lỗi
+nghiêm trọng gắn thêm `release-blocker`. Khi ra `rc.1`, ghi trong trang Release và README hai việc: bản thử dành cho ai
+(người muốn thử nâng cấp, người viết module ngoài repo) và phản hồi gửi đi đâu. Agent đọc mọi phản hồi mới mỗi lần
+kiểm tiêu chí; phản hồi không phải lỗi (đề xuất tính năng) ghi lại cho sau 1.0, không làm chậm bản chính thức.
+
+**Phát hành một bản thử** — đúng các bước 1–9 ở trên, với phiên bản `X.0.0-rc.N`:
 
 - `version` của workspace, ghim `=X.0.0-rc.N` của crate nội bộ, `docs/openapi.json`, `sdk/typescript/package.json`
   (+ lock), image của `compose.quickstart.yml`: đều `X.0.0-rc.N`.
@@ -214,7 +268,7 @@ hay nâng cấp hỏng trên SQLite hoặc PostgreSQL; máy chủ không khởi 
 6. Chữ ký và chứng thực của bản thử cuối kiểm được bằng đúng các lệnh của [`docs/VERIFYING.md`](VERIFYING.md).
 7. Chủ dự án đồng ý.
 
-**Phát hành bản chính thức**: bước 1–8 với `X.0.0`. Mục `## [X.0.0]` của `CHANGELOG.md` gồm thay đổi sau bản thử cuối,
+**Phát hành bản chính thức**: bước 1–9 với `X.0.0`. Mục `## [X.0.0]` của `CHANGELOG.md` gồm thay đổi sau bản thử cuối,
 kèm dòng đầu `Includes every change of X.0.0-rc.1 to X.0.0-rc.N, listed below.`; các mục bản thử giữ nguyên bên dưới.
 Khi ra `1.0.0`, chủ dự án thêm check **"Rust API compatibility (cargo-semver-checks)"** vào danh sách check bắt buộc
 (mục "Kiểm hợp đồng Rust").
@@ -228,7 +282,7 @@ giữ vĩnh viễn) và cần tài khoản của chủ dự án. Agent không t�
 Giữ cho sẵn sàng (đã chạy mỗi lần gate và mỗi lần phát hành):
 
 - `cargo xtask check` — luật `publish-ready`: metadata đủ, phụ thuộc nội bộ ghim `version = "=X.Y.Z"`.
-- `cargo xtask publish-check` (lúc phát hành, bước 4; lâu như một lần build sạch, ghi vào `target/package`) —
+- `cargo xtask publish-check` (lúc phát hành, bước 5; lâu như một lần build sạch, ghi vào `target/package`) —
   `cargo package` cho từng crate rồi build từ gói đã đóng, với phiên bản thư viện mới nhất hợp lệ: đúng thứ người
   dùng crates.io nhận. Đỏ thì sửa trước khi phát hành.
 
@@ -284,7 +338,7 @@ Chủ dự án giữ repo riêng tư (D-199), nên đẩy tag không kích hoạ
    docker push ghcr.io/<owner>/autoxide:X.Y
    ```
 
-3. Bước 8 (`cargo clean`) như trên.
+3. Bước 9 (`cargo clean`) như trên.
 
 Khi chủ dự án công khai repo (bước 50 của lộ trình), bỏ phần này.
 

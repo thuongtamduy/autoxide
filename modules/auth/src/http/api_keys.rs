@@ -83,6 +83,13 @@ async fn list_all_api_keys(
     Query(filter): Query<AllApiKeysQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<ManagedApiKeyResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    // Như service: người duyệt (không quản lý key) cũng xem được; không ai trong hai thì lỗi nêu quyền quản lý.
+    if !principal.has(&crate::permissions::API_KEYS_MANAGE)
+        && !principal.has(&crate::permissions::API_KEYS_APPROVE)
+    {
+        principal.require(&crate::permissions::API_KEYS_MANAGE)?;
+    }
     let page = PageRequest::try_from(query)?;
     let status = filter.status.as_deref();
     if status.is_some_and(|status| !["active", "pending"].contains(&status)) {
@@ -110,8 +117,8 @@ async fn list_all_api_keys(
 
 /// Revoke an API key of any user.
 ///
-/// Requires `auth.api_keys.manage`. The key stops working at once; the audit log records who
-/// revoked it.
+/// Requires `auth.api_keys.manage`, and every permission of the key's owner (a staff member)
+/// unless you revoke one of your own keys from a password session. The key stops working at once; the audit log records who revoked it.
 #[utoipa::path(
     delete,
     path = "/all-api-keys/{id}",
@@ -122,7 +129,7 @@ async fn list_all_api_keys(
     responses(
         (status = 204, description = "The key was revoked."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.api_keys.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.api_keys.manage` (code `permission_denied`), or the key's owner has permissions you do not have (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No key has this id; code `auth.api_key_not_found`.", body = Problem),
     )
 )]
@@ -326,7 +333,8 @@ impl From<CreatedApiKey> for CreatedApiKeyResponse {
 
 /// List your API keys.
 ///
-/// Any signed-in user. Newest first unless `order=asc`. Secrets are never listed.
+/// Any signed-in user. Newest first unless `order=asc`. Secrets are never listed. Called with
+/// an API key, the list holds only that key; called with an OAuth token, it is empty.
 #[utoipa::path(
     get,
     path = "/api-keys",
@@ -346,8 +354,7 @@ async fn list_api_keys(
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<ApiKeyResponse>, Error> {
-    let page =
-        state.api_keys.list(&tenant, principal.user_id(), &PageRequest::try_from(query)?).await?;
+    let page = state.api_keys.list_own(&tenant, &principal, &PageRequest::try_from(query)?).await?;
     Ok(page.map(ApiKeyResponse::from))
 }
 
@@ -394,7 +401,9 @@ async fn create_api_key(
 
 /// Revoke one of your API keys.
 ///
-/// The key stops working at once.
+/// The key stops working at once. Called with an API key, only that same key can be revoked (a
+/// leaked key can switch itself off); any other id answers `404`. An OAuth token revokes no key
+/// (`404`).
 #[utoipa::path(
     delete,
     path = "/api-keys/{id}",
@@ -405,7 +414,7 @@ async fn create_api_key(
     responses(
         (status = 204, description = "The key was revoked."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 404, description = "You have no key with this id; code `auth.api_key_not_found`.", body = Problem),
+        (status = 404, description = "You have no key with this id, or the request used another API key; code `auth.api_key_not_found`.", body = Problem),
     )
 )]
 async fn revoke_api_key(

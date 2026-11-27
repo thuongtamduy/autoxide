@@ -126,6 +126,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       bọc, kiểu nào để thư viện, đường chuyển
 - [ ] Làm lớp của kernel; chữ ký công khai hạng ổn định của kernel và testkit không còn kiểu của SeaORM, sea-query, axum,
       utoipa (gate kiểm)
+      - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
+            `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
+            (D-20261126-kernel-data-layer)
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên
@@ -133,7 +136,7 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 ### G3 — Nâng cấp một nút
 
-- [ ] Ngay: `compose.yml`, manifest Kubernetes và `AUTOXIDE_MIGRATE_ON_START` nâng cả database riêng của khách
+- [x] Ngay: `compose.yml`, manifest Kubernetes và `AUTOXIDE_MIGRATE_ON_START` nâng cả database riêng của khách
       (`--all`); `up_all` thử mọi nơi đặt dữ liệu, lỗi một khách vẫn làm tiếp, báo lỗi từng khách
 - [ ] `autoxide upgrade`: kiểm tương thích theo bảng phiên bản ghi trong binary (nâng từ bản nào được, bước tay bắt buộc),
       tự sao lưu mọi nơi đặt dữ liệu và kho file (hay từ chối nếu không có `--no-backup`), migrate database chính rồi mọi
@@ -204,15 +207,20 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 ### G8 — Chuẩn cộng đồng mã nguồn mở
 
-- [ ] CodeQL, OpenSSF Scorecard, huy hiệu OpenSSF Best Practices
-- [ ] Chính sách đóng góp do AI viết, DCO, `SUPPORT.md`, `GOVERNANCE.md` / người duy trì, `CODEOWNERS`, liên kết hỏi đáp
-      trong mẫu issue, nhãn good-first-issue
-- [ ] SBOM liệt kê crate Rust (`cargo auditable` / CycloneDX), build tái lập, CI dựng bằng MSRV, chính sách MSRV và bảng
-      feature trong `docs/COMPATIBILITY.md`
-- [ ] Bản tiếng Anh cho người ngoài: lộ trình công khai, đường đề xuất thay đổi (RFC), tóm tắt luật đóng góp
-- [ ] Hệ sinh thái module: quy ước tên và topic, danh sách module cộng đồng, manifest module, bảng tương thích phiên bản,
-      chính sách dùng tên Autoxide
-- [ ] Đầu SPDX / REUSE; fuzz (`cargo-fuzz`) cho bộ phân tích dữ liệu đầu vào không tin cậy
+- [x] CodeQL (Rust, JS/TS, workflow), OpenSSF Scorecard (`codeql.yml`, `scorecard.yml`); huy hiệu OpenSSF Best Practices và
+      branch protection do chủ dự án làm trên web, hướng dẫn ở `docs/OPENSSF.md` (EN + VI)
+- [x] Chính sách đóng góp do AI viết, DCO (`DCO`, job `dco` của CI, CODEOWNERS), commit convention,
+      `SUPPORT.md`, `GOVERNANCE.md` (vai trò, quyết định, RFC, bộ nhãn), `docs/rfcs/`, `CODEOWNERS`, `contact_links` trong
+      mẫu issue; chủ dự án tạo bộ nhãn trong cài đặt repo (bảng nhãn ở `GOVERNANCE.md`)
+- [x] SBOM (`cargo auditable` trong Dockerfile, CycloneDX `autoxide.cdx.json` trong bản phát hành), build tái lập
+      (`SOURCE_DATE_EPOCH`, `--remap-path-prefix`, tar xếp theo tên), job CI dựng bằng MSRV, mục MSRV / feature / build tái lập /
+      SBOM trong `docs/COMPATIBILITY.md`
+- [x] Bản tiếng Anh cho người ngoài: `docs/ROADMAP.public.md` (lộ trình công khai, tóm tắt luật đóng góp), RFC ở `docs/rfcs/`
+- [x] Hệ sinh thái module: `docs/MODULE_ECOSYSTEM.md` (tên `autoxide-*`, topic `autoxide-module`, manifest
+      `autoxide-module.toml` đề xuất, bảng tương thích, danh sách cộng đồng), `TRADEMARK.md` (EN + VI)
+- [x] `REUSE.toml` + `LICENSES/` (job `reuse`); `fuzz/` (cargo-fuzz: con trỏ trang, header chọn khách, câu tìm kiếm, CSV,
+      số thập phân / tiền, thời gian) + `fuzz.yml` chạy hằng tuần. Chưa phủ: `Idempotency-Key` và thân JSON (hàm riêng của tầng
+      HTTP) — thêm khi phần phân tích đó lộ ra thành hàm công khai
 
 ### G9 — Chất lượng thành quy trình và đo bằng con số
 
@@ -221,9 +229,14 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [x] Bất biến tiền, thuế, quyền thành property test chạy hằng đêm (rà ở `docs/quality/invariants.md`; phần còn thiếu ghi cuối file)
 - [ ] Đo tải trong CI hằng tuần trên cả hai database, chặn khi p95 của đường nóng tệ đi; vài benchmark vi mô cho đường
       nóng của kernel
+      — `load.yml`, `scripts/load-compare.py`, benchmark `divan` đã có; còn: lần chạy CI đầu để đặt số gốc trong
+      `docs/quality/load-baseline.json` (đang `null`, chưa chặn được hồi quy nào)
 - [ ] Chỉ số đo mỗi bản phát hành, ngưỡng cho 1.0: tải về tới request đầu tiên dưới 5 phút; người mới xong module đầu
       tiên dưới 30 phút; nâng cấp trong CI 100% thành công kể cả nhiều khách; agent thật làm xong việc mẫu trên 90%; p95
       đường nóng không tệ đi giữa hai bản
+      — bảng, ngưỡng và cách đo ở `docs/RELEASING.md` ("Chỉ số của mỗi bản phát hành"), workflow `release-metrics.yml` đã có;
+      còn: số đo người mới / agent làm module đầu (`docs/quality/first-module-timing.json`), file kết quả eval của G4,
+      và lần chạy đầu của `load.yml` (số gốc p95)
 
 ### G10 — Giảm tải cho agent phát triển
 
@@ -248,25 +261,37 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r1/`, không phải ý kiến pháp lý):
 
-- [ ] LG-1 (chặn 1.0): quy tắc `moit.checklist.*`, `cases.deadlines` phiên bản mới theo NĐ 248/2026 (thay NĐ 52/2013, 85/2021
+- [x] LG-1 (chặn 1.0): quy tắc `moit.checklist.*`, `cases.deadlines` phiên bản mới theo NĐ 248/2026 (thay NĐ 52/2013, 85/2021
       từ 01/7/2026), chuyển tiếp tới 30/6/2027; sửa `COMPLIANCE.md` / `.vi.md` và mẫu trang
 - [ ] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
       31/12/2026 – 01/01/2027 giờ Việt Nam; xong trước 31/12/2026; qua kiểm độc lập
 - [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
       sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
-- [ ] LG-4: quy tắc `privacy.subject_requests` v2 theo NĐ 356/2025 Điều 5 (hạn xác nhận và hạn thực hiện, ngày làm việc)
-- [ ] LG-5: dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
-- [ ] LG-6: module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận
+- [x] LG-4: quy tắc `privacy.subject_requests` v2 theo NĐ 356/2025 Điều 5 (hạn xác nhận và hạn thực hiện, ngày làm việc)
+- [x] LG-5 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
+- [x] LG-6 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận
       ngoài Việt Nam; `docs/AI.md` thêm mục dữ liệu cá nhân
 - [ ] LG-7: gói thuế `vn` v2 theo NĐ 68/2026 (ngưỡng hộ kinh doanh, tỉ lệ khấu trừ); `orders` hỏi
       `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos`
-- [ ] LG-8: tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
+- [x] LG-8 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
       kiện của module sàn
 - [ ] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
 - [ ] LG-10: phát hiện và báo chênh lệch thuế giữa đơn và hoá đơn khi qua mốc đổi thuế suất
-- [ ] LG-11: hạn mức và thủ tục khuyến mại theo NĐ 239/2026 và thông tư của Bộ Công Thương (thay căn cứ NĐ 81/2018 Điều 6, 7)
+- [x] LG-11: hạn mức và thủ tục khuyến mại theo NĐ 239/2026 và thông tư của Bộ Công Thương (thay căn cứ NĐ 81/2018 Điều 6, 7)
 - [ ] LG-12: `orders` ẩn đánh giá qua `ModerationPolicy` (ánh xạ mã lý do) hoặc sửa `COMPLIANCE.md` cho khớp code
-- [ ] LG-13: căn cứ Luật An ninh mạng 116/2025 và nghị định hướng dẫn thay NĐ 53/2022 trong tài liệu lưu dữ liệu trong nước
+- [x] LG-13: căn cứ Luật An ninh mạng 116/2025 và nghị định hướng dẫn thay NĐ 53/2022 trong tài liệu lưu dữ liệu trong nước
+- [x] LG-3/5/6/8 tài liệu: `COMPLIANCE.md` mục "Chưa làm (trước 1.0)", `AI.md` dữ liệu gửi ra nước ngoài, `TAX.md` /
+      `MONEY.md` phần khấu trừ thay đã có và chưa có (EN + VI)
+- [ ] LG-5 code (**sau 1.0**): cấu hình theo khách "dịch vụ hướng tới trẻ em", tự khai tuổi khi đăng ký, sổ đồng ý ghi
+      người đồng ý thay (vai, quan hệ) — cần người có chuyên môn xác nhận điều luật và độ tuổi
+- [ ] LG-6 code (**sau 1.0**): `Module::processors()` (mặc định rỗng, D-038) khai bên xử lý và nước nhận theo cấu hình
+      đang chạy (ai, mail, SMS, lưu trữ); sổ xử lý gộp tự động; `doctor` cảnh báo bên nhận ngoài Việt Nam
+- [ ] LG-8 code (**sau 1.0**, cùng module sàn): phát `TaxWithheld` khi chi trả cho hộ kinh doanh, lập
+      `withholding_certificate`, dữ liệu tờ khai khấu trừ thay
+- [ ] LG-1b: khi có văn bản gốc NĐ 248/2026 — thêm mục kiểm mới (tiêu chí xếp hạng, quy tắc điểm thưởng, báo cáo
+      định kỳ), xác nhận cơ quan tiếp nhận / online.gov.vn và hạn chuyển tiếp (D-20261126-legal-rules-r1-update)
+- [ ] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (đơn vị: ngày theo bản phân tích,
+      chưa xác nhận ngày làm việc hay ngày thường; bên xử lý thứ ba)
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
 
@@ -276,10 +301,37 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       module, người nối AI agent qua MCP, người vận hành, chủ cửa hàng dùng API) dùng thử theo tài liệu công khai, vài vòng
       (dùng thử → sửa → vòng sau, D-20261126-ai-role-reviews); vẫn mở kênh phản hồi cho người ngoài thật; tiêu chí chốt
       (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
-- [ ] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
-      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI)
-- [ ] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
-      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành
+- [ ] Chạy thử vòng 1 bằng agent đóng vai người dùng (`docs/trials/rc-trial-r1/`, agent đóng vai, không phải người thật) —
+      các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
+  - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
+        `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
+  - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
+        chạm bảo mật nên qua kiểm độc lập
+  - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
+        `.env`, `migrate up` trước `serve`, `AUTOXIDE_HTTP_ADDRESS`, mục "binary + PostgreSQL từ đầu", một ví dụ GET có
+        dữ liệu; `config` cảnh báo biến `AUTOXIDE_*` lạ; lỗi đọc `.env` nêu tên biến
+  - [ ] UT-4: thử luồng bán hàng khi chưa có tài khoản nhà cung cấp thật: cách chính thức hoàn tất thanh toán giả trong
+        sandbox, mục "thử không cần tài khoản thật" (chế độ multi, `tenant create`, header `Autoxide-Tenant`), dựng
+        cửa hàng trong sandbox; `shop.md` và `PROMOTIONS.md` thêm bước còn thiếu (phí ship thủ công, hồ sơ thuế, dãy hoá
+        đơn, tạo mã, tỉnh thông báo, luật giá tham chiếu, Order-Token của khách vãng lai)
+  - [ ] UT-5: tool MCP đủ để agent làm việc nhiều bước: mô tả cho mọi tham số (gate kiểm), `catalog.list_price_lists`,
+        kiểm `tax_category`, giá trị lọc sai (`readiness`, `module`, `subject`) báo lỗi, `version` nhận cả hai dạng, thông
+        báo `precondition_failed` riêng cho MCP, ẩn tool luôn lỗi với API key, cách idempotency của MCP ghi trong `mcp.md`,
+        lỗi `Idempotency-Key` trùng thành lỗi tool, gom lỗi của `invoices.create_draft`, tên key trong audit
+  - [ ] UT-6: `payment_id` của checkout / `payment-link` dùng được ở API ledger; header `Idempotent-Replayed` cho checkout
+        và huỷ đơn khách; `payment-link` gọi lại sau lần lỗi; cách gỡ khoản `needs_review`
+  - [ ] UT-7: thời gian build lần đầu của module ngoài repo (đo ~30 phút debug trên 4 lõi): hướng dẫn nêu con số, đường dùng
+        bản dựng sẵn hay cache, một cách gọi `check-module`; đo lại cho G9 trên máy rảnh
+  - [ ] UT-8: thông báo và log cho người vận hành: `--steps 0`, log backup / restore chỉ tóm tắt, `migrate up` tóm tắt,
+        log drain không để mức ERROR, `tenant_id` lặp, lỗi kết nối database nêu nguyên nhân gốc, WARN SMTP chỉ ở lệnh dùng
+        tới, `autoxide backup create` sửa thành `backup <thư mục>`, chữ "required" của `AUTOXIDE_AUTH_TOKEN_SECRET`
+  - [ ] UT-9: tài liệu rate limit khớp hành vi (120/phút/key, thông báo nói key, key đã thu hồi ra 401); bỏ ID quyết định
+        nội bộ ("D-225") khỏi dữ liệu công khai của `promotions`; sửa `sandbox.md` (số hoá đơn) và README của SDK (import,
+        header tenant)
+- [x] Chính sách hỗ trợ dài hạn: bản 1.x nhận vá bảo mật bao lâu, bản lớn trước còn được hỗ trợ bao lâu khi bản lớn mới ra,
+      quy trình vá ngược; ghi vào `docs/COMPATIBILITY.md` và `SECURITY.md` (EN + VI) — quy trình vá ngược và bảng ở `COMPATIBILITY.md` / `SECURITY.md`
+- [x] Trang tài liệu có phiên bản: website tài liệu chính thức (hướng dẫn, tham chiếu API sinh từ OpenAPI, MCP, docs.rs),
+      có tìm kiếm, mỗi bản phát hành một bộ tài liệu, EN + VI, tự dựng khi phát hành — mdBook, `scripts/build-docs-site.py`, workflow `docs-site.yml` (D-20261126-docs-site-mdbook); **chủ dự án bật GitHub Pages (nguồn: nhánh `gh-pages`)**
 - [ ] Chạy nhiều máy chủ cùng lúc: test trong CI 2–3 máy chủ song song không giao trùng việc nền / event, không mất lock
       migration; tài liệu sức chứa (SQLite chịu tới đâu, khi nào chuyển Postgres, số khách mỗi máy chủ, cấu hình đề xuất)
 - [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
@@ -288,18 +340,18 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       — thiết kế: [`docs/research/g13-field-encryption-audit.md`](research/g13-field-encryption-audit.md) (code sau G1 PR 2–5)
 - [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
       nhiều khách có database riêng và kho file
-- [ ] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
-      mỗi bản phát hành (binary, image, SDK)
+- [x] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
+      mỗi bản phát hành (binary, image, SDK) — `cargo deny` (đã có) + `THIRD-PARTY-LICENSES.html` bằng cargo-about (D-20261126-third-party-licenses)
 
 ### G14 — Vận hành và cam kết nền (chủ dự án duyệt ngày 26/11/2026, D-20261126-operations-baseline)
 
 - [ ] Cam kết nền tảng: chính sách bản Postgres (các bản lớn còn được hãng hỗ trợ), bản SQLite tối thiểu, hệ điều hành và
       kiến trúc CPU cho binary và image; CI chạy ma trận các bản Postgres được hỗ trợ (ít nhất bản cũ nhất và mới nhất); ghi
       vào `docs/COMPATIBILITY.md` (EN + VI); `doctor` cảnh báo khi chạy trên bản ngoài danh sách
-- [ ] Bộ đồ nghề vận hành: sổ tay xử lý sự cố `docs/RUNBOOK.md` (EN + VI) cho các tình huống thường gặp (database đầy hay
+- [x] Bộ đồ nghề vận hành: sổ tay xử lý sự cố `docs/RUNBOOK.md` (EN + VI) cho các tình huống thường gặp (database đầy hay
       chậm, hàng đợi việc nền ứ, xoay khoá ký và khoá mã hoá khi lộ, thu hồi hàng loạt API key / phiên, khôi phục một khách
       từ sao lưu, khách báo mất dữ liệu); mẫu bảng theo dõi và luật cảnh báo dựng sẵn từ số đo OTLP / Prometheus của core;
-      quy trình ứng phó lỗ hổng bảo mật (nhận báo, đánh giá, vá, công bố, xin mã CVE) ghi ở `SECURITY.md`
+      quy trình ứng phó lỗ hổng bảo mật (nhận báo, đánh giá, vá, công bố, xin mã CVE) ghi ở `SECURITY.md` — `docs/RUNBOOK.md`, thêm 3 luật cảnh báo vào `deploy/prometheus/autoxide-alerts.yml`, mục "How we handle a report" ở `SECURITY.md`
 - [ ] Thử hỏng có chủ đích trong CI trên cả hai database: mất kết nối database giữa transaction, đầy ổ đĩa, Postgres
       chuyển máy dự phòng / khởi động lại, tiến trình bị giết giữa việc nền, migration và sao lưu; hệ thống tự hồi phục,
       không mất hay nhân đôi event / job, không hỏng dữ liệu; kết quả ghi vào tài liệu sức chứa
@@ -563,7 +615,10 @@ thật (P7).
         event và worker còn một câu `EXISTS` mỗi database (D-20261126-idle-polling)
   - [ ] PT-15 triệt để: chỉ mục tìm chữ chạy trên cả hai database (FTS5 / `tsvector` sau một trait) thay cho
         `LIKE '%q%'` quét mọi bài đã đăng — các chốt hiện có chỉ giữ máy chủ không nghẽn, mỗi lượt tìm vẫn quét
-  - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
+  - [x] PT-11, PT-12, PT-18, PT-19: phân loại công khai chỉ theo bài hiện trên website; trần sự kiện analytics mỗi
+        ngày theo khối mạng; hạn mức mail xác nhận newsletter theo hộp thư; token SCIM sửa tài khoản cần "giữ được"
+        từng membership của nó (D-20261126-scim-covers-scope)
+  - [ ] Chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
         đếm câu SQL theo request) (PR 4, sau #516)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền

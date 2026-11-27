@@ -158,13 +158,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Build tái lập (docs/COMPATIBILITY.md): mọi mốc thời gian của image và file nén lấy từ thời điểm commit của tag.
+      - name: SOURCE_DATE_EPOCH
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
         with:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true,rewrite-timestamp=true
           # Chứng thực của BuildKit nằm cùng image: SBOM và nguồn gốc build đầy đủ.
           sbom: true
           provenance: mode=max
@@ -196,14 +203,48 @@ jobs:
           mkdir -p "dist/$name"
           container="$(docker create --platform "$PLATFORM" "$IMAGE@$DIGEST")"
           docker cp "$container:/usr/local/bin/autoxide" "dist/$name/autoxide"
+          docker cp "$container:/usr/share/doc/autoxide/THIRD-PARTY-LICENSES.html" "dist/$name/THIRD-PARTY-LICENSES.html"
           docker rm "$container" >/dev/null
           cp LICENSE-MIT LICENSE-APACHE README.md "dist/$name/"
           file "dist/$name/autoxide"
-          tar -C dist --owner=0 --group=0 -czf "dist/$name.tar.gz" "$name"
+          # Cùng thư mục cho cùng byte: xếp theo tên, chủ sở hữu và mốc thời gian cố định, gzip không ghi tên/giờ.
+          touch -d "@$SOURCE_DATE_EPOCH" "dist/$name"/*
+          tar -C dist --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_DATE_EPOCH" -cf - "$name" \
+            | gzip -n > "dist/$name.tar.gz"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binary-${{ strategy.job-index }}
           path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  # SBOM các crate Rust (CycloneDX 1.5) sinh từ Cargo.lock cho binary `autoxide` — NGOÀI job `publish`: cài `cargo-cyclonedx`
+  # chạy mã bên thứ ba (kể cả build script), nên job này chỉ có quyền đọc, không token OIDC, không quyền ghi hay ký; kết
+  # quả đi sang `publish` bằng artifact (được ký ở đó như mọi file phát hành). Danh sách nhúng trong binary do
+  # `cargo auditable` (Dockerfile) lo riêng. Công cụ ghim phiên bản (đã ra ≥ 7 ngày), `--locked`.
+  sbom:
+    needs: verify
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - run: cargo install cargo-cyclonedx --locked --version 0.5.10
+      # `cargo cyclonedx` sinh một file mỗi crate của workspace; lấy file của crate `autoxide` (mọi phụ thuộc của binary).
+      - run: |
+          cargo cyclonedx --manifest-path crates/app/Cargo.toml --format json --spec-version 1.5 \
+            --override-filename autoxide.cdx
+          mkdir sbom
+          cp crates/app/autoxide.cdx.json sbom/autoxide.cdx.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-cyclonedx
+          path: sbom/autoxide.cdx.json
           if-no-files-found: error
           retention-days: 1
 
@@ -270,11 +311,11 @@ jobs:
           retention-days: 1
 
   publish:
-    needs: [verify, image, native]
+    needs: [verify, image, sbom, native]
     # Điều kiện mặc định (`success()`) bỏ qua job khi BẤT KỲ job nào phía trên trong chuỗi `needs` bị bỏ qua — kể cả
     # `gate` bị bỏ qua có chủ đích khi dùng lại CI xanh (D-20261121-ci-batch-release-faster). v0.17.0 dính lỗi này:
     # image build xong nhưng không gắn thẻ, không cập nhật trang Release. Chỉ cần `image` xanh.
-    if: ${{ !cancelled() && needs.image.result == 'success' }}
+    if: ${{ !cancelled() && needs.image.result == 'success' && needs.sbom.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -300,6 +341,10 @@ jobs:
         with:
           pattern: binary-*
           merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom-cyclonedx
           path: dist
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -364,6 +409,12 @@ jobs:
           subject-digest: ${{ steps.index.outputs.digest }}
           sbom-path: dist/sbom.spdx.json
           push-to-registry: true
+      # Văn bản giấy phép bên thứ ba (D-20261126-third-party-licenses): lấy từ tarball đã build, đính riêng vào trang Release.
+      - name: Third-party licenses
+        run: |
+          tar -xzf dist/autoxide-*-x86_64-unknown-linux-gnu.tar.gz -O --wildcards '*/THIRD-PARTY-LICENSES.html' \
+            > dist/THIRD-PARTY-LICENSES.html
+          test -s dist/THIRD-PARTY-LICENSES.html
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
@@ -398,6 +449,8 @@ jobs:
       - name: Pack the TypeScript SDK
         working-directory: sdk/typescript
         run: |
+          # Giấy phép của chính SDK đi kèm gói (SDK không có phụ thuộc chạy, nên không có giấy phép bên thứ ba).
+          cp ../../LICENSE-MIT ../../LICENSE-APACHE .
           npm pack
           mv autoxide-sdk-*.tgz ../../dist/
       # Mọi file đính kèm: một `SHA256SUMS` ký bằng cosign (bundle Sigstore), và chứng thực nguồn gốc build (SLSA) cho
@@ -406,7 +459,7 @@ jobs:
         working-directory: dist
         run: |
           shopt -s nullglob
-          sha256sum -- *.tar.gz *.zip *.tgz sbom.spdx.json > SHA256SUMS
+          sha256sum -- *.tar.gz *.zip *.tgz sbom.spdx.json autoxide.cdx.json THIRD-PARTY-LICENSES.html > SHA256SUMS
           cat SHA256SUMS
       # Danh sách file cần chứng thực dựng ở đây, không bằng mẫu `dist/*.zip` trong `subject-path`: một nền tảng native hỏng
       # thì mẫu đó không khớp file nào và không biết `actions/attest` xử lý ra sao. Thiếu nền tảng thì ghi cảnh báo và thêm một
@@ -431,7 +484,7 @@ jobs:
           fi
           {
             echo "paths<<EOF"
-            printf '%s\n' dist/*.tar.gz dist/*.zip dist/*.tgz dist/sbom.spdx.json
+            printf '%s\n' dist/*.tar.gz dist/*.zip dist/*.tgz dist/sbom.spdx.json dist/autoxide.cdx.json dist/THIRD-PARTY-LICENSES.html
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -451,6 +504,8 @@ jobs:
           sdk="$(ls autoxide-sdk-*.tgz)"
           files=(
             "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image"
+            "autoxide.cdx.json#SBOM (CycloneDX JSON) of the Rust crates in the binary"
+            "THIRD-PARTY-LICENSES.html#License texts of the third-party Rust crates in the binary"
             "$sdk#TypeScript SDK (npm install <URL of this file>)"
             "SHA256SUMS#SHA-256 checksums of the release files"
             "SHA256SUMS.sigstore.json#Sigstore bundle: cosign signature of SHA256SUMS"
@@ -476,3 +531,15 @@ jobs:
             gh release create "$TAG" --title "Autoxide $TAG" --notes-file ../notes.md --verify-tag "${flags[@]}" \
               "${files[@]}"
           fi
+
+  # Bảng chỉ số của bản phát hành (71-G9, docs/RELEASING.md): đo sau khi bản đã đăng. Chỉ ghi vào trang tóm tắt và ghi
+  # chú bản phát hành (cần `contents: write` đúng cho việc đó), không làm đỏ Release.
+  metrics:
+    needs: [verify, publish]
+    if: ${{ !cancelled() && !github.event.repository.private && needs.publish.result == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release-metrics.yml
+    with:
+      tag: ${{ github.ref_name }}

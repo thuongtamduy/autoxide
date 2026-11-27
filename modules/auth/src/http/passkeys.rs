@@ -216,7 +216,7 @@ async fn add_passkey(
 
 /// List your passkeys.
 ///
-/// Newest first unless `order=asc`.
+/// Newest first unless `order=asc`. Signed in with a password session only.
 #[utoipa::path(
     get,
     path = "/me/passkeys",
@@ -227,6 +227,7 @@ async fn add_passkey(
     responses(
         (status = 200, description = "One page of your passkeys.", body = Page<PasskeyResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "The request used an API key or an OAuth token; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -236,6 +237,8 @@ async fn list_passkeys(
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<PasskeyResponse>, Error> {
+    // Như các thao tác passkey khác: chỉ phiên đăng nhập (API key, token OAuth không xem credential của chủ).
+    super::require_session(&principal)?;
     let page =
         state.passkeys.list(&tenant, principal.user_id(), &PageRequest::try_from(query)?).await?;
     Ok(page.map(PasskeyResponse::from))
@@ -310,8 +313,9 @@ async fn list_user_passkeys(
     Path(id): Path<Uuid>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<PasskeyResponse>, Error> {
-    let page = PageRequest::try_from(query)?;
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
     check_admin(&state, &tenant, &principal, id).await?;
+    let page = PageRequest::try_from(query)?;
     Ok(state.passkeys.list(&tenant, id, &page).await?.map(PasskeyResponse::from))
 }
 

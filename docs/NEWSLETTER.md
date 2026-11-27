@@ -103,7 +103,9 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
   with the subscription as proof.
 - The confirmation mail contains the list names and the link — never anything the visitor
   typed, so the form cannot be used to send spam to someone else. At most
-  `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` such mails go to one address a day.
+  `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` such mails go to one mailbox a day. Spellings that
+  reach the same mailbox count together: letter case, a `+tag` after the name, and dots in a Gmail
+  name.
 - The confirmation mail is always needed, even on a list without double opt-in, for a sign-up
   the anti-spam checks find suspicious (sent too fast…) and for an address that unsubscribed
   from that list or is still waiting for confirmation: nobody can sign someone else back up.

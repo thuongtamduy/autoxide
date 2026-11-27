@@ -329,7 +329,10 @@ Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa
   `kernel.migrations_pending`): chạy
   `$RUN $IMAGE migrate up` rồi mới khởi động.
   Với một máy chủ, có thể đặt `AUTOXIDE_MIGRATE_ON_START=true` thay vào đó: `serve` tự áp dụng
-  migration lúc khởi động, dưới một khoá để hai máy chủ khởi động cùng lúc không cùng migrate. Kèm
+  migration lúc khởi động (database chính trước khi mở port; rồi mọi database riêng của khách chạy
+  nền, thành một lượt migrate mà `GET /api/v1/kernel/placements/migrations` cho xem; khách trên
+  database chưa xong nhận 503 cho tới khi xong), dưới một khoá để hai máy chủ khởi động cùng lúc
+  không cùng migrate. Kèm
   `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` thì tạo luôn quản trị viên đầu tiên, kèm `AUTOXIDE_STARTUP_TASKS`
   thì nạp dữ liệu nền — đúng những gì `compose.quickstart.yml` làm. Nhiều máy chủ thì vẫn chạy
   `migrate up` một lần mỗi lần deploy: thấy rõ cái gì đổi, và migration hỏng thì deploy dừng trước
@@ -340,12 +343,14 @@ Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa
 - `docker run -p 8080:8080` mở cổng trên mọi giao diện mạng của máy; hãy dùng
   `-p 127.0.0.1:8080:8080` và một reverse proxy ([A.4](#4-đưa-lên-internet)). Thêm cấu hình vào
   `autoxide.env` (mỗi dòng một `TÊN=giá trị`, không có dấu nháy).
-- Cập nhật: kéo image mới, áp dụng migration của nó, thay container.
+- Cập nhật: kéo image mới, áp dụng migration của nó, thay container. `--all` nâng thêm mọi
+  database riêng của khách (placement) ở chế độ nhiều khách, ngoài chế độ đó không đổi gì; một
+  placement hỏng không chặn các placement khác, lệnh nêu tên nó và thoát với mã 1.
 
 ```bash
 IMAGE=ghcr.io/thuongtamduy/autoxide:<phiên bản mới>
 docker pull $IMAGE
-$RUN $IMAGE migrate up
+$RUN $IMAGE migrate up --all
 docker rm -f autoxide
 docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
   -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
@@ -1118,6 +1123,8 @@ và dashboard lấy giá trị lớn nhất, không cộng.
 
 ## Sổ tay xử lý sự cố
 
+Sự cố cần quyết định và nhiều bước (lộ key, thu hồi hàng loạt, khôi phục một khách, mất dữ liệu) ở [`RUNBOOK.vi.md`](RUNBOOK.vi.md).
+
 Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
 
 ### Lỗi máy chủ
@@ -1220,6 +1227,20 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
   mật khẩu. Quản trị viên chỉ mất bước xác thực thứ hai hay passkey:
   `autoxide user reset-mfa` / `autoxide user remove-passkeys`.
 
+### Khoá migration
+
+Mỗi lúc chỉ một tiến trình migrate. Có hai khoá: một cho database chính (`migrate up`, máy chủ khởi
+động với `AUTOXIDE_MIGRATE_ON_START`) và một cho database của khách (`migrate up --all` lấy nó sau khoá
+đầu, lượt migrate chạy nền và việc chuyển khách chỉ lấy khoá này), nên một lượt dài qua database của
+khách không bao giờ làm máy chủ đang khởi động phải chờ. Trên PostgreSQL mỗi khoá là một advisory lock
+trên kết nối riêng; proxy hay failover cắt kết nối đó thì khoá mất, và lượt dừng trước database của
+khách kế tiếp (chạy lại). Dùng PgBouncer ở chế độ session cho lệnh này, hoặc trỏ thẳng vào database.
+Trên SQLite khoá là các file cạnh database (`.migrate-lock`, `.placements-lock`); SQLite trong bộ nhớ
+không có khoá (chỉ một tiến trình). `migrate up --all` giữ khoá chính trong lúc chờ (tới 15 phút) khoá
+database của khách, nên trong lúc đó máy chủ khởi động có việc lúc khởi động (`AUTOXIDE_MIGRATE_ON_START`,
+quản trị viên đầu tiên, task khởi động) cũng phải chờ. Trong lúc cập nhật cuốn chiếu từ một bản cũ hơn khoá này, máy chủ
+bản cũ còn có thể chạy lượt migrate mà không giữ khoá: chờ cập nhật xong rồi mới chạy lượt từ API.
+
 ### Cập nhật khi hai phiên bản cùng chạy
 
 Lúc cập nhật cuốn chiếu, máy chủ cũ và mới cùng chạy trên một database, nên một bản phát hành đổi
@@ -1229,9 +1250,40 @@ database theo hai bước ("mở rộng trước, thu hẹp sau"):
    cả dạng cũ lẫn dạng mới. Bản cũ vẫn chạy: nó không biết cột mới.
 2. **Thu hẹp:** một bản phát hành sau, khi không còn máy chủ nào chạy bản cũ, thôi ghi dạng cũ và bỏ nó.
 
-`autoxide serve` không khởi động khi còn thiếu migration, nên chạy `autoxide migrate up` (thêm `--all` ở
-chế độ nhiều khách) trước khi bật máy chủ mới, rồi thay máy chủ cũ như mục "Cập nhật không làm rơi
+`autoxide serve` không khởi động khi còn thiếu migration, nên chạy `autoxide migrate up --all`
+(database chính rồi mọi database riêng của khách; ở chế độ một khách giống `migrate up`) trước khi
+bật máy chủ mới, rồi thay máy chủ cũ như mục "Cập nhật không làm rơi
 request".
+
+### Lùi về một bản trước
+
+`autoxide rollback --to X.Y.Z` đưa database chính và mọi database của khách về đúng các migration của
+bản `X.Y.Z` (từ 0.14.0 trở đi), để máy chủ của bản đó chạy lại được. Chạy bằng binary của bản đang rời
+đi: chỉ nó biết cách gỡ migration của chính nó.
+
+1. `autoxide rollback --to X.Y.Z --dry-run` liệt kê từng database: migration sẽ gỡ, bảng và cột sẽ bị
+   bỏ kèm số dòng hay giá trị đang có (cột chỉ chứa giá trị mặc định thì không mất gì), và số dòng một
+   bước gỡ sẽ xoá. Không đổi gì. Trên SQLite nó làm trên bản sao của database, trong một thư mục riêng
+   (`.autoxide-rollback-…`, chỉ user của máy chủ đọc được) cạnh file database, xoá khi xong: cần chỗ trống
+   bằng kích thước database ở đó. Lần chạy thật, khi máy chủ đã dừng, đo mà không chép. Trên PostgreSQL nó chạy
+   các bước gỡ trong một transaction rồi huỷ, nên trong lúc đó giữ lock trên các bảng nó đổi: chờ một
+   bảng đang bận tối đa `--lock-timeout-seconds` (mặc định 2) rồi dừng và báo — chạy lúc ít tải, hoặc
+   sau khi đã dừng máy chủ.
+2. Dừng mọi máy chủ và worker của bản hiện tại. Lần chạy thử cho thấy có dữ liệu sẽ mất thì backup
+   trước (`autoxide backup`).
+3. `autoxide rollback --to X.Y.Z --yes`, thêm `--accept-data-loss` khi có dữ liệu mất. Database của
+   khách trước, database chính sau cùng; database của khách nào hỏng thì database chính giữ nguyên:
+   sửa nguyên nhân rồi chạy lại đúng lệnh đó.
+4. Khởi động máy chủ của `X.Y.Z`.
+
+Module do binary của bạn tự ghép thêm (`.module(…)`) không có trong bảng phiên bản: lệnh lùi để nguyên
+migration của chúng và nói rõ; `--revert-untracked` gỡ cả chúng. Lần lùi được ghi thành một lượt migrate
+loại `rollback`; khi bản đích cũ hơn sổ ghi đó (0.19.0 trở về trước), lượt được đóng trước khi lùi
+database chính, và lỗi ở đó chỉ được in ra.
+
+Migration không trả lại được dữ liệu cho bản trước (bước thu hẹp của mở rộng–thu hẹp) làm lệnh từ
+chối; changelog liệt kê các migration như vậy ở mục ghi chú nâng cấp, và đường lùi qua chúng là bản
+backup lấy trước khi nâng.
 
 ## Kiểm trước khi chạy thật
 
