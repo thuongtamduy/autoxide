@@ -343,9 +343,29 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 `autoxide restore <thư mục backup>` ở đó trước khi khởi động service.
 
 Với `AUTOXIDE_TENANCY_MODE=multi`, bản backup có database chính (sổ khách và mọi khách trên đó) và
-mọi file ở nơi lưu file chung, nhưng không có database của các placement khác, cũng không có nơi lưu
-file riêng của placement; lệnh in cảnh báo nêu tên chúng. Backup những thứ đó bằng công cụ của chính
-database (và của nơi lưu). Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
+mọi file ở nơi lưu file chung. Thêm `--all` để backup cả mọi placement khác, kèm nơi lưu file riêng của
+nó, vào `placements/<tên>/` của thư mục; không có thì lệnh in cảnh báo nêu tên chúng. Với `--all`,
+`backup.json` của database chính được ghi sau cùng: một placement lỗi thì lệnh dừng và báo lỗi, thư
+mục không phải bản backup trọn (xoá nó rồi chạy lại). Để lấy lại một placement đã mất: restore database
+chính trước nếu nó cũng mất, tạo một database mới, trống ở đúng địa chỉ của placement, rồi chạy
+`autoxide restore <thư mục backup> --placement <tên>`: lệnh restore vào chính placement đó (cùng tên,
+cùng id), không phải vào một placement mới. Dừng service trước, như với database chính; trong lúc lệnh
+chạy, placement ở trạng thái `migrating` và khách của nó nhận 503.
+
+`restore` kiểm toàn bộ bản backup (phiên bản, module đang tắt hay không có, file) trước khi chạm đích,
+nên restore bị từ chối thì đích vẫn trống: sửa cấu hình được nêu rồi chạy lại. Nếu lệnh dừng giữa chừng
+sau đó (đầy đĩa, mất kết nối), đích có một phần dữ liệu: xoá và tạo lại database đó rồi chạy lại.
+
+Bản backup giữ nguyên schema của nguồn: lệnh không đòi database đã migrate, nên backup được ngay trước
+khi nâng cấp, và bản đang chạy trước khi nâng restore được bản backup đó (`backup.json` liệt kê các
+migration nó có). Bản mới hơn cũng restore được. Từ bản này trở đi, bản cũ hơn nguồn từ chối với
+thông báo rõ (các bản trước đó báo lỗi migration). Bản backup làm trước 0.20 không có danh sách
+migration, nên `restore` không biết nó có dữ liệu của module mà bản build này thiếu hay không: restore
+chúng bằng bản build có đủ mọi module của nguồn. Đừng thêm file vào thư mục backup (`restore` đếm file
+trong `files/`, một file `.DS_Store` cũng làm nó từ chối). Bản backup chứa các
+module đang bật: module đang tắt mà còn dữ liệu thì lệnh dừng và nói cấu hình nào bật nó.
+Cất
+`AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
 backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
 
 ## B+. Một binary với PostgreSQL, từ đầu

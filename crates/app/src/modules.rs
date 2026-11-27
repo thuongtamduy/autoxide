@@ -237,12 +237,35 @@ pub async fn refuse_dormant_data(
     command: &str,
 ) -> Result<(), String> {
     let dormant = dormant_with_data(modules, database).await?;
+    refuse_dormant(modules, &dormant, command, "the database")
+}
+
+/// Như [`refuse_dormant_data`] cho bản sao của một bản backup: chỉ xem đúng `database`, kể cả khi
+/// module đã khởi động (khi ấy `dormant_with_data` xem database điều khiển và các placement).
+pub async fn refuse_dormant_in(
+    modules: &Modules,
+    database: &Database,
+    command: &str,
+) -> Result<(), String> {
+    let dormant = modules.dormant(database).await.map_err(|error| format!("database: {error}"))?;
+    let dormant: Vec<DormantModule> =
+        dormant.into_iter().filter(|module| !module.tables_with_data.is_empty()).collect();
+    refuse_dormant(modules, &dormant, command, "the backup")
+}
+
+/// `subject`: thứ đang chứa dữ liệu đó, cho câu báo (`the database`, `the backup`).
+fn refuse_dormant(
+    modules: &Modules,
+    dormant: &[DormantModule],
+    command: &str,
+    subject: &str,
+) -> Result<(), String> {
     if dormant.is_empty() {
         return Ok(());
     }
     let names: Vec<&str> = dormant.iter().map(|module| module.name).collect();
     Err(format!(
-        "the database holds data of modules that are turned off ({}), and `autoxide {command}` \
+        "{subject} holds data of modules that are turned off ({}), and `autoxide {command}` \
          only handles the modules that are on, so that data would be left out. Run the command \
          with `{}` (or `AUTOXIDE_MODULES=all`).",
         names.join(", "),
