@@ -11012,12 +11012,26 @@ export type Data_OrdersPaymentAction = {
      * `none` (the payment could not be started yet; retry from the order).
      */
     kind: string;
+    /**
+     * Id of the collection at the payment partner, in the `ledger` module
+     * (`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment
+     * is not started yet (`kind = none`) and for cash on delivery or tenders.
+     */
+    ledger_payment_id?: string | null;
     order_id: string;
+    /**
+     * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
+     * after a failed or expired payment gets a new id). Not an id of the `ledger` module: use
+     * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
+     */
     payment_id: string;
     /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
     qr_payload?: string | null;
     redirect_url?: string | null;
-    /** `pending`, `succeeded`, `failed`, `expired`… */
+    /**
+     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its
+     * collection failed or expired; start the payment again from the order)…
+     */
     status: string;
     /** For `GET /public/payments/{token}`. */
     status_token: string;
@@ -14446,12 +14460,26 @@ export type Data_Vec_OrdersPaymentAction = {
      * `none` (the payment could not be started yet; retry from the order).
      */
     kind: string;
+    /**
+     * Id of the collection at the payment partner, in the `ledger` module
+     * (`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment
+     * is not started yet (`kind = none`) and for cash on delivery or tenders.
+     */
+    ledger_payment_id?: string | null;
     order_id: string;
+    /**
+     * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
+     * after a failed or expired payment gets a new id). Not an id of the `ledger` module: use
+     * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
+     */
     payment_id: string;
     /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
     qr_payload?: string | null;
     redirect_url?: string | null;
-    /** `pending`, `succeeded`, `failed`, `expired`… */
+    /**
+     * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its
+     * collection failed or expired; start the payment again from the order)…
+     */
     status: string;
     /** For `GET /public/payments/{token}`. */
     status_token: string;
@@ -19680,12 +19708,26 @@ export type OrdersPaymentAction = {
    * `none` (the payment could not be started yet; retry from the order).
    */
   kind: string;
+  /**
+   * Id of the collection at the payment partner, in the `ledger` module
+   * (`GET /api/v1/ledger/payments/{id}`, its refunds, its exceptions). `null` while the payment
+   * is not started yet (`kind = none`) and for cash on delivery or tenders.
+   */
+  ledger_payment_id?: string | null;
   order_id: string;
+  /**
+   * Id of this payment of the order (it stays the same while the buyer pays it; a new attempt
+   * after a failed or expired payment gets a new id). Not an id of the `ledger` module: use
+   * `ledger_payment_id` with `GET /api/v1/ledger/payments/{id}`.
+   */
   payment_id: string;
   /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
   qr_payload?: string | null;
   redirect_url?: string | null;
-  /** `pending`, `succeeded`, `failed`, `expired`… */
+  /**
+   * `pending`, `succeeded`, `expired`, `superseded` (replaced by a new attempt after its
+   * collection failed or expired; start the payment again from the order)…
+   */
   status: string;
   /** For `GET /public/payments/{token}`. */
   status_token: string;
