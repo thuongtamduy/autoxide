@@ -420,6 +420,24 @@ impl Modules {
             }
             found
         };
+        // `/{id}` và `/{key}` là cùng một route với axum (tên tham số khác nhau thì axum dừng tiến trình lúc ghép, kể cả
+        // khi method khác nhau): so theo dạng chuẩn hoá, mọi `{…}` thành `{}`.
+        let shape = |path: &str| {
+            let mut out = String::with_capacity(path.len());
+            let mut inside = false;
+            for c in path.chars() {
+                match c {
+                    '{' => {
+                        inside = true;
+                        out.push_str("{}");
+                    }
+                    '}' => inside = false,
+                    _ if inside => {}
+                    _ => out.push(c),
+                }
+            }
+            out
+        };
         let mut overlaps = Vec::new();
         for module in &self.modules {
             let endpoints = module.endpoints().into_router();
@@ -427,8 +445,16 @@ impl Modules {
             if endpoints.is_empty() {
                 continue;
             }
-            for (path, method) in pairs(&module.routes()).intersection(&endpoints) {
-                overlaps.push(format!("{}: {method} {path}", module.name()));
+            for (path, method) in &pairs(&module.routes()) {
+                for (other, other_method) in &endpoints {
+                    let same_route = shape(path) == shape(other);
+                    if same_route && (method == other_method || path != other) {
+                        overlaps.push(format!(
+                            "{}: {method} {path} (routes) and {other_method} {other} (endpoints)",
+                            module.name()
+                        ));
+                    }
+                }
             }
         }
         overlaps

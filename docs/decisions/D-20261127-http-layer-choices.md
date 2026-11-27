@@ -12,7 +12,8 @@ khác bản thiết kế ở bốn chỗ:
 2. **`Module::endpoints() -> Routes`** (có cài mặc định, D-038) thay cho bí danh tạm `ModuleRouter` đánh `#[deprecated]`.
    Kernel ghép kết quả với `Module::routes`; manifest (PR 5) thay cả hai.
 3. **Luật `wrapped-libraries` tách hai:** `[dependencies]` và `[dev-dependencies]` (`wrapped-libraries-dev`), mỗi luật một
-   baseline chỉ giảm. Module "đã chuyển" (luật `wrapped-paths` áp dụng) xét theo phụ thuộc thường.
+   baseline chỉ giảm. Module "đã chuyển" (luật `wrapped-paths` áp dụng) xét theo phụ thuộc thường. `tower` ở
+   `[dev-dependencies]` được phép (thiết kế §1.1).
 4. **`Path`, `Query`, `State` của kernel bọc extractor cùng tên của axum và trả nguyên rejection.** Lớp `problem` của
    kernel đổi rejection thành `Problem` như trước, nên hành vi không đổi. utoipa nhận extractor theo tên kiểu, nên
    OpenAPI cũng không đổi.

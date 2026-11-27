@@ -35,12 +35,18 @@ pub fn check(workspace: &Workspace) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
     for package in workspace.packages.iter().filter(|package| package.role == Role::Module) {
         let manifest = format!("{}/Cargo.toml", package.dir);
-        for dep in package.deps.iter().filter(|dep| libraries.contains(&dep.name)) {
+        // `tower` trong test của module được phép (thiết kế §1.1): chỉ ở `[dev-dependencies]`.
+        let allowed_in_dev =
+            |dep: &crate::workspace::Dep| dep.kind == DepKind::Dev && dep.name == "tower";
+        for dep in
+            package.deps.iter().filter(|dep| libraries.contains(&dep.name) && !allowed_in_dev(dep))
+        {
             // Phụ thuộc của test / bench tính riêng: testkit còn lộ kiểu `http` (`StatusCode`, `Method`), nên test của
             // module đã chuyển vẫn cần `axum` tới khi testkit bọc chúng; baseline riêng, cũng chỉ giảm.
             let (rule, section) = match dep.kind {
                 DepKind::Dev => ("wrapped-libraries-dev", "[dev-dependencies]"),
-                _ => ("wrapped-libraries", "[dependencies]"),
+                DepKind::Build => ("wrapped-libraries", "[build-dependencies]"),
+                DepKind::Normal => ("wrapped-libraries", "[dependencies]"),
             };
             violations.push(Violation {
                 rule,
@@ -437,7 +443,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("xtask")).unwrap();
         fs::create_dir_all(root.join("modules/notes/src")).unwrap();
-        fs::write(root.join(LIBRARIES), "# chú thích\naxum\nutoipa\n").unwrap();
+        fs::write(root.join(LIBRARIES), "# chú thích\naxum\ntower\nutoipa\n").unwrap();
         fs::write(root.join("modules/notes/src/lib.rs"), "pub fn module() {}\n").unwrap();
         let dep = |name: &str, kind| Dep { name: name.into(), kind };
         let package = Package {
@@ -448,6 +454,7 @@ mod tests {
             deps: vec![
                 dep("utoipa", DepKind::Normal),
                 dep("axum", DepKind::Dev),
+                dep("tower", DepKind::Dev),
                 dep("serde", DepKind::Normal),
             ],
         };

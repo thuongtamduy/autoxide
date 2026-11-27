@@ -61,10 +61,15 @@ fn parse_bounds(meta: &syn::meta::ParseNestedMeta<'_>, allowed: &[&str]) -> syn:
 
 fn parse_rules(field: &syn::Field) -> syn::Result<FieldRules> {
     let mut rules = FieldRules::default();
+    let mut seen = std::collections::BTreeSet::new();
     for attribute in field.attrs.iter().filter(|attribute| attribute.path().is_ident("validate")) {
         attribute.parse_nested_meta(|meta| {
             let name = meta.path.get_ident().map(ToString::to_string).unwrap_or_default();
             match name.as_str() {
+                "length" | "range" | "email" | "url" | "nested" if !seen.insert(name.clone()) => {
+                    // `validator` cũng chỉ giữ một luật mỗi loại; viết hai lần là nhầm, báo ngay thay vì bỏ lặng lẽ.
+                    return Err(meta.error(format!("`{name}` is declared twice on this field; keep one")));
+                }
                 "length" => rules.length = Some(parse_bounds(&meta, &["min", "max", "equal"])?),
                 "range" => {
                     rules.range =

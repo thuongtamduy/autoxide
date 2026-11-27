@@ -638,3 +638,48 @@ async fn route_trung_giua_routes_va_endpoints_thi_khong_khoi_dong() {
     .await
     .unwrap();
 }
+
+/// Get one item by `id` (cách cũ).
+#[utoipa::path(get, path = "/{id}", params(("id" = String, Path, description = "Id.")), responses((status = 200, description = "Item.")))]
+async fn item_by_id() -> &'static str {
+    "id"
+}
+
+/// Delete one item by `key` (cách mới): cùng route `/{…}` với tên tham số khác.
+#[autoxide_kernel::http::endpoint(delete, path = "/{key}", public, params(("key" = String, Path, description = "Key.")), responses((status = 204, description = "Deleted.")))]
+async fn item_by_key() -> autoxide_kernel::http::NoContent {
+    autoxide_kernel::http::NoContent
+}
+
+struct Renamed;
+
+impl Module for Renamed {
+    fn name(&self) -> &'static str {
+        "renamed"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        OpenApiRouter::new().routes(routes!(item_by_id))
+    }
+
+    fn endpoints(&self) -> autoxide_kernel::http::Routes {
+        autoxide_kernel::routes![item_by_key]
+    }
+}
+
+/// Cùng route mà tên tham số khác (`/{id}` và `/{key}`), dù khác method: axum dừng tiến trình khi ghép, nên kernel báo
+/// lỗi rõ lúc khởi động.
+#[tokio::test]
+async fn route_cung_dang_khac_ten_tham_so_thi_khong_khoi_dong() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let mut modules = Modules::new(vec![Box::new(Renamed)]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+        assert!(
+            error.contains("renamed: GET /{id} (routes) and DELETE /{key} (endpoints)"),
+            "{error}"
+        );
+    })
+    .await
+    .unwrap();
+}

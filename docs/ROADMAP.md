@@ -134,6 +134,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             `notes` không còn khai thư viện bọc ở `[dependencies]` (D-20261126-kernel-web-layer)
       - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
             `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng
+      - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
+            của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
+            (D-20261127-http-layer-choices)
       - [ ] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
             cần chúng
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
