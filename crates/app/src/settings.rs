@@ -119,6 +119,22 @@ pub fn load() -> Result<Settings, ConfigErrors> {
     read_with(&ConfigSource::load(Path::new(DOTENV_FILE))?, registry::all())
 }
 
+/// Nguồn cấu hình (biến môi trường và `.env`) để một lệnh nhỏ đọc đúng vài biến của nó qua `ConfigReader`, không dựng cả
+/// [`Settings`] (database, secret…): `autoxide healthcheck`, `autoxide initial-password`.
+pub fn source() -> Result<ConfigSource, ConfigErrors> {
+    ConfigSource::load(Path::new(DOTENV_FILE))
+}
+
+/// Đọc đúng một biến: `read` nhận reader và trả giá trị đã đọc.
+pub fn read_one<T>(
+    source: &ConfigSource,
+    read: impl FnOnce(&mut ConfigReader<'_>) -> Result<T, autoxide_kernel::config::Invalid>,
+) -> Result<T, ConfigErrors> {
+    let mut reader = ConfigReader::new(source);
+    let value = read(&mut reader);
+    reader.finish(value).map(|(value, _)| value)
+}
+
 /// Như [`load`] nhưng với MỌI module, bỏ qua `AUTOXIDE_MODULES`: cho lệnh in hợp đồng đầy đủ
 /// (`autoxide openapi`, `autoxide mcp-manifest`).
 pub fn load_everything() -> Result<Settings, ConfigErrors> {

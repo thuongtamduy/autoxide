@@ -96,6 +96,12 @@ curl http://127.0.0.1:8080/health/ready
 
 `{"data":{"status":"ok"}}` means the server and its database are ready.
 
+The image is distroless: it has no shell, `curl` or package manager (a smaller surface to attack and to patch), and runs as user
+`10001`. It checks itself with its own binary: `autoxide healthcheck` asks the server on this machine for `/health/ready`
+(`--live` for `/health/live`) and exits `0` when it answers 200. The image's `HEALTHCHECK` and the `app` service of
+`compose.yml` use it, so `docker compose ps` shows `healthy`. To look inside a running container use
+`docker debug` or `kubectl debug` (an ephemeral container with tools), not `docker exec … sh`: there is no `sh`.
+
 ### 3. Create the first administrator
 
 ```bash

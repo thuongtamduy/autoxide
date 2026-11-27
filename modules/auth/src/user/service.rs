@@ -654,6 +654,8 @@ pub(crate) async fn revoke_durable_grants_in<C: sea_orm::ConnectionTrait>(
 ) -> Result<(), Error> {
     crate::scim::revoke_created_by_in(connection, tenant, outbox, actor, id).await?;
     crate::oidc::provider::forget_configurer_in(connection, tenant, outbox, actor, id).await?;
+    // Client MCP người dùng đã duyệt cũng làm thay họ (D-20261126-mcp-oauth mục 9).
+    crate::oauth::revoke_user_grants_in(connection, tenant, outbox, actor, id).await?;
     let event = events::AccessRevoked {
         before: None,
         after: Some(serde_json::json!({"user_id": id, "reason": reason})),

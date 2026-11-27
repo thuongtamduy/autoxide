@@ -434,7 +434,7 @@ curl -sS "$API/api/v1/openapi/content.json"
 
 A walk-through on your own machine, from an empty directory to an assistant that answers questions about stock and sales. It starts from the [Quickstart](../../README.md#quickstart) (`compose.quickstart.yml`), so the server is at `http://127.0.0.1:8080`.
 
-**1. Sign in and make a key for the assistant.** Use the administrator's password from the file the server wrote (`docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
+**1. Sign in and make a key for the assistant.** Use the administrator's password from the file the server wrote (`docker compose -f compose.quickstart.yml exec autoxide autoxide initial-password`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
 
 ```bash
 API=http://127.0.0.1:8080

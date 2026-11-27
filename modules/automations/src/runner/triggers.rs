@@ -30,6 +30,8 @@ use crate::service::rules::{ACTIVE, parse_json};
 
 /// Event của module `auth` khi một API key bị thu hồi (chủ đề `auth.api_key:<id>`).
 const API_KEY_REVOKED: &str = "auth.api_key_revoked";
+/// Event của module `auth` khi một grant OAuth (client MCP) bị thu hồi (chủ đề `auth.oauth_grant:<id>`).
+const OAUTH_GRANT_REVOKED: &str = "auth.oauth_revoked";
 
 /// Bộ nhận mọi event.
 pub(crate) struct EventTrigger(pub Arc<Automations>);
@@ -47,6 +49,16 @@ impl EventHandler for EventTrigger {
                 .and_then(|id| id.parse::<uuid::Uuid>().ok())
         {
             self.0.credential_revoked(tenant, key).await?;
+        }
+        // Grant OAuth bị thu hồi: luật client đó đã tạo / bật tạm dừng như với API key (D-20261126-mcp-oauth).
+        if event.name == OAUTH_GRANT_REVOKED
+            && let Some(grant) = event
+                .subject
+                .as_deref()
+                .and_then(|subject| subject.strip_prefix("auth.oauth_grant:"))
+                .and_then(|id| id.parse::<uuid::Uuid>().ok())
+        {
+            self.0.credential_revoked(tenant, grant).await?;
         }
         // Mọi cửa vào tài khoản `run_as` vừa bị cắt (khoá, lấy lại bằng mail, khoá hẳn, xoá — có thể vì kẻ lạ
         // đã chiếm nó): luật của nó tạm dừng tới khi một người có quyền xem lại và bật lại
