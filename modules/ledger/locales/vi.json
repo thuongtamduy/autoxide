@@ -119,5 +119,7 @@
   "field:must be a payment in the currency of the money collected": "phải là thanh toán cùng tiền tệ với số tiền đã thu",
   "field:is required: this server has several payment partners and this shop has no default one (ledger.payments.default_provider)": "là bắt buộc: máy chủ này có nhiều đối tác thanh toán và cửa hàng chưa chọn đối tác mặc định (ledger.payments.default_provider)",
   "field:must be on one of this shop's own addresses: a verified domain (https) or an origin listed in the tenant setting `ledger.payments.return_origins`": "phải nằm trên một địa chỉ của chính cửa hàng: tên miền đã xác minh (https) hoặc origin khai trong cấu hình `ledger.payments.return_origins`",
-  "field:must be origins such as `https://shop.example.com`, separated by commas (no path, no `*`: list each host); not valid: {items}": "phải là các origin như `https://shop.example.com`, cách nhau bằng dấu phẩy (không có đường dẫn, không có `*`: khai từng tên máy chủ); không hợp lệ: {items}"
+  "field:must be origins such as `https://shop.example.com`, separated by commas (no path, no `*`: list each host); not valid: {items}": "phải là các origin như `https://shop.example.com`, cách nhau bằng dấu phẩy (không có đường dẫn, không có `*`: khai từng tên máy chủ); không hợp lệ: {items}",
+  "field:must be `succeeded` or `failed`": "phải là `succeeded` hoặc `failed`",
+  "field:must be a positive amount in the currency of the payment": "phải là số tiền dương, cùng loại tiền của thanh toán"
 }
