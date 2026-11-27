@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use super::checkout::{body, ready_cart};
 use super::guests::{access_token, guests};
-use super::{Call, Shop, drain};
+use super::{Call, PaymentSucceeded, Shop, drain, emit};
 
 /// Một request tới `/api/v1/orders…`: trả (status, header `Idempotent-Replayed`, thân).
 async fn send(
@@ -67,6 +67,13 @@ async fn card_order(shop: &Shop) -> (String, String, Value) {
     (id, number, placed)
 }
 
+/// `ledger` báo đã thu đủ lượt `payment` (như `ledger.payment_succeeded` thật).
+async fn paid(shop: &Shop, payment: &autoxide_ledger::api::Payment) {
+    let event = json!({"payment_id": payment.id, "source_module": "orders",
+        "amount": payment.amount, "reference": payment.reference});
+    emit(shop, &PaymentSucceeded(event)).await;
+}
+
 /// Số event `orders.payment_recorded` mang `superseded: true` của khách mặc định.
 async fn superseded_events(shop: &Shop) -> usize {
     let database = shop.database();
@@ -118,7 +125,6 @@ async fn luot_thu_hong_thi_mo_lai_ra_lan_thu_moi_va_luot_cu_thu_muon_duoc_hoan()
     TestDatabase::run(async |test| {
         let guests = guests(test, false).await;
         let shop = &guests.shop;
-        let tenant = shop.default_tenant();
         let (order, number, placed) = card_order(shop).await;
         let first = placed["data"]["payment_actions"][0].clone();
         let old = shop.ledger.payments()[0].clone();
@@ -156,7 +162,7 @@ async fn luot_thu_hong_thi_mo_lai_ra_lan_thu_moi_va_luot_cu_thu_muon_duoc_hoan()
         assert_eq!(shop.ledger.payments().len(), 2);
 
         // Thu lượt mới: đơn xác nhận.
-        shop.ledger.succeed(&tenant, &new).await.unwrap();
+        paid(shop, &new).await;
         drain(shop).await;
         let boss = Call::as_user(shop, "boss");
         let (_, view) = boss.send("GET", &format!("/{order}"), None).await;
@@ -165,9 +171,9 @@ async fn luot_thu_hong_thi_mo_lai_ra_lan_thu_moi_va_luot_cu_thu_muon_duoc_hoan()
 
         // Đối tác vẫn báo đã thu lượt cũ (hai lần): hoàn qua đối tác đúng một lần, đơn không cộng thêm,
         // một event audit.
-        shop.ledger.succeed(&tenant, &old).await.unwrap();
+        paid(shop, &old).await;
         drain(shop).await;
-        shop.ledger.succeed(&tenant, &old).await.unwrap();
+        paid(shop, &old).await;
         drain(shop).await;
         assert_eq!(
             super::refund_rows(&shop.ledger),
