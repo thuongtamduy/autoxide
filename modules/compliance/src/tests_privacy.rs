@@ -171,9 +171,10 @@ async fn tran_muc_dich_dung_khi_tao_dong_thoi() {
             })
             .count();
         assert_eq!((created, refused), (3, 5), "{answers:?}");
-        let backend = app.database().read().get_database_backend();
-        let rows = app
-            .database()
+        let tenant = app.default_tenant();
+        let backend = tenant.db().read().get_database_backend();
+        let rows = tenant
+            .db()
             .read()
             .query_all_raw(Statement::from_string(backend, "SELECT id FROM compliance_purposes"))
             .await
