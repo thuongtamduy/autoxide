@@ -354,6 +354,8 @@ pub(crate) async fn list_translation_requests(
     Path(id): Path<Uuid>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<TranslationRequestResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::CONTENT_READ)?;
     let page = PageRequest::try_from(query)?;
     let found = service.translation_requests_of(&tenant, &principal, id, &page).await?;
     Ok(found.map(TranslationRequestResponse::from))

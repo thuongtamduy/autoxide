@@ -368,6 +368,8 @@ async fn list_services(
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<BookingService>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::SERVICES_MANAGE)?;
     let page = PageRequest::try_from(query)?;
     let page = service.list_services(&tenant, &principal, &page).await?;
     let data = page.data.into_iter().map(BookingService::from_view).collect::<Result<_, _>>()?;
@@ -514,6 +516,8 @@ async fn list_resources(
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<BookingResource>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::SERVICES_MANAGE)?;
     let page = PageRequest::try_from(query)?;
     Ok(service.list_resources(&tenant, &principal, &page).await?.map(BookingResource::from))
 }

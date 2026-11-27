@@ -494,6 +494,8 @@ pub(crate) async fn list_carts(
     Query(query): Query<CartListQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<CartSummaryResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::READ)?;
     let status = query.status.as_deref().unwrap_or(crate::carts::ABANDONED);
     if ![
         crate::carts::ABANDONED,
