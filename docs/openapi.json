@@ -204065,7 +204065,7 @@
     },
     "/api/v1/kernel/records/{kind}/{id}/usages": {
       "get": {
-        "description": "Requires being able to read the record. The records of every module that point to it — posts\nusing an image, menu items linking to a page… — limited to modules whose `<module>.read` you\nhold. Use it before deleting or making a record private. Ordered by when each pointing row was\ncreated (its ID): newest first unless `order=asc`; paged with `limit` / `cursor` (`count=true`\nadds the total on the first page).",
+        "description": "Requires being able to read the record. The records of every module that point to it — posts\nusing an image, menu items linking to a page… — limited to modules whose `<module>.read` you\nhold. Use it before deleting or making a record private. Ordered by when each pointing row was\ncreated (its ID): newest first unless `order=asc`; paged with `limit` / `cursor` (`count=true`\nadds the total on the first page). Exception: a module that has no paged usage lookup of its own\norders its records by a stable key derived from their fields instead of creation time, and such\nrecords are interleaved with the others by that key.",
         "operationId": "kernel_get_record_usages",
         "parameters": [
           {
@@ -204154,7 +204154,7 @@
                 }
               }
             },
-            "description": "One page of the records using it, newest first."
+            "description": "One page of the records using it, newest first (records of a module without a paged usage lookup are ordered by a stable key instead)."
           },
           "401": {
             "content": {
