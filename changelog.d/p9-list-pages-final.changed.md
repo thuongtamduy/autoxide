@@ -11,8 +11,6 @@
   the rows read per request).
 - `GET /api/v1/compliance/documents/{id}/acceptances`, `GET /api/v1/orders/returns` and `GET /api/v1/orders/reviews`
   check the permission before the paging parameters: a caller without it gets `403`, not `422`.
-- The server refuses to start when a module declares two retention policies with the same name
-  (`Module::retention`), instead of failing `GET /api/v1/compliance/retention` with `500`.
 - The 31 remaining MCP list tools (`address.search_units`, `audit.list_entries`, `bookings.list_bookings`,
   `comments.queue`, `comments.unanswered`, `content.list`, `content.list_banners`, `content.list_revisions`,
   `content.list_theme_variants`, `content.list_types`, `conversations.list_callbacks`, `conversations.list_threads`,
