@@ -612,11 +612,14 @@ thật (P7).
         phát event và worker xét lệnh dừng giữa hai lượt cả khi còn việc (tắt nhanh sau đợt tải)
   - [x] PT-15, poll outbox: tìm công khai có trần số lượt cùng lúc, theo địa chỉ và thời gian; lượt rảnh của bộ phát
         event và worker còn một câu `EXISTS` mỗi database (D-20261126-idle-polling)
-  - [x] PT-15 triệt để: chỉ mục tìm chữ chạy trên cả hai database (FTS5 / `tsvector` sau trait `WordIndex`) thay cho
-        `LIKE '%q%'` ở danh sách bài, tìm công khai và gợi ý tìm; trần thời gian câu lệnh trên cả hai database;
-        nạp index một lần mỗi khoá; không trừ ngân sách khi phần ý nghĩa bị cắt; việc CPU bị huỷ cùng lượt tìm
-        (D-20261126-content-word-index)
-  - [ ] PT-11, PT-12, PT-18 và chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
+  - [x] PT-15 triệt để: chỉ mục đảo bằng bảng thường `content_published_words`, giống nhau trên hai database, thay cho
+        `LIKE '%q%'` ở danh sách bài, tìm công khai và gợi ý tìm; trần thời gian câu lệnh trên cả hai database (kernel
+        `within`); nạp index một lần mỗi khoá; không trừ ngân sách khi phần ý nghĩa bị cắt; việc CPU bị huỷ cùng lượt tìm
+        (D-20261126-content-word-index, D-20261127-db-read-within)
+  - [x] PT-11, PT-12, PT-18, PT-19: phân loại công khai chỉ theo bài hiện trên website; trần sự kiện analytics mỗi
+        ngày theo khối mạng; hạn mức mail xác nhận newsletter theo hộp thư; token SCIM sửa tài khoản cần "giữ được"
+        từng membership của nó (D-20261126-scim-covers-scope)
+  - [ ] Chỗ vướng cho việc test (bộ mồi dữ liệu thương mại, tool MCP trỏ operationId REST,
         đếm câu SQL theo request) (PR 4, sau #516)
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền

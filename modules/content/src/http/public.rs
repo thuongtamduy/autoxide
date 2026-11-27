@@ -576,7 +576,7 @@ pub(crate) struct PublicTermCount {
 
 /// List categories and tags that have published posts (public).
 ///
-/// No sign-in needed. Only terms with at least one published post in `locale` are listed, each
+/// No sign-in needed. Only terms with at least one post in `locale` shown on this website are listed, each
 /// with that count, so a blog can show its topics and the size of each; follow `next_cursor`
 /// for more. Get a term's posts with `GET /api/v1/content/public/posts?term_id=`.
 #[utoipa::path(
@@ -585,7 +585,7 @@ pub(crate) struct PublicTermCount {
     extensions(("x-public" = json!(true))),
     operation_id = "list_public_content_terms",
     security((), ("bearer" = [])),
-    params(PublicTermsQuery, PageQuery),
+    params(PublicTermsQuery, PageQuery, SiteQuery),
     responses(
         (status = 200, description = "One page of terms with their post counts.", body = Page<PublicTermCount>),
         (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
@@ -594,12 +594,13 @@ pub(crate) struct PublicTermCount {
 pub(crate) async fn list_terms(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
+    site: Site,
     _principal: Option<Principal>,
     Query(query): Query<PublicTermsQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
     let page = page_request(paging, Vec::new())?;
-    let found = service.public_terms(&tenant, &query.locale, query.taxonomy, &page).await?;
+    let found = service.public_terms(&tenant, &site, &query.locale, query.taxonomy, &page).await?;
     let page = found.map(|(term, posts)| PublicTermCount {
         term: PublicTerm {
             id: term.id,
@@ -709,14 +710,15 @@ pub(crate) struct PublicTermPage {
 /// Get a category or tag by slug (public).
 ///
 /// No sign-in needed. Looks in the language, then in the default language (`locale` says
-/// which was used).
+/// which was used). Only a term that at least one entry shown on this website carries is found;
+/// any other term answers `404`.
 #[utoipa::path(
     get,
     path = "/public/terms/{taxonomy}/{slug}",
     extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_term",
     security((), ("bearer" = [])),
-    params(("taxonomy" = Taxonomy, Path, description = "`category` or `tag`."), ("slug" = String, Path, description = "Slug of the term."), LocaleQuery),
+    params(("taxonomy" = Taxonomy, Path, description = "`category` or `tag`."), ("slug" = String, Path, description = "Slug of the term."), LocaleQuery, SiteQuery),
     responses(
         (status = 200, description = "The term.", body = Data<PublicTermPage>),
         (status = 404, description = "No such term; code `content.term_not_found`.", body = Problem),
@@ -726,11 +728,13 @@ pub(crate) struct PublicTermPage {
 pub(crate) async fn get_term(
     State(service): State<Arc<ContentService>>,
     tenant: TenantContext,
+    site: Site,
     _principal: Option<Principal>,
     Path((taxonomy, slug)): Path<(Taxonomy, String)>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Response, Error> {
-    let (full, shown) = service.term_by_slug(&tenant, taxonomy, &query.locale, &slug).await?;
+    let (full, shown) =
+        service.term_by_slug(&tenant, &site, taxonomy, &query.locale, &slug).await?;
     let text = full.texts.iter().find(|text| text.locale == shown.locale).cloned();
     let text = text.ok_or_else(|| Error::internal("term name missing"))?;
     let data = PublicTermPage {
