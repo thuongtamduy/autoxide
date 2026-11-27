@@ -31008,8 +31008,20 @@
                   "null"
                 ]
               },
+              "from_version": {
+                "description": "The release a rollback goes from; `null` for a placement run.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "id": {
                 "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).",
+                "example": "placements",
                 "type": "string"
               },
               "placement": {
@@ -31031,6 +31043,13 @@
                 "example": "done",
                 "type": "string"
               },
+              "to_version": {
+                "description": "The release a rollback goes to; `null` for a placement run.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "updated_at": {
                 "format": "date-time",
                 "type": "string"
@@ -31039,6 +31058,7 @@
             "required": [
               "id",
               "status",
+              "kind",
               "applied",
               "created_at",
               "updated_at"
@@ -54616,8 +54636,20 @@
               "null"
             ]
           },
+          "from_version": {
+            "description": "The release a rollback goes from; `null` for a placement run.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).",
+            "example": "placements",
             "type": "string"
           },
           "placement": {
@@ -54639,6 +54671,13 @@
             "example": "done",
             "type": "string"
           },
+          "to_version": {
+            "description": "The release a rollback goes to; `null` for a placement run.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "updated_at": {
             "format": "date-time",
             "type": "string"
@@ -54647,6 +54686,7 @@
         "required": [
           "id",
           "status",
+          "kind",
           "applied",
           "created_at",
           "updated_at"
@@ -72973,8 +73013,20 @@
                     "null"
                   ]
                 },
+                "from_version": {
+                  "description": "The release a rollback goes from; `null` for a placement run.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "id": {
                   "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`placements` (migrations of the tenant databases) or `rollback` (`autoxide rollback --to`).",
+                  "example": "placements",
                   "type": "string"
                 },
                 "placement": {
@@ -72996,6 +73048,13 @@
                   "example": "done",
                   "type": "string"
                 },
+                "to_version": {
+                  "description": "The release a rollback goes to; `null` for a placement run.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "updated_at": {
                   "format": "date-time",
                   "type": "string"
@@ -73004,6 +73063,7 @@
               "required": [
                 "id",
                 "status",
+                "kind",
                 "applied",
                 "created_at",
                 "updated_at"
@@ -166092,7 +166152,7 @@
     },
     "/api/v1/content/public/terms": {
       "get": {
-        "description": "No sign-in needed. Only terms with at least one published post in `locale` are listed, each\nwith that count, so a blog can show its topics and the size of each; follow `next_cursor`\nfor more. Get a term's posts with `GET /api/v1/content/public/posts?term_id=`.",
+        "description": "No sign-in needed. Only terms with at least one post in `locale` shown on this website are listed, each\nwith that count, so a blog can show its topics and the size of each; follow `next_cursor`\nfor more. Get a term's posts with `GET /api/v1/content/public/posts?term_id=`.",
         "operationId": "content_list_public_content_terms",
         "parameters": [
           {
@@ -166158,6 +166218,16 @@
             "required": false,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
             }
           },
           {
@@ -166247,6 +166317,12 @@
             "kind": "boolean",
             "name": "count",
             "operator": "eq"
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "kind": "uuid",
+            "name": "site",
+            "operator": "eq"
           }
         ],
         "x-autoxide-list": "content.list_public_content_terms",
@@ -166255,7 +166331,7 @@
     },
     "/api/v1/content/public/terms/{taxonomy}/{slug}": {
       "get": {
-        "description": "No sign-in needed. Looks in the language, then in the default language (`locale` says\nwhich was used).",
+        "description": "No sign-in needed. Looks in the language, then in the default language (`locale` says\nwhich was used). Only a term that at least one entry shown on this website carries is found;\nany other term answers `404`.",
         "operationId": "content_get_public_content_term",
         "parameters": [
           {
@@ -166283,6 +166359,16 @@
             "name": "locale",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },

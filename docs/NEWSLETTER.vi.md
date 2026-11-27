@@ -101,8 +101,9 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
 - Chữ đồng ý, phiên bản của nó, thời điểm, nguồn và dấu vết băm của khối địa chỉ mạng được lưu
   cùng đăng ký làm bằng chứng.
 - Mail xác nhận chỉ có tên danh sách và link — không bao giờ có chữ người đọc gõ, để form không
-  bị dùng gửi thư rác cho người khác. Mỗi địa chỉ nhận tối đa
-  `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` mail xác nhận mỗi ngày.
+  bị dùng gửi thư rác cho người khác. Mỗi hộp thư nhận tối đa
+  `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` mail xác nhận mỗi ngày. Các cách viết cùng tới một hộp
+  thư được đếm chung: chữ hoa / thường, phần `+nhãn` sau tên, dấu chấm trong tên Gmail.
 - Luôn cần mail xác nhận, kể cả ở danh sách không bật double opt-in, khi đăng ký bị bộ chống
   spam nghi ngờ (gửi quá nhanh…) và khi địa chỉ đã huỷ đăng ký danh sách đó hay vẫn đang chờ xác
   nhận: không ai đăng ký lại hộ người khác được.

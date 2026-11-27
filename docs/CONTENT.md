@@ -207,6 +207,11 @@ No sign-in needed. Only published versions are ever returned — drafts never.
 
 (All under `/api/v1/content`.)
 
+A category or tag is public only once an entry shown on the website carries it: the term page answers
+`404 content.term_not_found` before that, and the term list leaves it out. This is on purpose — a term
+being prepared is not revealed — so a menu item pointing to an empty category leads to a 404 page until
+a post carries the category.
+
 **Several sites on one server.** On a server with several tenants, each tenant is its own site:
 the public endpoints answer for the tenant of the request — its own domain, or the
 `Autoxide-Tenant` header (its short name). Two tenants may use the same slugs, addresses,
