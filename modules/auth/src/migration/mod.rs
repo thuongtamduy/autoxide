@@ -43,6 +43,7 @@ mod m0044_scim;
 mod m0045_scim_groups;
 mod m0046_oidc_configured_by;
 pub(crate) mod m0047_list_page_indexes;
+pub(crate) mod m0048_oauth;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -138,6 +139,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0046_oidc_configured_by::Migration),
         // Index cho danh sách có phân trang keyset (bước 70 P9).
         Box::new(m0047_list_page_indexes::Migration),
+        // Máy chủ uỷ quyền OAuth 2.1 cho MCP (bước 71 G4, D-20261126-mcp-oauth).
+        Box::new(m0048_oauth::Migration),
     ]
 }
 

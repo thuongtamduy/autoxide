@@ -62,7 +62,10 @@ pub(super) fn render(inputs: &LlmsInputs<'_>) -> String {
             text,
             "Authenticate machines with an API key: send `Authorization: Bearer <API key>`. A \
              signed-in user creates one, with only the permissions the agent needs, at \
-             `POST {api}/auth/api-keys`.\n"
+             `POST {api}/auth/api-keys`. MCP clients can instead sign in with OAuth 2.1 when the server \
+             enables it: start from `/.well-known/oauth-protected-resource/mcp`. Refresh OAuth tokens one \
+             at a time: a refresh token sent twice (also by two parallel refreshes) counts as stolen and \
+             revokes the whole approval.\n"
         );
     }
     let _ = writeln!(
