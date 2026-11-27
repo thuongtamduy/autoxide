@@ -38,7 +38,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ChangePasswordRequest {
     current_password: String,
-    /// 12 to 128 characters.
+    /// 15 to 128 characters, not a common or breached password.
     new_password: String,
     /// `true`: also remove every API key, passkey and external sign-in link of the account, as a
     /// password recovery does - use it after a suspected compromise. Default `false`: they keep
@@ -495,7 +495,7 @@ async fn update_me(
         (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).", body = Problem),
-        (status = 422, description = "The body is missing a field, or the new password breaks the rules (see `errors`).", body = Problem),
+        (status = 422, description = "The body is missing a field, or the new password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`) (see `errors`).", body = Problem),
         (status = 429, description = "Too many wrong passwords for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
     )
 )]

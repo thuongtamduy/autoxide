@@ -108,8 +108,8 @@ pub(crate) struct AcceptInvitationRequest {
     token: String,
     /// For a new account: display name (default: the one in the invitation).
     name: Option<String>,
-    /// For a new account: a password (12 to 128 characters). Omit to sign in later with a link
-    /// or add a passkey with the tokens returned here.
+    /// For a new account: a password (15 to 128 characters, not a common or breached one).
+    /// Omit to sign in later with a link or add a passkey with the tokens returned here.
     password: Option<String>,
 }
 
@@ -272,7 +272,7 @@ async fn resend_invitation(
         (status = 400, description = "The invitation is wrong, used, revoked or expired; code `auth.invitation_invalid`.", body = Problem),
         (status = 403, description = "You are signed in with another account than the invited email; code `auth.invitation_email_mismatch`.", body = Problem),
         (status = 409, description = "The email already has an account: sign in, then accept; code `auth.invitation_sign_in_required`.", body = Problem),
-        (status = 422, description = "The password is too short or too long; see `errors`.", body = Problem),
+        (status = 422, description = "The password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn accept_invitation(
