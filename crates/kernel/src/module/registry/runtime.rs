@@ -402,12 +402,47 @@ impl Modules {
         crate::sync::declared(&self.modules)
     }
 
+    /// The path + method pairs a module serves both through `Module::routes` and `Module::endpoints`, as
+    /// `"<module>: <METHOD> <path>"`: the two would collide when merged. Called at the end of `start`.
+    pub(crate) fn overlapping_routes(&self) -> Vec<String> {
+        const METHODS: [&str; 8] =
+            ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
+        // Cặp (path, method) mà một router khai trong tài liệu OpenAPI của nó (route nào cũng có tài liệu, luật 6).
+        let pairs = |router: &OpenApiRouter| {
+            let document = serde_json::to_value(&router.get_openapi().paths).unwrap_or_default();
+            let mut found = std::collections::BTreeSet::new();
+            if let Some(paths) = document.as_object() {
+                for (path, item) in paths {
+                    for method in METHODS.iter().filter(|method| item.get(**method).is_some()) {
+                        found.insert((path.clone(), method.to_uppercase()));
+                    }
+                }
+            }
+            found
+        };
+        let mut overlaps = Vec::new();
+        for module in &self.modules {
+            let endpoints = module.endpoints().into_router();
+            let endpoints = pairs(&endpoints);
+            if endpoints.is_empty() {
+                continue;
+            }
+            for (path, method) in pairs(&module.routes()).intersection(&endpoints) {
+                overlaps.push(format!("{}: {method} {path}", module.name()));
+            }
+        }
+        overlaps
+    }
+
     /// Routes of each module with the module name, in registration order. Call after [`start`](Self::start).
     /// Besides each module's routes there is also `("me", ...)`: the "mine" endpoint served by the kernel
     /// under `/api/v1/me` (per-user flags, D-207) - `me` is a reserved name, no module uses it.
     pub fn routes(&self) -> Vec<(&'static str, OpenApiRouter)> {
-        let mut routes: Vec<(&'static str, OpenApiRouter)> =
-            self.modules.iter().map(|module| (module.name(), module.routes())).collect();
+        let mut routes: Vec<(&'static str, OpenApiRouter)> = self
+            .modules
+            .iter()
+            .map(|module| (module.name(), module.routes().merge(module.endpoints().into_router())))
+            .collect();
         // Schema bộ lọc (P7): sinh từ tham số của từng endpoint danh sách, gắn vào OpenAPI và giữ
         // lại để kiểm view đã lưu.
         let mut lists = Vec::new();

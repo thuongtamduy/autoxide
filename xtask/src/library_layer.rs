@@ -11,7 +11,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::boundaries::{Violation, rust_files};
-use crate::workspace::{Role, Workspace};
+use crate::workspace::{DepKind, Role, Workspace};
 
 /// Thư viện đã có (hay sẽ có) lớp của kernel; module không khai trực tiếp.
 pub const LIBRARIES: &str = "xtask/wrapped-libraries.txt";
@@ -36,12 +36,19 @@ pub fn check(workspace: &Workspace) -> Result<Vec<Violation>, String> {
     for package in workspace.packages.iter().filter(|package| package.role == Role::Module) {
         let manifest = format!("{}/Cargo.toml", package.dir);
         for dep in package.deps.iter().filter(|dep| libraries.contains(&dep.name)) {
+            // Phụ thuộc của test / bench tính riêng: testkit còn lộ kiểu `http` (`StatusCode`, `Method`), nên test của
+            // module đã chuyển vẫn cần `axum` tới khi testkit bọc chúng; baseline riêng, cũng chỉ giảm.
+            let (rule, section) = match dep.kind {
+                DepKind::Dev => ("wrapped-libraries-dev", "[dev-dependencies]"),
+                _ => ("wrapped-libraries", "[dependencies]"),
+            };
             violations.push(Violation {
-                rule: "wrapped-libraries",
+                rule,
                 location: manifest.clone(),
                 message: format!(
-                    "module depends on `{}`, which the kernel wraps: use the kernel layer instead (`autoxide_kernel::db` \
-                     for queries; see docs/research/kernel-contract-1-0.md) and remove the dependency",
+                    "module depends on `{}` ({section}), which the kernel wraps: use the kernel layer instead \
+                     (`autoxide_kernel::db` for queries, `autoxide_kernel::http` for endpoints; see \
+                     docs/research/kernel-contract-1-0.md) and remove the dependency",
                     dep.name
                 ),
             });
@@ -110,7 +117,10 @@ pub fn check_strict(workspace: &Workspace) -> Result<Vec<Violation>, String> {
         }
     }
     for package in workspace.packages.iter().filter(|package| package.role == Role::Module) {
-        let converted = !package.deps.iter().any(|dep| libraries.contains(&dep.name));
+        let converted = !package
+            .deps
+            .iter()
+            .any(|dep| dep.kind != DepKind::Dev && libraries.contains(&dep.name));
         let files = module_files(workspace, package)?;
         if converted {
             for (file, text) in &files {
@@ -418,6 +428,35 @@ fn is_test_file(file: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::workspace::{Dep, Package};
+
+    // Phụ thuộc thường và phụ thuộc của test tính hai luật riêng; module chỉ còn thư viện bọc ở dev vẫn là "đã chuyển".
+    #[test]
+    fn thu_vien_boc_tach_phu_thuoc_thuong_va_dev() {
+        let root = std::env::temp_dir().join(format!("xtask-wrapped-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("xtask")).unwrap();
+        fs::create_dir_all(root.join("modules/notes/src")).unwrap();
+        fs::write(root.join(LIBRARIES), "# chú thích\naxum\nutoipa\n").unwrap();
+        fs::write(root.join("modules/notes/src/lib.rs"), "pub fn module() {}\n").unwrap();
+        let dep = |name: &str, kind| Dep { name: name.into(), kind };
+        let package = Package {
+            name: "autoxide-notes".into(),
+            license: None,
+            dir: "modules/notes".into(),
+            role: Role::Module,
+            deps: vec![
+                dep("utoipa", DepKind::Normal),
+                dep("axum", DepKind::Dev),
+                dep("serde", DepKind::Normal),
+            ],
+        };
+        let workspace = Workspace { root: root.clone(), packages: vec![package] };
+        let rules: Vec<&str> =
+            check(&workspace).unwrap().iter().map(|violation| violation.rule).collect();
+        assert_eq!(rules, ["wrapped-libraries", "wrapped-libraries-dev"]);
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn record_nhieu_dong_cfg_attr_module_long() {

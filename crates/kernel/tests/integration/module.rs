@@ -581,3 +581,60 @@ fn khai_deprecated_sai_bi_tu_choi_luc_dang_ky() {
     assert!(error.contains("`since` must be a YYYY-MM-DD date"), "{error}");
     assert!(error.contains("`sunset` must come after `since`"), "{error}");
 }
+
+/// `GET /` khai bằng `#[endpoint]` (lớp HTTP của kernel).
+#[autoxide_kernel::http::endpoint(get, path = "/", public, responses((status = 200, description = "Hello.")))]
+async fn hello() -> &'static str {
+    "hello"
+}
+
+/// `GET /other` khai bằng `#[endpoint]`.
+#[autoxide_kernel::http::endpoint(get, path = "/other", public, responses((status = 200, description = "Other.")))]
+async fn other() -> &'static str {
+    "other"
+}
+
+/// Module khai cùng một route ở cả `routes` (cách cũ) và `endpoints` (cách mới) khi `twice`.
+struct Both {
+    twice: bool,
+}
+
+impl Module for Both {
+    fn name(&self) -> &'static str {
+        "both"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        OpenApiRouter::new().routes(routes!(list_notes))
+    }
+
+    fn endpoints(&self) -> autoxide_kernel::http::Routes {
+        if self.twice {
+            autoxide_kernel::routes![hello, other]
+        } else {
+            autoxide_kernel::routes![other]
+        }
+    }
+}
+
+/// `Module::routes` và `Module::endpoints` trùng path + method: không khởi động, báo đúng route trùng (thay vì axum
+/// dừng tiến trình lúc ghép router); không trùng thì hai cách cùng chạy.
+#[tokio::test]
+async fn route_trung_giua_routes_va_endpoints_thi_khong_khoi_dong() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let mut modules = Modules::new(vec![Box::new(Both { twice: true })]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+        assert!(error.contains("both: GET /"), "{error}");
+        assert!(!error.contains("/other"), "{error}");
+
+        let mut modules = Modules::new(vec![Box::new(Both { twice: false })]).unwrap();
+        modules.start(&db).unwrap();
+        let routes = modules.routes();
+        let (_, router) = routes.iter().find(|(name, _)| *name == "both").unwrap();
+        let paths: Vec<&String> = router.get_openapi().paths.paths.keys().collect();
+        assert_eq!(paths, ["/", "/other"]);
+    })
+    .await
+    .unwrap();
+}
