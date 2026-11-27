@@ -144,7 +144,7 @@ krilla = { version = "0.8.2", default-features = false }
 # Tra glyph và đo bề rộng chữ cho PDF (cùng phiên bản krilla đã kéo vào).
 skrifa = "0.50"
 # File Excel (.xlsx) của bản xuất kế toán (D-354). Không bật feature nào (không serde, không polars).
-rust_xlsxwriter = { version = "0.102.0", default-features = false }
+rust_xlsxwriter = { version = "0.103.0", default-features = false }
 # Thời gian thay `chrono` / `chrono-tz` (đã ngừng bảo trì, đã gỡ; D-20261121-time-library): lớp `autoxide_kernel::time`
 # dựng trên `jiff`. Bỏ `tz-system` / `tzdb-zoneinfo` (đọc `/usr/share/zoneinfo` của máy): cơ sở dữ liệu múi giờ
 # luôn nhúng vào binary (`tzdb-bundle-always`) như `chrono-tz`, để mọi máy (kể cả image không có zoneinfo) tính
