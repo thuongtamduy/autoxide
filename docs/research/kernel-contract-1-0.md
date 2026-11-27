@@ -771,134 +771,185 @@ người đọc; và lọc/sắp theo trường nhạy cảm vẫn lộ giá tr�
 ### 14.2 Mã hoá mức trường (G13) cắm vào `db`
 
 Đây là **nguồn duy nhất** mô tả cách mã hoá mức trường ghép vào lớp `db`, kể cả vòng đời khoá. Thiết kế G13
-(`docs/research/g13-field-encryption-audit.md`, PR #577) giữ phần mật mã (envelope, `enc:v1`, `KeyProvider`, nhật ký kiểm
-toán) và dẫn sang mục này cho phần chạm hợp đồng kernel. Code của G13 đi sau G1 PR 2–5. Đã qua rà độc lập lần 1 (#580).
+(`docs/research/g13-field-encryption-audit.md`, PR #577) giữ phần mật mã (envelope, `enc:v1`, nhật ký kiểm toán) và dẫn
+sang mục này cho phần chạm hợp đồng kernel. Code của G13 đi sau G1 PR 2–5. Đã qua hai vòng rà độc lập (#580).
 
-#### a. Kiểu và thuộc tính
+Giới hạn phải nói thật: kiểm quyền `reveal` bảo vệ **người gọi API** (REST, MCP, job do người dùng khởi tạo), không bảo
+vệ trước **mã của module** — module chạy trong cùng tiến trình với kernel. Chống mã module xấu là việc của rà soát mã và
+hạng module (§2.1), không phải của lớp này.
+
+#### a. Kiểu, thuộc tính, purpose
 
 - Bộ kiểu trường (§3.1) nhận thêm `db::Sensitive<T, C = class::Sensitive>` (`T`: `String`, `serde_json::Value`; cột cho NULL
   là `Option<Sensitive<T, C>>`) và `db::BlindIndex<T>`. `C` là lớp dữ liệu (`privacy::class::{Personal, Sensitive,
-  Financial}`): số tài khoản chi trả là `Sensitive<String, class::Financial>`. Thêm ở PR 1 của G13, không chen vào PR 2: kiểu
-  trường mới là thay đổi cộng thêm, và derive đang từ chối mọi tuỳ chọn lạ trong `#[record(…)]`.
+  Financial}`): số tài khoản chi trả là `Sensitive<String, class::Financial>`. Thêm ở PR 1 của G13: kiểu trường mới là thay
+  đổi cộng thêm, và derive đang từ chối mọi tuỳ chọn lạ trong `#[record(…)]`.
 - **Kiểu quyết định việc mã hoá**, không có `#[record(encrypted)]`. Ngoại lệ duy nhất: `#[record(plaintext = "<lý do>")]`
   (lưu rõ trong lúc chuyển; vẫn che ở egress); gate `sensitive-plaintext` đếm, baseline chỉ giảm.
-- Derive từ chối (lỗi biên dịch): `Sensitive` trên record `scope = global` (không có khách thì không có DEK); `Sensitive`
-  trên record không có `#[record(primary_key)]` (AAD cần khoá chính). Cột khoá chính không cài `Settable`.
-- `purpose` của trường là `<module>.<tên trường>` mặc định, đổi được bằng `#[record(purpose = "…")]`. Nó được lưu vào AAD và
-  `kernel_data_keys`, nên **đổi tên trường Rust phải giữ `purpose` cũ** bằng thuộc tính này; `doctor` cảnh báo purpose có dữ
-  liệu mà không record nào khai.
-- Kiểm lúc khởi động (`check_records`): cột `Sensitive` và cột `BlindIndex` phải là `TEXT`.
-- Đường dẫn: `Sensitive`, `BlindIndex`, `Classified` ở `autoxide_kernel::db` / `privacy` là **ổn định** khi ≥ 2 module dùng
-  trước 1.0 (`compliance`, `ledger`); chưa đủ thì ở `unstable::`, và khi lên hạng giữ `pub use` cũ kèm `#[deprecated]` một bản.
+- **Loại cột ở kiểu, không ở tên kiểu.** `Col<R, T, K = Plain>` thêm tham số loại `K` ∈ `Plain`, `Key` (khoá chính),
+  `Sealed` (trường `Sensitive`), `Index` (trường `BlindIndex`). Derive chọn `K` từ associated const của trait trường
+  (`DbField::KIND`), không so tên kiểu (bí danh hay đường dẫn khác vẫn đúng). Chỉ `Plain` cài `Settable`. API của PR 2 đổi theo:
+  `Update::set` / `set_expr` / `adjust` đòi `K = Plain`; `on_conflict_update` (danh sách cập nhật) đòi `Plain`;
+  `eq`/`ne`/`is_in`/`order_*`/`group_by`/`select`/hàm gộp nhận `Plain | Key`; `Find::page` / `id_cursor` nhận
+  `Col<R, Uuid, Key>`. `Col<R, T>` viết sẵn trong module vẫn là `Plain`, nên chỉ chỗ `set(R::ID, …)` (vốn là lỗi) thôi biên dịch.
+- Derive từ chối: `Sensitive` trên record `scope = global` (không có khách thì không có khoá); `Sensitive` trên record không
+  có `#[record(primary_key)]`.
+- **Purpose** của trường mặc định là `<module>.<đuôi tên bảng>.<trường>` (bảng `ledger_payout`, trường `account` →
+  `ledger.payout.account`); đổi được bằng `#[record(purpose = "…")]`, bắt buộc có tiền tố `<module>.`. Purpose được lưu vào AAD
+  và `kernel_data_keys`, nên **đổi tên trường Rust phải giữ purpose cũ** bằng thuộc tính này.
+- `RecordInfo` mang loại (`plain` / `sensitive` / `blind_index`) và purpose của từng cột. `check_records` từ chối lúc khởi
+  động khi: các record của cùng một bảng khai một cột khác loại hay khác purpose; một purpose dùng cho hai cột; một purpose
+  dùng chung cho bảng thuộc `retained_tables` và bảng không thuộc; cột `Sensitive` / `BlindIndex` không phải `TEXT`.
+  `doctor` cảnh báo purpose có dữ liệu mà không record nào khai.
+- Đường dẫn: `Sensitive`, `BlindIndex`, `Classified` là **ổn định** khi ≥ 2 module dùng trước 1.0 (`compliance`, `ledger`);
+  chưa đủ thì ở `unstable::`, lên hạng thì giữ `pub use` cũ kèm `#[deprecated]` một bản.
 
-#### b. Đọc: giải mã lười, `reveal` bất đồng bộ
+#### b. Khoá: ba tầng, theo khách
 
-`Record::read` là hàm đồng bộ, không có khoá, nên **không giải mã**: `Sensitive<T, C>` đọc từ dòng chỉ giữ bản mã cùng ngữ
-cảnh AAD (khách, purpose, khoá chính). Giá trị ra bằng một lời gọi duy nhất, chữ ký chốt từ giờ:
+`KeyProvider` giữ **KEK** của bản cài → **tenant key** (một khoá mỗi khách) → **DEK** (một khoá mỗi khách và purpose, bọc bằng
+tenant key, lưu trong `kernel_data_keys`).
+
+- `KeyProvider` dùng KMS / Vault: tenant key là một khoá của KMS cho mỗi khách (tạo khi tạo khách), không rời KMS.
+- `LocalKeyProvider` (mặc định): tenant key nằm trong một **kho khoá riêng**, ngoài database và ngoài file backup của
+  database (thư mục cấu hình bằng `AUTOXIDE_KEY_STORE`, mỗi khách một file, bọc bằng KEK suy ra từ khoá gốc). RUNBOOK (G14)
+  ghi luật backup riêng cho kho này: backup tách nơi, tách quyền với backup database; mất kho là mất dữ liệu nhạy cảm.
+- **Huỷ khoá một khách** (D-20261126-tenant-delete-key-shred) là huỷ tenant key của khách đó (KMS: lên lịch xoá khoá;
+  local: xoá file và mọi bản sao của nó theo luật backup của kho). Bản backup database cũ còn DEK đã bọc nhưng không còn
+  tenant key để mở. Trước khi huỷ, DEK của purpose phải lưu giữ được **bọc lại bằng retention key** riêng của khách (cũng
+  trong `KeyProvider`), giữ tới hết hạn lưu rồi huỷ.
+- Khoá đặt tên lock cho blind index (mục g) suy ra từ khoá gốc theo khách và purpose, không xoay, không lưu ở đâu.
+
+#### c. Đọc: giải mã lười, `reveal` theo handle
+
+`Record::read` là hàm đồng bộ, không có khoá, nên **không giải mã**: `Sensitive<T, C>` đọc từ dòng chỉ giữ bản mã, `dek_id`,
+purpose, khoá chính và nút tổ chức của dòng (cột `#[record(org)]`). Chữ ký chốt từ giờ:
 
 ```rust
 impl<T: DbValue, C: DataClass> Sensitive<T, C> {
-    /// Kiểm `<module>.read_<lớp>` của `principal`, ghi audit "đọc dữ liệu nhạy cảm" (đường riêng của kernel), mở DEK
-    /// (cache; trượt cache thì gọi `KeyProvider` — ngoài transaction ghi), giải mã, kiểm AAD.
-    pub async fn reveal(&self, tenant: &TenantContext, principal: &Principal) -> Result<Classified<T, C>, Error>;
+    pub async fn reveal<H: RevealHandle>(&self, handle: &H, principal: &Principal) -> Result<Classified<T, C>, Error>;
 }
 ```
 
-`Sensitive` không cài `Serialize`/`Display`; `Debug` in `«sensitive»`. Việc nền (job) đọc bằng chính `reveal`, với
-`Principal` của job mang tên job và **lý do** (`Principal::job(name, reason)`); audit ghi cả hai. Không có đường giải mã khác.
+- `handle` là `TenantRead` / `TenantDb` (ngoài transaction: được nạp khoá từ `KeyProvider` khi trượt cache) hay `TenantTx`
+  (trong transaction ghi: **chỉ** đọc bộ khoá đã nạp của Tx, trượt là lỗi `db.data_key_unavailable`).
+- Khách lấy từ **handle**, không từ giá trị: AAD dựng với khách của handle, DEK tra theo cặp (khách của handle, `dek_id`), và
+  `principal.tenant_id()` phải bằng khách của handle. Giá trị chép sang khách khác thì AEAD báo lỗi. Test trên hai database.
+- Quyền: `<module>.read_<lớp>` (manifest tự khai khi module có trường `Sensitive` lớp đó) kiểm **tại nút tổ chức của
+  dòng**, tôn trọng giới hạn của API key (phạm vi nút, permission đã chọn).
+- Purpose không module nào khai: từ chối.
+- **Audit không ghi ngay** (một lần ghi mỗi `reveal` sẽ chiếm pool ghi một kết nối của SQLite và làm cạn pool Postgres): mỗi
+  `reveal` thêm vào bộ đệm gắn với request (hay với handle khi không có request); kernel ghi bộ đệm sau khi transaction /
+  request kết thúc, gộp mỗi (request, purpose) thành một dòng có số đếm, qua đường ghi riêng của kernel.
+- `Sensitive` không cài `Serialize`/`Display`; `Debug` in `«sensitive»`.
 
-#### c. Ghi: codec trong handle, khoá nạp trước transaction
+#### d. Job đọc dữ liệu nhạy cảm
 
-- Không gọi `KeyProvider` (có thể là KMS qua mạng) trong transaction ghi (luật dữ liệu). `begin_write()` / `write()` của handle
-  khách **nạp sẵn** mọi DEK và trạng thái cột (mục d) của khách vào cache **trước** `BEGIN` (vài dòng mỗi khách). Trong
-  transaction, codec chỉ đọc cache; trượt cache là lỗi `db.data_key_unavailable`, không đi lấy khoá.
-- DEK của một purpose được tạo khi tạo khách hoặc khi bật module có purpose đó, trong một transaction ngắn riêng (sau khi đã
-  bọc khoá ngoài transaction).
+- `Principal` của job chỉ bộ chạy job của kernel tạo được, lấy từ `JobContext` (không có hàm dựng `pub`); tên là loại job
+  module đó đã đăng ký.
+- Quyền reveal của từng loại job khai trong manifest: `.job::<PayoutExport>().reveals::<class::Financial>("<lý do>")`; audit ghi
+  loại job và lý do.
+- Job do người dùng khởi tạo chạy bằng `PrincipalSnapshot` của người đó (quyền của người đó lúc tạo job).
+- Luật xtask mới `principal-constructors`: `Principal::new` / `with_all_permissions` trong `src` chỉ ở kernel và `auth` (test thì
+  được).
+
+#### e. Ghi: codec trong handle, khoá nạp trước transaction
+
+- Không gọi `KeyProvider` trong transaction ghi. `begin_write()` / `write()` của handle khách nạp sẵn bộ khoá của khách (mọi
+  DEK, trạng thái cột) **trước** `BEGIN`; DEK còn thiếu (purpose mới) được tạo trong một transaction ngắn riêng ngay lúc nạp.
+  Tx giữ `Arc` tới bộ khoá của nó (xoay khoá giữa chừng không đổi khoá của Tx đang mở).
 - Mã hoá ở `insert`/`insert_many` ngay sau bước kiểm `tenant_of(row) == khách của handle`, trước khi dựng câu.
-  `AllTenantsTx::insert` lấy khách từ chính dòng.
-- `Col<R, Sensitive<…>>` không cài `Settable`: không `update().set(…)` hàng loạt. Đổi giá trị nhạy cảm bằng cập nhật **một
-  dòng theo khoá chính, nêu rõ cột**: `tx.update_one::<R>(pk).set_sensitive(R::PHONE, value)`. Không có hàm ghi cả dòng.
-- `on_conflict_update` không nhận cột `Sensitive` (dòng va chạm có khoá chính khác dòng chèn).
-- Không `eq` / `order_*` / `select` / hàm gộp / `group_by` trên cột `Sensitive` (thiếu impl → lỗi biên dịch).
-- `db.sql`: `Sensitive` không chuyển được sang `db::Value` (không bind được); hàm đọc của `Sql` đòi `R: NoSensitive` (derive
-  sinh). `xtask` cảnh báo câu `db.sql` có tên cột `Sensitive` (danh sách lấy từ `RecordInfo`).
-- Cầu tạm `ConnectionTrait` (G2) không qua codec: module chỉ được khai `Sensitive` khi đã bỏ hẳn thư viện bọc. `compliance` và
+  `AllTenantsTx` chỉ ghi cột `Sensitive` khi đã khai trước danh sách khách (`all_tenants(…).for_tenants(&ids)` nạp khoá của
+  từng khách); không khai thì ghi cột đó bị từ chối. `AllTenantsTx::insert` lấy khách từ chính dòng.
+- Không `update().set(…)` hàng loạt cột `Sensitive` (loại `Sealed` không `Settable`). Đổi giá trị bằng cập nhật **một dòng
+  theo khoá chính**: `tx.update_one::<R>(pk).set_sensitive(R::PHONE, value).set(R::UPDATED_AT, now)` — nhận cả `.set` cột
+  thường, tự tính lại blind index đi kèm.
+- `db.sql`: `Sensitive` không bind được; hàm đọc của `Sql` đòi `R: NoSensitive` (derive sinh). `xtask` cảnh báo câu `db.sql` có
+  tên cột `Sensitive` (danh sách từ `RecordInfo`).
+- Cầu tạm `ConnectionTrait` (G2) không qua codec: module chỉ khai `Sensitive` khi đã bỏ hẳn thư viện bọc. `compliance` và
   `ledger` vì vậy chuyển cụm trước PR 3 của G13.
 
-#### d. Trạng thái cột: không có đường quay về bản rõ
+#### f. Trạng thái cột: không có đường quay về bản rõ
 
-Bảng kernel cấp khách `kernel_field_states (tenant_id, purpose, state, updated_at)`, `state` ∈ `plaintext` → `migrating` →
-`encrypted`, chỉ tiến. Đọc giá trị không có tiền tố `enc:`: ở `plaintext`/`migrating` là bản rõ cũ; ở `encrypted` là **lỗi
-đọc** (`db.field_not_encrypted`, có trong `doctor`), không bao giờ quay về bản rõ — giá trị rõ ai đó ghi lách codec không được
-chấp nhận lặng lẽ. Không dùng ràng buộc `CHECK` trên cột (SQLite phải dựng lại bảng). Job `kernel.fields.rekey` chuyển
-`plaintext` → `migrating` → `encrypted` khi mã hoá xong.
+- Bảng kernel cấp khách `kernel_field_states (tenant_id, purpose, state, updated_at)`, `state` ∈ `plaintext` → `migrating` →
+  `encrypted`, chỉ tiến. Khách tạo sau khi purpose có mặt bắt đầu ở `encrypted`; khách cũ còn dữ liệu rõ bắt đầu ở `plaintext`.
+- Đọc giá trị không có tiền tố `enc:`: ở `plaintext`/`migrating` là bản rõ cũ; ở `encrypted` là lỗi đọc
+  (`db.field_not_encrypted`, có trong `doctor`), không bao giờ quay về bản rõ. Không dùng ràng buộc `CHECK` (SQLite phải dựng
+  lại bảng).
+- Job `kernel.fields.rekey` chỉ chuyển sang `encrypted` khi: không record nào khai `plaintext` cho purpose; một lượt quét cuối
+  không còn dòng rõ; và **mọi instance đang chạy binary đã mã hoá** — luật deploy: chỉ bật bước chuyển sau khi rolling upgrade
+  xong, kernel kiểm phiên bản trong sổ instance trước khi chuyển.
 
-#### e. AAD và định dạng
+#### g. AAD, định dạng, blind index
 
-AAD mã hoá dạng chuẩn, mỗi phần có tiền tố độ dài 4 byte: `"enc"`, `"v1"`, `dek_id`, `purpose`, `tenant_id`, khoá chính. Dùng
-`purpose` ổn định, không dùng tên bảng hay tên cột vật lý (đổi tên bảng không làm hỏng dữ liệu). Định dạng `enc:v1:<dek_id>:
-<base64url(nonce 96 bit || bản mã || tag)>` của #577 giữ nguyên.
-
-Giới hạn và điều không giấu được: nonce ngẫu nhiên 96 bit an toàn tới khoảng 2^32 lần mã hoá mỗi DEK. Kernel đếm xấp xỉ
-theo lô trong cache, ghi vào `kernel_data_keys` khi trả lô; quá 2^31 thì `doctor` cảnh báo và job xoay DEK chạy. Độ dài bản
-mã và việc cột có hay không có giá trị (NULL) vẫn lộ; ghi trong tài liệu người dùng.
-
-#### f. Blind index
-
-- Cột `BlindIndex<T>` lưu `bidx:v1:<key_id>:<giá trị>`; khai `#[record(blind_index = "<trường Sensitive>")]`. Handle tự tính
-  khi ghi trường nguồn; `BlindIndex` không `Settable`.
-- `matches(&value)` tính HMAC với **mọi** khoá blind index đang hoạt động của purpose (thường 1, lúc xoay là 2) thành `IN`. Ở
-  trạng thái `plaintext`/`migrating` (mục d), `matches` so thêm cột nguồn dạng rõ.
-- Chống trùng (số CCCD) trong lúc xoay khoá: unique index không bao được hai phiên bản khoá, nên kiểm trùng giữ
-  `tx.lock_key("bidx:<purpose>:<HMAC theo khoá hiện hành>")` rồi `exists` theo `matches`.
+- AAD dạng chuẩn, mỗi phần có tiền tố độ dài 4 byte: `"enc"`, `"v1"`, `dek_id`, purpose, khách (16 byte UUID thô), khoá chính
+  (16 byte UUID thô). Không dùng tên bảng hay tên cột vật lý. Định dạng `enc:v1:<dek_id>:<base64url(nonce 96 bit || bản mã ||
+  tag)>` của #577 giữ nguyên.
+- Nonce ngẫu nhiên 96 bit an toàn tới khoảng 2^32 lần mã hoá mỗi DEK: kernel đếm xấp xỉ theo lô, ghi khi trả lô; quá 2^31 thì
+  `doctor` cảnh báo và job xoay DEK chạy. Độ dài bản mã và việc có / không có giá trị (NULL) vẫn lộ; ghi trong tài liệu
+  người dùng.
+- `BlindIndex<T>` lưu `bidx:v1:<key_id>:<giá trị>`, khai `#[record(blind_index = "<trường Sensitive>")]`; handle tự tính khi
+  ghi trường nguồn (loại `Index` không `Settable`). `matches(&value)` tính với **mọi** khoá blind index đang hoạt động (thường
+  1, lúc xoay là 2) thành `IN`; ở `plaintext`/`migrating` so thêm cột nguồn dạng rõ.
+- Chống trùng (số CCCD) không dựa vào unique index (không bao được hai phiên bản khoá): giữ `tx.lock_key(<HMAC theo khoá đặt
+  tên lock của purpose>)` — khoá này không xoay (mục b), nên hai giao dịch cùng giá trị luôn tranh cùng một lock dù đang xoay
+  khoá — rồi `exists` theo `matches`.
 - Tách / gộp khách tính lại blind index bằng khoá của khách đích; xoá dữ liệu của chủ thể xoá cả blind index.
 
-#### g. Xoay khoá
+#### h. Xoay khoá
 
-Job `kernel.fields.rekey` ghi bằng compare-and-swap: `UPDATE … SET col = <bản mã mới> WHERE pk = ? AND col = <bản mã cũ>`; 0
-dòng là dòng đã đổi giữa chừng, đọc lại ở lô sau. Chạy lại được, idempotent nhờ `dek_id` trong giá trị.
+- DEK: job `kernel.fields.rekey` ghi bằng compare-and-swap `UPDATE … SET col = <mới> WHERE pk = ? AND col = <cũ>`; 0 dòng là dòng
+  đã đổi giữa chừng, đọc lại ở lô sau. Chạy lại được, idempotent nhờ `dek_id` trong giá trị.
+- **Không rekey DEK** của purpose `kernel.audit` và mọi purpose nằm trong chuỗi băm của audit (mã hoá lại đổi bản mã mà chuỗi đã
+  băm): DEK cũ chuyển sang chế độ chỉ giải mã tới hết hạn lưu; DEK mới dùng cho dòng mới. Bọc lại tenant key / DEK bằng KEK
+  mới thì vẫn làm (không đổi bản mã).
 
-#### h. Giá trị đã `reveal` không được lưu rõ ở chỗ khác
+#### i. Giá trị đã `reveal` không được lưu rõ ở chỗ khác
 
-- `Classified<T, C>` (kết quả của `reveal`) mang lớp dữ liệu: `#[derive(Schema)]` tự coi trường kiểu đó là `data_class = C`
-  (sinh `x-autoxide-data-class`, cài `Redact`), nên giá trị từ cột mã hoá ra response không mất lớp dọc đường.
-- Payload được **lưu** — event (outbox), đầu vào job, tài liệu tìm kiếm, diff audit — đòi `P: NoClassified` (trait đánh dấu:
-  cài cho kiểu nguyên thuỷ và kiểu của std; `#[derive(Schema)]` cài khi mọi trường cài; `Classified` không cài). Muốn mang giá
-  trị đã phân loại thì bọc `Sealed<Classified<T, C>>`: mã hoá bằng cùng codec dưới purpose của kernel (`kernel.outbox`,
-  `kernel.jobs`, `kernel.search`, `kernel.audit`).
-- Kho response của idempotency mã hoá thân response có trường đã phân loại (bước egress biết từ schema), purpose
+- `Classified<T, C>` mang lớp dữ liệu: `#[derive(Schema)]` coi trường kiểu đó là `data_class = C` (sinh `x-autoxide-data-class`,
+  cài `Redact`). `Classified` **serialize ra dạng đã che** (`"«sensitive»"`), trừ khi đi qua serializer của bước egress của
+  kernel (§14.1), nên `serde_json::to_value` ở chỗ khác không làm lộ giá trị.
+- Trait đánh dấu `NoClassified`: cài cho kiểu nguyên thuỷ và kiểu của std; derive (`Schema`, event payload) cài cho kiểu khi mọi
+  trường cài, với bound đặt trên **kiểu của trường** qua mẹo `for<'a>` (`where for<'a> FieldTy: NoClassified`) — bound sai
+  thành impl không thoả (kiểu không cài trait) thay vì lỗi ở chỗ khai; lỗi hiện ra ở chỗ đòi `NoClassified`. `Classified`
+  không cài.
+- Payload được **lưu** — event, đầu vào job, tài liệu tìm kiếm, diff audit — đòi `P: NoClassified`. Bound này đến cùng PR 5b
+  (event có schema, `EventInfo::payload::<P>`) trên API mới; đường cũ nhận `serde_json::Value` (`Outbox::record`) được giữ
+  `#[deprecated]` nên module chưa chuyển vẫn biên dịch, và vẫn an toàn vì `Classified` chỉ thành `Value` ở dạng đã che.
+- Muốn lưu giá trị đã phân loại thì bọc `Sealed<Classified<T, C>>`: mã hoá bằng cùng codec dưới purpose của kernel
+  (`kernel.outbox`, `kernel.jobs`, `kernel.search`, `kernel.audit`). `enqueue_database` (job chạy ở database khác) từ chối
+  `Sealed`.
+- Kho response của idempotency mã hoá thân response có trường đã phân loại (egress biết từ schema), purpose
   `kernel.idempotency`.
 
-#### i. Khoá theo khách, dời, xoá, xuất, khôi phục
+#### j. Khách: bảng, dời, tách / gộp, xoá, xuất, khôi phục, sandbox
 
-- `kernel_data_keys` và `kernel_field_states` là bảng cấp khách của kernel: có `tenant_id`, ở mọi placement, **không** nằm
-  trong `control_plane_tables`, đi theo khách khi dời (cùng loại với `kernel_shares`, §14); chỉ kernel ghi.
-- Dời placement giữ `tenant_id`: không đụng bản mã. **Tách / gộp khách** đặt lại `tenant_id` (`relocate::kernel_tables`), mà
-  AAD có `tenant_id`: bước tách/gộp giải mã bằng DEK của khách nguồn và mã hoá lại bằng DEK của khách đích, tính lại blind
-  index; danh sách cột lấy từ `Module::records`.
-- **Xoá dữ liệu khách**: xoá mọi DEK của khách (huỷ khoá — bản sao lưu cũ không đọc được nữa), trừ DEK của purpose thuộc
-  `retained_tables` (`ledger`, `compliance`), giữ tới hết hạn lưu (D-20261126-tenant-delete-key-shred).
-- **Xuất dữ liệu khách** (tenant export, không phải "transfer"): chỉ giải mã lớp mà người yêu cầu có quyền đọc, phần còn lại
-  che; không bao giờ kèm DEK đã bọc.
-- **Khôi phục bản sao lưu** cần cùng KEK (`KeyProvider`) với lúc sao lưu: ghi trong RUNBOOK (G14), cùng cách sao lưu khoá.
-- `SandboxCopy` (bản sao để thử) che cột `Sensitive`, không chép bản mã.
+- `kernel_data_keys` và `kernel_field_states` là bảng cấp khách của kernel: có `tenant_id`, ở mọi placement, **không** trong
+  `control_plane_tables`, đi theo khách khi dời (cùng loại `kernel_shares`, §14); chỉ kernel ghi.
+- Dời placement giữ `tenant_id` và tenant key: không đụng bản mã.
+- **Tách / gộp khách** đặt lại `tenant_id` (`relocate::kernel_tables`), mà AAD có khách: bước tách/gộp giải mã bằng khoá của
+  khách nguồn, mã hoá lại bằng khoá của khách đích (cả dòng còn rõ), tính lại blind index; danh sách cột từ `RecordInfo`.
+- **Xoá dữ liệu khách**: huỷ tenant key, giữ purpose phải lưu dưới retention key (mục b, D-20261126-tenant-delete-key-shred).
+- **Xuất dữ liệu khách** (tenant export): chỉ giải mã lớp người yêu cầu có quyền, phần còn lại che; không bao giờ kèm DEK đã bọc.
+- **Khôi phục backup** cần cùng KEK và cùng kho tenant key (bản backup của kho khớp thời điểm): ghi trong RUNBOOK.
+- `SandboxCopy`: cột `Sensitive` chép ở dạng đã che, mã hoá bằng DEK của sandbox (sandbox có tenant key riêng, bắt đầu ở
+  `encrypted`).
 
-#### j. Egress
+#### k. Egress
 
-Che theo **lớp của trường DTO**, không theo cách lưu: trường lưu rõ (`plaintext`) vẫn bị che như trường mã hoá. Hai lớp
-kiểm khác nhau: `reveal` kiểm **người đang thao tác**; bước egress (§14.1) kiểm **người nhận** (chủ webhook, người nhận thông
-báo, bên tải file xuất) — giá trị đã `reveal` cho A vẫn bị che khi tới B thiếu quyền lớp đó.
+Che theo **lớp của trường DTO**, không theo cách lưu: trường lưu rõ (`plaintext`) vẫn bị che như trường mã hoá. `reveal` kiểm
+**người đang thao tác**; bước egress (§14.1) kiểm **người nhận** (chủ webhook, người nhận thông báo, bên tải file xuất) — giá
+trị đã `reveal` cho A vẫn bị che khi tới B thiếu quyền lớp đó.
 
-#### k. Hạng và crate
+#### l. Hạng và crate
 
 Việc tách crate đã dời sau 1.0, nên tất cả ở `autoxide-kernel`:
 
-- `Sensitive`, `BlindIndex`, `Classified`, `class::*`, `NoClassified`, `Sealed`: ổn định (điều kiện ở mục a).
+- `Sensitive`, `BlindIndex`, `Classified`, `class::*`, `NoClassified`, `Sealed`, `RevealHandle`: ổn định (điều kiện ở mục a).
 - `KeyProvider`, `AuditAnchor`: **thử nghiệm**, `autoxide_kernel::unstable::security` — hợp đồng của bộ nối nhà cung cấp (KMS,
   Vault, Object Lock, RFC 3161), cùng tiêu chí với `payment`/`sms` (§2.1). `audit` (official) dùng được bên trong, miễn `api`
   của nó không lộ kiểu này.
-- Codec `enc:v1`, cache DEK: nội bộ của kernel (handle gọi). `LocalKeyProvider`, lệnh `autoxide keys …`, job rekey: sang
-  `autoxide-host` khi tách.
+- Codec `enc:v1`, bộ khoá theo Tx, bộ đệm audit: nội bộ của kernel. `LocalKeyProvider`, kho tenant key, lệnh `autoxide keys …`,
+  job rekey: sang `autoxide-host` khi tách.
 
 ## 15. Kết quả ba spike (trước PR 2)
 
@@ -983,7 +1034,8 @@ Hai module chuyển trọn: `notes` (6 endpoint, dùng `etag`) và `audit` (3 en
 
   Khoảng trải của mỗi ô (±10%) lớn hơn chênh lệch giữa hai bản. Lượt đo đầu (đo hết bản cũ rồi mới đo bản mới) cho `audit`
   +20%, `notes` −12%: nhiễu do điều kiện máy đổi giữa hai đợt. Luật đo cho PR 4 (§4.2): **đo xen kẽ hai bản trong cùng một
-  đợt**, và đo **`cargo check` toàn workspace** (không chỉ module đã chuyển), ngưỡng chấp nhận tăng ≤ 5%.
+  đợt**, ít nhất 10 lần mỗi bản (hay dùng `hyperfine`), so trung vị; đo **`cargo check` toàn workspace** (không chỉ module
+  đã chuyển), ngưỡng chấp nhận tăng ≤ 5%.
 - **Cách làm đã chạy** (giữ cho PR 4):
   - `#[endpoint]` giữ nguyên hàm của module, sinh thêm một struct đánh dấu **cùng tên hàm** cài `http::Endpoint`.
     Struct phải có ngoặc nhọn (`struct x {}`): struct đơn vị `struct x;` chiếm cả namespace giá trị nên trùng tên hàm.
@@ -1001,7 +1053,8 @@ Hai module chuyển trọn: `notes` (6 endpoint, dùng `etag`) và `audit` (3 en
   - Response 401/403 chuẩn tự sinh khi endpoint cần đăng nhập / permission mà module không tự viết; module tự viết thì giữ
     bản của module.
   - Bí danh tạm `ModuleRouter` không cần: PR 4 thêm `Module::endpoints() -> Routes` có cài mặc định (D-038), kernel ghép với
-    `Module::routes`; manifest (PR 5) thay cả hai. Lý do: bí danh `#[deprecated]` buộc module dùng nó phải tắt cảnh báo
+    `Module::routes`; manifest (PR 5) thay cả hai. Kernel báo lỗi rõ (lúc khởi động) khi `routes` và `endpoints` của một module trùng cặp
+    path + method; `endpoints` ghi vào danh sách đếm của luật `module-contract-legacy` (PR 5) như `routes`. Lý do: bí danh `#[deprecated]` buộc module dùng nó phải tắt cảnh báo
     `deprecated`, mà luật không cho tắt lint để qua gate.
   - `ValidJson` và tool MCP đổi ràng buộc sang trait `http::Validate` của kernel (impl chung cho kiểu của `validator`), nên
     module chưa chuyển không phải sửa; `#[derive(Validate)]` của kernel sinh đúng mã của `validator_derive`.
