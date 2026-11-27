@@ -27,63 +27,39 @@ cụ thể lập ở PR đầu (rà theo `data_class = sensitive`), không viế
 Không mã hoá: cột dùng để lọc, sắp, nối, khoá ngoại; tiền (cần cộng, đối soát); `tenant_id`, `org_id`, ID. Cột vừa nhạy
 cảm vừa cần tra đúng giá trị (số điện thoại, số CCCD) dùng **blind index** (§2.5).
 
-### 2.2 Khoá: envelope encryption
+### 2.2 Cách ghép vào lớp `db`: nguồn duy nhất là §14.2 của hợp đồng kernel
 
-- **KEK** (khoá mã hoá khoá): một trait mới của kernel `KeyProvider` — `wrap(dek) -> WrappedKey`, `unwrap(WrappedKey) ->
-  Dek`, `current_kek_id()`. Cài đặt mặc định `LocalKeyProvider`: KEK = `SecretKey::derive("autoxide/kernel/fields/kek/v1")`
-  từ khoá gốc. Nhà cung cấp ngoài (AWS KMS, Google Cloud KMS, HashiCorp Vault Transit) là module bộ nối, cắm vào bằng
-  `context.provide::<dyn KeyProvider>`. Khoá chủ khi đó không bao giờ ở máy chủ Autoxide.
-- **DEK** (khoá mã hoá dữ liệu): mỗi khách một DEK cho mỗi mục đích (`<module>.<cột>` hay nhóm cột), sinh ngẫu nhiên 256 bit,
-  lưu **đã bọc** trong bảng mới của kernel `kernel_data_keys` (cấp khách, ở mọi placement, đi theo khách khi dời / tách /
-  gộp): `id`, `tenant_id`, `purpose`, `wrapped_key`, `kek_id`, `created_at`, `retired_at`. DEK đã mở giữ trong bộ nhớ có hạn
-  (LRU theo khách, `Zeroizing`), không ghi log, không vào bản dump bộ nhớ có chủ đích.
-- Khách có database riêng mang DEK của mình trong chính database đó; KEK vẫn ở `KeyProvider`. Dump một placement không đủ
-  để đọc dữ liệu.
+Mọi chi tiết về cách mã hoá mức trường ghép vào lớp `db` và vòng đời khoá nằm ở **§14.2 của
+`docs/research/kernel-contract-1-0.md`** (đã qua rà độc lập, #580). File này không nhắc lại để hai nơi không lệch nhau;
+chỗ nào ở đây có vẻ khác §14.2 thì §14.2 đúng. §14.2 chốt:
+
+- kiểu `db::Sensitive<T, C>` và `db::BlindIndex<T>`; **kiểu** quyết định việc mã hoá, không có thuộc tính `encrypted`;
+  ngoại lệ `#[record(plaintext = "<lý do>")]` đếm bằng gate (§14.2 a);
+- khoá ba tầng: KEK của bản cài → tenant key mỗi khách → DEK mỗi (khách, purpose) bọc bằng tenant key, lưu trong
+  `kernel_data_keys`; thứ tự tạo khoá không bao giờ ghi đè; huỷ khoá khi xoá khách (§14.2 b);
+- đọc không giải mã: `Sensitive::reveal(handle, principal)` kiểm quyền tại nút của dòng, audit gộp ở bước egress
+  (§14.2 c, d);
+- ghi: codec trong handle, khoá nạp trước transaction (§14.2 e);
+- trạng thái cột chỉ tiến (`plaintext` → `migrating` → `encrypted`), không có đường quay về bản rõ (§14.2 f);
+- AAD, định dạng và blind index (§14.2 g), xoay khoá (§14.2 h), giá trị đã `reveal` không lưu rõ ở chỗ khác (§14.2 i),
+  và khách: dời, tách, gộp, xoá, xuất, khôi phục (§14.2 j).
+
+Phần riêng của file này, không có ở §14.2:
+
+- **`KeyProvider`** là trait của kernel; nhà cung cấp ngoài (AWS KMS, Google Cloud KMS, HashiCorp Vault Transit) là module
+  bộ nối cắm vào bằng `context.provide::<dyn KeyProvider>`, khoá chủ khi đó không bao giờ ở máy chủ Autoxide. Cài đặt mặc
+  định `LocalKeyProvider` và kho khoá của nó: §14.2 b.
 - `doctor` cảnh báo (production: lỗi) khi có cột mã hoá mà khoá gốc nằm trong database (`kernel_secrets`) và
-  `KeyProvider` là mặc định: mã hoá khi đó không chống được dump.
+  `KeyProvider` là mặc định: mã hoá khi đó không chống được kẻ lấy dump.
+- **Định dạng lưu trữ** `enc:v1:<dek_id>:<base64url(nonce 96 bit || ciphertext || tag)>`, cột `TEXT` (như nhau trên SQLite và
+  Postgres), AES-256-GCM qua `ring` (đã có, D-043). `v1` là định dạng lưu trữ: đổi thì thêm `v2`, không sửa. AAD: §14.2 g.
+- **Blind index** chỉ cho cột thật sự cần tra đúng giá trị (số điện thoại đăng nhập, số CCCD chống trùng), ghi trong quyết
+  định của module; rủi ro lộ tần suất (hai dòng cùng giá trị có cùng chỉ mục). Cách tính và xoay: §14.2 g, h.
+- **Lộ khoá:** sổ tay `docs/RUNBOOK.md` (G14) có bước xoay KEK, xoay mọi DEK của khách bị ảnh hưởng, thu hồi bản sao lưu cũ.
+- **Crypto-shredding theo từng người** (một DEK mỗi người, xoá DEK là xoá dữ liệu cả trong bản sao lưu) là bước sau, chỉ cho
+  bảng lớn như hồ sơ KYC; ghi thành quyết định riêng khi làm. Xoá theo yêu cầu chủ thể dữ liệu vẫn xoá giá trị như hôm nay.
 
-### 2.3 Định dạng giá trị
-
-`enc:v1:<dek_id>:<base64url(nonce 96 bit || ciphertext || tag)>`, lưu trong cột `TEXT` (như nhau trên SQLite và Postgres).
-AES-256-GCM qua `ring` (đã có, D-043). AAD = `table|column|tenant_id|primary key`: chép giá trị sang dòng, cột hay khách
-khác thì không mở được (như `seal`). Định dạng `v1` là định dạng lưu trữ: đổi thì thêm `v2`, không sửa.
-
-### 2.4 Cắm vào G1
-
-- `#[derive(Record)]` nhận `#[record(encrypted)]` trên trường kiểu `Sensitive<T>` (`T`: `String`, `Option<String>`,
-  `serde_json::Value`). Thiếu `encrypted` trên trường `data_class = sensitive` là lỗi biên dịch, trừ khi ghi rõ
-  `#[record(plaintext = "<lý do>")]`. Gate mới `sensitive-plaintext` đếm các ngoại lệ đó.
-- `Sensitive<T>` không cài `Display` / `Serialize`; `Debug` in `«sensitive»`. Lấy giá trị bằng `reveal(&principal)`: handle
-  kiểm quyền lớp dữ liệu (`<module>.read_sensitive`, G1 §14.1), ghi audit "đọc dữ liệu nhạy cảm" qua đường riêng của kernel.
-- Handle `db` mã hoá khi ghi, giải mã khi đọc (mở DEK theo khách của handle — khách đã được handle quyết, G1 §3.2). Không
-  có đường ghi `Sensitive` bằng SQL viết tay: `db::raw` không nhận kiểu đó.
-- Lọc / sắp theo trường mã hoá: không cho (lỗi biên dịch, cột `Col<R, Sensitive<_>>` không cài `eq`, `order_by`), trừ tra đúng
-  giá trị qua blind index.
-
-### 2.5 Tra đúng giá trị: blind index
-
-Cột kèm `<cột>_bidx` = HMAC-SHA256(khoá blind index của khách + mục đích, giá trị đã chuẩn hoá), cắt 16 byte, base64url.
-Khoá blind index là DEK riêng (`purpose = <module>.<cột>.bidx`). Chỉ hỗ trợ `eq` / `IN`. Rủi ro: lộ tần suất (hai dòng cùng
-giá trị có cùng `bidx`). Chỉ dùng cho cột cần tra (số điện thoại đăng nhập, số CCCD chống trùng), ghi trong quyết định của
-module.
-
-### 2.6 Xoay khoá
-
-- **Xoay KEK:** bọc lại mọi DEK bằng KEK mới (vài dòng mỗi khách, một transaction). `autoxide keys rotate-kek`.
-- **Xoay DEK:** tạo DEK mới cho mục đích, đánh dấu cũ `retired_at`. Job nền `kernel.fields.rekey` mã hoá lại từng lô (keyset
-  theo khoá chính, chạy được lại, idempotent nhờ `dek_id` trong giá trị), có tiến độ (`autoxide keys status`). Đọc được cả
-  DEK cũ tới khi job xong; xong thì DEK cũ xoá bọc (giữ dòng để kiểm). Chạy như nhau trên hai database (chỉ SELECT / UPDATE theo
-  khoá chính).
-- **Lộ khoá:** sổ tay `docs/RUNBOOK.md` (G14) có bước: xoay KEK, xoay mọi DEK của khách bị ảnh hưởng, thu hồi bản sao lưu cũ.
-
-### 2.7 Dữ liệu cũ và xoá dữ liệu
-
-- Chuyển dần: giá trị không có tiền tố `enc:` là bản rõ cũ, đọc được trong thời gian chuyển; job `kernel.fields.rekey` mã
-  hoá hết; `doctor` báo còn bao nhiêu dòng rõ.
-- Xoá theo yêu cầu chủ thể dữ liệu vẫn xoá giá trị như hôm nay. Crypto-shredding (một DEK mỗi người, xoá DEK là xoá dữ liệu
-  cả trong bản sao lưu) là bước sau, chỉ cho bảng lớn như hồ sơ KYC; ghi thành quyết định riêng khi làm.
-
-### 2.8 Hiệu năng và test
+### 2.3 Hiệu năng và test
 
 AES-GCM nhanh hơn nhiều so với một lượt hỏi database; chi phí thật là mở DEK (một lần mỗi khách, có cache). Đo bằng
 `docs/BENCHMARKS.md` trước và sau trên danh sách có trường mã hoá. Test trên cả hai database:
@@ -106,7 +82,7 @@ AES-GCM nhanh hơn nhiều so với một lượt hỏi database; chi phí thậ
 ### 3.2 Chuỗi có khoá (`audit-v2`)
 
 `chain_hash_v2 = HMAC-SHA256(K_audit(tenant), "audit-v2" || chain_hash trước || các phần như v1)`. `K_audit` lấy từ
-`KeyProvider` (§2.2, `purpose = audit.chain`), không lưu trong database khi khoá gốc ở ngoài. Dòng v1 giữ nguyên; dòng đầu
+`KeyProvider` (§2.2 ở trên và §14.2 b của hợp đồng kernel, `purpose = audit.chain`), không lưu trong database khi khoá gốc ở ngoài. Dòng v1 giữ nguyên; dòng đầu
 tiên của v2 nối vào `chain_hash` v1 cuối (điểm chuyển ghi ở `audit_chain.format`). `doctor` kiểm cả hai đoạn. Kẻ chỉ có
 quyền ghi database không tính lại được v2. Mất `K_audit` thì mất khả năng **kiểm**, không mất dữ liệu: ghi rõ trong
 RUNBOOK, cùng cách sao lưu khoá.
@@ -128,18 +104,15 @@ Xoá dữ liệu cá nhân vẫn giữ chuỗi như D-183 (băm `payload_hash`, 
 
 ## 4. Phối hợp với phiên "Hợp đồng kernel" (G1 / G2)
 
-Cần chốt với G1 trước khi code (qua phiên điều phối):
-
-1. Tên thuộc tính trên `#[derive(Record)]` (`encrypted`, `plaintext = "…"`) và kiểu `Sensitive<T>` đi vào bộ kiểu trường
-   được nhận (G1 §3.1) — cần có từ PR 2 để module không đổi chữ ký sau.
-2. Chỗ handle gọi codec mã hoá: sau khi quyết khách, trước khi dựng câu; `db::raw` cấm `Sensitive`.
-3. `KeyProvider`, `AuditAnchor` thuộc phần công khai hạng nào (G1 §2) và nằm ở crate nào khi tách kernel (G1 §6).
-4. `kernel_data_keys` là bảng cấp khách của kernel ở mọi placement, như `kernel_shares` (G1 §14).
-5. Bước egress (G1 §14.1) đối xử `Sensitive` như `data_class = sensitive`: che nếu thiếu quyền, kể cả khi trường chưa mã hoá.
+Các điểm cần chốt với G1 (tên kiểu và thuộc tính, chỗ handle gọi codec, `db.sql` không nhận `Sensitive`, `kernel_data_keys`
+là bảng cấp khách của kernel, egress đối xử `Sensitive` như `data_class = sensitive`) đã chốt ở §14.2 của
+`docs/research/kernel-contract-1-0.md`. Còn mở: `KeyProvider`, `AuditAnchor` thuộc phần công khai hạng nào (G1 §2) và nằm ở
+crate nào khi tách kernel (G1 §6).
 
 ## 5. Thứ tự PR (sau G1 PR 2–5)
 
-1. Kernel: `KeyProvider` + `LocalKeyProvider`, `kernel_data_keys`, codec `enc:v1`, `Sensitive<T>`, test hai database.
+1. Kernel: theo §14.2 — `KeyProvider` + `LocalKeyProvider` và kho khoá, `kernel_data_keys`, codec `enc:v1`,
+   `Sensitive<T, C>` / `BlindIndex<T>`, test hai database.
 2. Kernel: job `kernel.fields.rekey`, lệnh `autoxide keys rotate-kek | rotate-dek | status`, bước `doctor`.
 3. Module: `compliance` (KYC) và `ledger` (số tài khoản chi trả) chuyển cột sang `Sensitive`, kèm blind index nơi cần tra.
 4. Audit: chuỗi `audit-v2` có khoá, điểm chuyển, `doctor` kiểm hai đoạn.
