@@ -331,17 +331,13 @@ impl LedgerService {
         reference: &str,
         details: &Value,
     ) -> Result<(), Error> {
-        let database = tenant.database();
-        let outbox = &self.outbox;
-        database
-            .write_with_retry(move || async move {
-                let transaction = database.begin_write().await?;
-                open_refund_failed(&transaction, tenant, outbox, payment_id, reference, details)
-                    .await?;
-                transaction.commit().await?;
-                Ok(())
-            })
-            .await
+        // Handle `tenant.db()` của kernel (luật raw-database); lỗi tạm thì bên gọi gửi lại cùng mã.
+        let db = tenant.db();
+        let transaction = db.begin_write().await?;
+        open_refund_failed(&transaction, tenant, &self.outbox, payment_id, reference, details)
+            .await?;
+        transaction.commit().await?;
+        Ok(())
     }
 }
 

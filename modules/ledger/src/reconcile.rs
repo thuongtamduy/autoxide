@@ -147,25 +147,21 @@ impl LedgerService {
         tenant: &TenantContext,
         payment: Uuid,
     ) -> Result<(), Error> {
-        let database = tenant.database();
-        let outbox = &self.outbox;
-        database
-            .write_with_retry(move || async move {
-                let transaction = database.begin_write().await?;
-                close_payment_items(
-                    &transaction,
-                    tenant,
-                    outbox,
-                    payment,
-                    &[LATE_PAYMENT],
-                    "kept",
-                    CLOSED_BY_SOURCE,
-                )
-                .await?;
-                transaction.commit().await?;
-                Ok(())
-            })
-            .await
+        // Handle `tenant.db()` của kernel (luật raw-database); lỗi tạm thì bên gọi (event) thử lại.
+        let db = tenant.db();
+        let transaction = db.begin_write().await?;
+        close_payment_items(
+            &transaction,
+            tenant,
+            &self.outbox,
+            payment,
+            &[LATE_PAYMENT],
+            "kept",
+            CLOSED_BY_SOURCE,
+        )
+        .await?;
+        transaction.commit().await?;
+        Ok(())
     }
 }
 
