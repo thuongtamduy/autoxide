@@ -39,6 +39,8 @@ pub(crate) fn require_session(principal: &Principal) -> Result<(), Error> {
 
 pub(crate) struct RequestAuthenticator {
     pub sessions: Arc<SessionService>,
+    /// Máy chủ uỷ quyền OAuth (`None`: tắt): access token `axo1_…` của client MCP.
+    pub oauth: Option<Arc<crate::oauth::OAuthService>>,
     pub roles: Arc<RoleService>,
     pub api_keys: Arc<ApiKeyService>,
     /// Sổ database: tìm khách của credential.
@@ -63,6 +65,14 @@ impl Authenticator for RequestAuthenticator {
         _hint: &TenantHint,
     ) -> Result<Principal, Error> {
         let token = bearer_token(authorization)?;
+        // Access token OAuth của client MCP (D-20261126-mcp-oauth): phân luồng theo tiền tố, không bao giờ lẫn với
+        // API key hay access token của phiên.
+        if token.starts_with(crate::oauth::ACCESS_PREFIX) {
+            return match &self.oauth {
+                Some(oauth) => oauth.authenticate(token, &self.step_up).await,
+                None => Err(crate::token::invalid_token()),
+            };
+        }
         if let Some(tenant) = api_key::tenant_of(token)? {
             let tenant = self.tenant(tenant, api_key::invalid_api_key).await?;
             let principal = self.api_keys.authenticate(&tenant, token).await?;

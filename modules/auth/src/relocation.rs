@@ -37,6 +37,11 @@ pub(crate) fn relocation() -> Relocation {
             "auth_mfa_challenge",
             "auth_passkey_ceremony",
             "auth_support_grant",
+            // Grant OAuth và token của nó gắn với khách lúc duyệt (token mang ID khách): người dùng duyệt lại ở khách
+            // mới. Client đăng ký động thuộc issuer của nền tảng.
+            "auth_oauth_grants",
+            "auth_oauth_tokens",
+            "auth_oauth_clients",
             // Rào nằm ở database nền tảng, theo ID khách: không theo dữ liệu khi tách / gộp.
             "auth_tenant_guardrails",
         ])

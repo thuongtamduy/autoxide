@@ -120,6 +120,13 @@ pub(crate) const SCIM_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Destructive);
 
+pub(crate) const OAUTH_GRANTS_MANAGE: Permission = Permission::new(
+    "auth.oauth_grants.manage",
+    "See every approval people gave to MCP / OAuth clients (Claude, ChatGPT, IDEs) to act for them, and \
+     revoke any of them, e.g. when a client misbehaves or a person leaves.",
+)
+.with_risk(Risk::Destructive);
+
 /// Mọi permission module `auth` khai.
 pub(crate) fn all() -> Vec<Permission> {
     vec![
@@ -142,5 +149,6 @@ pub(crate) fn all() -> Vec<Permission> {
         OIDC_READ,
         OIDC_MANAGE,
         SCIM_MANAGE,
+        OAUTH_GRANTS_MANAGE,
     ]
 }

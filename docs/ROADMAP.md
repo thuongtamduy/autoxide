@@ -117,6 +117,12 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       tính hạn mức
 - [ ] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
       chéo lúc lưu, có cache
+- [ ] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
+      một event cho mọi bên đăng ký khớp tên theo thứ tự đăng ký và dừng ở bên đầu tiên trả lỗi (hay panic, hay cả lượt
+      quá `DELIVERY_TIMEOUT`); cả event bị đánh dấu lỗi và thử lại với backoff từ bên đầu tiên — bên đã nhận rồi nhận lại
+      (D-054), bên sau chưa nhận gì. Sau `MAX_ATTEMPTS` lần event thành hỏng hẳn (bên sau không bao giờ nhận), riêng
+      `auth.user_deleted` thử lại mỗi giờ mãi mãi (D-149). Cân nhắc ghi trạng thái giao theo từng bên nhận (bảng con của
+      outbox hay cột theo module), để thử lại chỉ bên lỗi và bên khác không phải chờ
 
 ### G2 — Không để thư viện níu chân (D-20261126-library-isolation)
 
@@ -458,8 +464,15 @@ thật (P7).
     - [ ] Module tắt: dọn dữ liệu theo thời hạn lưu (job của module chưa chạy khi tắt)
     - [ ] Module tắt: gieo dữ liệu khởi đầu cho khách tạo trong lúc module tắt
     - [ ] `copy` / `backup create` / `backup restore` gồm cả bảng của module tắt (hiện từ chối khi còn dữ liệu)
-    - [ ] `conversations` đang bật mà bộ nối nhà cung cấp thoại tắt: `erase_recording` bỏ qua xoá ở nhà cung cấp nhưng
-          vẫn xoá `provider_recording_id` (bản ghi nằm lại không dấu vết) — làm như đường "nghỉ": báo lỗi, thử lại
+    - [x] `conversations` đang bật mà bộ nối nhà cung cấp thoại tắt: `erase_recording` bỏ qua xoá ở nhà cung cấp nhưng
+          vẫn xoá `provider_recording_id` (bản ghi nằm lại không dấu vết) — làm như đường "nghỉ": báo lỗi, thử lại —
+          báo 503 `conversations.voice_provider_unavailable` trước khi đụng tới gì, job dọn theo hạn bỏ qua dòng lỗi
+          (và khách lỗi) rồi báo lỗi để thử lại; xoá tài khoản không trả lỗi cho event (lỗi chặn mọi module nhận sau)
+          mà xoá bản sao trong nơi lưu, giữ `provider_recording_id`, đưa hạn lưu về bây giờ cho job dọn
+          (D-20261127-voice-recording-provider-off)
+    - [ ] Xoá khách (`crates/kernel/src/data/tenancy/erasure.rs`) xoá dòng `conversations_calls` và file trong kho mà
+          không xoá bản ghi âm còn ở nhà cung cấp thoại (`provider_recording_id`): module chưa có hook chạy trước khi
+          xoá khách. Khoảng hở có từ trước, không do D-20261127-voice-recording-provider-off
     - [ ] `forms` tắt: job dọn file CSV xuất theo `expires_at` không chạy (cần xác minh; thuộc mục dọn theo thời hạn lưu)
     - [ ] Kế hoạch tách / gộp (dry run) đếm cả dòng của module tắt chỉ có bảng ở nguồn (dời đã đếm)
     - [ ] Test chiều ngược cho tách / gộp, test lệch phiên bản migration của module tắt giữa hai database
@@ -479,9 +492,13 @@ thật (P7).
           tra cứu theo khoá client gửi (`catalog/variants?code=`, `comments/public/counts`,
           `inventory/public/availability`) được cho phép (chủ dự án giao phiên điều phối quyết, 26/11/2026,
           D-20261126-list-pages-done mục 2)
-  - [ ] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
+  - [x] `./gate.sh` chưa chạy tsc trên SDK và ví dụ trong `docs/guides` (CI có: `cargo xtask sdk --extract-examples` + `tsc
         --noEmit`); `sdk --check` chỉ so SDK với `docs/openapi.json` nên kiểu SDK hỏng vẫn lọt tới CI (#517). Chạy khi SDK
-        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền)
+        hay ví dụ đổi và có Node; còn hai kiểu `& Record<string, unknown>` có sẵn trên `main` (`realm`, một kiểu tiền) —
+        gate (cả gate nhẹ) chạy `sdk --extract-examples` + `tsc --noEmit` khi có Node và SDK, hợp đồng hay
+        `docs/guides` đổi (D-20261127-gate-tsc); hai kiểu sai do `///` trên trường `#[schema(inline)]` có kiểu là
+        thẳng struct / enum (thành `allOf` chuỗi giao object, `realm` không gán được giá trị nào) — bỏ doc ở trường,
+        mô tả chuyển lên kiểu; luật `api-inline-field-doc` chặn tái phạm (D-20261127-inline-field-docs)
   - [x] Rustdoc tiếng Anh cho phần công khai của kernel, testkit, `autoxide` và `api` của module (docs.rs); gate
         `doc-language` giữ phần viết mới là tiếng Anh (D-20261123-english-rustdoc)
   - [ ] Chạy thử năm bộ nối của P7 bằng tài khoản thử thật; đối chiếu các điểm "(?)" của MoMo với trang tài liệu gốc
