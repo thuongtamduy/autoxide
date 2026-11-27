@@ -12,7 +12,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use autoxide_auth::api::{PhoneCodeSent, PhoneCodes};
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::rows;
 use autoxide_kernel::secret::sha256;
@@ -263,32 +263,6 @@ impl ComplianceService {
         }
         transaction.commit().await?;
         Ok(phone)
-    }
-
-    /// Như `unlock_phone` (`phone_locks.rs`), với người làm `actor` đã được kiểm (lệnh CLI chạy bằng quyền người
-    /// vận hành máy chủ).
-    pub(crate) async fn unlock_phone_as(
-        &self,
-        tenant: &TenantContext,
-        actor: Actor,
-        raw: &str,
-    ) -> Result<bool, Error> {
-        let phone = PhoneNumber::parse(raw, "84").ok_or_else(|| {
-            Error::validation(vec![FieldError::new("phone", "invalid", "is not a phone number")])
-        })?;
-        let phone_key = self.secret.phone_key(tenant.id(), &phone).await?;
-        let transaction = tenant.database().begin_write().await?;
-        let unlocked = crate::phone_lock::clear(&transaction, tenant, &phone_key).await?;
-        if unlocked {
-            // Không ghi số vào event: chỉ khoá của số (HMAC theo khách).
-            let event = events::PhoneUnlocked(json!({"phone_key": phone_key}));
-            self.outbox.record(&transaction, tenant, actor, None, &event).await?;
-        }
-        transaction.commit().await?;
-        if unlocked {
-            tracing::info!(phone = %phone.masked(), "sign-in codes of a phone number unlocked");
-        }
-        Ok(unlocked)
     }
 
     /// Khoá của số (`SecretKey::phone_key`, HMAC theo khách) cho trạng thái chống đoán mã.

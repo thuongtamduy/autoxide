@@ -172,7 +172,7 @@ raw-database 10 modules/compliance/src/legal.rs
 raw-database 1 modules/compliance/src/overview.rs
 raw-database 10 modules/compliance/src/privacy.rs
 raw-database 3 modules/compliance/src/service.rs
-raw-database 5 modules/compliance/src/sign_in_codes.rs
+raw-database 4 modules/compliance/src/sign_in_codes.rs
 raw-database 5 modules/compliance/src/subject_requests.rs
 raw-database 11 modules/compliance/src/tests_cases.rs
 raw-database 1 modules/compliance/src/tests_moit.rs
