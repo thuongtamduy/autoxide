@@ -148,6 +148,7 @@ name = "autoxide-kernel"
 version = "0.19.0"
 dependencies = [
  "async-trait",
+ "autoxide-macros",
  "axum",
  "base64 0.23.1",
  "bytes",
@@ -160,6 +161,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "jiff",
+ "matchit",
  "metrics",
  "metrics-exporter-prometheus",
  "minijinja",
@@ -189,6 +191,15 @@ dependencies = [
  "uuid",
  "validator",
  "zeroize",
+]
+
+[[package]]
+name = "autoxide-macros"
+version = "0.19.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
 ]
 
 [[package]]
