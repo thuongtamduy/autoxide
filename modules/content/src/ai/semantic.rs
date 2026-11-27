@@ -17,6 +17,7 @@
 
 use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -38,6 +39,7 @@ use uuid::Uuid;
 use crate::entity::{embedding, embedding_state, entry, published};
 use crate::entries::{Kind, is_unique_violation};
 use crate::permissions::CONTENT_READ;
+use crate::publishing::words;
 use crate::service::{ContentService, invalid, now};
 
 pub(crate) const INDEX: &str = "content.index_embeddings";
@@ -85,7 +87,7 @@ impl Job for IndexJob {
 }
 
 /// Vector của một (`scope`, `locale`) đã nạp vào bộ nhớ.
-struct Loaded {
+pub(crate) struct Loaded {
     version: i64,
     model: String,
     chunks: Vec<(Uuid, i32, Vec<f32>)>,
@@ -101,6 +103,9 @@ type QueryKey = (TenantId, String);
 pub(crate) struct SearchCache {
     // `Mutex` của thư viện chuẩn: giữ khoá rất ngắn, không có `await` bên trong.
     indexes: Mutex<HashMap<IndexKey, Arc<Loaded>>>,
+    /// Khoá nạp của từng (khách, phạm vi, ngôn ngữ): nhiều lượt tìm cùng thấy cache cũ thì chỉ một lượt đọc database,
+    /// các lượt kia chờ rồi đọc cache (single-flight). Giữ `Weak`: khoá tự mất khi không còn ai nạp.
+    loading: Mutex<HashMap<IndexKey, std::sync::Weak<tokio::sync::Mutex<()>>>>,
     /// Vector câu tìm theo (khách, "mô hình + câu"): khách có thể dùng mô hình riêng (khoá AI
     /// theo khách), và câu tìm của khách này không được lộ qua thời gian trả lời ở khách kia.
     queries: Mutex<HashMap<QueryKey, Arc<Vec<f32>>>>,
@@ -109,9 +114,32 @@ pub(crate) struct SearchCache {
     public_budget: Mutex<HashMap<TenantId, (Instant, u32)>>,
     /// Chốt của tìm công khai: số lượt cùng lúc, số lượt mỗi phút theo địa chỉ (PT-15).
     pub(crate) public_limits: super::public_limits::PublicLimits,
+    /// Chỗ chạy riêng của gợi ý tìm (phần riêng trong cùng một trần với tìm kiếm, `public_limits::capacities`): endpoint
+    /// gợi ý không đếm theo địa chỉ, nên gợi ý không được lấy chỗ của tìm kiếm — một địa chỉ gọi gợi ý dồn dập chỉ làm
+    /// gợi ý bỏ nguồn `content`.
+    pub(crate) suggest_limits: super::public_limits::PublicLimits,
+    /// Số lần thật sự đọc vector từ database (cho test single-flight).
+    #[cfg(test)]
+    pub(crate) loads: std::sync::atomic::AtomicUsize,
 }
 
 impl SearchCache {
+    /// Khoá nạp (single-flight) của `key`: cùng một khoá cho mọi lượt đang nạp cùng `key`.
+    fn loading_gate(&self, key: &IndexKey) -> Arc<tokio::sync::Mutex<()>> {
+        let Ok(mut loading) = self.loading.lock() else {
+            // Mutex hỏng (một thread panic khi giữ): không chặn tìm, mỗi lượt tự nạp như trước.
+            return Arc::new(tokio::sync::Mutex::new(()));
+        };
+        if let Some(gate) = loading.get(key).and_then(std::sync::Weak::upgrade) {
+            return gate;
+        }
+        // Dọn khoá không còn ai giữ: bảng không lớn dần theo số (khách, ngôn ngữ) từng tìm.
+        loading.retain(|_, gate| gate.strong_count() > 0);
+        let gate = Arc::new(tokio::sync::Mutex::new(()));
+        loading.insert(key.clone(), Arc::downgrade(&gate));
+        gate
+    }
+
     /// Số `version` của vector (khách, `scope`, `locale`) đang giữ trong bộ nhớ (cho test).
     #[cfg(test)]
     pub(crate) fn cached_version(
@@ -380,6 +408,44 @@ impl ContentService {
         Ok(missing.len())
     }
 
+    /// Giữ một chỗ của tìm công khai trên database của khách `tenant` cho người đọc ở địa chỉ `ip` (không biết địa chỉ:
+    /// chỉ tính số lượt cùng lúc): 429 khi vượt. Dùng cho `GET /public/search` và danh sách bài có `q`. Số chỗ theo
+    /// [`capacities`](super::public_limits::capacities): dưới pool đọc của database đó.
+    pub(crate) fn admit_public_search(
+        &self,
+        tenant: &TenantContext,
+        ip: Option<std::net::IpAddr>,
+    ) -> Result<super::public_limits::Slot, Error> {
+        let (search, _) = super::public_limits::capacities(
+            self.config.public_search_concurrency,
+            tenant.read_pool_size(),
+        );
+        self.search_cache.public_limits.admit(
+            tenant.placement(),
+            ip,
+            self.config.public_search_per_address,
+            search,
+        )
+    }
+
+    /// Giữ một chỗ của gợi ý tìm công khai trên database của khách `tenant` (phần riêng của gợi ý trong
+    /// [`capacities`](super::public_limits::capacities), không đếm theo địa chỉ): 429 khi hết chỗ.
+    pub(crate) fn admit_public_suggest(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<super::public_limits::Slot, Error> {
+        let (_, suggest) = super::public_limits::capacities(
+            self.config.public_search_concurrency,
+            tenant.read_pool_size(),
+        );
+        self.search_cache.suggest_limits.admit(
+            tenant.placement(),
+            None,
+            self.config.public_search_per_address,
+            suggest,
+        )
+    }
+
     /// Tìm công khai trên website `site` của người đọc ở địa chỉ `ip`, qua các chốt của
     /// [`public_limits`](super::public_limits): tìm công khai tắt thì 404 như [`search`](Self::search); bật thì giới hạn
     /// theo địa chỉ, số lượt cùng lúc, trần thời gian trả lời, và trần riêng cho phần tìm theo ý nghĩa.
@@ -394,11 +460,7 @@ impl ContentService {
         if !self.config.public_semantic_search {
             return self.search(tenant, principal, query, Some(site)).await;
         }
-        let slot = self.search_cache.public_limits.admit(
-            ip,
-            self.config.public_search_per_address,
-            self.config.public_search_concurrency,
-        )?;
+        let slot = self.admit_public_search(tenant, ip)?;
         // Lượt tìm chạy trong task riêng giữ `slot` tới khi việc xong thật: hết giờ trả lời hay client ngắt chỉ bỏ phần
         // chờ ở đây; câu truy vấn và việc tính vector đang chạy vẫn chiếm chỗ cho tới khi xong (`tokio::spawn` cần dữ
         // liệu sở hữu: chép `Arc` của service và các tham số).
@@ -497,7 +559,9 @@ impl ContentService {
             return Err(invalid(problems));
         }
         let scope = if public { Scope::Published } else { Scope::Draft };
-        let by_text = self.text_candidates(tenant, scope, q, &locale, query.kind).await?;
+        let lineage = site.map(autoxide_kernel::tenancy::Site::lineage_ids);
+        let by_text =
+            self.text_candidates(tenant, scope, q, &locale, query.kind, lineage.as_deref()).await?;
         let mut unloaded = None;
         let by_meaning = if self.embedder.enabled() && (!public || self.spend_public_budget(tenant))
         {
@@ -510,6 +574,10 @@ impl ContentService {
                 Some(Ok(found)) => found,
                 None => {
                     tracing::warn!("search by meaning too slow; matching words only");
+                    // Phần ý nghĩa không cho kết quả: không tính vào ngân sách mỗi phút của khách.
+                    if public {
+                        self.refund_public_budget(tenant);
+                    }
                     unloaded = Some(locale.clone());
                     Vec::new()
                 }
@@ -583,6 +651,7 @@ impl ContentService {
         q: &str,
         locale: &str,
         kind: Option<Kind>,
+        site: Option<&[Uuid]>,
     ) -> Result<Vec<Uuid>, Error> {
         let read = tenant.database().read();
         let limit = CANDIDATES as u64;
@@ -604,23 +673,21 @@ impl ContentService {
                     .all(read)
                     .await?
             }
+            // Bản công khai: chỉ mục từ (PT-15), đã mới đăng trước.
             Scope::Published => {
-                let mut select = published::Entity::find()
-                    .scoped(tenant)
-                    .select_only()
-                    .column(published::Column::EntryId)
-                    .filter(published::Column::RestrictedAt.is_null())
-                    .filter(published::Column::Locale.eq(locale))
-                    .filter(autoxide_kernel::search::contains(published::Column::SearchKey, q));
-                if let Some(kind) = kind {
-                    select = select.filter(published::Column::Kind.eq(kind.as_str()));
-                }
-                select
-                    .order_by_desc(published::Column::PublishedAt)
-                    .limit(limit)
-                    .into_tuple()
-                    .all(read)
-                    .await?
+                // Website của người đọc lọc ngay trong câu chạm chỉ mục: trần số bài khớp tính trên bài họ thấy.
+                let matching = words::Matching {
+                    locale,
+                    kind: kind.map(Kind::as_str),
+                    site,
+                    indexable_only: false,
+                    term: None,
+                    author: None,
+                };
+                let mut ids =
+                    words::matching_ids(tenant, matching, &words::WordQuery::parse(q)).await?;
+                ids.truncate(CANDIDATES);
+                ids
             }
         })
     }
@@ -638,9 +705,14 @@ impl ContentService {
         // Duyệt mọi vector là việc CPU dài (100 000 đoạn × 1 024 chiều ~50 ms một nhân): chạy trên
         // thread cho việc chặn của tokio để không giữ thread async, và chia ra các nhân (bước 39 B6,
         // `docs/BENCHMARKS.md` "Tìm theo ý nghĩa").
-        let best = tokio::task::spawn_blocking(move || best_chunks(&query, &loaded.chunks))
-            .await
-            .map_err(Error::internal)??;
+        // Future bị bỏ (quá giờ, client ngắt) thì `_cancel` bật cờ và vòng duyệt dừng sớm: việc CPU không chạy tiếp
+        // ngoài trần số lượt cùng lúc của tìm công khai.
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let _cancel = CancelOnDrop(cancelled.clone());
+        let best =
+            tokio::task::spawn_blocking(move || best_chunks(&query, &loaded.chunks, &cancelled))
+                .await
+                .map_err(Error::internal)??;
         let mut ranked: Vec<(Uuid, f32, i32)> =
             best.into_iter().map(|(id, (similarity, chunk))| (id, similarity, chunk)).collect();
         ranked.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
@@ -676,7 +748,7 @@ impl ContentService {
     }
 
     /// Vector của (`scope`, `locale`) trong bộ nhớ; nạp lại khi `version` trong database đổi.
-    async fn loaded(
+    pub(crate) async fn loaded(
         &self,
         tenant: &TenantContext,
         scope: Scope,
@@ -692,13 +764,25 @@ impl ContentService {
             .map_or(0, |row| row.version);
         let model = self.embedder.model_id().to_owned();
         let key = (tenant.id(), scope, locale.to_owned());
-        let cached =
-            self.search_cache.indexes.lock().ok().and_then(|cache| cache.get(&key).cloned());
-        if let Some(cached) =
-            cached.filter(|cached| cached.version == version && cached.model == model)
-        {
+        let fresh = |cache: &SearchCache| {
+            cache
+                .indexes
+                .lock()
+                .ok()
+                .and_then(|cache| cache.get(&key).cloned())
+                .filter(|cached| cached.version == version && cached.model == model)
+        };
+        if let Some(cached) = fresh(&self.search_cache) {
             return Ok(cached);
         }
+        // Một lượt nạp mỗi khoá: lượt tới sau chờ khoá, rồi thấy cache đã mới thì dùng luôn.
+        let gate = self.search_cache.loading_gate(&key);
+        let _loading = gate.lock().await;
+        if let Some(cached) = fresh(&self.search_cache) {
+            return Ok(cached);
+        }
+        #[cfg(test)]
+        self.search_cache.loads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let dimensions = i32::try_from(self.embedder.dimensions()).unwrap_or(0);
         let rows = embedding::Entity::find()
             .scoped(tenant)
@@ -734,6 +818,14 @@ impl ContentService {
         }
         budgets.insert(tenant.id(), (start, used + 1));
         true
+    }
+
+    /// Trả lại một lần đã trừ bởi [`spend_public_budget`](Self::spend_public_budget) trong phút hiện tại.
+    fn refund_public_budget(&self, tenant: &TenantContext) {
+        let Ok(mut budgets) = self.search_cache.public_budget.lock() else { return };
+        if let Some((_, used)) = budgets.get_mut(&tenant.id()) {
+            *used = used.saturating_sub(1);
+        }
     }
 
     /// Chi tiết của các mục tìm được (bỏ mục không còn, hay khác `kind`).
@@ -841,22 +933,25 @@ const CHUNKS_PER_THREAD: usize = 10_000;
 fn best_chunks(
     query: &[f32],
     chunks: &[(Uuid, i32, Vec<f32>)],
+    cancelled: &AtomicBool,
 ) -> Result<HashMap<Uuid, (f32, i32)>, Error> {
     let threads = std::thread::available_parallelism()
         .map_or(1, std::num::NonZeroUsize::get)
         .min(chunks.len() / CHUNKS_PER_THREAD)
         .max(1);
     if threads == 1 {
-        return Ok(best_in(query, chunks));
+        return best_in(query, chunks, cancelled);
     }
     let size = chunks.len().div_ceil(threads);
     let parts: Vec<HashMap<Uuid, (f32, i32)>> = std::thread::scope(|scope| {
-        let handles: Vec<_> =
-            chunks.chunks(size).map(|part| scope.spawn(move || best_in(query, part))).collect();
+        let handles: Vec<_> = chunks
+            .chunks(size)
+            .map(|part| scope.spawn(move || best_in(query, part, cancelled)))
+            .collect();
         handles
             .into_iter()
             .map(|handle| {
-                handle.join().map_err(|_| Error::internal("a semantic search thread failed"))
+                handle.join().map_err(|_| Error::internal("a semantic search thread failed"))?
             })
             .collect::<Result<_, _>>()
     })?;
@@ -872,17 +967,36 @@ fn best_chunks(
     Ok(best)
 }
 
-fn best_in(query: &[f32], chunks: &[(Uuid, i32, Vec<f32>)]) -> HashMap<Uuid, (f32, i32)> {
+fn best_in(
+    query: &[f32],
+    chunks: &[(Uuid, i32, Vec<f32>)],
+    cancelled: &AtomicBool,
+) -> Result<HashMap<Uuid, (f32, i32)>, Error> {
     let mut best: HashMap<Uuid, (f32, i32)> = HashMap::new();
-    for (entry_id, chunk, vector) in chunks {
+    for (at, (entry_id, chunk, vector)) in chunks.iter().enumerate() {
+        if at % CANCEL_CHECK_EVERY == 0 && cancelled.load(Ordering::Relaxed) {
+            return Err(Error::internal("search by meaning was cancelled"));
+        }
         let similarity = vector::dot(query, vector);
         let slot = best.entry(*entry_id).or_insert((f32::MIN, *chunk));
         if similarity > slot.0 {
             *slot = (similarity, *chunk);
         }
     }
-    best
+    Ok(best)
 }
+
+/// Bật cờ huỷ khi bị bỏ (xem [`best_in`]).
+struct CancelOnDrop(Arc<AtomicBool>);
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+}
+
+/// Số đoạn giữa hai lần xem cờ huỷ: đủ thưa để không tốn, đủ dày để dừng trong vài mili giây.
+const CANCEL_CHECK_EVERY: usize = 1_024;
 
 /// ~[`CHUNK_WORDS`] từ, chồng [`OVERLAP_WORDS`] từ lên đoạn trước. Ít nhất một đoạn.
 pub(crate) fn chunks(title: &str, excerpt: &str, plain_text: &str) -> Vec<String> {
@@ -1069,8 +1183,18 @@ mod tests {
             }
         }
         let query = [0.3, 0.2, 0.1];
-        let parallel = best_chunks(&query, &data).unwrap();
-        assert_eq!(parallel, best_in(&query, &data));
+        let parallel = best_chunks(&query, &data, &AtomicBool::new(false)).unwrap();
+        assert_eq!(parallel, best_in(&query, &data, &AtomicBool::new(false)).unwrap());
         assert_eq!(parallel.len(), entries.len());
+    }
+
+    #[test]
+    fn co_huy_dung_vong_duyet() {
+        let data = vec![(Uuid::now_v7(), 0, vec![1.0_f32])];
+        assert!(best_in(&[1.0], &data, &AtomicBool::new(true)).is_err());
+        assert!(best_chunks(&[1.0], &data, &AtomicBool::new(true)).is_err());
+        let cancel = Arc::new(AtomicBool::new(false));
+        drop(CancelOnDrop(cancel.clone()));
+        assert!(cancel.load(Ordering::Relaxed), "dropping the guard sets the flag");
     }
 }

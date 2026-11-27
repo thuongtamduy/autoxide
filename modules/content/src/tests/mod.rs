@@ -72,3 +72,4 @@ mod templates;
 mod tenancy;
 mod translation;
 mod translation_recovery;
+mod word_index;

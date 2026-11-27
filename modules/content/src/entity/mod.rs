@@ -17,6 +17,7 @@ pub(crate) mod not_found_path;
 pub(crate) mod page_template;
 pub(crate) mod placement;
 pub(crate) mod published;
+pub(crate) mod published_word;
 pub(crate) mod redirect;
 pub(crate) mod revision;
 pub(crate) mod schedule;

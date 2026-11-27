@@ -17,7 +17,8 @@ use sea_orm::ConnectionTrait as _;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
 use serde_json::{Value, json};
 
-const A: [&str; 4] = ["content.read", "content.write", "files.upload", "files.manage"];
+const A: [&str; 5] =
+    ["content.read", "content.write", "content.publish", "files.upload", "files.manage"];
 
 async fn app(test: &TestDatabase) -> TestApp {
     let dir = std::env::temp_dir().join(format!("autoxide-move-{}", uuid::Uuid::now_v7()));
@@ -74,6 +75,17 @@ async fn doi_khach_co_du_lieu_cua_nhieu_module_roi_doi_ve() {
 
         // Dữ liệu của `a` ở nhiều module; `b` có một bài.
         let post = entry(&app, "token-a", "Hello").await;
+        // Bài đã đăng: dòng của bản đăng và của chỉ mục từ (`content_published_words`) đi theo khách.
+        let read = app.get(&format!("/api/v1/content/entries/{post}")).token("token-a").send();
+        let etag = read.await.unwrap().headers()["etag"].to_str().unwrap().to_owned();
+        let published = app
+            .post(&format!("/api/v1/content/entries/{post}/publish"))
+            .token("token-a")
+            .header("if-match", &etag)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(published.status(), 200, "{}", published.json());
         let other = entry(&app, "token-b", "Other").await;
         let accounts = app.api::<dyn Accounts>().unwrap();
         let account = NewAccount {
@@ -107,6 +119,8 @@ async fn doi_khach_co_du_lieu_cua_nhieu_module_roi_doi_ve() {
         assert_eq!(planned("auth_user"), 1);
         assert_eq!(planned("files_file"), 1);
         assert!(planned("content_entries") >= 1);
+        assert_eq!(planned("content_published"), 1);
+        assert!(planned("content_published_words") >= 1, "the word index moves with the tenant");
         assert_eq!(rows(&main, "auth_user", &a).await, 1);
 
         // Dời thật (đường của CLI).

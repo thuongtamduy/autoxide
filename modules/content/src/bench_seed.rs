@@ -21,7 +21,7 @@ use sea_orm::{EntityTrait, IntoActiveModel, PaginatorTrait, Set};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::entity::{entry, entry_author, entry_term, published, revision};
+use crate::entity::{entry, entry_author, entry_term, published, published_word, revision};
 use crate::entries::revisions::{Reason, Snapshot};
 use crate::entries::{Entry, Kind, Status, blank, body};
 use crate::service::ContentService;
@@ -72,6 +72,7 @@ struct Batch {
     entries: Vec<entry::ActiveModel>,
     revisions: Vec<revision::ActiveModel>,
     published: Vec<published::ActiveModel>,
+    words: Vec<published_word::ActiveModel>,
     terms: Vec<entry_term::ActiveModel>,
     authors: Vec<entry_author::ActiveModel>,
 }
@@ -260,6 +261,15 @@ impl Seed {
             created_at: Set(at),
         });
         let path = format!("/{}/{}", self.service.config.post_path_prefix, row.slug);
+        // Chỉ mục từ như khi đăng qua API (PT-15).
+        for word in crate::publishing::words::words(&row.search_key) {
+            batch.words.push(published_word::ActiveModel {
+                tenant_id: Set(tenant_id),
+                entry_id: Set(row.id),
+                word: Set(word),
+                locale: Set(row.locale.clone()),
+            });
+        }
         batch.published.push(
             published::Model {
                 entry_id: row.id,
@@ -336,6 +346,7 @@ async fn flush(tenant: &TenantContext, batch: Batch) -> Result<(), Error> {
     bench_seed::insert_all(database, batch.entries).await?;
     bench_seed::insert_all(database, batch.revisions).await?;
     bench_seed::insert_all(database, batch.published).await?;
+    bench_seed::insert_all(database, batch.words).await?;
     bench_seed::insert_all(database, batch.terms).await?;
     bench_seed::insert_all(database, batch.authors).await
 }

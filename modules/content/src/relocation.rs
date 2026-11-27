@@ -20,6 +20,8 @@ pub(crate) fn relocation() -> Relocation {
             "content_not_found_paths",
         ])
         .follow("content_published", "entry_id", "content_entries")
+        // Chỉ mục từ của bản công khai (PT-15) đi theo bài.
+        .follow("content_published_words", "entry_id", "content_entries")
         .follow("content_revisions", "entry_id", "content_entries")
         .follow("content_schedules", "entry_id", "content_entries")
         .follow("content_entry_terms", "entry_id", "content_entries")

@@ -503,6 +503,12 @@ impl TenantContext {
         crate::db::TenantDb::new(self)
     }
 
+    /// The size of the read pool of the tenant's database ([`Database::read_pool_size`]): a module that limits its
+    /// own concurrent reads keeps below it.
+    pub fn read_pool_size(&self) -> u32 {
+        self.0.database.read_pool_size()
+    }
+
     /// The database that holds the tenant's data.
     pub fn database(&self) -> &Database {
         &self.0.database

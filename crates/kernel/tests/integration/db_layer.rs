@@ -657,3 +657,48 @@ async fn record_global_tren_bang_cua_khach_bi_tu_choi_luc_chay() {
     .await
     .unwrap();
 }
+
+/// `Find::within` / `Grouped::within`: câu của bộ dựng câu chạy dưới trần thời gian cho cùng kết quả như không có trần
+/// (mọi kiểu giá trị bind, cả `LIMIT`), vẫn lọc theo khách; trên transaction ghi thì là lỗi, không âm thầm bỏ qua.
+#[tokio::test]
+async fn doc_co_tran_tren_bo_dung_cau() {
+    TestDatabase::run(async |test| {
+        let database = open(test).await;
+        let (a, b) = (tenant(&database, 0xA), tenant(&database, 0xB));
+        seed(&a, &b).await;
+        let read = a.db().read();
+        let limit = std::time::Duration::from_secs(5);
+        let query = || {
+            read.find::<Line>()
+                .filter(Line::AMOUNT_MINOR.gte(0))
+                .filter(Line::EFFECTIVE_DATE.gte(day("2000-01-01")))
+                .order_desc(Line::ID)
+                .limit(2)
+        };
+        let plain: Vec<Uuid> = query().all().await.unwrap().iter().map(|line| line.id).collect();
+        let bounded: Vec<Uuid> =
+            query().within(limit).all().await.unwrap().iter().map(|line| line.id).collect();
+        assert_eq!(bounded, plain);
+        assert_eq!(bounded, vec![id(0x1012), id(0x1011)], "tenant A only");
+        let ids: Vec<(Uuid,)> = query().within(limit).select((Line::ID,)).all().await.unwrap();
+        assert_eq!(ids, vec![(id(0x1012),), (id(0x1011),)]);
+
+        // `page` cũng đi qua trần (cả câu đếm lẫn câu lấy dòng), không bỏ qua lặng lẽ.
+        let request = PageRequest::first(2, Order::Desc).counted();
+        let page = read.find::<Line>().within(limit).page(Line::ID, &request).await.unwrap();
+        assert_eq!(page.data.iter().map(|line| line.id).collect::<Vec<_>>(), plain);
+
+        // Trên transaction ghi, `within` là lỗi ở mọi cách đọc — bằng chứng cách đọc đó đi qua trần.
+        let tx = a.db().begin_write().await.unwrap();
+        assert!(tx.find::<Line>().within(limit).all().await.is_err());
+        assert!(tx.find::<Line>().within(limit).count().await.is_err());
+        let uncounted = PageRequest::first(2, Order::Desc);
+        let rows = tx.find::<Line>().within(limit).page(Line::ID, &uncounted);
+        assert!(rows.await.is_err(), "page honours within");
+        let counted = tx.find::<Line>().within(limit).page(Line::ID, &request);
+        assert!(counted.await.is_err(), "the page count honours within");
+        tx.rollback().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

@@ -1,5 +1,6 @@
-//! Chốt của tìm công khai (PT-15): tìm theo chữ trên bản đã đăng là `LIKE '%q%'` quét mọi bài đã đăng của ngôn ngữ, nên
-//! vài chục request không đăng nhập cùng lúc làm chậm mọi request khác. Ba chốt, trong bộ nhớ của từng tiến trình:
+//! Chốt của tìm công khai (PT-15): tìm theo ý nghĩa tốn CPU và gọi nhà cung cấp; tìm theo chữ đi qua chỉ mục từ có trần
+//! thời gian câu lệnh riêng (`publishing::words`, D-20261126-content-word-index). Ba chốt, trong bộ nhớ của từng
+//! tiến trình:
 //!
 //! - số lượt tìm công khai chạy cùng lúc (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`): hết chỗ thì trả 429 ngay, không
 //!   xếp hàng giữ kết nối;
@@ -18,6 +19,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::PlacementId;
 use autoxide_kernel::throttle::address_key;
 
 /// Trần thời gian trả lời một lượt tìm công khai.
@@ -34,7 +36,8 @@ const MAX_ADDRESSES: usize = 100_000;
 
 #[derive(Default)]
 pub(crate) struct PublicLimits {
-    running: Arc<AtomicU32>,
+    /// Số lượt đang chạy theo database (placement): mỗi placement một pool đọc, trần tính theo pool đó.
+    running: Mutex<HashMap<PlacementId, Arc<AtomicU32>>>,
     // `Mutex` của thư viện chuẩn: giữ khoá rất ngắn, không có `await` bên trong.
     by_address: Mutex<Counts>,
 }
@@ -56,24 +59,31 @@ impl Drop for Slot {
 }
 
 impl PublicLimits {
-    /// Giữ một chỗ chạy rồi tính một lượt của địa chỉ `ip` (không biết địa chỉ: không đếm); lỗi 429 khi vượt. Hết chỗ thì
-    /// không tính lượt của địa chỉ (người đọc không mất lượt vì máy chủ bận).
+    /// Giữ một chỗ chạy trên database `placement` (tối đa `concurrency` lượt cùng lúc trên database đó) rồi tính một
+    /// lượt của địa chỉ `ip` (không biết địa chỉ: không đếm); lỗi 429 khi vượt. Hết chỗ thì không tính lượt của địa chỉ
+    /// (người đọc không mất lượt vì máy chủ bận).
     pub(crate) fn admit(
         &self,
+        placement: PlacementId,
         ip: Option<IpAddr>,
         per_address: u32,
         concurrency: u32,
     ) -> Result<Slot, Error> {
+        let running = match self.running.lock() {
+            Ok(mut running) => Arc::clone(running.entry(placement).or_default()),
+            // Mutex hỏng (một thread panic khi giữ): không chặn tìm, dùng một bộ đếm riêng.
+            Err(_) => Arc::new(AtomicU32::new(0)),
+        };
         // Tăng trước rồi kiểm: hai lượt cùng lúc không cùng thấy còn một chỗ.
-        if self.running.fetch_add(1, Ordering::AcqRel) >= concurrency {
-            self.running.fetch_sub(1, Ordering::AcqRel);
+        if running.fetch_add(1, Ordering::AcqRel) >= concurrency {
+            running.fetch_sub(1, Ordering::AcqRel);
             return Err(Error::too_many_requests(
                 "content.public_search_busy",
                 "Too many searches are running right now. Try again in a moment.",
             )
             .with_retry_after(1));
         }
-        let slot = Slot(Arc::clone(&self.running));
+        let slot = Slot(running);
         if let Some(ip) = ip {
             // Lỗi thì `slot` bị huỷ ở đây, chỗ được trả lại.
             self.count(&address_key("content-public-search", ip), per_address)?;
@@ -112,6 +122,19 @@ impl PublicLimits {
     }
 }
 
+/// Kết nối đọc để dành cho phần còn lại của ứng dụng: tìm và gợi ý công khai cộng lại không dùng quá pool đọc trừ
+/// chừng này.
+const READ_RESERVE: u32 = 2;
+
+/// Số lượt cùng lúc trên một database có pool đọc `pool` kết nối, cho (tìm kiếm, gợi ý): một trần chung
+/// `min(concurrency, pool − READ_RESERVE)` (ít nhất 2), gợi ý được một phần tư (ít nhất 1), tìm kiếm phần còn lại. Hai
+/// bên không lấy chỗ của nhau, và cộng lại luôn để dành kết nối cho các câu đọc khác.
+pub(crate) fn capacities(concurrency: u32, pool: u32) -> (u32, u32) {
+    let total = concurrency.min(pool.saturating_sub(READ_RESERVE)).max(2);
+    let suggest = (total / 4).max(1);
+    (total - suggest, suggest)
+}
+
 /// Lỗi khi một lượt tìm công khai vượt [`TIMEOUT`].
 pub(crate) fn timed_out() -> Error {
     Error::unavailable(
@@ -125,42 +148,75 @@ pub(crate) fn timed_out() -> Error {
 mod tests {
     use super::*;
 
+    const MAIN: PlacementId = autoxide_kernel::tenancy::MAIN_PLACEMENT;
+
     fn ip(text: &str) -> Option<IpAddr> {
         text.parse().ok()
+    }
+
+    #[test]
+    fn tran_chung_duoi_pool_doc_va_chia_cho_goi_y() {
+        // Pool mặc định 10, trần 8: 6 cho tìm, 2 cho gợi ý; để dành 2 kết nối.
+        assert_eq!(capacities(8, 10), (6, 2));
+        // Pool nhỏ của placement (4): trần hạ còn 2 — 1 tìm, 1 gợi ý.
+        assert_eq!(capacities(8, 4), (1, 1));
+        // Trần cấu hình nhỏ hơn pool: theo cấu hình.
+        assert_eq!(capacities(4, 50), (3, 1));
+        for pool in 4..=200 {
+            for concurrency in 1..=1000 {
+                let (search, suggest) = capacities(concurrency, pool);
+                assert!(search >= 1 && suggest >= 1);
+                assert!(search + suggest <= pool - READ_RESERVE, "{concurrency} {pool}");
+            }
+        }
+    }
+
+    #[test]
+    fn moi_database_mot_bo_dem() {
+        let limits = PublicLimits::default();
+        let other = PlacementId::from_uuid(uuid::Uuid::from_u128(7));
+        let held = limits.admit(MAIN, None, 100, 1).unwrap();
+        assert_eq!(
+            limits.admit(MAIN, None, 100, 1).err().unwrap().code(),
+            "content.public_search_busy"
+        );
+        // Database khác (placement khác, pool riêng) không bị ảnh hưởng.
+        assert!(limits.admit(other, None, 100, 1).is_ok());
+        drop(held);
     }
 
     #[test]
     fn het_cho_hay_qua_luot_thi_429() {
         let limits = PublicLimits::default();
         // Hai chỗ: lượt thứ ba bị từ chối khi hai lượt trước còn chạy; trả chỗ thì nhận lại.
-        let first = limits.admit(ip("203.0.113.1"), 100, 2).unwrap();
-        let second = limits.admit(ip("203.0.113.2"), 100, 2).unwrap();
-        let busy = limits.admit(ip("203.0.113.3"), 100, 2).err().unwrap();
+        let first = limits.admit(MAIN, ip("203.0.113.1"), 100, 2).unwrap();
+        let second = limits.admit(MAIN, ip("203.0.113.2"), 100, 2).unwrap();
+        let busy = limits.admit(MAIN, ip("203.0.113.3"), 100, 2).err().unwrap();
         assert_eq!(busy.code(), "content.public_search_busy");
         drop(first);
-        assert!(limits.admit(ip("203.0.113.3"), 100, 2).is_ok());
+        assert!(limits.admit(MAIN, ip("203.0.113.3"), 100, 2).is_ok());
         drop(second);
         // Theo địa chỉ: 3 lượt mỗi phút; cùng khối /64 của IPv6 tính chung, địa chỉ khác không bị ảnh hưởng.
         for _ in 0..3 {
-            drop(limits.admit(ip("2001:db8:1:2::1"), 3, 10).unwrap());
+            drop(limits.admit(MAIN, ip("2001:db8:1:2::1"), 3, 10).unwrap());
         }
-        let limited = limits.admit(ip("2001:db8:1:2::99"), 3, 10).err().unwrap();
+        let limited = limits.admit(MAIN, ip("2001:db8:1:2::99"), 3, 10).err().unwrap();
         assert_eq!(limited.code(), "content.public_search_rate_limited");
         assert!(limited.retry_after().is_some());
-        assert!(limits.admit(ip("2001:db8:1:3::1"), 3, 10).is_ok());
+        assert!(limits.admit(MAIN, ip("2001:db8:1:3::1"), 3, 10).is_ok());
     }
 
     #[test]
     fn het_cho_thi_khong_mat_luot_cua_dia_chi() {
         let limits = PublicLimits::default();
-        let held = limits.admit(None, 1, 1).unwrap();
+        let held = limits.admit(MAIN, None, 1, 1).unwrap();
         for _ in 0..5 {
-            let busy = limits.admit(ip("203.0.113.1"), 1, 1).err().unwrap();
+            let busy = limits.admit(MAIN, ip("203.0.113.1"), 1, 1).err().unwrap();
             assert_eq!(busy.code(), "content.public_search_busy");
         }
         drop(held);
         // Năm lượt bị từ chối vì bận không tiêu lượt duy nhất của địa chỉ.
-        assert!(limits.admit(ip("203.0.113.1"), 1, 1).is_ok());
+        assert!(limits.admit(MAIN, ip("203.0.113.1"), 1, 1).is_ok());
     }
 
     #[test]
@@ -169,7 +225,7 @@ mod tests {
         for index in 0..(MAX_ADDRESSES + 10) {
             let [a, b, c, d] = u32::try_from(index).unwrap().to_be_bytes();
             let address = IpAddr::from([10 | a, b, c, d]);
-            drop(limits.admit(Some(address), 5, 1).unwrap());
+            drop(limits.admit(MAIN, Some(address), 5, 1).unwrap());
         }
         assert!(limits.by_address.lock().unwrap().windows.len() <= MAX_ADDRESSES);
     }
@@ -177,16 +233,19 @@ mod tests {
     #[tokio::test]
     async fn cho_di_theo_task_toi_khi_viec_xong() {
         let limits = PublicLimits::default();
-        let slot = limits.admit(None, 10, 1).unwrap();
+        let slot = limits.admit(MAIN, None, 10, 1).unwrap();
         let (release, wait) = tokio::sync::oneshot::channel::<()>();
         let task = tokio::spawn(async move {
             let _slot = slot;
             let _ = wait.await;
         });
         // Task còn chạy (request có thể đã trả 503): chỗ vẫn bị giữ.
-        assert_eq!(limits.admit(None, 10, 1).err().unwrap().code(), "content.public_search_busy");
+        assert_eq!(
+            limits.admit(MAIN, None, 10, 1).err().unwrap().code(),
+            "content.public_search_busy"
+        );
         release.send(()).unwrap();
         task.await.unwrap();
-        assert!(limits.admit(None, 10, 1).is_ok());
+        assert!(limits.admit(MAIN, None, 10, 1).is_ok());
     }
 }

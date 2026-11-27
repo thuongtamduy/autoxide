@@ -8,6 +8,7 @@ pub(crate) mod preview;
 pub(crate) mod reading;
 pub(crate) mod redirects;
 pub(crate) mod schedules;
+pub(crate) mod words;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
@@ -596,6 +597,8 @@ impl ContentService {
                     .map_err(|error| unique_path(error, &path))?;
             }
         }
+        // Chỉ mục từ của bản công khai (PT-15): cùng transaction với bản đăng.
+        words::write(transaction, tenant, version.id, &version.locale, &version.search_key).await?;
         paths::clear_automatic(transaction, tenant, &version.locale, &path).await?;
         paths::redirect_moved(transaction, tenant, &version.locale, &moved, by, now).await?;
         if let Some(type_id) = version.type_id {
@@ -647,6 +650,7 @@ impl ContentService {
             .filter(published::Column::EntryId.eq(entry.id))
             .exec(transaction)
             .await?;
+        words::remove(transaction, tenant, entry.id).await?;
         if old.type_id.is_some() {
             crate::types::public::remove_published_index(transaction, tenant, entry.id).await?;
         }

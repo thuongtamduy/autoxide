@@ -187,6 +187,11 @@ tên. Không gì bị xoá, và log khởi động lẫn `autoxide doctor` báo 
 module đang tắt, kèm dòng cần thêm — xem
 [MODULES.vi.md](MODULES.vi.md#nâng-cấp-từ-017-trở-về-trước). Điều này áp dụng cả cho cách B và C.
 
+**Cập nhật lên bản có chỉ mục từ của content** (migration `content.m0036_word_index`): migration điền từ
+của mọi bài đã đăng vào bảng mới `content_published_words` theo từng lô, rồi dựng index của bảng và thêm một index trên `content_published`. Website lớn
+thì lâu hơn và giữ lock của migration trong lúc đó: hãy cập nhật vào giờ vắng. Điều này áp dụng cả cho cách B
+và C.
+
 ### 6. Backup và khôi phục
 
 ```bash
@@ -1258,7 +1263,9 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
 - **Sửa:** dừng thứ đang giữ kết nối (truy vấn chậm, job kẹt), rồi tăng
   `AUTOXIDE_DATABASE_READ_CONNECTIONS` / `AUTOXIDE_DATABASE_WRITE_CONNECTIONS` — mỗi tiến trình mở chừng
   ấy kết nối, nên giữ tổng dưới `max_connections` của máy chủ database. SQLite theo thiết kế chỉ có một
-  kết nối ghi.
+  kết nối ghi. Tìm chữ công khai (bài có `q`, `/public/search`, gợi ý) không bao giờ dùng quá pool đọc trừ 2
+  trên mỗi database (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, tự hạ), và bỏ sau 2 giây, kể cả thời gian
+  chờ kết nối.
 
 ### Database đầy
 

@@ -190,6 +190,11 @@ them. Nothing is deleted, and the startup log and `autoxide doctor` tell you whe
 holds data of a module that is off, with the line to add — see
 [MODULES.md](MODULES.md#upgrading-from-017-or-earlier). This applies to setups B and C too.
 
+**Updating to the release with the content word index** (migration `content.m0036_word_index`): the
+migration fills the new table `content_published_words` with the words of every published entry, in
+batches, then builds its index and one more index on `content_published`. On a large site it takes longer and holds the migration lock meanwhile:
+update in a quiet hour. This applies to setups B and C too.
+
 ### 6. Back up and restore
 
 ```bash
@@ -1307,7 +1312,9 @@ mass revocation, restoring one tenant, lost data) are in [`RUNBOOK.md`](RUNBOOK.
 - **Fix:** end what holds connections (a slow query, a stuck job), then raise
   `AUTOXIDE_DATABASE_READ_CONNECTIONS` / `AUTOXIDE_DATABASE_WRITE_CONNECTIONS` — every process opens
   that many, so keep the total under the server's `max_connections`. SQLite has one write connection
-  by design.
+  by design. Public text search (content posts with `q`, `/public/search`, suggestions) never takes
+  more than the read pool minus 2 per database (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`, lowered
+  automatically), and gives up after 2 seconds, waiting for a connection included.
 
 ### Database full
 

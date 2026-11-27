@@ -28,6 +28,7 @@ mod m0031_type_detail_layout;
 mod m0033_campaign_drafts;
 mod m0034_not_found_paths;
 mod m0035_list_indexes;
+pub(crate) mod m0036_word_index;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -203,5 +204,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0034_not_found_paths::Migration),
         // Index cho danh sách có phân trang (bước 70 P9).
         Box::new(m0035_list_indexes::Migration),
+        // Chỉ mục từ của bản công khai: bảng `content_published_words`, giống nhau trên hai database (PT-15,
+        // D-20261126-content-word-index).
+        Box::new(m0036_word_index::Migration),
     ]
 }

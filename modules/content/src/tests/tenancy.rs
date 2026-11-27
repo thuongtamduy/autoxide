@@ -251,6 +251,49 @@ async fn cache_tim_theo_y_nghia_khong_dung_chung() {
     .unwrap();
 }
 
+/// Single-flight của việc nạp vector (`loaded`): nhiều lượt tìm cùng lúc thấy cache cũ thì chỉ một lượt đọc
+/// database, các lượt kia chờ rồi dùng cache — kết quả của mọi lượt như nhau.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn tim_dong_thoi_chi_nap_vector_mot_lan() {
+    TestDatabase::run(async |test| {
+        let embedder = Arc::new(FakeEmbedder::new(128));
+        let (_app, content, a, _) = two_tenants(test, embedder).await;
+        let ada = editor().in_tenant(a.id());
+        let mut input = post("Đà Lạt mùa hoa");
+        input.locale = Some("vi".into());
+        input.fields.body = Some(paragraph("Hoa dã quỳ nở vàng đồi thông."));
+        let entry = content.create(&a, &ada, input).await.unwrap();
+        content.index_entry(&a, entry.id).await.unwrap();
+        // Cache còn trống: mọi lượt cùng lúc đều cần vector.
+        let before = content.search_cache.loads.load(std::sync::atomic::Ordering::Relaxed);
+        // Tám lượt trên nhiều thread, xuất phát cùng lúc (barrier).
+        let start = Arc::new(tokio::sync::Barrier::new(8));
+        let tasks: Vec<_> = (0..8)
+            .map(|_| {
+                let (content, tenant, start) = (content.clone(), a.clone(), start.clone());
+                tokio::spawn(async move {
+                    start.wait().await;
+                    content.loaded(&tenant, Scope::Draft, "vi").await.map(|_| ())
+                })
+            })
+            .collect();
+        for task in tasks {
+            task.await.unwrap().unwrap();
+        }
+        assert_eq!(content.search_cache.cached_version(a.id(), Scope::Draft, "vi"), Some(1));
+        let loads = content.search_cache.loads.load(std::sync::atomic::Ordering::Relaxed) - before;
+        assert_eq!(loads, 1, "one load for eight concurrent loads");
+        let query =
+            SearchQuery {
+                q: "hoa đà lạt".into(), locale: Some("vi".into()), ..Default::default()
+            };
+        let hits = content.search(&a, Some(&ada), &query, None).await.unwrap();
+        assert_eq!(hits[0].entry_id, entry.id);
+    })
+    .await
+    .unwrap();
+}
+
 /// Lịch đăng của khách `b` (database riêng) chạy bằng job của khách đó: đăng ở `b`, event ghi ở
 /// database của `b`; khách `a` không có gì. Job định kỳ dọn revision và lập index bù chạy theo
 /// từng database.

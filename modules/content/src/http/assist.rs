@@ -500,7 +500,9 @@ pub(crate) async fn search(
 /// (then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only
 /// published entries, each with its `path`. Searches by meaning have a budget per minute
 /// (`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only. Searches
-/// are also limited per client address and per server, and stopped after 3 seconds.
+/// are also limited per client address and per server, and stopped after 3 seconds. The word part
+/// matches whole words and word prefixes from 3 letters, ignoring case and accents (not any
+/// substring), among the newest matching entries.
 #[utoipa::path(
     get,
     path = "/public/search",

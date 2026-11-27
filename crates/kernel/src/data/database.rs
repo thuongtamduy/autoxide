@@ -108,6 +108,21 @@ impl Database {
         &self.read
     }
 
+    /// The most connections the read pool opens (`AUTOXIDE_DATABASE_READ_CONNECTIONS`, or the smaller pool of a
+    /// placement). A module that limits its own concurrent reads (public search) keeps below it, so the rest of the
+    /// application always finds a free read connection.
+    pub fn read_pool_size(&self) -> u32 {
+        // sqlx giữ số kết nối tối đa trong tuỳ chọn của pool; SeaORM cho lấy pool theo loại database.
+        match self.backend {
+            DatabaseBackend::Sqlite => {
+                self.read.get_sqlite_connection_pool().options().get_max_connections()
+            }
+            DatabaseBackend::Postgres => {
+                self.read.get_postgres_connection_pool().options().get_max_connections()
+            }
+        }
+    }
+
     /// Connection for WRITE statements. A single write statement uses this connection directly; several
     /// statements that must succeed or fail together use [`begin_write`](Self::begin_write).
     pub fn write(&self) -> &DatabaseConnection {

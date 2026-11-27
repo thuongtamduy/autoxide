@@ -99,6 +99,7 @@
 //! The library types stay inside the kernel; a few library *trait impls* on these types (to let kernel
 //! functions that still take a connection accept a handle) are not part of the contract.
 
+mod bounded;
 mod check;
 mod handle;
 mod query;
@@ -109,6 +110,7 @@ mod write;
 
 /// `#[derive(Record)]`: see [`Record`].
 pub use autoxide_macros::Record;
+pub use bounded::{QUERY_TIMEOUT, is_query_timeout};
 pub use check::RecordInfo;
 pub(crate) use check::control_plane_prefix_problem;
 pub(crate) use check::problems as record_problems;

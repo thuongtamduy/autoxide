@@ -240,6 +240,21 @@ pub(crate) fn on_site(lineage: &[Uuid]) -> sea_orm::Condition {
 }
 
 impl ContentService {
+    /// Như [`public_posts`](Self::public_posts), cho người đọc ở địa chỉ `ip` qua endpoint công khai: có tìm theo chữ
+    /// (`search`) thì giữ một chỗ của chốt tìm công khai (số lượt cùng lúc, số lượt mỗi phút theo địa chỉ; 429 khi
+    /// vượt) tới khi trả lời. Client ngắt thì chỗ được trả và database dừng câu đang chạy (`within`).
+    pub(crate) async fn public_posts_for(
+        &self,
+        tenant: &TenantContext,
+        filter: &PostFilter,
+        page: &PageRequest,
+        ip: Option<std::net::IpAddr>,
+    ) -> Result<Page<Published>, Error> {
+        let searching = filter.search.as_deref().is_some_and(|search| !search.trim().is_empty());
+        let _slot = if searching { Some(self.admit_public_search(tenant, ip)?) } else { None };
+        self.public_posts(tenant, filter, page).await
+    }
+
     /// Bài đã đăng của một ngôn ngữ, mới nhất trước (theo ngày đăng hiển thị).
     pub(crate) async fn public_posts(
         &self,
@@ -259,12 +274,23 @@ impl ContentService {
         if let Some(author) = filter.author_id {
             select = select.filter(crate::taxonomy::authors::published_has_author(tenant, author));
         }
+        let read = tenant.database().read();
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
-            select = select
-                .filter(autoxide_kernel::search::contains(published::Column::SearchKey, search));
+            // Chỉ mục từ (PT-15): tối đa `MATCH_CAP` bài khớp mới nhất — đã lọc website, chuyên mục, tác giả trước khi
+            // cắt — rồi lọc tiếp như mọi trang.
+            let matching = super::words::Matching {
+                locale: &filter.locale,
+                kind: Some("post"),
+                site: Some(&filter.site),
+                indexable_only: false,
+                term: filter.term_id,
+                author: filter.author_id,
+            };
+            let query = super::words::WordQuery::parse(search);
+            let ids = super::words::matching_ids(tenant, matching, &query).await?;
+            select = select.filter(published::Column::EntryId.is_in(ids));
         }
         let key = |row: &Published| SortValue::Time(row.published_at);
-        let read = tenant.database().read();
         fetch_page_by(
             select,
             published::Column::PublishedAt,

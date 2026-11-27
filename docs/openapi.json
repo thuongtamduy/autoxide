@@ -167475,7 +167475,7 @@
             }
           },
           {
-            "description": "Only posts whose title, summary or body contains this text, ignoring case and accents.\nAt most 200 characters.",
+            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Returns the newest matching posts, at most 1,000 across all pages, after the other\nfilters (`term_id`, `author_id`). At most 200 characters. A search that takes longer than 2\nseconds answers 503 rather than a partial list. Changed: earlier versions matched any\nsubstring.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -167583,6 +167583,26 @@
             },
             "description": "A parameter is invalid; see `errors`."
           },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "With `q`: too many searches from your network this minute (`content.public_search_rate_limited`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_ADDRESS_PER_MINUTE`), or too many searches running on the server (`content.public_search_busy`, `AUTOXIDE_CONTENT_PUBLIC_SEARCH_CONCURRENCY`); wait `Retry-After` seconds."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The search by `q` took longer than 2 seconds and was stopped (`content.public_search_timeout`); try more specific words."
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -167624,7 +167644,7 @@
             "operator": "eq"
           },
           {
-            "description": "Only posts whose title, summary or body contains this text, ignoring case and accents.\nAt most 200 characters.",
+            "description": "Only posts whose title, summary or body contain every word of this text, ignoring case and\naccents; a word of 3 letters or more also matches longer words that start with it (`lat` finds\n\"Da Lat\"). Returns the newest matching posts, at most 1,000 across all pages, after the other\nfilters (`term_id`, `author_id`). At most 200 characters. A search that takes longer than 2\nseconds answers 503 rather than a partial list. Changed: earlier versions matched any\nsubstring.",
             "kind": "string",
             "name": "q",
             "operator": "contains"
@@ -167871,7 +167891,7 @@
     },
     "/api/v1/content/public/search": {
       "get": {
-        "description": "No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`\n(then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only\npublished entries, each with its `path`. Searches by meaning have a budget per minute\n(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only. Searches\nare also limited per client address and per server, and stopped after 3 seconds.",
+        "description": "No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`\n(then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only\npublished entries, each with its `path`. Searches by meaning have a budget per minute\n(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only. Searches\nare also limited per client address and per server, and stopped after 3 seconds. The word part\nmatches whole words and word prefixes from 3 letters, ignoring case and accents (not any\nsubstring), among the newest matching entries.",
         "operationId": "content_search_public_content",
         "parameters": [
           {
