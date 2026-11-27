@@ -90,6 +90,16 @@ enum Command {
     /// image that has none. It does not touch the database itself.
     Healthcheck(commands::healthcheck::Arguments),
 
+    /// Print the generated password of the first administrator, or delete the file that holds it.
+    ///
+    /// `autoxide serve` writes the email and the generated password to the file named by
+    /// `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT` (default `data/initial-admin-password`, readable only by the
+    /// server's user) when it creates the first administrator without a password you gave. This prints that
+    /// file (the email, then the password) and, with `--remove`, deletes it once you have changed the
+    /// password. It exists because the Docker image has no shell, `cat` or `rm`. Exits with status 1 when the
+    /// file does not exist, 2 when the configuration is invalid. The password never goes to the log.
+    InitialPassword(commands::initial_password::Arguments),
+
     /// Inspect and retry background jobs that failed for good (the dead-letter queue).
     Jobs(commands::jobs::Arguments),
 
@@ -280,6 +290,7 @@ fn dispatch(command: Command) -> ExitCode {
         Command::Demo(arguments) => commands::demo::run(&arguments),
         Command::Doctor(arguments) => commands::doctor::run(&arguments),
         Command::Healthcheck(arguments) => commands::healthcheck::run(&arguments),
+        Command::InitialPassword(arguments) => commands::initial_password::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Modules(arguments) => commands::modules::run(&arguments),
