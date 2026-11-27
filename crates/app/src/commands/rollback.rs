@@ -14,7 +14,9 @@
 use std::process::ExitCode;
 
 use autoxide_kernel::database::Database;
-use autoxide_kernel::migration::{MigrationLock, Migrator, RollbackPlan};
+use std::time::Duration;
+
+use autoxide_kernel::migration::{DryRunLimits, MigrationLock, Migrator, RollbackPlan};
 use autoxide_kernel::tenancy::{DatabaseRegistry, MAIN_PLACEMENT, PlacementId, Placements};
 
 use super::{EXIT_FAILURE, report_failure, report_invalid_configuration, run_with_observability};
@@ -29,7 +31,8 @@ pub struct Arguments {
     #[arg(long)]
     to: String,
     /// Only show what would be reverted, per database, and the tables and columns that would be dropped with
-    /// how many rows they hold. Changes nothing.
+    /// how many rows they hold. Changes nothing. On PostgreSQL it runs the reverts inside a transaction that is
+    /// rolled back, holding locks on the tables it changes for that time (see `--lock-timeout-seconds`).
     #[arg(long)]
     dry_run: bool,
     /// Go on although the rollback drops tables or columns that hold data (see `--dry-run`).
@@ -38,6 +41,16 @@ pub struct Arguments {
     /// Confirm that every server and worker of the current release is stopped.
     #[arg(long)]
     yes: bool,
+    /// Also revert the migrations of modules the release table does not track (modules this binary adds with
+    /// `.module(…)`): without it they are left as they are.
+    #[arg(long)]
+    revert_untracked: bool,
+    /// PostgreSQL: how long the dry run waits for a table another session uses before it gives up.
+    #[arg(long, default_value_t = 2)]
+    lock_timeout_seconds: u64,
+    /// PostgreSQL: longest run of one statement of the dry run.
+    #[arg(long, default_value_t = 60)]
+    statement_timeout_seconds: u64,
 }
 
 pub fn run(arguments: &Arguments) -> ExitCode {
@@ -50,7 +63,7 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     let outcome = run_with_observability(&config, async move {
         let releases = MigrationReleases::embedded()?;
         let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
-        let main_lock = MigrationLock::acquire(&settings.config.database, LOCK_WAIT)
+        let mut main_lock = MigrationLock::acquire(&settings.config.database, LOCK_WAIT)
             .await
             .map_err(|error| error.to_string())?;
         let database = Database::connect(&settings.config.database)
@@ -64,7 +77,13 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         let outcome = match settings.modules.placements(&registry) {
             Ok(placements) => {
                 let migrator = migrator.keyed_on(&database);
-                execute(&arguments, &releases, &migrator, &registry, &placements).await
+                let context = Context {
+                    releases: &releases,
+                    migrator: &migrator,
+                    registry: &registry,
+                    placements: &placements,
+                };
+                execute(&arguments, &context, &mut main_lock).await
             }
             Err(error) => Err(error.to_string()),
         };
@@ -91,20 +110,31 @@ pub(crate) struct Outcome {
     pub(crate) failed: bool,
 }
 
-/// Mọi việc sau khi đã giữ khoá chính: kiểm bản đích, lấy khoá placement, lập kế hoạch, lùi.
+/// Những thứ lệnh dùng (gom lại để hàm không nhận quá nhiều tham số).
+pub(crate) struct Context<'a> {
+    pub(crate) releases: &'a MigrationReleases,
+    pub(crate) migrator: &'a Migrator,
+    pub(crate) registry: &'a DatabaseRegistry,
+    pub(crate) placements: &'a Placements,
+}
+
+/// Migration đầu tiên của phần đa khách: bản đích chưa có nó thì không biết placement là gì.
+const TENANCY: (&str, &str) = ("kernel", "m0003_create_tenancy");
+/// Migration thêm cột `kind` của `kernel_migration_runs`: bản đích còn giữ nó thì ghi kết thúc lượt sau cùng được.
+const RUN_KIND: (&str, &str) = ("kernel", "m0043_migration_run_kind");
+
+/// Mọi việc sau khi đã giữ khoá chính (`main_lock`): kiểm bản đích, lấy khoá placement, lập kế hoạch, lùi.
 pub(crate) async fn execute(
     arguments: &Arguments,
-    releases: &MigrationReleases,
-    migrator: &Migrator,
-    registry: &DatabaseRegistry,
-    placements: &Placements,
+    context: &Context<'_>,
+    main_lock: &mut MigrationLock,
 ) -> Result<Outcome, String> {
     let current = env!("CARGO_PKG_VERSION");
     let target = arguments.to.trim_start_matches('v');
-    if !releases.knows(target) {
+    if !context.releases.knows(target) {
         return Err(format!(
             "`{target}` is not a release this binary knows; known releases: {}",
-            releases.releases().join(", ")
+            context.releases.releases().join(", ")
         ));
     }
     if compare(target, current) == std::cmp::Ordering::Greater {
@@ -113,10 +143,8 @@ pub(crate) async fn execute(
         ));
     }
     let describe = |error: autoxide_kernel::error::Error| super::describe_error(&error);
-    let mut lock = placements.lock(LOCK_WAIT).await.map_err(describe)?;
-    let outcome =
-        rollback_locked(arguments, releases, migrator, registry, placements, target, &mut lock)
-            .await;
+    let mut lock = context.placements.lock(LOCK_WAIT).await.map_err(describe)?;
+    let outcome = rollback_locked(arguments, context, target, &mut lock, main_lock).await;
     if let Err(error) = lock.release().await {
         tracing::warn!(error = %error, "cannot release the migration lock");
     }
@@ -125,38 +153,68 @@ pub(crate) async fn execute(
 
 async fn rollback_locked(
     arguments: &Arguments,
-    releases: &MigrationReleases,
-    migrator: &Migrator,
-    registry: &DatabaseRegistry,
-    placements: &Placements,
+    context: &Context<'_>,
     target: &str,
     lock: &mut MigrationLock,
+    main_lock: &mut MigrationLock,
 ) -> Result<Outcome, String> {
     let describe = |error: autoxide_kernel::error::Error| super::describe_error(&error);
-    let keep = |module: &str, name: &str| releases.in_release(target, module, name);
+    let releases = context.releases;
+    let keep = |module: &str, name: &str| {
+        (!releases.tracks_module(module) && !arguments.revert_untracked)
+            || releases.in_release(target, module, name)
+    };
     // Placement trước (theo tên), database chính sau cùng.
-    let mut databases: Vec<(String, Database)> = Vec::new();
-    for found in placements.list().await.map_err(describe)? {
+    let mut placements: Vec<(String, Database)> = Vec::new();
+    for found in context.placements.list().await.map_err(describe)? {
         if found.id == MAIN_PLACEMENT.as_uuid() {
             continue;
         }
-        let database = registry
+        let database = context
+            .registry
             .placement_database(PlacementId::from_uuid(found.id))
             .await
             .map_err(describe)?;
-        databases.push((found.name, database));
+        placements.push((found.name, database));
     }
-    databases.push(("main".to_owned(), registry.control().clone()));
+    if !placements.is_empty()
+        && releases.tracks_module(TENANCY.0)
+        && !releases.in_release(target, TENANCY.0, TENANCY.1)
+    {
+        return Err(format!(
+            "`{target}` has no tenant databases (placements), and this installation has some; it cannot go back that far"
+        ));
+    }
+    let main = context.registry.control().clone();
+    let limits = DryRunLimits {
+        lock_timeout: Duration::from_secs(arguments.lock_timeout_seconds),
+        statement_timeout: Duration::from_secs(arguments.statement_timeout_seconds),
+    };
 
     let mut plans: Vec<(String, RollbackPlan)> = Vec::new();
-    for (name, database) in &databases {
-        let plan = migrator
-            .rollback_plan(database, &keep)
+    for (name, database) in
+        placements.iter().chain(std::iter::once(&("main".to_owned(), main.clone())))
+    {
+        let plan = context
+            .migrator
+            .rollback_plan(database, &keep, limits)
             .await
             .map_err(|error| format!("{name}: {error}"))?;
         plans.push((name.clone(), plan));
     }
     let mut output = render_plans(target, &plans);
+    let untracked = untracked_modules(context.migrator, releases);
+    if !untracked.is_empty() {
+        let verb = if arguments.revert_untracked {
+            "reverted too (--revert-untracked)"
+        } else {
+            "left as is"
+        };
+        output.push_str(&format!(
+            "Modules not tracked by the release table, {verb}: {}\n",
+            untracked.join(", ")
+        ));
+    }
     if plans.iter().all(|(_, plan)| plan.steps.is_empty()) {
         output
             .push_str(&format!("Nothing to roll back: every database already matches {target}.\n"));
@@ -180,39 +238,67 @@ async fn rollback_locked(
     }
 
     let current = env!("CARGO_PKG_VERSION");
-    let run = placements.begin_rollback_run(lock, current, target).await.map_err(describe)?;
+    let run =
+        context.placements.begin_rollback_run(lock, current, target).await.map_err(describe)?;
     let mut failures = Vec::new();
-    let (main, others) = databases.split_last().ok_or("no database")?;
-    for (name, database) in others {
+    for (name, database) in &placements {
         if let Err(error) = lock.verify().await {
             failures.push(error.to_string());
             break;
         }
-        match migrator.rollback(database, &keep).await {
+        // `migrating` trong lúc lùi: khách nhận 503 thay vì lỗi SQL; tiến trình chết thì lượt sau đặt `behind`.
+        context.placements.mark_rollback(lock, name, false).await.map_err(describe)?;
+        let reverted = context.migrator.rollback(database, &keep).await;
+        context.placements.mark_rollback(lock, name, true).await.map_err(describe)?;
+        match reverted {
             Ok(reverted) => output.push_str(&format!("{name}: reverted {}\n", reverted.len())),
             Err(error) => failures.push(format!("{name}: {error}")),
         }
     }
-    let error = (!failures.is_empty()).then(|| failures.join("\n"));
-    // Ghi kết thúc lượt TRƯỚC khi lùi database chính: lùi xa có thể bỏ chính các cột của bảng lượt.
-    placements.finish_run(run, error.clone()).await.map_err(describe)?;
-    if let Some(error) = error {
+    // Bản đích còn cột `kind` của bảng lượt thì ghi kết thúc lượt sau khi lùi database chính; không thì phải ghi
+    // TRƯỚC (lùi database chính bỏ chính các cột đó), và lỗi của database chính chỉ in ra, không vào lượt.
+    let finish_last = releases.in_release(target, RUN_KIND.0, RUN_KIND.1);
+    if !failures.is_empty() {
+        let error = failures.join("\n");
+        context.placements.finish_run(run, Some(error.clone())).await.map_err(describe)?;
         output.push_str(&format!(
             "{error}\nThe main database was NOT rolled back: fix the failure and run again (what is reverted \
              stays reverted).\n"
         ));
         return Ok(Outcome { output, failed: true });
     }
-    let (name, database) = main;
-    match migrator.rollback(database, &keep).await {
-        Ok(reverted) => output.push_str(&format!("{name}: reverted {}\n", reverted.len())),
+    if !finish_last {
+        context.placements.finish_run(run, None).await.map_err(describe)?;
+    }
+    let main_outcome = match main_lock.verify().await {
+        Ok(()) => context.migrator.rollback(&main, &keep).await.map_err(|error| error.to_string()),
+        Err(error) => Err(error.to_string()),
+    };
+    if finish_last {
+        let error = main_outcome.as_ref().err().map(|error| format!("main: {error}"));
+        context.placements.finish_run(run, error).await.map_err(describe)?;
+    }
+    match main_outcome {
+        Ok(reverted) => output.push_str(&format!("main: reverted {}\n", reverted.len())),
         Err(error) => {
-            output.push_str(&format!("{name}: {error}\n"));
+            output.push_str(&format!("main: {error}\n"));
             return Ok(Outcome { output, failed: true });
         }
     }
     output.push_str(&format!("Rolled back to {target}: start the servers of {target} now.\n"));
     Ok(Outcome { output, failed: false })
+}
+
+/// Module của binary mà bảng phiên bản không ghi (module ghép từ ngoài).
+fn untracked_modules(migrator: &Migrator, releases: &MigrationReleases) -> Vec<String> {
+    let mut modules: Vec<String> = migrator
+        .names()
+        .into_iter()
+        .filter_map(|name| name.split_once('/').map(|(module, _)| module.to_owned()))
+        .filter(|module| !releases.tracks_module(module))
+        .collect();
+    modules.dedup();
+    modules
 }
 
 fn render_plans(target: &str, plans: &[(String, RollbackPlan)]) -> String {
@@ -228,15 +314,14 @@ fn render_plans(target: &str, plans: &[(String, RollbackPlan)]) -> String {
             output.push_str(&format!("Revert {}/{}{kind}\n", step.module, step.name));
         }
         for lost in &plan.data_loss {
-            match &lost.column {
-                None => {
-                    output.push_str(&format!("Drops table {} ({} row(s))\n", lost.table, lost.rows))
+            let line = match (&lost.column, lost.dropped) {
+                (None, true) => format!("Drops table {} ({} row(s))\n", lost.table, lost.rows),
+                (None, false) => format!("Deletes {} row(s) of table {}\n", lost.rows, lost.table),
+                (Some(column), _) => {
+                    format!("Drops column {}.{column} ({} value(s))\n", lost.table, lost.rows)
                 }
-                Some(column) => output.push_str(&format!(
-                    "Drops column {}.{column} ({} value(s))\n",
-                    lost.table, lost.rows
-                )),
-            }
+            };
+            output.push_str(&line);
         }
     }
     output
@@ -245,59 +330,100 @@ fn render_plans(target: &str, plans: &[(String, RollbackPlan)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use autoxide_kernel::config::ConfigSource;
+    use autoxide_kernel::error::Error;
+    use autoxide_kernel::migration::prelude::*;
+    use autoxide_kernel::migration::{DataUpgrade, ModuleMigrations, UpgradeContext};
     use autoxide_kernel::tenancy::{NewPlacement, PlacementKind, TenancyConfig, TenancyMode};
     use autoxide_testkit::TestDatabase;
 
     const NEWEST: &str = "kernel/m0043_migration_run_kind";
 
     fn arguments(dry_run: bool, accept: bool, yes: bool) -> Arguments {
-        Arguments { to: "0.0.1".to_owned(), dry_run, accept_data_loss: accept, yes }
+        Arguments {
+            to: "0.0.1".to_owned(),
+            dry_run,
+            accept_data_loss: accept,
+            yes,
+            revert_untracked: false,
+            lock_timeout_seconds: 2,
+            statement_timeout_seconds: 60,
+        }
     }
 
-    /// Bản giả `0.0.1`: mọi migration của binary trừ migration mới nhất của kernel.
-    fn releases(migrator: &Migrator) -> MigrationReleases {
-        let introduced: serde_json::Map<String, serde_json::Value> = migrator
-            .names()
+    /// Bảng phiên bản giả: bản `0.0.1` có mọi tên trong `names` trừ `newer`.
+    fn releases(names: Vec<String>, newer: &[&str]) -> MigrationReleases {
+        let introduced: serde_json::Map<String, serde_json::Value> = names
             .into_iter()
-            .filter(|name| name != NEWEST)
-            .map(|name| (name, serde_json::Value::from("0.0.1")))
+            .map(|name| {
+                let first = if newer.contains(&name.as_str()) { "0.0.2" } else { "0.0.1" };
+                (name, serde_json::Value::from(first))
+            })
             .collect();
-        MigrationReleases::parse(
-            &serde_json::json!({"releases": ["0.0.1"], "introduced": introduced}).to_string(),
-        )
+        let table = serde_json::json!({"releases": ["0.0.1", "0.0.2"], "introduced": introduced});
+        MigrationReleases::parse(&table.to_string())
     }
 
-    /// Lùi database chính và placement về bản trước: chạy thử không đổi gì; thiếu `--accept-data-loss` / `--yes`
-    /// thì từ chối kèm kế hoạch; chạy thật gỡ đúng migration mới ở mọi database, rồi `migrate up` nâng lại được.
+    struct Setup {
+        database: Database,
+        registry: DatabaseRegistry,
+        placements: Placements,
+        p1: Database,
+    }
+
+    /// Database chính đủ migration, chế độ nhiều khách, một placement `p1`.
+    async fn setup(test: &TestDatabase) -> Setup {
+        let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+        let settings = crate::settings::read(&source).unwrap();
+        let database = Database::connect(&settings.config.database).await.unwrap();
+        let registry = DatabaseRegistry::new(
+            database.clone(),
+            settings.config.database.clone(),
+            TenancyConfig::with_mode(TenancyMode::Multi),
+        );
+        let placements = settings.modules.placements(&registry).unwrap();
+        placements.up_all().await.unwrap();
+        let url = test.extra_database().await.unwrap();
+        let new = NewPlacement::new("p1", PlacementKind::Dedicated, url.parse().unwrap());
+        placements.add(new).await.unwrap();
+        placements.up_all().await.unwrap();
+        let id = placements.list().await.unwrap().into_iter().find(|p| p.name == "p1").unwrap().id;
+        let p1 = registry.placement_database(PlacementId::from_uuid(id)).await.unwrap();
+        Setup { database, registry, placements, p1 }
+    }
+
+    async fn pending(migrator: &Migrator, database: &Database) -> Vec<String> {
+        migrator
+            .pending(database)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|state| format!("{}/{}", state.module, state.name))
+            .collect()
+    }
+
+    /// Lùi database chính và placement về bản trước: chạy thử không đổi gì; cột chỉ toàn giá trị mặc định không
+    /// tính là mất dữ liệu; thiếu `--yes` thì từ chối kèm kế hoạch; chạy thật gỡ đúng migration mới ở mọi database.
     #[tokio::test]
     async fn lui_database_chinh_va_placement_ve_ban_truoc() {
         TestDatabase::run(async |test| {
+            let setup = setup(test).await;
             let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
             let settings = crate::settings::read(&source).unwrap();
-            let database = Database::connect(&settings.config.database).await.unwrap();
-            let registry = DatabaseRegistry::new(
-                database.clone(),
-                settings.config.database.clone(),
-                TenancyConfig::with_mode(TenancyMode::Multi),
-            );
-            let placements = settings.modules.placements(&registry).unwrap();
-            placements.up_all().await.unwrap();
-            let url = test.extra_database().await.unwrap();
-            placements
-                .add(NewPlacement::new("p1", PlacementKind::Dedicated, url.parse().unwrap()))
-                .await
-                .unwrap();
-            placements.up_all().await.unwrap();
-            let migrator = settings.modules.migrator().unwrap().keyed_on(&database);
-            let releases = releases(&migrator);
-            let main_lock = placements.lock_main(LOCK_WAIT).await.unwrap();
-            let run = async |arguments: Arguments| {
-                execute(&arguments, &releases, &migrator, &registry, &placements).await
+            let migrator = settings.modules.migrator().unwrap().keyed_on(&setup.database);
+            let releases = releases(migrator.names(), &[NEWEST]);
+            let context = Context {
+                releases: &releases,
+                migrator: &migrator,
+                registry: &setup.registry,
+                placements: &setup.placements,
             };
+            let mut main_lock = setup.placements.lock_main(LOCK_WAIT).await.unwrap();
 
-            let dry = run(arguments(true, false, false)).await.unwrap();
-            assert!(!dry.failed);
+            let dry =
+                execute(&arguments(true, false, false), &context, &mut main_lock).await.unwrap();
             assert_eq!(
                 dry.output.matches(&format!("Revert {NEWEST}\n")).count(),
                 2,
@@ -309,51 +435,231 @@ mod tests {
                 "{}",
                 dry.output
             );
-            // `up_all` đã ghi lượt vào `kernel_migration_runs`: cột `kind` sắp bị bỏ đang có dữ liệu.
+            // `kind` chỉ có giá trị mặc định (`placements`), hai cột phiên bản toàn NULL: lùi không mất gì.
+            assert!(!dry.output.contains("Drops"), "{}", dry.output);
             assert!(
-                dry.output.contains("Drops column kernel_migration_runs.kind"),
+                migrator.pending(&setup.database).await.unwrap().is_empty(),
+                "chạy thử không đổi gì"
+            );
+
+            let refused = execute(&arguments(false, false, false), &context, &mut main_lock)
+                .await
+                .err()
+                .unwrap();
+            assert!(refused.contains("--yes"), "{refused}");
+
+            let done =
+                execute(&arguments(false, false, true), &context, &mut main_lock).await.unwrap();
+            assert!(
+                !done.failed && done.output.contains("Rolled back to 0.0.1"),
+                "{}",
+                done.output
+            );
+            for target in [&setup.database, &setup.p1] {
+                assert_eq!(pending(&migrator, target).await, [NEWEST]);
+            }
+            let again =
+                execute(&arguments(true, false, false), &context, &mut main_lock).await.unwrap();
+            assert!(again.output.contains("Nothing to roll back"), "{}", again.output);
+            main_lock.release().await.unwrap();
+            migrator.up(&setup.database).await.unwrap();
+            setup.database.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Lần đầu `down` của data upgrade hỏng (giả lập lỗi giữa chừng), lần sau được.
+    static FAIL_DOWN: AtomicBool = AtomicBool::new(true);
+
+    struct Flaky;
+
+    #[async_trait::async_trait]
+    impl DataUpgrade for Flaky {
+        fn name(&self) -> &'static str {
+            "u0001_fill"
+        }
+
+        fn after(&self) -> &'static str {
+            "m0002_create_extra"
+        }
+
+        async fn up(&self, _context: &UpgradeContext) -> Result<(), Error> {
+            Ok(())
+        }
+
+        async fn down(&self, _context: &UpgradeContext) -> Result<(), Error> {
+            if FAIL_DOWN.swap(false, Ordering::SeqCst) {
+                return Err(Error::internal("deliberate failure"));
+            }
+            Ok(())
+        }
+    }
+
+    struct CreateTable(&'static str, &'static str);
+
+    impl MigrationName for CreateTable {
+        fn name(&self) -> &str {
+            self.0
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl MigrationTrait for CreateTable {
+        async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+            manager
+                .create_table(Table::create().table(self.1).col(schema::pk_uuid("id")).to_owned())
+                .await
+        }
+
+        async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+            manager.drop_table(Table::drop().table(self.1).to_owned()).await
+        }
+    }
+
+    fn flaky() -> ModuleMigrations {
+        ModuleMigrations::new(
+            "flaky",
+            vec![
+                Box::new(CreateTable("m0001_create_base", "flaky_base")),
+                Box::new(CreateTable("m0002_create_extra", "flaky_extra")),
+            ],
+        )
+        .with_upgrades(vec![Box::new(Flaky)])
+    }
+
+    /// Placement hỏng giữa chừng (data upgrade lùi lỗi): database chính không bị đụng, lượt ghi `failed`; chạy lại
+    /// làm tiếp tới xong. Module không có trong bảng phiên bản (ở đây là mọi module thật) để nguyên, trừ khi có
+    /// `--revert-untracked`.
+    #[tokio::test]
+    async fn placement_hong_thi_khong_lui_database_chinh_roi_chay_lai_duoc() {
+        TestDatabase::run(async |test| {
+            let setup = setup(test).await;
+            let outside = ModuleMigrations::new(
+                "outside",
+                vec![Box::new(CreateTable("m0001_create_thing", "outside_thing"))],
+            );
+            let migrator = Migrator::new(vec![flaky(), outside]).unwrap().keyed_on(&setup.database);
+            migrator.up(&setup.database).await.unwrap();
+            migrator.up(&setup.p1).await.unwrap();
+            // `outside` (như module ghép từ ngoài) không có trong bảng phiên bản.
+            let flaky_names: Vec<String> =
+                migrator.names().into_iter().filter(|name| name.starts_with("flaky/")).collect();
+            let releases = releases(flaky_names, &["flaky/m0002_create_extra", "flaky/u0001_fill"]);
+            let context = Context {
+                releases: &releases,
+                migrator: &migrator,
+                registry: &setup.registry,
+                placements: &setup.placements,
+            };
+            let mut main_lock = setup.placements.lock_main(LOCK_WAIT).await.unwrap();
+            FAIL_DOWN.store(true, Ordering::SeqCst);
+
+            let dry =
+                execute(&arguments(true, false, false), &context, &mut main_lock).await.unwrap();
+            assert!(
+                dry.output.contains("Revert flaky/u0001_fill (data upgrade)"),
                 "{}",
                 dry.output
             );
-            assert!(migrator.pending(&database).await.unwrap().is_empty(), "chạy thử không đổi gì");
+            assert!(
+                dry.output.contains("not tracked by the release table, left as is: outside"),
+                "{}",
+                dry.output
+            );
+            assert!(!dry.output.contains("Revert outside/"), "{}", dry.output);
+            let mut all = arguments(true, false, false);
+            all.revert_untracked = true;
+            let dry_all = execute(&all, &context, &mut main_lock).await.unwrap();
+            assert!(
+                dry_all.output.contains("Revert outside/m0001_create_thing"),
+                "{}",
+                dry_all.output
+            );
 
-            let refused = run(arguments(false, false, true)).await.err().unwrap();
-            assert!(refused.contains("--accept-data-loss"), "{refused}");
-            let refused = run(arguments(false, true, false)).await.err().unwrap();
-            assert!(refused.contains("--yes"), "{refused}");
+            let first =
+                execute(&arguments(false, false, true), &context, &mut main_lock).await.unwrap();
+            assert!(first.failed, "{}", first.output);
+            assert!(first.output.contains("main database was NOT rolled back"), "{}", first.output);
+            assert!(
+                pending(&migrator, &setup.database).await.is_empty(),
+                "database chính không bị đụng"
+            );
+            // p1 đã lùi được một phần, đang `behind` (khách nhận 503 tới khi xong).
+            let p1 = setup
+                .placements
+                .list()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|p| p.name == "p1")
+                .unwrap();
+            assert_eq!(p1.schema_state, "behind");
 
-            let done = run(arguments(false, true, true)).await.unwrap();
-            assert!(!done.failed, "{}", done.output);
-            assert!(done.output.contains("Rolled back to 0.0.1"), "{}", done.output);
-            let p1 = registry
-                .placement_database(PlacementId::from_uuid(
-                    placements
-                        .list()
-                        .await
-                        .unwrap()
-                        .into_iter()
-                        .find(|found| found.name == "p1")
-                        .unwrap()
-                        .id,
-                ))
+            let second =
+                execute(&arguments(false, false, true), &context, &mut main_lock).await.unwrap();
+            assert!(!second.failed, "{}", second.output);
+            for target in [&setup.database, &setup.p1] {
+                assert_eq!(
+                    pending(&migrator, target).await,
+                    ["flaky/m0002_create_extra", "flaky/u0001_fill"]
+                );
+            }
+            // Hai lượt `rollback`: lần đầu `failed` (nêu p1), lần sau `done`.
+            let select = sea_orm::sea_query::Query::select()
+                .columns(["status", "error"].map(sea_orm::sea_query::Alias::new))
+                .from(sea_orm::sea_query::Alias::new("kernel_migration_runs"))
+                .and_where(
+                    sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("kind"))
+                        .eq("rollback"),
+                )
+                .order_by(sea_orm::sea_query::Alias::new("id"), sea_orm::sea_query::Order::Asc)
+                .to_owned();
+            let rows =
+                sea_orm::ConnectionTrait::query_all(setup.database.read(), &select).await.unwrap();
+            let runs: Vec<(String, Option<String>)> = rows
+                .into_iter()
+                .map(|row| (row.try_get("", "status").unwrap(), row.try_get("", "error").unwrap()))
+                .collect();
+            assert_eq!(runs.len(), 2, "{runs:?}");
+            assert_eq!(runs[0].0, "failed");
+            assert!(runs[0].1.as_deref().unwrap_or("").starts_with("p1: "), "{runs:?}");
+            assert_eq!((runs[1].0.as_str(), runs[1].1.as_deref()), ("done", None));
+            main_lock.release().await.unwrap();
+            setup.database.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    /// `down` hỏng ngay trong chạy thử (bảng của migration đã bị bỏ tay): lệnh từ chối, không đổi gì.
+    #[tokio::test]
+    async fn down_hong_trong_chay_thu_thi_tu_choi_sach() {
+        TestDatabase::run(async |test| {
+            let setup = setup(test).await;
+            let migrator = Migrator::new(vec![flaky()]).unwrap().keyed_on(&setup.database);
+            migrator.up(&setup.database).await.unwrap();
+            let releases =
+                releases(migrator.names(), &["flaky/m0002_create_extra", "flaky/u0001_fill"]);
+            let context = Context {
+                releases: &releases,
+                migrator: &migrator,
+                registry: &setup.registry,
+                placements: &setup.placements,
+            };
+            SchemaManager::new(setup.database.write())
+                .drop_table(Table::drop().table("flaky_extra").to_owned())
                 .await
                 .unwrap();
-            for target in [&database, &p1] {
-                let pending: Vec<String> = migrator
-                    .pending(target)
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .map(|state| format!("{}/{}", state.module, state.name))
-                    .collect();
-                assert_eq!(pending, [NEWEST]);
-            }
-            // Đã khớp bản đích: lần sau không còn gì để lùi.
-            let again = run(arguments(true, false, false)).await.unwrap();
-            assert!(again.output.contains("Nothing to roll back"), "{}", again.output);
+            let mut main_lock = setup.placements.lock_main(LOCK_WAIT).await.unwrap();
+            let error = execute(&arguments(true, false, false), &context, &mut main_lock)
+                .await
+                .err()
+                .unwrap();
+            assert!(error.starts_with("main: ") && error.contains("cannot measure"), "{error}");
+            assert!(pending(&migrator, &setup.database).await.is_empty(), "không đổi gì");
             main_lock.release().await.unwrap();
-            migrator.up(&database).await.unwrap();
-            database.close().await.unwrap();
+            setup.database.close().await.unwrap();
         })
         .await
         .unwrap();

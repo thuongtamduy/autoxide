@@ -24,11 +24,17 @@ compose / Kubernetes / DEPLOY.
    `kernel_migration_runs` (migration mới `m0043_migration_run_kind`: `kind`, `from_version`, `to_version`), đóng lượt
    TRƯỚC khi lùi database chính vì lùi xa có thể bỏ chính các cột đó. `--dry-run` in từng database: migration sẽ gỡ,
    bảng / cột sẽ mất kèm số dòng (chạy các `down` schema trong một transaction, so bảng / cột trước và sau, huỷ
-   transaction; data upgrade chỉ liệt kê). Chạy thật có dữ liệu mất cần `--accept-data-loss`; luôn cần `--yes` (xác
+   transaction; data upgrade chỉ liệt kê) — sau kiểm độc lập #586: SQLite chạy trên bản sao `VACUUM INTO` (không khoá
+   database thật), Postgres trong transaction có `lock_timeout` (`--lock-timeout-seconds`, mặc định 2) và
+   `statement_timeout`; một lần chụp shape trước / sau; đếm cả dòng bị xoá ở bảng còn giữ; cột chỉ toàn giá trị mặc
+   định không tính là mất; bảng lịch sử `<module>_migrations` không tính. Placement đang lùi ở `migrating`, xong thì
+   `behind`. Module không có tên nào trong bảng (ghép từ ngoài) giữ nguyên, trừ khi `--revert-untracked`. Bản đích
+   chưa có phần đa khách mà bản cài có placement thì từ chối. Bản đích còn `m0043` thì đóng lượt sau khi lùi database
+   chính; không thì đóng trước (giới hạn, ghi trong DEPLOY). Chạy thật có dữ liệu mất cần `--accept-data-loss`; luôn cần `--yes` (xác
    nhận đã dừng mọi máy chủ bản hiện tại — kernel chưa có sổ tiến trình để tự kiểm). Từ chối khi phải giữ một migration
    chạy sau một migration bị gỡ, hay gặp migration khai `MigrationTrait::irreversible() == true` (hàm mới, mặc định
    `false`, D-038; bước thu hẹp đánh dấu như vậy phải ghi ở mục changelog "cần làm khi nâng cấp") — khi đó khôi phục
-   backup. Binary ghép module ngoài: module không có trong bảng bị coi là chưa phát hành, `--dry-run` cho thấy nó bị gỡ.
+   backup.
 3. **Backup trước nâng cấp** (PR b): dựng bản nháp đúng tập migration nguồn đã áp (không chạy `up` của binary mới), manifest
    ghi tên migration đã áp, giữ dữ liệu module đang tắt; từng placement backup ngay trước migration đầu tiên của nó, chỉ
    khi có migration chờ, chạy lại dùng lại backup đó; `--backup=recent` nhận bản tốt trong `kernel_backups` mới hơn N giờ;

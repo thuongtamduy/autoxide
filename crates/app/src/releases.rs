@@ -45,6 +45,16 @@ impl MigrationReleases {
         &self.releases
     }
 
+    /// Bảng có ghi ít nhất một migration của `module` (module chính thức). Module ghép từ ngoài (`.module(…)`) không có
+    /// trong bảng: `rollback` để nguyên migration của nó, trừ khi có `--revert-untracked`.
+    pub(crate) fn tracks_module(&self, module: &str) -> bool {
+        let prefix = format!("{module}/");
+        self.introduced
+            .range(prefix.clone()..)
+            .next()
+            .is_some_and(|(name, _)| name.starts_with(&prefix))
+    }
+
     /// Migration `module/name` có trong bản `target` (đã phát hành ở `target` hay trước đó).
     pub(crate) fn in_release(&self, target: &str, module: &str, name: &str) -> bool {
         self.introduced
@@ -94,6 +104,17 @@ mod tests {
         for first in table.introduced.values() {
             assert!(table.knows(first), "{first} is not in `releases`");
         }
+    }
+
+    // Bản đang build phải có trong bảng (lúc phát hành, `migration-releases record` ghi nó cùng PR đổi `version`).
+    #[test]
+    fn bang_nhung_biet_ban_dang_build() {
+        let table = MigrationReleases::embedded().unwrap();
+        assert!(
+            table.knows(env!("CARGO_PKG_VERSION")),
+            "run `cargo xtask migration-releases record`"
+        );
+        assert!(table.tracks_module("kernel") && !table.tracks_module("kerne"));
     }
 
     #[test]

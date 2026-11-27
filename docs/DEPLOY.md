@@ -1311,14 +1311,25 @@ before starting the new servers, then replace the old ones as in
 migrations of release `X.Y.Z` (0.14.0 or later), so the servers of that release start again. Run it
 with the binary of the release you are leaving: only it knows how to revert its own migrations.
 
-1. `autoxide rollback --to X.Y.Z --dry-run` lists, per database, the migrations it would revert and
-   the tables and columns it would drop, with how many rows they hold. It changes nothing.
+1. `autoxide rollback --to X.Y.Z --dry-run` lists, per database, the migrations it would revert, the
+   tables and columns it would drop with how many rows or values they hold (a column that only holds
+   its default value loses nothing), and the rows a revert deletes. It changes nothing. On SQLite it
+   works on a copy of the database; on PostgreSQL it runs the reverts inside a transaction that is
+   rolled back, so for that time it holds locks on the tables it changes: it waits at most
+   `--lock-timeout-seconds` (default 2) for a busy table, then stops and says so — run it when the
+   load is low, or once the servers are stopped.
 2. Stop every server and worker of the current release. If the dry run shows data that would be
    dropped, take a backup first (`autoxide backup`).
 3. `autoxide rollback --to X.Y.Z --yes`, adding `--accept-data-loss` when data is dropped. Tenant
    databases go first, the main database last; if a tenant database fails, the main database is
    left as it is: fix the cause and run the same command again.
 4. Start the servers of `X.Y.Z`.
+
+Modules your own binary adds (`.module(…)`) are not in the release table: the rollback leaves their
+migrations as they are and says so; `--revert-untracked` reverts them too. The rollback is recorded as
+a migration run of kind `rollback`; when the target release predates that record (0.19.0 and
+earlier), the run is closed before the main database is rolled back, and an error there is only
+printed.
 
 A migration that cannot give an earlier release its data back (the contract step of an expand–contract
 change) refuses the rollback; the changelog lists such migrations under the upgrade notes, and the way

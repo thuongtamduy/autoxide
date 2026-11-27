@@ -3,17 +3,15 @@
 //! other applied migration is reverted, newest first: modules in the reverse of their registration (dependency)
 //! order, and inside a module in the reverse of its run order.
 //!
-//! [`Migrator::rollback_plan`] is the dry run. It also measures the data the rollback would lose: it reverts the
-//! schema migrations inside ONE transaction, compares the tables and columns before and after, counts the rows
-//! (or non-null values) of what disappears, then rolls the transaction back. Both databases run schema changes
-//! inside a transaction, so the dry run changes nothing; on Postgres it briefly holds the locks the statements
-//! take. Data upgrades are listed, not run, in the dry run (they open their own transactions).
+//! [`Migrator::rollback_plan`] is the dry run. It also measures the data the rollback would lose: it runs the schema
+//! `down`s where they change nothing — on SQLite on a copy of the database (`VACUUM INTO`), on Postgres inside a
+//! transaction that is rolled back, bounded by [`DryRunLimits`] (the DDL holds ACCESS EXCLUSIVE locks on the tables
+//! it changes until then) — and compares tables, columns and row counts before and after. Data upgrades are listed,
+//! not run, in the dry run (they open their own transactions).
 
-use std::collections::{BTreeMap, BTreeSet};
+mod loss;
+pub use loss::DryRunLimits;
 
-use sea_orm::{ConnectionTrait, DbBackend, DbErr, Statement, TransactionTrait as _};
-
-use super::manager::{self, SchemaManager};
 use super::{Entry, MigrationError, MigrationState, Migrator, applied_names, failure};
 use crate::database::Database;
 
@@ -27,14 +25,16 @@ pub struct RollbackStep {
     pub upgrade: bool,
 }
 
-/// Data a rollback removes: a whole table (`column: None`) or one column, with how many rows (or non-null
-/// values) it holds now.
+/// Data a rollback removes: a whole table (`column: None`, `dropped`), one column (values neither NULL nor the
+/// column's default), or rows a `down` deletes from a table it keeps (`column: None`, not `dropped`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct LostData {
     pub table: String,
     pub column: Option<String>,
     pub rows: u64,
+    /// The table itself disappears.
+    pub dropped: bool,
 }
 
 /// What a rollback of one database does.
@@ -63,6 +63,7 @@ impl Migrator {
         &self,
         database: &Database,
         keep: &dyn Fn(&str, &str) -> bool,
+        limits: DryRunLimits,
     ) -> Result<RollbackPlan, MigrationError> {
         let steps = self.rollback_entries(database, keep).await?;
         let plan_steps: Vec<RollbackStep> = steps
@@ -76,7 +77,7 @@ impl Migrator {
         if plan_steps.is_empty() {
             return Ok(RollbackPlan::default());
         }
-        let data_loss = measure_loss(database, &steps).await.map_err(|error| {
+        let data_loss = loss::measure(database, &steps, limits).await.map_err(|error| {
             MigrationError(format!("cannot measure the data the rollback removes: {error}"))
         })?;
         Ok(RollbackPlan { steps: plan_steps, data_loss })
@@ -154,102 +155,4 @@ impl Migrator {
         }
         Ok(steps)
     }
-}
-
-/// Runs the schema `down`s inside one transaction, compares tables and columns before and after, counts what
-/// disappears, rolls back.
-async fn measure_loss(
-    database: &Database,
-    steps: &[(&super::ModuleMigrations, Entry)],
-) -> Result<Vec<LostData>, DbErr> {
-    let transaction = database.write().begin().await?;
-    let before = shape(&transaction).await?;
-    let mut counted = Vec::new();
-    for (set, entry) in steps {
-        let Entry::Schema(migration) = entry else {
-            continue;
-        };
-        // Đếm trước khi gỡ: bảng / cột bị bỏ ở bước này thì sau đó không còn để đếm.
-        let current = shape(&transaction).await?;
-        let nested = transaction.begin().await?;
-        migration.down(&SchemaManager::new(&nested)).await?;
-        manager::forget(&nested, &set.history_table(), migration.name()).await?;
-        nested.commit().await?;
-        let after = shape(&transaction).await?;
-        for (table, columns) in &current {
-            match after.get(table) {
-                None if before.contains_key(table) => {
-                    counted.push(LostData { table: table.clone(), column: None, rows: 0 });
-                }
-                Some(remaining) => {
-                    for column in columns.difference(remaining) {
-                        if before.get(table).is_some_and(|original| original.contains(column)) {
-                            counted.push(LostData {
-                                table: table.clone(),
-                                column: Some(column.clone()),
-                                rows: 0,
-                            });
-                        }
-                    }
-                }
-                None => {}
-            }
-        }
-    }
-    transaction.rollback().await?;
-    // Đếm trên dữ liệu thật (sau khi huỷ transaction mọi bảng / cột còn nguyên).
-    let backend = database.write().get_database_backend();
-    for lost in &mut counted {
-        lost.rows = count(database, backend, &lost.table, lost.column.as_deref()).await?;
-    }
-    Ok(counted)
-}
-
-type Shape = BTreeMap<String, BTreeSet<String>>;
-
-/// Tables and their columns.
-async fn shape<C: ConnectionTrait>(connection: &C) -> Result<Shape, DbErr> {
-    let backend = connection.get_database_backend();
-    let sql = match backend {
-        DbBackend::Sqlite => {
-            "SELECT m.name, p.name FROM sqlite_master m, pragma_table_info(m.name) p \
-             WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'"
-        }
-        _ => {
-            "SELECT table_name::text, column_name::text FROM information_schema.columns \
-             WHERE table_schema = current_schema()"
-        }
-    };
-    let rows = connection.query_all_raw(Statement::from_string(backend, sql)).await?;
-    let mut shape = Shape::new();
-    for row in rows {
-        let table: String = row.try_get_by_index(0)?;
-        let column: String = row.try_get_by_index(1)?;
-        shape.entry(table).or_default().insert(column);
-    }
-    Ok(shape)
-}
-
-/// Rows of `table`, or its non-null values of `column`. Names come from the database catalog; checked to be
-/// plain identifiers before they go into SQL.
-async fn count(
-    database: &Database,
-    backend: DbBackend,
-    table: &str,
-    column: Option<&str>,
-) -> Result<u64, DbErr> {
-    let plain = |name: &str| name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
-    if !plain(table) || !column.is_none_or(plain) {
-        return Err(DbErr::Custom(format!("unexpected table or column name `{table}`")));
-    }
-    let sql = match column {
-        None => format!("SELECT COUNT(*) FROM \"{table}\""),
-        Some(column) => format!("SELECT COUNT(\"{column}\") FROM \"{table}\""),
-    };
-    let row = database.read().query_one_raw(Statement::from_string(backend, sql)).await?;
-    let rows: i64 = match row {
-        Some(row) => row.try_get_by_index(0)?,
-        None => 0,
-    };
-    Ok(u64::try_from(rows).unwrap_or(0))
 }

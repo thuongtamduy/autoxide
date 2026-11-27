@@ -122,7 +122,8 @@ enum Command {
     /// Run it with the binary of the CURRENT release, then start the servers of the earlier one.
     /// `--dry-run` lists, per database, what would be reverted and the tables and columns that
     /// would be dropped with the rows they hold. A rollback that drops data needs
-    /// `--accept-data-loss`; every real run needs `--yes` once the servers are stopped.
+    /// `--accept-data-loss`; every real run needs `--yes` once the servers are stopped. Modules
+    /// this binary adds with `.module(…)` are left as they are unless `--revert-untracked`.
     Rollback(commands::rollback::Arguments),
 
     /// Restore a backup made by `autoxide backup` into a new, empty database.

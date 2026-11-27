@@ -35,7 +35,7 @@ mod helpers;
 mod lock;
 mod manager;
 mod rollback;
-pub use rollback::{LostData, RollbackPlan, RollbackStep};
+pub use rollback::{DryRunLimits, LostData, RollbackPlan, RollbackStep};
 pub mod schema;
 pub use helpers::{HelperTable, helper_tables};
 pub use lock::MigrationLock;

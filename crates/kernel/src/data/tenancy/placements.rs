@@ -454,6 +454,23 @@ impl Placements {
             .ok_or_else(|| Error::internal("the rollback run was not recorded"))
     }
 
+    /// Holding the placements lock: marks placement `name` `migrating` while a rollback reverts its migrations
+    /// (its tenants get 503 instead of SQL errors; if the process stops, the next run sets it `behind`), or, with
+    /// `done`, `behind` once reverted (the servers of the earlier release mark it `ready` again when they check it).
+    pub async fn mark_rollback(
+        &self,
+        held: &MigrationLock,
+        name: &str,
+        done: bool,
+    ) -> Result<(), Error> {
+        let _ = held;
+        let Some(row) = self.selected(Some(name)).await?.into_iter().next() else {
+            return Err(super::errors::tenant_placement_not_found(name));
+        };
+        let state = if done { SchemaState::Behind } else { SchemaState::Migrating };
+        self.set_state(PlacementId::from_uuid(row.id), &row.schema_state, state).await
+    }
+
     /// Closes a run started with [`begin_rollback_run`](Self::begin_rollback_run): `done`, or `failed` with `error`.
     pub async fn finish_run(&self, run: Uuid, error: Option<String>) -> Result<(), Error> {
         super::migration_runs::claim::finish(self.registry.control(), run, None, error).await
