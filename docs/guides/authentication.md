@@ -48,8 +48,9 @@ and `phone_code` sent to its own number; after that it can add a passkey and sig
 - codes per hour from one client (one IPv4 address, or one IPv6 /64) and from all clients together, and
   codes per day — sign-in codes and phone verification codes counted apart, so asking for sign-in codes
   never uses up the owner's way to verify the number again (`429 compliance.otp_throttled`);
-- wrong codes per day from one client, and from all clients together, for sign-in and verification codes
-  alike (`429 compliance.otp_daily_limit`);
+- wrong codes per day (`429 compliance.otp_daily_limit`): for sign-in codes, from one client and from all
+  clients together; for phone verification codes, only on the signed-in user's own codes for the number
+  (no "all clients" cap, so nobody else's wrong codes block it);
 - wrong codes in a row, with no time window: from 90 the number is locked for clients that never signed
   in with it, and from 100 for every client (`403 compliance.otp_locked`).
 

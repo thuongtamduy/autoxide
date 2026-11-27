@@ -103,17 +103,28 @@ pub(crate) async fn succeeded<C: ConnectionTrait>(
         .scoped(tenant)
         .exec(connection)
         .await?;
-    phone_challenge::Entity::update_many()
+    expire_open_sign_in_codes(connection, tenant, phone, Some(used), at).await
+}
+
+/// Cho hết hạn mọi mã đăng nhập còn mở của số (trừ `except`). Chỉ mã đăng nhập (chưa có tài khoản): mã xác thực số của
+/// người đã đăng nhập thuộc tài khoản của họ.
+pub(crate) async fn expire_open_sign_in_codes<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    phone: &str,
+    except: Option<Uuid>,
+    at: Timestamp,
+) -> Result<(), Error> {
+    let mut update = phone_challenge::Entity::update_many()
         .col_expr(phone_challenge::Column::ExpiresAt, Expr::value(at))
         .filter(phone_challenge::Column::Phone.eq(phone))
-        // Chỉ mã đăng nhập (chưa có tài khoản): mã xác thực số của người đã đăng nhập thuộc tài khoản của họ.
         .filter(phone_challenge::Column::UserId.eq(Uuid::nil()))
-        .filter(phone_challenge::Column::Id.ne(used))
         .filter(phone_challenge::Column::ConsumedAt.is_null())
-        .filter(phone_challenge::Column::ExpiresAt.gt(at))
-        .scoped(tenant)
-        .exec(connection)
-        .await?;
+        .filter(phone_challenge::Column::ExpiresAt.gt(at));
+    if let Some(except) = except {
+        update = update.filter(phone_challenge::Column::Id.ne(except));
+    }
+    update.scoped(tenant).exec(connection).await?;
     Ok(())
 }
 

@@ -41,7 +41,8 @@ pub(crate) struct PhoneUnlocked {
 }
 
 impl ComplianceService {
-    /// Mở khoá mã đăng nhập SMS của số `raw` (xoá bộ đếm lần sai liên tiếp). Cần `compliance.phone_locks.manage`.
+    /// Mở khoá mã đăng nhập SMS của số `raw` (đưa bộ đếm lần sai liên tiếp về 0 và ghi `unlocked_at`). Cần
+    /// `compliance.phone_locks.manage`.
     pub(crate) async fn unlock_phone(
         &self,
         tenant: &TenantContext,
@@ -69,6 +70,15 @@ impl ComplianceService {
         let unlocked =
             crate::phone_lock::unlock(&transaction, tenant, &phone_key, locked_from, now()).await?;
         if unlocked {
+            // Như một lần đúng: mã đăng nhập còn mở của số (có thể của người đã đoán) không nhận thêm lượt nào.
+            crate::phone_lock::expire_open_sign_in_codes(
+                &transaction,
+                tenant,
+                phone.as_str(),
+                None,
+                now(),
+            )
+            .await?;
             // Không ghi số vào event: chỉ khoá của số (HMAC theo khách).
             let event = events::PhoneUnlocked(json!({"phone_key": phone_key}));
             self.outbox.record(&transaction, tenant, actor, None, &event).await?;

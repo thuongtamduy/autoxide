@@ -298,6 +298,21 @@ impl ComplianceService {
         {
             return Err(phone_in_use());
         }
+        // Hạn mức mã sai mỗi ngày trên mã xác minh của chính người này với số (như khi xác nhận): đã chạm thì không gửi
+        // thêm mã (mã gửi đi cũng không kiểm được).
+        let lock_key = self.secret.phone_key(tenant.id(), &phone).await?;
+        let mine = phone_challenge::Entity::find()
+            .filter(phone_challenge::Column::Phone.eq(phone.as_str()))
+            .filter(phone_challenge::Column::UserId.eq(user_id))
+            .filter(
+                phone_challenge::Column::CreatedAt.gt(now() - crate::sign_in_codes::WRONG_WINDOW),
+            )
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        let unlocked =
+            crate::phone_lock::unlocked_at(tenant.database().read(), tenant, &lock_key).await?;
+        self.check_wrong_today(&mine, None, true, unlocked, now())?;
         let otp = self.otp;
         let mut limits = vec![
             (

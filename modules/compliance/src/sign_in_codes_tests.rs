@@ -36,7 +36,7 @@ async fn app_with(
     let capture = Arc::new(Capture::default());
     let sender: Arc<dyn SmsSender> = sms.clone();
     // `alice`: người đã đăng nhập, xác thực lại số để mở khoá (D-20261126-otp-nist).
-    let mut builder = TestApp::builder(test).user("alice", 2, &[]).user(
+    let mut builder = TestApp::builder(test).user("alice", 2, &[]).user("bob", 4, &[]).user(
         "admin",
         3,
         &["compliance.phone_locks.manage"],
@@ -442,32 +442,52 @@ async fn lan_sai_dong_thoi_deu_duoc_dem() {
 #[tokio::test]
 async fn job_don_client_quen_cu_va_bo_dem_cu() {
     TestDatabase::run(async |test| {
-        use sea_orm::EntityTrait;
         use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         let (app, codes, sms) = app(test).await;
         let tenant = app.default_tenant();
         let sent = codes.send(&tenant, "0912000777", ip("198.51.100.70")).await.unwrap();
         codes.verify(&tenant, sent.id, &code_in(&sms, "+84912000777")).await.unwrap();
-        let sent = codes.send(&tenant, "0912000777", ip("198.51.100.71")).await.unwrap();
-        let code = code_in(&sms, "+84912000777");
-        codes
-            .verify(&tenant, sent.id, if code == "000000" { "111111" } else { "000000" })
-            .await
-            .unwrap_err();
-        let old =
-            autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(100 * 24);
+        // Hai số, mỗi số một lần sai: hai bộ đếm.
+        for (phone, e164) in [("0912000777", "+84912000777"), ("0912000778", "+84912000778")] {
+            let sent = codes.send(&tenant, phone, ip("198.51.100.71")).await.unwrap();
+            let code = code_in(&sms, e164);
+            codes
+                .verify(&tenant, sent.id, if code == "000000" { "111111" } else { "000000" })
+                .await
+                .unwrap_err();
+        }
+        let days_ago = |days: i64| {
+            autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(days * 24)
+        };
         crate::entity::phone_known_client::Entity::update_many()
-            .col_expr(crate::entity::phone_known_client::Column::LastSuccessAt, Expr::value(old))
+            .col_expr(
+                crate::entity::phone_known_client::Column::LastSuccessAt,
+                Expr::value(days_ago(100)),
+            )
             .scoped(&tenant)
             .exec(app.database().write())
             .await
             .unwrap();
-        crate::entity::phone_failure::Entity::update_many()
-            .col_expr(crate::entity::phone_failure::Column::UpdatedAt, Expr::value(old))
+        // Một bộ đếm không đổi 100 ngày (còn), một bộ đếm không đổi 400 ngày (bị xoá).
+        let counts = crate::entity::phone_failure::Entity::find()
             .scoped(&tenant)
-            .exec(app.database().write())
+            .all(app.database().read())
             .await
             .unwrap();
+        assert_eq!(counts.len(), 2);
+        for (row, days) in counts.iter().zip([100, 400]) {
+            crate::entity::phone_failure::Entity::update_many()
+                .col_expr(
+                    crate::entity::phone_failure::Column::UpdatedAt,
+                    Expr::value(days_ago(days)),
+                )
+                .filter(crate::entity::phone_failure::Column::Id.eq(row.id))
+                .scoped(&tenant)
+                .exec(app.database().write())
+                .await
+                .unwrap();
+        }
         crate::tests::run_jobs(&app).await;
         let read = app.database().read();
         assert!(
@@ -476,17 +496,15 @@ async fn job_don_client_quen_cu_va_bo_dem_cu() {
                 .all(read)
                 .await
                 .unwrap()
-                .is_empty()
+                .is_empty(),
+            "a known client unseen for 100 days is removed"
         );
+        let left =
+            crate::entity::phone_failure::Entity::find().scoped(&tenant).all(read).await.unwrap();
         assert_eq!(
-            crate::entity::phone_failure::Entity::find()
-                .scoped(&tenant)
-                .all(read)
-                .await
-                .unwrap()
-                .len(),
-            1,
-            "a count unchanged for 100 days is kept"
+            left.iter().map(|row| row.id).collect::<Vec<_>>(),
+            [counts[0].id],
+            "the count unchanged for 100 days is kept, the one unchanged for 400 days is removed"
         );
     })
     .await
@@ -604,14 +622,88 @@ async fn mo_khoa_chi_khi_dang_khoa_va_tinh_lai_han_muc_ngay() {
                 .await;
         assert_eq!(done["data"]["unlocked"], false, "{done}");
         assert_eq!(unlock_events(&app).await, 0);
+        // Mã đăng nhập còn mở từ nơi khác trước khi mở khoá: hết hạn khi mở khoá, như sau một lần đúng.
+        let open = codes.send(&tenant, "0912000444", ip("203.0.113.96")).await.unwrap();
+        let open_code = code_in(&sms, "+84912000444");
         // Đang khoá: mở được, và hạn mức sai trong ngày tính lại.
         set_failures(&app, &tenant, 95).await;
         let (_, done) =
             crate::tests::call(&app, "POST", "/phone-locks/unlock", "admin", Some(unlock)).await;
         assert_eq!(done["data"]["unlocked"], true, "{done}");
         assert_eq!(unlock_events(&app).await, 1);
+        let error = codes.verify(&tenant, open.id, &open_code).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_invalid", "open codes close on unlock");
         let sent = codes.send(&tenant, "0912000444", home).await.unwrap();
         codes.verify(&tenant, sent.id, &code_in(&sms, "+84912000444")).await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Xác minh số (`/me/phone-verifications`) chịu hạn mức mã sai mỗi ngày, đếm trên mã của chính người dùng với số đó:
+/// chạm hạn mức thì cả mã đúng lẫn xin mã mới đều 429 `compliance.otp_daily_limit`; người khác cùng số và lần sai mã đăng
+/// nhập của client lạ không bị kéo theo; quản trị viên mở khoá thì tính lại.
+#[tokio::test]
+async fn xac_minh_so_co_han_muc_ma_sai_moi_ngay() {
+    TestDatabase::run(async |test| {
+        let settings = [
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_ALL_CLIENTS_PER_HOUR", "100"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_DAY", "1000"),
+            ("AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY", "2"),
+        ];
+        let (app, codes, sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        let phone = serde_json::json!({"phone": "0912000321"});
+        let wrong_for = |code: &str| if code == "000000" { "111111" } else { "000000" }.to_owned();
+        let start = async |user: &str| {
+            crate::tests::call(&app, "POST", "/me/phone-verifications", user, Some(phone.clone()))
+                .await
+        };
+        let confirm = async |user: &str, id: &str, code: &str| {
+            let uri = format!("/me/phone-verifications/{id}/confirm");
+            let body = serde_json::json!({"code": code});
+            crate::tests::call(&app, "POST", &uri, user, Some(body)).await
+        };
+
+        // Client lạ nhập sai mã đăng nhập của số: không đụng tới hạn mức xác minh của alice.
+        for _ in 0..2 {
+            let sent = codes.send(&tenant, "0912000321", ip("203.0.113.77")).await.unwrap();
+            let wrong = wrong_for(&code_in(&sms, "+84912000321"));
+            codes.verify(&tenant, sent.id, &wrong).await.unwrap_err();
+        }
+
+        // alice nhập sai hai lần: mã đúng sau đó, và xin mã mới, đều 429.
+        let (status, sent) = start("alice").await;
+        assert_eq!(status, axum::http::StatusCode::CREATED, "{sent}");
+        let id = sent["data"]["id"].as_str().unwrap().to_owned();
+        let right = code_in(&sms, "+84912000321");
+        for _ in 0..2 {
+            let (status, _) = confirm("alice", &id, &wrong_for(&right)).await;
+            assert_eq!(status, axum::http::StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        let (status, problem) = confirm("alice", &id, &right).await;
+        assert_eq!(status, axum::http::StatusCode::TOO_MANY_REQUESTS, "{problem}");
+        assert_eq!(problem["code"], "compliance.otp_daily_limit");
+        let (status, problem) = start("alice").await;
+        assert_eq!(status, axum::http::StatusCode::TOO_MANY_REQUESTS, "{problem}");
+        assert_eq!(problem["code"], "compliance.otp_daily_limit");
+
+        // bob cùng số: không bị chặn.
+        let (status, sent) = start("bob").await;
+        assert_eq!(status, axum::http::StatusCode::CREATED, "{sent}");
+
+        // Quản trị viên mở khoá số đang khoá: hạn mức ngày của alice tính lại.
+        set_failures(&app, &tenant, 95).await;
+        let unlock = serde_json::json!({"phone": "0912000321"});
+        let (_, done) =
+            crate::tests::call(&app, "POST", "/phone-locks/unlock", "admin", Some(unlock)).await;
+        assert_eq!(done["data"]["unlocked"], true, "{done}");
+        let (status, sent) = start("alice").await;
+        assert_eq!(status, axum::http::StatusCode::CREATED, "{sent}");
+        let id = sent["data"]["id"].as_str().unwrap().to_owned();
+        let (status, done) = confirm("alice", &id, &code_in(&sms, "+84912000321")).await;
+        assert_eq!(status, axum::http::StatusCode::OK, "{done}");
     })
     .await
     .unwrap();

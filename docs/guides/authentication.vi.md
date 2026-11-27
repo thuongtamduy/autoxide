@@ -47,8 +47,9 @@ mới gửi tới chính số của mình; sau đó thêm được passkey và �
 - số mã mỗi giờ từ một client (một địa chỉ IPv4, hay một khối IPv6 /64) và từ mọi client cộng lại, và số mã mỗi
   ngày — mã đăng nhập và mã xác minh số đếm riêng, nên xin mã đăng nhập không bao giờ làm chủ số hết đường xác minh
   lại số (`429 compliance.otp_throttled`);
-- số mã sai mỗi ngày từ một client, và từ mọi client cộng lại, cho cả mã đăng nhập lẫn mã xác minh số
-  (`429 compliance.otp_daily_limit`);
+- số mã sai mỗi ngày (`429 compliance.otp_daily_limit`): với mã đăng nhập, từ một client và từ mọi client cộng
+  lại; với mã xác minh số, chỉ trên mã của chính người dùng với số đó (không có trần "mọi client", nên lần sai của
+  người khác không chặn được);
 - số mã sai liên tiếp, không theo cửa sổ thời gian: từ 90 lần thì số bị khoá với client chưa từng đăng nhập bằng số,
   từ 100 lần thì khoá với mọi client (`403 compliance.otp_locked`).
 

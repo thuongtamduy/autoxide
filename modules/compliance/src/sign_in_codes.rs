@@ -37,7 +37,7 @@ use crate::verification::{
 /// Chủ của mã đăng nhập: chưa có tài khoản.
 const NOBODY: Uuid = Uuid::nil();
 /// Cửa sổ đếm lần nhập sai của một số.
-const WRONG_WINDOW: SignedDuration = SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
+pub(crate) const WRONG_WINDOW: SignedDuration = SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
 /// Số ngày nhớ một client đã đăng nhập đúng bằng mã của một số (D-20261126-otp-nist): client quen không bị trần
 /// chung của số chặn.
 pub(crate) const KNOWN_CLIENT_DAYS: i64 = 90;
