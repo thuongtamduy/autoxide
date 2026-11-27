@@ -35,6 +35,19 @@ Thay bằng chỉ mục đảo `content_published_words` — bảng thường c�
   website này không thấy gì. Sau bước này, câu thường như cũ (điều kiện "hiện trên website" đầy đủ `reading::on_site`
   với bài bị che ở nút gần hơn, phân loại, tác giả, keyset pagination) thêm `entry_id IN (…)`. Số câu tối đa một lần
   tìm: chừng 100 (bước 2) / 85 (bước 3), mỗi câu đi theo index; mọi câu chung một hạn.
+
+  Số đo (2026-11-27, máy phát triển 4 nhân, bản release, một khách 50 000 bài, mỗi bài `pho` `ga`, ba bài thêm
+  `hiem`; thời gian của `matching_ids`):
+
+  | Câu tìm                       | Đường đi              | SQLite  | Postgres 16 |
+  | ----------------------------- | --------------------- | ------- | ----------- |
+  | `hiem` (3 bài)                | bước 2                | 0,7 ms  | 23 ms       |
+  | `pho hiem` / `ga pho hiem`    | bước 2 + khoá chính   | 19–21 ms | 43–53 ms   |
+  | `pho` (50 000 bài)            | bước 3                | 73 ms   | 63 ms       |
+  | `pho ga` (50 000 bài)         | bước 3                | 109 ms  | 85 ms       |
+  | `khongco` / `pho khongco`     | bước 1 dừng sớm       | 0,4–6 ms | 1–6 ms     |
+
+  Chi phí của từ phổ biến không còn theo số bài của khách (trần dòng mỗi bước), xa dưới hạn 2 s.
 - **Không SQL viết tay**: bước (1) dựng bằng bộ dựng câu của lớp `db` của kernel (`tenant.db().read()`, `Record`
   `PublishedHit` và `IndexedWord` chỉ để đọc; ghi vẫn qua entity SeaORM của module cho tới khi chuyển cả module), nên
   lọc khách do handle của kernel làm, cả trong subquery của từng từ.

@@ -312,10 +312,126 @@ async fn migration_nap_lai_tu_cho_bai_cu() {
             assert_eq!(find("ha noi").await, [ids[1]]);
             assert_eq!(find("hoi an").await, [ids[2]]);
         }
-        // Bài đăng sau migration vẫn vào chỉ mục (trigger SQLite, cột của Postgres).
+        // Chạy `up` lần nữa trên bảng đã có (lần trước hỏng giữa chừng): dựng lại, không vấp "table already exists".
+        migration.up(&SchemaManager::new(database.write())).await.unwrap();
+        assert_eq!(find("ha noi").await, [ids[1]]);
+        // Bài đăng sau migration vẫn vào chỉ mục (ghi cùng transaction với bản đăng).
         let late = content.create(&tenant, &ada, post("Cơm tấm Sài Gòn")).await.unwrap();
         content.publish(&tenant, &ada, late.id, None, None, false).await.unwrap();
         assert_eq!(find("com tam").await, [late.id]);
+    })
+    .await
+    .unwrap();
+}
+
+/// Backfill trên nhiều bài nhiều từ: hơn một lô bài (200) và tổng tham số bind vượt xa trần của cả hai database nếu
+/// dồn vào một câu (210 bài × 120 từ × 4 tham số ≈ 100 000).
+#[tokio::test]
+async fn migration_nap_nhieu_bai_nhieu_tu() {
+    TestDatabase::run(async |test| {
+        use autoxide_kernel::migration::prelude::{MigrationTrait as _, SchemaManager};
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let ada = editor();
+        let mut last = None;
+        for n in 0..210 {
+            let body: Vec<String> = (0..120).map(|w| format!("bai{n}tu{w}")).collect();
+            let mut input = post(&format!("Bai so {n}"));
+            input.fields.body = Some(paragraph(&body.join(" ")));
+            let entry = content.create(&tenant, &ada, input).await.unwrap();
+            content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
+            last = Some(entry.id);
+        }
+        let migration = crate::migration::m0036_word_index::Migration;
+        migration.down(&SchemaManager::new(database.write())).await.unwrap();
+        migration.up(&SchemaManager::new(database.write())).await.unwrap();
+        let found = words::matching_ids(&tenant, anywhere("en"), &WordQuery::parse("bai209tu119"))
+            .await
+            .unwrap();
+        assert_eq!(found, [last.unwrap()]);
+        let all = words::matching_ids(&tenant, anywhere("en"), &WordQuery::parse("so")).await.unwrap();
+        assert_eq!(all.len(), 210, "every entry of every batch is indexed");
+    })
+    .await
+    .unwrap();
+}
+
+/// Từ phổ biến (hơn [`TERM_ROWS_MAX`](words::TERM_ROWS_MAX) bài) không làm câu đọc hết chỉ mục: có một từ hiếm thì
+/// đi từ từ hiếm và kiểm từ phổ biến trên chính các bài đó; mọi từ đều phổ biến thì duyệt bài mới nhất và vẫn trả đủ
+/// [`MATCH_CAP`] bài khớp mới nhất, đúng thứ tự.
+#[tokio::test]
+async fn tu_pho_bien_khong_quet_het_chi_muc() {
+    TestDatabase::run(async |test| {
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let ada = editor();
+        let seed = content.create(&tenant, &ada, post("Phở gà mẫu")).await.unwrap();
+        content.publish(&tenant, &ada, seed.id, None, None, false).await.unwrap();
+        let template = published::Entity::find()
+            .filter(published::Column::EntryId.eq(seed.id))
+            .scoped(&tenant)
+            .one(database.read())
+            .await
+            .unwrap()
+            .unwrap();
+        // Chép thẳng vào hai bảng (nhanh, như đã đăng): mỗi bài một giây, bài sau mới hơn.
+        let total = words::TERM_ROWS_MAX + 20;
+        let ids: Vec<Uuid> = (0..total).map(|_| Uuid::now_v7()).collect();
+        let rows: Vec<published::ActiveModel> = ids
+            .iter()
+            .enumerate()
+            .map(|(n, id)| {
+                sea_orm::IntoActiveModel::into_active_model(published::Model {
+                    entry_id: *id,
+                    path: format!("/p/{n}"),
+                    slug: format!("p-{n}"),
+                    title: format!("Phở gà {n}"),
+                    published_at: template.published_at
+                        + jiff::SignedDuration::from_secs(i64::try_from(n).unwrap() + 1),
+                    ..template.clone()
+                })
+            })
+            .collect();
+        for chunk in rows.chunks(200) {
+            published::Entity::insert_many(chunk.to_vec()).exec(database.write()).await.unwrap();
+        }
+        // Ba bài có thêm từ hiếm `hiem`.
+        let rare = [ids[3], ids[2_000], ids[4_000]];
+        let mut index: Vec<crate::entity::published_word::ActiveModel> = Vec::new();
+        for id in &ids {
+            let mut row_words = vec!["pho", "ga"];
+            if rare.contains(id) {
+                row_words.push("hiem");
+            }
+            for word in row_words {
+                index.push(crate::entity::published_word::ActiveModel {
+                    tenant_id: sea_orm::Set(tenant.id().as_uuid()),
+                    entry_id: sea_orm::Set(*id),
+                    word: sea_orm::Set(word.to_owned()),
+                    locale: sea_orm::Set("en".to_owned()),
+                });
+            }
+        }
+        for chunk in index.chunks(words::INSERT_ROWS) {
+            crate::entity::published_word::Entity::insert_many(chunk.to_vec())
+                .exec_without_returning(database.write())
+                .await
+                .unwrap();
+        }
+        let find = async |q: &str| {
+            words::matching_ids(&tenant, anywhere("en"), &WordQuery::parse(q)).await.unwrap()
+        };
+
+        // Từ hiếm cùng từ phổ biến: đúng ba bài, mới nhất trước.
+        assert_eq!(find("pho hiem").await, [rare[2], rare[1], rare[0]]);
+        assert_eq!(find("hiem ga pho").await, [rare[2], rare[1], rare[0]]);
+        // Mọi từ đều phổ biến: `MATCH_CAP` bài mới nhất, đúng thứ tự.
+        let found = find("pho ga").await;
+        let newest: Vec<Uuid> =
+            ids.iter().rev().take(usize::try_from(MATCH_CAP).unwrap()).copied().collect();
+        assert_eq!(found, newest);
+        // Từ phổ biến cùng một từ không có ở bài nào: không có kết quả.
+        assert!(find("pho khongco").await.is_empty());
     })
     .await
     .unwrap();
