@@ -313,13 +313,19 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 
 Với `AUTOXIDE_TENANCY_MODE=multi`, bản backup có database chính (sổ khách và mọi khách trên đó) và
 mọi file ở nơi lưu file chung. Thêm `--all` để backup cả mọi placement khác, kèm nơi lưu file riêng của
-nó, vào `placements/<tên>/` của thư mục; không có thì lệnh in cảnh báo nêu tên chúng. Khôi phục một
-placement bằng `autoxide restore <thư mục>/placements/<tên> --placement <tên>` vào một placement có
-database mới, trống (`autoxide placement add`).
+nó, vào `placements/<tên>/` của thư mục; không có thì lệnh in cảnh báo nêu tên chúng. Với `--all`,
+`backup.json` của database chính được ghi sau cùng: một placement lỗi thì lệnh dừng và báo lỗi, thư
+mục không phải bản backup trọn (xoá nó rồi chạy lại). Để lấy lại một placement đã mất: restore database
+chính trước nếu nó cũng mất, tạo một database mới, trống ở đúng địa chỉ của placement, rồi chạy
+`autoxide restore <thư mục backup> --placement <tên>`: lệnh restore vào chính placement đó (cùng tên,
+cùng id), không phải vào một placement mới.
 
 Bản backup giữ nguyên schema của nguồn: lệnh không đòi database đã migrate, nên backup được ngay trước
 khi nâng cấp, và bản đang chạy trước khi nâng restore được bản backup đó (`backup.json` liệt kê các
-migration nó có). Bản backup cũng có dữ liệu của module đang tắt. Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
+migration nó có). Bản mới hơn cũng restore được; bản cũ hơn nguồn thì từ chối. Bản backup chứa các
+module đang bật: module đang tắt mà còn dữ liệu thì lệnh dừng và nói cấu hình nào bật nó.
+Cất
+`AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
 backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
 
 ## C. Một container với SQLite

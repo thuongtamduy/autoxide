@@ -17,7 +17,9 @@ use autoxide_kernel::storage::Storage;
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, PlacementId, TenancyMode};
 use autoxide_kernel::transfer::copy_modules;
 
-use super::backup::{describe, load_files, read_manifest, summary};
+use super::backup::{
+    describe, load_files, migrations_behind, read_manifest, refuse_newer_backup, summary,
+};
 use crate::runtime::{self, Migrations, Runtime};
 use crate::settings::Settings;
 
@@ -62,6 +64,9 @@ pub(crate) async fn write_all(
         let database = registry.placement_database(id).await.map_err(describe)?;
         // Nơi lưu riêng của placement; không có thì file của nó nằm ở nơi lưu chung, đã có trong bản chính.
         let files = registry.placement_storage(id).await.map_err(describe)?;
+        let behind = migrations_behind(&keyed, &database)
+            .await
+            .map_err(|error| format!("placement `{}`: {error}", found.name))?;
         let scratch =
             std::env::temp_dir().join(format!("autoxide-backup-{}", uuid::Uuid::now_v7()));
         let manifest = backup::write_backup_of(
@@ -75,8 +80,12 @@ pub(crate) async fn write_all(
         )
         .await
         .map_err(|error| format!("placement `{}`: {}", found.name, describe(error)))?;
+        let note = match behind {
+            0 => String::new(),
+            count => format!(" (its database is {count} migration(s) behind this program)"),
+        };
         text.push_str(&format!(
-            "Backed up placement {}: {} rows in {} tables and {} files.\n",
+            "Backed up placement {}: {} rows in {} tables and {} files{note}.\n",
             found.name,
             manifest.rows(),
             manifest.tables.len(),
@@ -105,11 +114,44 @@ pub(crate) async fn restore_placement(
     directory: PathBuf,
     name: String,
 ) -> Result<String, String> {
-    let manifest = read_manifest(&directory).await?;
+    let (directory, manifest) = placement_backup(directory, &name).await?;
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
     let result = restore_into(&runtime, &directory, &name, &manifest).await;
     let _ = runtime.database.close().await;
     result
+}
+
+/// Bản backup của placement `name`: `directory` là chính nó (`<thư mục>/placements/<tên>`), hay bản backup của database
+/// chính làm bằng `--all` — khi ấy lấy `placements/<tên>/` của nó, và từ chối rõ khi bản đó không chứa placement này.
+async fn placement_backup(
+    directory: PathBuf,
+    name: &str,
+) -> Result<(PathBuf, serde_json::Value), String> {
+    let manifest = read_manifest(&directory).await?;
+    if !manifest["placement"].is_null() {
+        return Ok((directory, manifest));
+    }
+    let held: Vec<&str> = manifest["placements"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect();
+    if !held.contains(&name) {
+        let what = if held.is_empty() {
+            "no placement (it was made without `--all`)".to_owned()
+        } else {
+            format!("only these placements: {}", held.join(", "))
+        };
+        return Err(format!(
+            "this is the backup of the main database and it holds {what}, not placement `{name}`; \
+             give the backup directory of `{name}`"
+        ));
+    }
+    let inner = placement_directory(&directory, name)?;
+    let manifest = read_manifest(&inner).await?;
+    Ok((inner, manifest))
 }
 
 async fn restore_into(
@@ -148,6 +190,7 @@ async fn restore_into(
     let target = registry.placement_database(id).await.map_err(describe)?;
     let migrator =
         runtime.modules.migrator().map_err(|error| error.to_string())?.keyed_on(&runtime.database);
+    refuse_newer_backup(manifest, &migrator)?;
     let states = migrator.status(&target).await.map_err(|error| error.to_string())?;
     if states.iter().any(|state| state.applied) {
         return Err(format!(

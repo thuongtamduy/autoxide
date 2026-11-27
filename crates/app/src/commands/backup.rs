@@ -41,10 +41,12 @@ pub struct BackupArguments {
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct RestoreArguments {
-    /// Directory made by `autoxide backup` (for `--placement`: its `placements/<name>/`).
+    /// Directory made by `autoxide backup` (for `--placement`: one made with `--all`, or its
+    /// `placements/<name>/`).
     directory: PathBuf,
-    /// Restore into this tenant database (placement), which must be empty, instead of the main database;
-    /// the files go to its own file storage, or the shared one.
+    /// Restore the backup of this tenant database (placement) into that same placement, whose database
+    /// must be empty again, instead of the main database; the files go to its own file storage, or the
+    /// shared one.
     #[arg(long)]
     placement: Option<String>,
 }
@@ -114,7 +116,14 @@ pub(crate) async fn run_backup(
         // `--all`: các placement trước, manifest của database chính SAU CÙNG kèm danh sách placement — manifest chính
         // có mặt nghĩa là mọi placement nó nêu đã xong.
         let (mut placements_text, placements) = if all {
-            super::backup_placements::write_all(&runtime, &names, &directory).await?
+            super::backup_placements::write_all(&runtime, &names, &directory).await.map_err(|error| {
+                // Manifest chính chưa ghi: thư mục không phải bản backup trọn, restore sẽ từ chối nó.
+                format!(
+                    "{error}. The backup is incomplete ({} has no {MANIFEST}): remove the directory and run \
+                     the command again",
+                    directory.display()
+                )
+            })?
         } else {
             (skipped_placements(runtime.modules.tenancy().as_ref()).await?, Vec::new())
         };
@@ -209,6 +218,7 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
         ));
     }
     let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
+    refuse_newer_backup(&manifest, &migrator)?;
     let target = Database::connect(&settings.config.database).await.map_err(|e| e.to_string())?;
     let prepared = async {
         let states = migrator.status(&target).await.map_err(|error| error.to_string())?;
@@ -272,11 +282,63 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
                  directory"
             ));
         }
-        Ok(summary("Restored", &tables, files, &directory))
+        let mut text = summary("Restored", &tables, files, &directory);
+        text.push_str(&placements_to_restore(&manifest));
+        Ok(text)
     }
     .await;
     let _ = std::fs::remove_dir_all(&scratch);
     result
+}
+
+/// Bản backup do một bản Autoxide MỚI hơn làm (module đang chạy ở đây mà có migration chương trình này không biết):
+/// từ chối rõ, TRƯỚC khi chạm database đích. Migration của module đang tắt ở đây thì bỏ qua: `refuse_dormant_data`
+/// trên bản sao quyết (chỉ dừng khi module đó có dữ liệu). Bản backup cũ (định dạng 1 trước khi có danh sách
+/// migration) không có gì để kiểm.
+pub(crate) fn refuse_newer_backup(
+    manifest: &Value,
+    migrator: &autoxide_kernel::migration::Migrator,
+) -> Result<(), String> {
+    let known: std::collections::BTreeSet<String> = migrator.names().into_iter().collect();
+    let running: std::collections::BTreeSet<&str> =
+        known.iter().filter_map(|name| name.split('/').next()).collect();
+    let listed = manifest["migrations"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let newer: Vec<&str> = listed
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|name| !known.contains(*name))
+        .filter(|name| running.contains(name.split('/').next().unwrap_or(name)))
+        .collect();
+    if !newer.is_empty() {
+        let shown = newer.iter().take(3).copied().collect::<Vec<_>>().join(", ");
+        return Err(format!(
+            "this backup holds {} migration(s) this Autoxide ({}) does not know ({shown}): it was made from a \
+             database migrated by a newer release (`backup.json` names the version that wrote it); restore it \
+             with that release",
+            newer.len(),
+            env!("CARGO_PKG_VERSION"),
+        ));
+    }
+    Ok(())
+}
+
+/// Bản backup làm bằng `--all`: nhắc restore từng placement nó chứa.
+fn placements_to_restore(manifest: &Value) -> String {
+    let names: Vec<&str> = manifest["placements"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    if names.is_empty() {
+        return String::new();
+    }
+    format!(
+        "The backup also holds these placements: {}. Restore each one into its own empty database with \
+         `autoxide restore <directory> --placement <name>`.\n",
+        names.join(", ")
+    )
 }
 
 pub(crate) fn summary(verb: &str, tables: &[CopiedTable], files: u64, directory: &Path) -> String {
@@ -604,12 +666,17 @@ mod tests {
                 wrong.contains("the backup of placement `eu-1`, not of placement `eu-2`"),
                 "{wrong}"
             );
-            let wrong = restore(backup.clone(), "eu-1").await.unwrap_err();
-            assert!(wrong.contains("the backup of the main database"), "{wrong}");
             let wrong = run_restore(multi(test.url()), eu1.clone()).await.unwrap_err();
             assert!(wrong.contains("--placement eu-1"), "{wrong}");
+            // Bản backup không chứa placement được hỏi: từ chối, nêu những placement nó có.
+            let wrong = restore(backup.clone(), "eu-9").await.unwrap_err();
+            assert!(
+                wrong.contains("only these placements: eu-1, eu-2, not placement `eu-9`"),
+                "{wrong}"
+            );
 
-            let restored = restore(eu1.clone(), "eu-1").await.unwrap();
+            // Thư mục của bản backup chính (`--all`) cũng được: lấy `placements/eu-1/` của nó.
+            let restored = restore(backup.clone(), "eu-1").await.unwrap();
             assert!(restored.starts_with("Restored placement eu-1:"), "{restored}");
             let state =
                 placements.list().await.unwrap().into_iter().find(|p| p.name == "eu-1").unwrap();
@@ -657,7 +724,7 @@ mod tests {
             let restored =
                 format!("sqlite://{}?mode=rwc", scratch.0.join("restored.sqlite").display());
             let files_b = scratch.0.join("files-b");
-            run_restore(settings(&restored, &files_b), backup).await.unwrap();
+            run_restore(settings(&restored, &files_b), backup.clone()).await.unwrap();
             check(&restored, &files_b).await;
 
             // Database do một bản Autoxide MỚI hơn migrate (có migration chương trình này không biết): báo rõ.
@@ -675,6 +742,28 @@ mod tests {
                 .await
                 .unwrap_err();
             assert!(newer.contains("migrated by a newer Autoxide"), "{newer}");
+
+            // Restore một bản backup do bản mới hơn làm: từ chối trước khi chạm database đích.
+            let mut manifest: Value =
+                serde_json::from_str(&std::fs::read_to_string(backup.join(MANIFEST)).unwrap())
+                    .unwrap();
+            manifest["migrations"]
+                .as_array_mut()
+                .unwrap()
+                .push(Value::from("auth/m9999_from_the_future"));
+            // Migration của module không chạy ở đây không làm bản backup thành "mới hơn".
+            manifest["migrations"].as_array_mut().unwrap().push(Value::from("unknown/m0001_x"));
+            std::fs::write(backup.join(MANIFEST), manifest.to_string()).unwrap();
+            let empty = format!("sqlite://{}?mode=rwc", scratch.0.join("empty.sqlite").display());
+            let refused =
+                run_restore(settings(&empty, &files_b), backup.clone()).await.unwrap_err();
+            assert!(refused.contains("1 migration(s) this Autoxide"), "{refused}");
+            assert!(refused.contains("auth/m9999_from_the_future"), "{refused}");
+            let target =
+                Database::connect(&settings(&empty, &files_b).config.database).await.unwrap();
+            let states = migrator.status(&target).await.unwrap();
+            assert!(states.iter().all(|state| !state.applied), "the target must stay untouched");
+            target.close().await.unwrap();
         })
         .await
         .unwrap();
