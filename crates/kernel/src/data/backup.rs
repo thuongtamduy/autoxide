@@ -55,6 +55,56 @@ pub struct BackupManifest {
     pub tables: Vec<BackupTable>,
     pub files: u64,
     pub file_bytes: u64,
+    /// Migrations applied to the source when it was backed up (`<module>/<name>`, in run order): the schema of
+    /// `database.sqlite` is exactly this one, not the one of the program that wrote the backup, so the program
+    /// the source ran on can restore it (an upgrade backs up before migrating). Empty in backups of format 1
+    /// written before 0.20.
+    #[serde(default)]
+    pub migrations: Vec<String>,
+    /// The placement (tenant database) this is the backup of; `None`: the main database. A restore refuses a
+    /// backup meant for another database.
+    #[serde(default)]
+    pub placement: Option<BackupPlacement>,
+    /// Backup of the main database written with `--all`: the placements backed up beside it (in
+    /// `placements/<name>/`), written BEFORE this manifest, so a manifest that lists them means they are there.
+    #[serde(default)]
+    pub placements: Vec<String>,
+}
+
+/// The placement a backup belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct BackupPlacement {
+    pub id: uuid::Uuid,
+    pub name: String,
+}
+
+impl BackupPlacement {
+    pub fn new(id: uuid::Uuid, name: impl Into<String>) -> Self {
+        BackupPlacement { id, name: name.into() }
+    }
+}
+
+/// What a backup is of, written into its manifest.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BackupOf {
+    /// A placement; `None`: the main database.
+    pub placement: Option<BackupPlacement>,
+    /// Main database with `--all`: the placements already backed up beside it.
+    pub placements: Vec<String>,
+}
+
+impl BackupOf {
+    /// The main database.
+    pub fn main(placements: Vec<String>) -> Self {
+        BackupOf { placement: None, placements }
+    }
+
+    /// A placement.
+    pub fn placement(placement: BackupPlacement) -> Self {
+        BackupOf { placement: Some(placement), placements: Vec::new() }
+    }
 }
 
 impl BackupManifest {
@@ -138,26 +188,62 @@ impl BackupSink for StorageSink {
     }
 }
 
-/// Creates a backup of `database` in `sink`: the tables of `modules` (with `migrator` fully applied) and
-/// every file of `files` (if any) except [`BACKUP_PREFIX`]. `scratch` is a private temporary directory used to
+/// Creates a backup of `database` in `sink`: the tables of `modules` and every file of `files` (if any) except
+/// [`BACKUP_PREFIX`]. The copy gets exactly the migrations applied to `database` (not the newer ones of
+/// `migrator`), so a database that is behind is backed up as it is, and its own program can restore it. `scratch` is a private temporary directory used to
 /// build the SQLite file before pushing it to `sink` (needs free space about the size of the database); the
 /// function cleans it up itself, even on error.
 pub async fn write_backup(
     database: &Database,
     migrator: &Migrator,
-    modules: &[&'static str],
+    modules: &[&str],
     files: Option<Arc<dyn Storage>>,
     sink: &dyn BackupSink,
     scratch: &Path,
 ) -> Result<BackupManifest, Error> {
+    write_backup_of(database, migrator, modules, files, sink, scratch, BackupOf::default()).await
+}
+
+/// Like [`write_backup`], recording in the manifest which database it is the backup of.
+pub async fn write_backup_of(
+    database: &Database,
+    migrator: &Migrator,
+    modules: &[&str],
+    files: Option<Arc<dyn Storage>>,
+    sink: &dyn BackupSink,
+    scratch: &Path,
+    of: BackupOf,
+) -> Result<BackupManifest, Error> {
     private_dir(scratch).map_err(io(scratch))?;
     let result = async {
         let path = scratch.join(DATABASE_FILE);
-        let copy = open_sqlite(&path, migrator).await?;
+        let migrations: Vec<String> = migrator
+            .status(database)
+            .await
+            .map_err(|error| Error::internal(error.to_string()))?
+            .into_iter()
+            .filter(|state| state.applied)
+            .map(|state| format!("{}/{}", state.module, state.name))
+            .collect();
+        let applied: std::collections::BTreeSet<&str> =
+            migrations.iter().map(String::as_str).collect();
+        let copy = open_sqlite_where(&path, migrator, &|module, name| {
+            applied.contains(format!("{module}/{name}").as_str())
+        })
+        .await?;
+        // `backup.json` ghi đúng những gì bản sao có (không phải mọi thứ của nguồn): migration của module mà bản
+        // sao bỏ qua (module đang tắt) không được liệt kê như thể có.
+        let held = migrator.status(&copy).await;
         let tables = copy_modules(database, &copy, modules).await;
         // Đóng trước khi đọc file: mọi trang đã nằm trong file chính, không còn file `-wal`.
         copy.close().await?;
         let tables = tables.map_err(|error| Error::internal(error.to_string()))?;
+        let migrations: Vec<String> = held
+            .map_err(|error| Error::internal(error.to_string()))?
+            .into_iter()
+            .filter(|state| state.applied)
+            .map(|state| format!("{}/{}", state.module, state.name))
+            .collect();
         sink.put(DATABASE_FILE, read_file(path).await?).await?;
         let (count, bytes) = match files {
             Some(storage) => copy_files(storage.as_ref(), sink).await?,
@@ -174,6 +260,9 @@ pub async fn write_backup(
                 .collect(),
             files: count,
             file_bytes: bytes,
+            migrations,
+            placement: of.placement,
+            placements: of.placements,
         };
         let text = serde_json::to_vec_pretty(&manifest).map_err(Error::internal)?;
         let stream = futures_util::stream::once(async move { Ok(bytes::Bytes::from(text)) });
@@ -203,6 +292,15 @@ async fn copy_files(storage: &dyn Storage, sink: &dyn BackupSink) -> Result<(u64
 
 /// The SQLite file at `path` (created if missing), with every migration of `migrator` applied.
 pub async fn open_sqlite(path: &Path, migrator: &Migrator) -> Result<Database, Error> {
+    open_sqlite_where(path, migrator, &|_, _| true).await
+}
+
+/// Like [`open_sqlite`], with only the migrations `wanted(module, name)` accepts.
+pub async fn open_sqlite_where(
+    path: &Path,
+    migrator: &Migrator,
+    wanted: &(dyn Fn(&str, &str) -> bool + Sync),
+) -> Result<Database, Error> {
     let url = format!("sqlite://{}?mode=rwc", path.display());
     let source = ConfigSource::from_pairs([("DATABASE_URL", url.as_str())]);
     let mut reader = ConfigReader::new(&source);
@@ -211,7 +309,7 @@ pub async fn open_sqlite(path: &Path, migrator: &Migrator) -> Result<Database, E
         reader.finish(config).map_err(|errors| Error::internal(errors.to_string()))?;
     let database =
         Database::connect(&config).await.map_err(|error| Error::internal(error.to_string()))?;
-    if let Err(error) = migrator.up(&database).await {
+    if let Err(error) = migrator.up_where(&database, wanted).await {
         let _ = database.close().await;
         return Err(Error::internal(error.to_string()));
     }

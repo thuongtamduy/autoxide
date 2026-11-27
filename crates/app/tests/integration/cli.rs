@@ -401,7 +401,16 @@ async fn user_create_tao_admin_va_bao_loi_ro() {
 
         let short = create("bob@example.com", "short\n");
         assert_eq!(short.status.code(), Some(1));
-        assert!(stderr(&short).contains("  - password: must be between 12"), "{}", stderr(&short));
+        assert!(stderr(&short).contains("  - password: must be between 15"), "{}", stderr(&short));
+        // Mật khẩu đã lộ bị chặn cả khi tạo bằng dòng lệnh (bước 71 G7), và không bị in lại.
+        let breached = create("bob@example.com", "Password123456789\n");
+        assert_eq!(breached.status.code(), Some(1));
+        let message = stderr(&breached);
+        assert!(
+            message.contains("  - password: is a commonly used or breached password"),
+            "{message}"
+        );
+        assert!(!message.contains("Password123456789"), "{message}");
 
         // Gỡ xác thực hai bước (D-159): tài khoản có thật thì xong (kể cả khi chưa bật), không
         // có thì báo rõ.

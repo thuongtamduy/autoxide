@@ -13,7 +13,7 @@
             ]
           },
           "password": {
-            "description": "For a new account: a password (12 to 128 characters). Omit to sign in later with a link\nor add a passkey with the tokens returned here.",
+            "description": "For a new account: a password (15 to 128 characters, not a common or breached one).\nOmit to sign in later with a link or add a passkey with the tokens returned here.",
             "type": [
               "string",
               "null"
@@ -8209,7 +8209,7 @@
             "type": "string"
           },
           "new_password": {
-            "description": "12 to 128 characters.",
+            "description": "15 to 128 characters, not a common or breached password.",
             "type": "string"
           },
           "revoke_other_credentials": {
@@ -16133,7 +16133,7 @@
             "type": "string"
           },
           "password": {
-            "description": "12 to 128 characters. When omitted, the account cannot sign in with a password\nuntil one is set.",
+            "description": "15 to 128 characters, not a common or breached password. When omitted, the account cannot sign in with a password\nuntil one is set.",
             "type": [
               "string",
               "null"
@@ -92253,7 +92253,7 @@
             "type": "string"
           },
           "password": {
-            "description": "12 to 128 characters.",
+            "description": "15 to 128 characters, not a common or breached password.",
             "type": "string"
           },
           "realm": {
@@ -92921,7 +92921,7 @@
         "description": "A new password, with the token from the reset mail.",
         "properties": {
           "password": {
-            "description": "12 to 128 characters.",
+            "description": "15 to 128 characters, not a common or breached password.",
             "type": "string"
           },
           "token": {
@@ -94978,7 +94978,7 @@
         "description": "The first password of an account.",
         "properties": {
           "password": {
-            "description": "12 to 128 characters.",
+            "description": "15 to 128 characters, not a common or breached password.",
             "type": "string"
           }
         },
@@ -110826,7 +110826,7 @@
                 }
               }
             },
-            "description": "The password is too short or too long; see `errors`."
+            "description": "The password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
@@ -114344,7 +114344,7 @@
                 }
               }
             },
-            "description": "The body is missing a field, or the new password breaks the rules (see `errors`)."
+            "description": "The body is missing a field, or the new password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`) (see `errors`)."
           },
           "429": {
             "content": {
@@ -117322,7 +117322,7 @@
                 }
               }
             },
-            "description": "The password does not follow the rules (12 to 128 characters); see `errors`."
+            "description": "The password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
@@ -117991,7 +117991,7 @@
                 }
               }
             },
-            "description": "A value is invalid, e.g. a password shorter than 12 characters; see `errors`."
+            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
@@ -118069,7 +118069,7 @@
                 }
               }
             },
-            "description": "A value is invalid, e.g. a password shorter than 12 characters; see `errors`."
+            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
@@ -122369,7 +122369,7 @@
                 }
               }
             },
-            "description": "A value is invalid; see `errors`."
+            "description": "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {
@@ -123745,7 +123745,7 @@
                 }
               }
             },
-            "description": "The password breaks the rules; see `errors`."
+            "description": "The password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`."
           },
           "default": {
             "content": {

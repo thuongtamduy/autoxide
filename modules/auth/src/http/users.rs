@@ -41,7 +41,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SetPasswordRequest {
-    /// 12 to 128 characters.
+    /// 15 to 128 characters, not a common or breached password.
     password: String,
 }
 
@@ -146,7 +146,7 @@ pub(crate) struct CreateUserRequest {
     /// Display name, 1 to 200 characters.
     #[schema(example = "Ada Lovelace")]
     name: String,
-    /// 12 to 128 characters. When omitted, the account cannot sign in with a password
+    /// 15 to 128 characters, not a common or breached password. When omitted, the account cannot sign in with a password
     /// until one is set.
     password: Option<String>,
 }
@@ -161,7 +161,7 @@ pub(crate) struct RegisterRequest {
     /// Display name, 1 to 200 characters.
     #[schema(example = "Ada Lovelace")]
     name: String,
-    /// 12 to 128 characters.
+    /// 15 to 128 characters, not a common or breached password.
     password: String,
     /// `staff` (default; needs self-registration on the server) or `customer`: a customer
     /// account of this tenant's shop, without any permission (open unless the tenant turns off
@@ -282,7 +282,7 @@ async fn list_users(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.manage`; code `permission_denied`.", body = Problem),
         (status = 409, description = "An account has this email; code `auth.email_taken`.", body = Problem),
-        (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn create_user(
@@ -421,7 +421,7 @@ async fn delete_user(
         (status = 201, description = "The account was created.", body = Data<UserResponse>),
         (status = 403, description = "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
         (status = 409, description = "An account has this email; code `auth.email_taken`.", body = Problem),
-        (status = 422, description = "A value is invalid, e.g. a password shorter than 12 characters; see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn register(
@@ -460,7 +460,7 @@ async fn register(
     responses(
         (status = 202, description = "Accepted; a mail went to the email (confirm the new account, or a notice when it already had one).", body = Data<RegistrationResponse>),
         (status = 403, description = "Self-registration of staff is turned off for this tenant (setting `auth.staff_registration`, otherwise the server's AUTOXIDE_AUTH_SELF_REGISTRATION; code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
-        (status = 422, description = "A value is invalid, e.g. a password shorter than 12 characters; see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a password that is not 15 to 128 characters (more when the tenant raises `auth.password_min_length`), or is on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn request_registration(
@@ -551,7 +551,7 @@ async fn registration_open(
         (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "The account already has a password; code `auth.password_already_set`. Its owner changes it with `POST /api/v1/auth/me/password` or resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
-        (status = 422, description = "The password breaks the rules; see `errors`.", body = Problem),
+        (status = 422, description = "The password breaks the rules: it must be 15 to 128 characters (more when the tenant raises `auth.password_min_length`) and not on the list of common or breached passwords (field code `common_password`); see `errors`.", body = Problem),
     )
 )]
 async fn set_user_password(
