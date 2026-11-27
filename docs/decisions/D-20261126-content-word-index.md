@@ -59,6 +59,24 @@ Thay bằng chỉ mục đảo `content_published_words` — bảng thường c�
   | `pho mot`      | 1 000   | bước 3 (nhiều ứng viên)                    | 182–190 ms  | 220–250 ms   |
   | `khongco`, `ga khongco` | 0 | bước 1 dừng sớm                       | 0,4–67 ms   | 1–40 ms      |
 
+  Bước 1 đọc mọi từ với trần nhỏ (`DIRECT_MAX`) trước: câu tiếng Việt tự nhiên nhiều từ phổ biến ("của là và các
+  những…") có một từ hiếm thì không đọc tập lớn nào (review thứ ba). Số đo câu nhiều từ (cùng máy, 60 000 bài; `cua`
+  `la` `va` `cac` `nhung` `ga` ở mọi bài, `dalat` ở 1/20 số bài, các từ khác như trên):
+
+  | Câu tìm                               | Kết quả | SQLite      | Postgres 16 (trước / sau `ANALYZE`) |
+  | ------------------------------------- | ------- | ----------- | ----------------------------------- |
+  | `cua la va hiem`                      | 3       | 19–22 ms    | 25 / 10 ms                          |
+  | `cua la va cac nhung hiem`            | 3       | 23 ms       | 30 / 13 ms                          |
+  | `cua la va cac nhung ga pho hiem`     | 3       | 29 ms       | 41 / 23 ms                          |
+  | `cua la va cac`                       | 1 000   | 273–280 ms  | 381 / 95 ms                         |
+  | `cua la va dalat`                     | 1 000   | 372–417 ms  | 404 / 374 ms                        |
+  | `cua la va cac nhung ga dalat hai`    | 1 000   | 593–615 ms  | 222 / 204 ms                        |
+  | `cua la va cac nhung ga pho mot`      | 1 000   | 581–666 ms  | 408 / 359 ms                        |
+  | `cua la va khongco`                   | 0       | 8 ms        | 5 / 5 ms                            |
+
+  Bài bị bài cùng đường dẫn ở nút gần hơn che (`on_site`) vẫn được tính vào trần 1 000 trước khi bước sau bỏ nó:
+  trường hợp hiếm (hai nút cùng đường dẫn), kết quả có thể ít hơn 1 000 bài một chút, không sai.
+
   Rủi ro còn lại: câu có từ rất phổ biến (hơn 50 000 bài) mà bài khớp mọi từ chỉ nằm sâu trong bài cũ thì bước 3 duyệt
   nhiều trang, mỗi trang thêm câu dò khoá chính; trên khách rất lớn có thể hết hạn (`503`, "thử từ cụ thể hơn").
   Không bao giờ trả kết quả sai hay thiếu.
