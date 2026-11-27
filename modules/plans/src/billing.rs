@@ -82,6 +82,26 @@ impl PlansService {
         self.databases.default_tenant()
     }
 
+    /// Xếp job xử lý hoá đơn của kỳ vừa huỷ (trong transaction huỷ kỳ): job `plans.invoice_period` thấy kỳ
+    /// `void` có hoá đơn thì huỷ / điều chỉnh giảm nó; lỗi giữa chừng thì job thử lại. Khoá `void:<kỳ>`: một job.
+    pub(crate) async fn enqueue_void_invoice<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        period_id: Uuid,
+    ) -> Result<(), Error> {
+        if self.invoices.is_none() {
+            return Ok(());
+        }
+        self.jobs
+            .enqueue_database(
+                connection,
+                &InvoicePeriod { period_id },
+                EnqueueOptions::default().unique_key(format!("void:{period_id}")),
+            )
+            .await
+            .map(|_| ())
+    }
+
     /// Xếp job lập hoá đơn cho kỳ `period_id` (trong transaction mở kỳ).
     pub(crate) async fn enqueue_invoice<C: ConnectionTrait>(
         &self,
@@ -292,10 +312,18 @@ impl PlansService {
             Ok(_) => Ok(()),
             // Hoá đơn điện tử đã gửi cơ quan thuế mà luật không cho huỷ (Việt Nam từ 01/6/2025): lập điều
             // chỉnh giảm toàn bộ. `reference` cố định nên job chạy lại không lập hai lần.
-            Err(error) if error.code() == "invoices.einvoice_not_cancellable" => {
+            // Lượt trước đã điều chỉnh xong (gốc thành `adjusted`): đi lại đường điều chỉnh — cùng `reference`
+            // nên trả lại đúng điều chỉnh đó, phát hành lại trả cùng số.
+            Err(error)
+                if error.code() == "invoices.einvoice_not_cancellable"
+                    || error.code() == "invoices.not_cancellable" =>
+            {
                 let Some(original) = invoices.document(&operator, document).await? else {
                     return Ok(());
                 };
+                if error.code() == "invoices.not_cancellable" && original.status != "adjusted" {
+                    return Err(error);
+                }
                 let lines = original
                     .lines
                     .iter()

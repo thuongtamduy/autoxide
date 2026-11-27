@@ -89,9 +89,9 @@ pub(crate) struct FxSnapshot {
 }
 
 /// Trạng thái của chứng từ còn thay thế / điều chỉnh được.
-const CORRECTABLE: [&str; 3] = ["issued", "submitting", "accepted"];
+pub(crate) const CORRECTABLE: [&str; 3] = ["issued", "submitting", "accepted"];
 
-fn not_correctable(status: &str) -> Error {
+pub(crate) fn not_correctable(status: &str) -> Error {
     Error::conflict(
         "invoices.not_correctable",
         "Only an issued document can be adjusted or replaced (this one is `{status}`).",
@@ -885,9 +885,8 @@ impl InvoicesService {
         correction: Correction,
     ) -> Result<Submitted<Document>, Error> {
         let Correction { relation, direction, buyer, lines, reference } = correction;
-        if !CORRECTABLE.contains(&original.status.as_str()) {
-            return Err(not_correctable(&original.status));
-        }
+        // Trạng thái của chứng từ gốc được kiểm trong transaction tạo nháp, SAU bước replay (`create_inner`):
+        // gọi lại sau khi điều chỉnh đã phát hành (gốc thành `adjusted`) trả lại đúng điều chỉnh đó.
         let direction = direction.unwrap_or_else(|| "increase".to_owned());
         if relation == "adjustment" && !["increase", "decrease"].contains(&direction.as_str()) {
             return Err(Error::validation(vec![FieldError::new(
@@ -909,7 +908,11 @@ impl InvoicesService {
         )
         .source_id(original.id.to_string());
         draft.on_behalf_of = original.on_behalf_of_org_id.map(OrgId::from_uuid);
-        draft.series = original.series_id;
+        // Giữ dãy số của chứng từ gốc khi cùng năm; khác năm thì để phát hành tự chọn dãy của năm lập.
+        let year_now = self.tax.tax_date(tenant, OrgId::from_uuid(original.org_id), Timestamp::now()).await?.year();
+        draft.series = original
+            .series_id
+            .filter(|_| original.issue_date.is_some_and(|day| day.year() == year_now));
         draft.prices_include_tax = original.prices_include_tax;
         draft.booked_by_source = original.booked_by_source;
         let direction = if relation == "replacement" { "increase".to_owned() } else { direction };

@@ -411,6 +411,17 @@ impl InvoicesService {
             if let Some(existing) = reference::replayed(stored, reference, fingerprint)? {
                 return Ok(Submitted::Replayed(existing));
             }
+            // Điều chỉnh / thay thế: chứng từ gốc phải còn sửa được (đọc trong transaction, sau replay).
+            if let Some((original, _, _)) = related {
+                let found = document::Entity::find_by_id(*original)
+                    .scoped(tenant)
+                    .one(&transaction)
+                    .await?
+                    .ok_or_else(document_not_found)?;
+                if !crate::issue::CORRECTABLE.contains(&found.status.as_str()) {
+                    return Err(crate::issue::not_correctable(&found.status));
+                }
+            }
             let at = now();
             let id = Uuid::now_v7();
             let saved = document::Entity::insert(document::ActiveModel {

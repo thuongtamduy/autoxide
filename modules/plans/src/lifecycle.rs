@@ -679,9 +679,16 @@ impl PlansService {
             json!({ "tenant_id": tenant, "reference": voided.reference }),
         );
         self.record_event(&transaction, actor, tenant, &event).await?;
+        if voided.invoice_id.is_some() {
+            // Cùng transaction: hoá đơn của kỳ chắc chắn được xử lý (job thử lại khi lỗi).
+            self.enqueue_void_invoice(&transaction, id).await?;
+        }
         transaction.commit().await?;
-        // Sau commit: huỷ hoá đơn của kỳ (gọi `dyn Invoices`, có thể gọi nhà cung cấp).
-        self.cancel_invoice(&voided).await?;
+        // Sau commit: huỷ / điều chỉnh hoá đơn của kỳ ngay (gọi `dyn Invoices`, có thể gọi nhà cung cấp); lỗi
+        // thì job vừa xếp làm lại, kỳ vẫn huỷ.
+        if let Err(error) = self.cancel_invoice(&voided).await {
+            tracing::warn!(error = %error, period_id = %id, "cancelling the invoice of a voided period failed; the job retries");
+        }
         Ok(voided)
     }
 

@@ -836,7 +836,7 @@ async fn hoa_don_dien_tu_da_gui_khong_huy_duoc_o_viet_nam() {
 }
 
 /// Điều chỉnh tính thuế theo ngày của hoá đơn gốc, kể cả khi sửa nháp điều chỉnh (kiểm độc lập #575, B và C):
-/// hoá đơn gốc lùi sang 05/01/2027 (GTGT 10%, hết giảm), hôm nay còn 8% — điều chỉnh vẫn 10%.
+/// hoá đơn gốc đặt ở phía kia mốc hết giảm GTGT (01/01/2027) so với hôm nay — điều chỉnh theo thuế suất của gốc.
 #[tokio::test]
 async fn dieu_chinh_theo_thue_suat_cua_hoa_don_goc() {
     use sea_orm::ConnectionTrait as _;
@@ -854,10 +854,12 @@ async fn dieu_chinh_theo_thue_suat_cua_hoa_don_goc() {
         assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
         let vietnam = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
         let today = Timestamp::now().date_in(&vietnam);
-        // Bài chỉ có nghĩa khi hôm nay còn giảm thuế (8%).
-        if today >= Date::new(2027, 1, 1).unwrap() {
-            return;
-        }
+        // Ngày của hoá đơn gốc ở phía kia mốc hết giảm thuế so với hôm nay: thuế suất của nó khác hôm nay.
+        let (original_day, today_rate, original_rate) = if today < Date::new(2027, 1, 1).unwrap() {
+            (Date::new(2027, 1, 5).unwrap(), "8", "10")
+        } else {
+            (Date::new(2026, 12, 30).unwrap(), "10", "8")
+        };
         let body = json!({"kind": "vat_invoice", "symbol": "1C26TAA", "year": today.year()});
         let (status, created) = call(&app, "POST", "/series", Some(body)).await;
         assert_eq!(status, StatusCode::CREATED, "{created}");
@@ -872,26 +874,37 @@ async fn dieu_chinh_theo_thue_suat_cua_hoa_don_goc() {
         let id = created["data"]["id"].as_str().unwrap().to_owned();
         let (status, issued) = call(&app, "POST", &format!("/documents/{id}/issue"), None).await;
         assert_eq!(status, StatusCode::OK, "{issued}");
-        assert_eq!(issued["data"]["lines"][0]["rate_percent"], "8");
+        assert_eq!(issued["data"]["lines"][0]["rate_percent"], today_rate);
         let write = app.database().write();
         write
             .execute_raw(autoxide_kernel::database::statement(
                 write.get_database_backend(),
                 "UPDATE invoices_documents SET issue_date = $1 WHERE id = $2",
-                [Date::new(2027, 1, 5).unwrap().into(), id.parse::<Uuid>().unwrap().into()],
+                [original_day.into(), id.parse::<Uuid>().unwrap().into()],
             ))
             .await
             .unwrap();
         let adjust = json!({"direction": "decrease", "reference": "ADJ-G-1", "lines": [line(50_000)]});
         let (status, adjusted) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(adjust)).await;
         assert_eq!(status, StatusCode::CREATED, "{adjusted}");
-        assert_eq!(adjusted["data"]["lines"][0]["rate_percent"], "10", "{adjusted}");
+        assert_eq!(adjusted["data"]["lines"][0]["rate_percent"], original_rate, "{adjusted}");
         // Sửa nháp điều chỉnh: vẫn theo ngày của hoá đơn gốc.
         let path = format!("/documents/{}", adjusted["data"]["id"].as_str().unwrap());
         let (status, edited) = call(&app, "PATCH", &path, Some(json!({"lines": [line(60_000)]}))).await;
         assert_eq!(status, StatusCode::OK, "{edited}");
-        assert_eq!(edited["data"]["lines"][0]["rate_percent"], "10", "{edited}");
-        assert_eq!(edited["data"]["tax"]["amount"], "6000");
+        assert_eq!(edited["data"]["lines"][0]["rate_percent"], original_rate, "{edited}");
+        let tax = if original_rate == "10" { "6000" } else { "4800" };
+        assert_eq!(edited["data"]["tax"]["amount"], tax);
+        // Gốc khác năm: điều chỉnh không giữ dãy số của gốc, phát hành tự chọn dãy của năm lập.
+        assert_eq!(edited["data"]["series_id"], Value::Null, "{edited}");
+        let (status, issued) = call(&app, "POST", &format!("{path}/issue"), None).await;
+        assert_eq!(status, StatusCode::OK, "{issued}");
+        assert_eq!(issued["data"]["symbol"], "1C26TAA");
+        // Gọi lại cùng điều chỉnh sau khi gốc đã `adjusted`: trả lại đúng điều chỉnh đó, không lỗi.
+        let again = json!({"direction": "decrease", "reference": "ADJ-G-1", "lines": [line(50_000)]});
+        let (status, replayed) = call(&app, "POST", &format!("/documents/{id}/adjust"), Some(again)).await;
+        assert!(status.is_success(), "{status} {replayed}");
+        assert_eq!(replayed["data"]["id"], adjusted["data"]["id"]);
     })
     .await
     .unwrap();
