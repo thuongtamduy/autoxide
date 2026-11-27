@@ -232,8 +232,10 @@ impl Search<'_> {
         complete.sort_by_key(HashSet::len);
         let mut sets = complete.into_iter();
         if let Some(first) = sets.next() {
-            let mut candidates: Vec<Uuid> =
-                sets.fold(first, |kept, set| kept.intersection(&set).copied().collect()).into_iter().collect();
+            let mut candidates: Vec<Uuid> = sets
+                .fold(first, |kept, set| kept.intersection(&set).copied().collect())
+                .into_iter()
+                .collect();
             for term in &common {
                 candidates = self.having(term, &candidates).await?;
             }
@@ -247,7 +249,10 @@ impl Search<'_> {
     fn remaining(&self) -> Result<Duration, Error> {
         let left = self.deadline.saturating_duration_since(Instant::now());
         if left.is_zero() {
-            return Err(Error::unavailable(QUERY_TIMEOUT, "The query ran longer than its time limit."));
+            return Err(Error::unavailable(
+                QUERY_TIMEOUT,
+                "The query ran longer than its time limit.",
+            ));
         }
         Ok(left)
     }

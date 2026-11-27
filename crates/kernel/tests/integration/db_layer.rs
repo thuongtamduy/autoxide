@@ -692,7 +692,8 @@ async fn doc_co_tran_tren_bo_dung_cau() {
         let tx = a.db().begin_write().await.unwrap();
         assert!(tx.find::<Line>().within(limit).all().await.is_err());
         assert!(tx.find::<Line>().within(limit).count().await.is_err());
-        let rows = tx.find::<Line>().within(limit).page(Line::ID, &PageRequest::first(2, Order::Desc));
+        let uncounted = PageRequest::first(2, Order::Desc);
+        let rows = tx.find::<Line>().within(limit).page(Line::ID, &uncounted);
         assert!(rows.await.is_err(), "page honours within");
         let counted = tx.find::<Line>().within(limit).page(Line::ID, &request);
         assert!(counted.await.is_err(), "the page count honours within");

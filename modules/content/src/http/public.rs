@@ -549,8 +549,12 @@ pub(crate) async fn list_posts(
         author_id: query.author_id,
         search: query.q,
     };
-    let page =
-        views(&service, &tenant, service.public_posts_for(&tenant, &filter, &page, client.ip).await?).await?;
+    let page = views(
+        &service,
+        &tenant,
+        service.public_posts_for(&tenant, &filter, &page, client.ip).await?,
+    )
+    .await?;
     Ok(public_cache(page.into_response()))
 }
 

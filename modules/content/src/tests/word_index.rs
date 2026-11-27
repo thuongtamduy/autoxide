@@ -349,7 +349,8 @@ async fn migration_nap_nhieu_bai_nhieu_tu() {
             .await
             .unwrap();
         assert_eq!(found, [last.unwrap()]);
-        let all = words::matching_ids(&tenant, anywhere("en"), &WordQuery::parse("so")).await.unwrap();
+        let all =
+            words::matching_ids(&tenant, anywhere("en"), &WordQuery::parse("so")).await.unwrap();
         assert_eq!(all.len(), 210, "every entry of every batch is indexed");
     })
     .await
