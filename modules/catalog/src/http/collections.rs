@@ -239,6 +239,8 @@ async fn list_collections(
     Query(query): Query<CollectionsQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<CollectionResponse>, Error> {
+    // Quyền trước tham số trang: thiếu quyền là 403, không phải 422 (luật `permission-first` của xtask).
+    principal.require(&crate::permissions::PRODUCTS_READ)?;
     let page = PageRequest::try_from(paging)?;
     let found =
         service.list_collections(&tenant, &principal, query.status.as_deref(), &page).await?;
