@@ -333,11 +333,12 @@ impl ScimService {
     pub(crate) async fn delete_user(&self, caller: &ScimCaller, id: &str) -> Result<(), ScimError> {
         let tenant = &caller.tenant;
         let user_id = Uuid::try_parse(id).map_err(|_| user_not_found(id))?;
+        let read = tenant.database().read();
         scim_user::Entity::find_by_id((tenant.id().as_uuid(), user_id))
-            .one(tenant.database().read())
+            .one(read)
             .await?
             .ok_or_else(|| user_not_found(id))?;
-        self.require_creator_covers(caller, user_id).await?;
+        self.require_creator_covers(read, caller, user_id).await?;
         self.users.delete(tenant, caller.actor(), user_id).await.map_err(|error| {
             if error.code() == "auth.user_not_found" { user_not_found(id) } else { error.into() }
         })?;
@@ -348,13 +349,29 @@ impl ScimService {
     /// `Ok` nếu người tạo token SCIM của `caller` bao trùm mọi permission của tài khoản `target`
     /// (D-079): token do người quyền thấp tạo không nhận về, khoá hay đổi email tài khoản quyền cao
     /// hơn. Người tạo đã bị xoá hay khoá coi như không có permission nào.
-    async fn require_creator_covers(
+    async fn require_creator_covers<C: sea_orm::ConnectionTrait>(
         &self,
+        connection: &C,
         caller: &ScimCaller,
         target: Uuid,
     ) -> Result<(), ScimError> {
         let creator = self.authority(caller).await?;
-        self.roles.require_covers(&caller.tenant, &creator, target).await?;
+        let tenant = &caller.tenant;
+        self.roles.require_covers(tenant, &creator, target).await?;
+        // `require_covers` so theo TÊN permission, bỏ qua phạm vi: người tạo có quyền ở một nhánh vẫn qua với tài khoản
+        // ở nhánh khác (PT-19). Thêm luật "giữ được" của membership: người tạo phải cấp được từng (nút, role) tài khoản
+        // đang giữ — cùng luật với nhóm SCIM và luật ánh xạ (D-20261125-scim-grant-cover).
+        use crate::role::entity::user_role;
+        let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+        let held: Vec<(Uuid, Uuid)> = user_role::Entity::find()
+            .filter(user_role::Column::UserId.eq(target))
+            .scoped(tenant)
+            .all(connection)
+            .await?
+            .into_iter()
+            .map(|row| (row.org_id.unwrap_or(root), row.role_id))
+            .collect();
+        crate::role::require_grantable(connection, tenant, &creator, &held, &[]).await?;
         Ok(())
     }
 
@@ -453,7 +470,7 @@ impl ScimService {
                         )));
                     }
                     // Nhận về tài khoản có sẵn: người tạo token phải bao trùm quyền của nó.
-                    self.require_creator_covers(caller, account.id).await?;
+                    self.require_creator_covers(transaction, caller, account.id).await?;
                     (Some(snapshot(&account)), account, None)
                 }
                 None => {
@@ -507,7 +524,7 @@ impl ScimService {
                 || link.family_name != input.family_name
         });
         if changed {
-            self.require_creator_covers(caller, id).await?;
+            self.require_creator_covers(transaction, caller, id).await?;
         }
         let mut update = user::Entity::update_many()
             .col_expr(user::Column::UpdatedAt, Expr::value(now))

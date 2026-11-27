@@ -32,6 +32,14 @@ pub(crate) const EVENTS_PER_MINUTE: Setting = Setting::new(
 )
 .with_default("120");
 
+pub(crate) const EVENTS_PER_DAY: Setting = Setting::new(
+    "AUTOXIDE_ANALYTICS_EVENTS_PER_DAY",
+    "Visit events taken per day from one network block (IPv4 /24, IPv6 /64) (1 to 10000000), on top \
+     of the per-minute limit; more are dropped silently. Bounds how much one network can skew the \
+     reports, since pages send events without signing in.",
+)
+.with_default("20000");
+
 pub(crate) const ALLOWED_HOSTS: Setting = Setting::new(
     "AUTOXIDE_ANALYTICS_ALLOWED_HOSTS",
     "Website hosts, comma-separated (e.g. `shop.example,www.shop.example`), whose pages may send \
@@ -83,6 +91,8 @@ pub(crate) struct AnalyticsConfig {
     pub raw_retention_days: u32,
     pub retention_days: u32,
     pub events_per_minute: u32,
+    /// Sự kiện mỗi ngày từ một khối mạng (PT-12): chặn tổng lượng một mạng làm lệch báo cáo.
+    pub events_per_day: u32,
     /// Chữ thường, không cổng.
     pub allowed_hosts: Vec<String>,
 }
@@ -94,6 +104,7 @@ impl Default for AnalyticsConfig {
             raw_retention_days: 7,
             retention_days: 790,
             events_per_minute: 120,
+            events_per_day: 20_000,
             allowed_hosts: Vec::new(),
         }
     }
@@ -111,6 +122,7 @@ impl AnalyticsConfig {
         let days = reader.get_with(&RETENTION_DAYS, |raw| parse_in_range(raw, 30u32, 3650));
         let per_minute =
             reader.get_with(&EVENTS_PER_MINUTE, |raw| parse_in_range(raw, 1u32, 100_000));
+        let per_day = reader.get_with(&EVENTS_PER_DAY, |raw| parse_in_range(raw, 1u32, 10_000_000));
         let hosts = reader.get_with(&ALLOWED_HOSTS, |raw| {
             Ok::<_, String>(
                 raw.split(',')
@@ -124,6 +136,7 @@ impl AnalyticsConfig {
             raw_retention_days: raw_days?,
             retention_days: days?,
             events_per_minute: per_minute?,
+            events_per_day: per_day?,
             allowed_hosts: hosts?,
         })
     }

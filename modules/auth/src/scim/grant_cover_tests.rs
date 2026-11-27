@@ -800,3 +800,96 @@ async fn token_con_ma_nguoi_tao_da_mat_thi_creator_status_deleted() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn token_quyen_o_nhanh_khac_khong_doi_tai_khoan_ngoai_nhanh() {
+    // PT-19: người tạo token có `content.write` ở nhánh A (cùng TÊN permission với tài khoản ở nhánh B): so theo tên thì
+    // "bao trùm", nhưng họ không cấp được role của tài khoản ở nhánh B — không đổi được hồ sơ liên kết của nó.
+    use autoxide_kernel::tenancy::{OrgId, OrgTree};
+    TestDatabase::run(async |test| {
+        let (app, services, _, admin_token) = setup(test).await;
+        let tenant = &services.tenant;
+        let root = autoxide_kernel::tenancy::root_of(tenant.id());
+        if let Ok(write) = services.database.begin_write().await
+            && OrgTree::insert_root(&write, tenant.id()).await.is_ok()
+        {
+            write.commit().await.unwrap();
+        }
+        let (a, b) =
+            (OrgId::from_uuid(uuid::Uuid::now_v7()), OrgId::from_uuid(uuid::Uuid::now_v7()));
+        let write = services.database.begin_write().await.unwrap();
+        OrgTree::insert(&write, tenant.id(), a, root, 8).await.unwrap();
+        OrgTree::insert(&write, tenant.id(), b, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "writer".to_owned(),
+            description: String::new(),
+            // Theo nhánh (không phải toàn khách): người giữ role ở A chỉ có quyền ở cây con của A.
+            permissions: Vec::new(),
+            grants: vec![(
+                "auth.invitations.manage".to_owned(),
+                autoxide_kernel::access::Scope::Subtree,
+            )],
+        };
+        let writer = services.roles.create(tenant, Actor::system(), input).await.unwrap();
+        let boss = autoxide_kernel::access::Principal::with_all_permissions(uuid::Uuid::now_v7())
+            .in_tenant(tenant.id());
+
+        // Người vận hành: `auth.scim.manage` ở gốc, `writer` chỉ ở nhánh A.
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "sync".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.scim.manage".to_owned()],
+            grants: Vec::new(),
+        };
+        let sync_role = services.roles.create(tenant, Actor::system(), input).await.unwrap();
+        // Mật khẩu sinh mới cho mỗi lần chạy: test không mang mật khẩu viết cứng.
+        let password = format!("scim-operator-{}", uuid::Uuid::now_v7());
+        let input = NewUser {
+            email: "it@example.com".to_owned(),
+            name: "Sync".to_owned(),
+            password: Some(password.clone()),
+        };
+        let operator = services.users.create(tenant, Actor::system(), input).await.unwrap().id;
+        services
+            .roles
+            .set_memberships(
+                tenant,
+                &boss,
+                operator,
+                vec![(root.as_uuid(), vec![sync_role.id]), (a.as_uuid(), vec![writer.id])],
+            )
+            .await
+            .unwrap();
+        let access = bearer(&app, "it@example.com", &password).await;
+        let low_token = scim_token(&app, &access, None).await;
+
+        // Tài khoản ở nhánh B giữ `writer`: token không đổi được.
+        let target = scim_user(&app, &admin_token, "b-staff@example.com").await;
+        let id = uuid::Uuid::parse_str(&target).unwrap();
+        services
+            .roles
+            .set_memberships(tenant, &boss, id, vec![(b.as_uuid(), vec![writer.id])])
+            .await
+            .unwrap();
+        let path = format!("/Users/{target}");
+        let rename = patch(json!([{"op": "replace", "path": "externalId", "value": "other"}]));
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(rename.clone())).await;
+        assert_forbidden(status, &body);
+
+        // Cùng tài khoản chuyển sang nhánh A: đổi được.
+        services
+            .roles
+            .set_memberships(tenant, &boss, id, vec![(a.as_uuid(), vec![writer.id])])
+            .await
+            .unwrap();
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(rename)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    })
+    .await
+    .unwrap();
+}

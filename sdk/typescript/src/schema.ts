@@ -40540,7 +40540,7 @@ export interface paths {
   "/api/v1/content/public/terms": {
     /** List categories and tags that have published posts (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; taxonomy?: Taxonomy; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
       responses: {
         200: Page_PublicTermCount;
         403: Problem;
@@ -40552,7 +40552,7 @@ export interface paths {
   "/api/v1/content/public/terms/{taxonomy}/{slug}": {
     /** Get a category or tag by slug (public). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string }; };
+      parameters: { header: { "Accept-Language"?: string }; path: { taxonomy: Taxonomy; slug: string }; query: { locale: string; site?: string }; };
       responses: {
         200: Data_PublicTermPage;
         403: Problem;
