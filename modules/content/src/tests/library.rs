@@ -192,8 +192,16 @@ async fn danh_muc_va_the() {
             shown,
             [("Du lịch".to_owned(), "vi".to_owned()), ("Food".to_owned(), "en".to_owned())]
         );
-        let (_, by_slug) =
-            content.term_by_slug(&tenant, Taxonomy::Category, "vi", "du-lich").await.unwrap();
+        let (_, by_slug) = content
+            .term_by_slug(
+                &tenant,
+                &autoxide_kernel::tenancy::Site::whole(&tenant),
+                Taxonomy::Category,
+                "vi",
+                "du-lich",
+            )
+            .await
+            .unwrap();
         assert_eq!(by_slug.name, "Du lịch");
 
         assert_eq!(
@@ -483,6 +491,67 @@ async fn doc_menu_cu() {
                 },
             ]
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// PT-11: phân loại công khai chỉ lộ thuật ngữ gắn với bài người đọc thấy được trên website — thuật ngữ chỉ gắn với bản
+/// nháp hay bài bị ẩn không có trong danh sách và trang theo slug trả 404.
+#[tokio::test]
+async fn phan_loai_cong_khai_chi_theo_bai_dang_hien() {
+    TestDatabase::run(async |test| {
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+        let (content, _, database) = service(test, config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
+        let site = autoxide_kernel::tenancy::Site::whole(&tenant);
+        let ada = editor();
+        let secret = content
+            .create_term(&tenant, &ada, Taxonomy::Tag, name("en", "Upcoming"))
+            .await
+            .unwrap();
+        let entry = content.create(&tenant, &ada, post("Launch notes")).await.unwrap();
+        content.set_entry_terms(&tenant, &ada, entry.id, vec![secret.term.id]).await.unwrap();
+        let first = PageRequest::first(10, Order::Asc);
+        let listed = |page: autoxide_kernel::pagination::Page<_>| {
+            page.data
+                .iter()
+                .map(|(term, _): &(crate::taxonomy::terms::TermRef, u64)| term.id)
+                .collect::<Vec<_>>()
+        };
+        let by_slug = || content.term_by_slug(&tenant, &site, Taxonomy::Tag, "en", "upcoming");
+
+        // Chỉ gắn với bản nháp: không lộ.
+        assert!(
+            listed(content.public_terms(&tenant, &site, "en", None, &first).await.unwrap())
+                .is_empty()
+        );
+        assert_eq!(by_slug().await.unwrap_err().code(), "content.term_not_found");
+
+        // Đăng: hiện.
+        content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
+        assert_eq!(
+            listed(content.public_terms(&tenant, &site, "en", None, &first).await.unwrap()),
+            [secret.term.id]
+        );
+        assert_eq!(by_slug().await.unwrap().1.id, secret.term.id);
+
+        // Bài bị ẩn vì vụ việc (D-363): như chưa đăng.
+        crate::entity::published::Entity::update_many()
+            .col_expr(
+                crate::entity::published::Column::RestrictedAt,
+                Expr::value(Some(autoxide_kernel::time::Timestamp::now())),
+            )
+            .filter(crate::entity::published::Column::EntryId.eq(entry.id))
+            .exec(database.write())
+            .await
+            .unwrap();
+        assert!(
+            listed(content.public_terms(&tenant, &site, "en", None, &first).await.unwrap())
+                .is_empty()
+        );
+        assert_eq!(by_slug().await.unwrap_err().code(), "content.term_not_found");
     })
     .await
     .unwrap();

@@ -1255,6 +1255,36 @@ database theo hai bước ("mở rộng trước, thu hẹp sau"):
 bật máy chủ mới, rồi thay máy chủ cũ như mục "Cập nhật không làm rơi
 request".
 
+### Lùi về một bản trước
+
+`autoxide rollback --to X.Y.Z` đưa database chính và mọi database của khách về đúng các migration của
+bản `X.Y.Z` (từ 0.14.0 trở đi), để máy chủ của bản đó chạy lại được. Chạy bằng binary của bản đang rời
+đi: chỉ nó biết cách gỡ migration của chính nó.
+
+1. `autoxide rollback --to X.Y.Z --dry-run` liệt kê từng database: migration sẽ gỡ, bảng và cột sẽ bị
+   bỏ kèm số dòng hay giá trị đang có (cột chỉ chứa giá trị mặc định thì không mất gì), và số dòng một
+   bước gỡ sẽ xoá. Không đổi gì. Trên SQLite nó làm trên bản sao của database, trong một thư mục riêng
+   (`.autoxide-rollback-…`, chỉ user của máy chủ đọc được) cạnh file database, xoá khi xong: cần chỗ trống
+   bằng kích thước database ở đó. Lần chạy thật, khi máy chủ đã dừng, đo mà không chép. Trên PostgreSQL nó chạy
+   các bước gỡ trong một transaction rồi huỷ, nên trong lúc đó giữ lock trên các bảng nó đổi: chờ một
+   bảng đang bận tối đa `--lock-timeout-seconds` (mặc định 2) rồi dừng và báo — chạy lúc ít tải, hoặc
+   sau khi đã dừng máy chủ.
+2. Dừng mọi máy chủ và worker của bản hiện tại. Lần chạy thử cho thấy có dữ liệu sẽ mất thì backup
+   trước (`autoxide backup`).
+3. `autoxide rollback --to X.Y.Z --yes`, thêm `--accept-data-loss` khi có dữ liệu mất. Database của
+   khách trước, database chính sau cùng; database của khách nào hỏng thì database chính giữ nguyên:
+   sửa nguyên nhân rồi chạy lại đúng lệnh đó.
+4. Khởi động máy chủ của `X.Y.Z`.
+
+Module do binary của bạn tự ghép thêm (`.module(…)`) không có trong bảng phiên bản: lệnh lùi để nguyên
+migration của chúng và nói rõ; `--revert-untracked` gỡ cả chúng. Lần lùi được ghi thành một lượt migrate
+loại `rollback`; khi bản đích cũ hơn sổ ghi đó (0.19.0 trở về trước), lượt được đóng trước khi lùi
+database chính, và lỗi ở đó chỉ được in ra.
+
+Migration không trả lại được dữ liệu cho bản trước (bước thu hẹp của mở rộng–thu hẹp) làm lệnh từ
+chối; changelog liệt kê các migration như vậy ở mục ghi chú nâng cấp, và đường lùi qua chúng là bản
+backup lấy trước khi nâng.
+
 ## Kiểm trước khi chạy thật
 
 - [ ] `AUTOXIDE_AUTH_TOKEN_SECRET` và `AUTOXIDE_SECRET_KEY` là chuỗi ngẫu nhiên dài, giữ bí mật
