@@ -125,6 +125,15 @@ impl Transport {
                 }
             },
             Transport::File(directory) => {
+                // Lần đầu một thư bị ghi ra file thay vì gửi: nói một lần, lúc nó thật sự xảy ra.
+                static WARNED: std::sync::Once = std::sync::Once::new();
+                WARNED.call_once(|| {
+                    tracing::warn!(
+                        directory = %directory.display(),
+                        "AUTOXIDE_MAIL_SMTP_URL is not set: this mail is written to a file, not sent; set it \
+                         for production"
+                    );
+                });
                 let directory = directory.clone();
                 let bytes = message.formatted();
                 // Ghi file là việc chặn: đẩy sang thread dành cho việc chặn.

@@ -176,7 +176,7 @@ So that data is not lost by accident:
   `modules_turned_off`, when the database holds rows of a module that is off — with the exact
   `AUTOXIDE_MODULES=…` line that turns it back on. (When you set `AUTOXIDE_MODULES` yourself the
   message is informational: you chose.)
-- `autoxide copy`, `autoxide backup create` and `autoxide backup restore` refuse to run while
+- `autoxide copy`, `autoxide backup` and `autoxide restore` refuse to run while
   such data exists, because they only handle the modules that are on. Run them with the module
   turned on, or with `AUTOXIDE_MODULES=all`.
 

@@ -352,6 +352,53 @@ pub(crate) mod phone_challenge {
     tenant_scoped!();
 }
 
+/// Client đã đăng nhập đúng bằng mã SMS của một số (PT-7, D-20261126-otp-nist).
+pub(crate) mod phone_known_client {
+    use autoxide_kernel::time::Timestamp;
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_phone_known_clients")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// `SecretKey::phone_key` của số (HMAC theo khách) — không lưu số.
+        pub phone_key: String,
+        /// Dấu client như `phone_challenge::requester_block`.
+        pub requester_block: String,
+        pub last_success_at: Timestamp,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+/// Số lần nhập sai liên tiếp mã đăng nhập SMS của một số, kể từ lần đúng gần nhất (PT-7, D-20261126-otp-nist).
+pub(crate) mod phone_failure {
+    use autoxide_kernel::time::Timestamp;
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "compliance_phone_failures")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// `SecretKey::phone_key` của số.
+        pub phone_key: String,
+        pub failures: i32,
+        pub updated_at: Timestamp,
+        /// Lúc quản trị viên mở khoá gần nhất: giới hạn mã sai mỗi ngày coi như một lần đúng.
+        pub unlocked_at: Option<Timestamp>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
 pub(crate) mod legal_profile {
     use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;

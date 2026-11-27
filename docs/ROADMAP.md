@@ -129,6 +129,16 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
             `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
             (D-20261126-kernel-data-layer)
+      - [x] Lớp HTTP: `#[endpoint]` (khai rõ ai được gọi, 401/403 chuẩn tự sinh), `routes!`, `Routes`,
+            `#[derive(Schema/Params/Validate)]`, `Path`/`Query`/`State`, `NoContent`, `Download`, `async_trait`;
+            `notes` không còn khai thư viện bọc ở `[dependencies]` (D-20261126-kernel-web-layer)
+      - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
+            `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng
+      - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
+            của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
+            (D-20261127-http-layer-choices)
+      - [ ] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
+            cần chúng
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên
@@ -341,6 +351,7 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 - [ ] Mô hình mối đe doạ của core (`docs/THREAT_MODEL.md`, EN + VI) làm đầu vào cho đợt kiểm thử bên ngoài; mã hoá ở mức
       trường cho dữ liệu cá nhân nhạy cảm (khoá quản lý được, xoay khoá); nhật ký kiểm toán khó sửa lén (chuỗi băm hay tương
       đương)
+      — thiết kế: [`docs/research/g13-field-encryption-audit.md`](research/g13-field-encryption-audit.md) (code sau G1 PR 2–5)
 - [ ] Mục tiêu khôi phục sau sự cố: RPO / RTO ghi rõ cho từng cách triển khai; diễn tập khôi phục trong CI cả trường hợp
       nhiều khách có database riêng và kho file
 - [x] Rà giấy phép thư viện: `cargo deny` chặn giấy phép không hợp MIT/Apache; danh sách giấy phép của bên thứ ba đi kèm
@@ -608,8 +619,13 @@ thật (P7).
         dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
   - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
-  - [ ] PT-7: trần chung 5× nới giới hạn đoán mã mỗi số mỗi ngày, và trần chung còn cho phép khoá chủ số từ nhiều
-        client — cân nhắc trần chung thấp hơn, mã dài hơn, hay đếm theo người nhập mã (đổi `PhoneCodes::verify`)
+  - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút; lần sai liên tiếp đếm bền (client lạ khoá từ 90, mọi client từ
+        100; quản trị viên mở khoá qua REST / MCP / CLI);
+        trần chung là setting riêng thay cho 5×; số mã mỗi giờ theo cặp (số, client); client đã đăng nhập bằng số không
+        bị trần "mọi client" khoá
+        (D-20261126-otp-nist)
+  - [ ] Mã đăng nhập SMS: token thiết bị có ký, cấp khi đăng nhập đúng, để nhận client quen thay cho địa chỉ (CGNAT di
+        động đổi địa chỉ) — cần đổi hợp đồng `PhoneCodes` của `auth` (D-20261126-otp-nist, rủi ro còn lại)
   - [x] PT-13, PT-14: lớp kiểm permission chung của kernel đọc `x-permissions` (403 trước validation / ETag / tra bản
         ghi), 18 `x-permissions` thiếu đã bổ sung, hai test e2e giữ (D-20261126-permission-gate)
   - [x] PT-16, PT-17: slug tự sinh tìm theo nhóm ứng viên `slug IN (…)` dùng unique index (content, catalog); bộ

@@ -242,6 +242,10 @@ backups`, then add `-v "$PWD/backups:/backups"` and run `backup /backups/<name>`
 shown under [Configuration](#configuration) (use `http://127.0.0.1:8080`). For PostgreSQL,
 a reverse proxy with HTTPS, updates and restore, see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
+**No Docker?** Build the binary and run it by hand: [`docs/DEPLOY.md`, section B](docs/DEPLOY.md#b-one-binary-with-sqlite)
+(SQLite) or [B+](docs/DEPLOY.md#b-one-binary-with-postgresql-from-scratch) (PostgreSQL). The two secrets go in `.env`,
+`autoxide migrate up` runs before `autoxide serve`, and `AUTOXIDE_HTTP_ADDRESS` changes the address.
+
 ## Requirements
 
 These are only needed to build from source (to run a released image, see above).

@@ -6,20 +6,19 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::http::{Schema, Validate};
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
-use utoipa::ToSchema;
 use uuid::Uuid;
-use validator::Validate;
 
 use crate::http::{CreateNoteRequest, NoteResponse};
 use crate::permissions::{NOTES_READ, NOTES_WRITE};
 use crate::service::{NoteChanges, NoteService};
 
 /// A note to act on.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NoteId {
     /// Id of the note.
@@ -27,7 +26,7 @@ pub(crate) struct NoteId {
 }
 
 /// Changes to a note; omitted fields stay as they are.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UpdateNoteInput {
     /// Id of the note.

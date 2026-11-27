@@ -15,6 +15,7 @@ publish.workspace = true
 async-trait.workspace = true
 autoxide-macros.workspace = true
 axum.workspace = true
+matchit.workspace = true
 base64.workspace = true
 bytes.workspace = true
 jiff.workspace = true

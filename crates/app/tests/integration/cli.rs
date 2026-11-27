@@ -177,7 +177,17 @@ fn migrate_voi_cau_hinh_mac_dinh_tu_tao_file_sqlite() {
     );
     assert!(listed.contains("\n0 applied, "), "{listed}");
     assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
-    assert!(stdout(&up).contains("  auth/m0001_create_user\n"), "{}", stdout(&up));
+    // Hàng trăm migration: `up` tóm tắt mỗi module một dòng (từng cái ở `migrate status`).
+    let applied = stdout(&up);
+    assert!(applied.starts_with("Applied ") && applied.contains(" migrations:\n"), "{applied}");
+    assert!(
+        applied.lines().any(|line| {
+            line.strip_prefix("  auth: ")
+                .is_some_and(|count| count.parse::<u32>().is_ok_and(|n| n > 1))
+        }),
+        "{applied}"
+    );
+    assert!(applied.contains("autoxide migrate status"), "{applied}");
     let again = autoxide(directory.path(), &["migrate", "up"], &[]);
     assert_eq!(stdout(&again), "Nothing to apply: the database is up to date.\n");
     // Không cấu hình gì: database là file SQLite trong thư mục `data/`, tự tạo.

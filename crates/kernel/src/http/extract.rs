@@ -4,11 +4,11 @@ use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{FromRequest, Request};
 use serde::de::DeserializeOwned;
-use validator::Validate;
 
+use super::Validate;
 use crate::error::{Error, ErrorKind};
 
-/// The JSON body of the request, read as `T` AND having passed `T::validate()`.
+/// The JSON body of the request, read as `T` AND having passed [`Validate::check`].
 ///
 /// When a handler takes `ValidJson(input): ValidJson<CreateNote>`, `input` is guaranteed valid; a bad
 /// request gets an error before the handler runs:
@@ -48,7 +48,7 @@ where
         }
         let request = Request::from_parts(parts, axum::body::Body::from(bytes));
         let Json(value) = Json::<T>::from_request(request, state).await.map_err(from_rejection)?;
-        value.validate()?;
+        value.check()?;
         Ok(ValidJson(value))
     }
 }

@@ -36,6 +36,7 @@ events! {
     CONSENT_GRANTED, ConsentGranted, "compliance.consent_granted", "A consent was given (`consent_id`, `purpose`, `scope`, `channel`).";
     CONSENT_WITHDRAWN, ConsentWithdrawn, "compliance.consent_withdrawn", "A consent was withdrawn (`consent_id`, `purpose`, `scope`, `channel`).";
     PHONE_VERIFIED, PhoneVerified, "compliance.phone_verified", "A user confirmed a phone number with a one-time code (`user_id`).";
+    PHONE_UNLOCKED, PhoneUnlocked, "compliance.phone_unlocked", "An administrator unlocked sign-in codes for a phone number locked after too many wrong codes (`phone_key`: the tenant's key of the number, not the number).";
     PHONE_REMOVED, PhoneRemoved, "compliance.phone_removed", "A user removed their verified phone number (`user_id`).";
     POLICY_UPDATED, PolicyUpdated, "compliance.policy_updated", "A compliance policy of the tenant was set (`key`).";
     LEGAL_PROFILE_UPDATED, LegalProfileUpdated, "compliance.legal_profile_updated", "A legal (owner) profile was created or changed (`profile_id`, `org_id`).";
