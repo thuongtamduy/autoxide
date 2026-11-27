@@ -16210,7 +16210,7 @@
             "properties": {
               "secret": {
                 "description": "Verify the `webhook-signature` header of each request with this secret (Standard\nWebhooks). Store it now: it cannot be shown again, only replaced.",
-                "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+                "example": "whsec_EXAMPLE-not-a-real-secret",
                 "type": "string"
               }
             },
@@ -24942,7 +24942,7 @@
                 "properties": {
                   "secret": {
                     "description": "Verify the `webhook-signature` header of each request with this secret (Standard\nWebhooks). Store it now: it cannot be shown again, only replaced.",
-                    "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+                    "example": "whsec_EXAMPLE-not-a-real-secret",
                     "type": "string"
                   }
                 },
@@ -38686,7 +38686,7 @@
             "description": "A new signing secret, shown only once.",
             "properties": {
               "secret": {
-                "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+                "example": "whsec_EXAMPLE-not-a-real-secret",
                 "type": "string"
               }
             },
@@ -94625,7 +94625,7 @@
         "description": "A new signing secret, shown only once.",
         "properties": {
           "secret": {
-            "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+            "example": "whsec_EXAMPLE-not-a-real-secret",
             "type": "string"
           }
         },
