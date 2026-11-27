@@ -56,6 +56,47 @@ To prepare the notices, `GET /promotions/{id}/notice-export?format=json|csv` (pe
 is required under the rules in force on the start day, the last day to submit, the legal basis and what was
 recorded. People submit the notice to the authority; Autoxide only prepares the data and records it.
 
+### A coupon, step by step
+
+With `API`, `TOKEN` and `ORG` (your unit) as in the [shop guide](guides/shop.md#1-turn-on-the-connectors). The
+paths in this page are under `/api/v1/promotions`, so a promotion is at `/api/v1/promotions/promotions/{id}`.
+
+```bash
+P="$API/api/v1/promotions/promotions"
+# 1. The province that receives your notices: a setting of your unit (units below it inherit it).
+curl -sS -X PUT "$API/api/v1/organizations/units/$ORG/settings/promotions.notice_province" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"value": "01"}'
+
+# 2. A draft: 10% off with a code, from now for 30 days.
+PROMO=$(curl -sS "$P" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"org_id\": \"$ORG\", \"trigger\": \"code\", \"kind\": \"percent_off\", \"value_bp\": 1000,
+       \"currency\": \"VND\", \"locale\": \"vi\", \"title\": \"Giảm 10%\", \"terms\": \"Nhập mã GIAM10\",
+       \"starts_at\": \"$(jq -rn 'now | todate')\", \"ends_at\": \"$(jq -rn 'now + 30 * 86400 | todate')\"}" \
+  | jq -r .data.id)
+
+# 3. The code buyers type (`"count": 100` instead of `code` generates codes).
+curl -sS "$P/$PROMO/codes" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"purpose": "redeem", "code": "GIAM10"}'
+
+# 4. What is still missing: a `promotions.notice_required` check names its authority, e.g. `province:01`.
+curl -sS -X POST "$P/$PROMO/activation-check" -H "Authorization: Bearer $TOKEN" | jq '.data.checks'
+
+# 5. Record the notice you submitted to that authority, then turn the promotion on.
+curl -sS -X PATCH "$P/$PROMO/notices/province:01" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"status": "submitted", "reference": "123/TB-SCT"}'
+curl -sS -X POST "$P/$PROMO/activate" -H "Authorization: Bearer $TOKEN"
+```
+
+- `purpose` is `redeem` for the coupon of a `code` promotion and `claim` for the claim code of a `voucher`
+  promotion. A code taken by another promotion is refused (`promotions.code_taken`).
+- The setting holds the province code (`GET /api/v1/address/provinces`); without it the authority is
+  `province:unknown`. `{"status": "not_required"}` records that no notice is needed.
+- **Prices must exist before the promotion starts.** The legal limit is computed from the price just before
+  `starts_at`, and a price counts only from its `valid_from` (now, when you leave it out). A promotion that starts
+  before the product's first price gives that product no discount (`withheld`, reason
+  `promotions.reason.no_reference_price`). Start the promotion after the price was set, or give the price an
+  earlier `valid_from` when you add it (`POST /api/v1/catalog/price-lists/{id}/prices`).
+
 ## Computing a cart
 
 `POST /evaluate` (and `Promotions::evaluate`) computes a cart without holding anything:

@@ -115,6 +115,21 @@ pub(crate) struct PaymentInput {
     payment_id: Uuid,
 }
 
+/// The partner's answer to simulate for a sandbox payment.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SimulateInput {
+    /// Id of the payment: for an order, find it with
+    /// `GET /api/v1/ledger/payments?source_module=orders&source_id=<order id>`.
+    payment_id: Uuid,
+    /// `succeeded` (the partner collected the money) or `failed` (the buyer did not pay).
+    outcome: String,
+    /// The amount the partner reports collected, in the smallest unit of the payment's currency
+    /// (e.g. `150000` for 150,000 VND); omit for exactly the amount due. Another amount puts the
+    /// payment in `needs_review`.
+    amount_minor: Option<i64>,
+}
+
 /// Which items.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -179,8 +194,24 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
     let (balance, entries, trial, post) =
         (service.clone(), service.clone(), service.clone(), service.clone());
     let (payment, exceptions, resolve) = (service.clone(), service.clone(), service.clone());
-    let (rate, record) = (service.clone(), service.clone());
+    let (rate, record, simulate) = (service.clone(), service.clone(), service.clone());
     vec![
+        Tool::new(
+            "simulate_payment",
+            "Inside a sandbox only (and when the server allows it): play the payment partner for a \
+             pending sandbox payment, reporting it `succeeded` or `failed`. Goes through the same path \
+             as a partner notification (entry posted, the order told); no money moves.",
+            move |tenant: TenantContext, principal: Principal, input: SimulateInput| {
+                let service = simulate.clone();
+                async move {
+                    let amount = input.amount_minor.map(crate::simulate::Reported::Minor);
+                    service
+                        .simulate_payment(&tenant, &principal, input.payment_id, &input.outcome, amount)
+                        .await
+                }
+            },
+        )
+        .requires(RECONCILE),
         Tool::new(
             "payment",
             "A payment collected through a payment partner, with its status and refunded amount.",

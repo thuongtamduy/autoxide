@@ -11832,6 +11832,50 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Inside a sandbox only (and when the server allows it): play the payment partner for a pending sandbox payment, reporting it `succeeded` or `failed`. Goes through the same path as a partner notification (entry posted, the order told); no money moves.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The partner's answer to simulate for a sandbox payment.",
+        "properties": {
+          "amount_minor": {
+            "description": "The amount the partner reports collected, in the smallest unit of the payment's currency\n(e.g. `150000` for 150,000 VND); omit for exactly the amount due. Another amount puts the\npayment in `needs_review`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "outcome": {
+            "description": "`succeeded` (the partner collected the money) or `failed` (the buyer did not pay).",
+            "type": "string"
+          },
+          "payment_id": {
+            "description": "Id of the payment: for an order, find it with\n`GET /api/v1/ledger/payments?source_module=orders&source_id=<order id>`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_id",
+          "outcome"
+        ],
+        "type": "object"
+      },
+      "name": "ledger.simulate_payment",
+      "output_schema": null,
+      "permissions": [
+        "ledger.reconcile"
+      ],
+      "stability": "official"
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false

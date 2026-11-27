@@ -29,6 +29,7 @@ mod provider;
 mod reconcile;
 mod return_url;
 mod service;
+mod simulate;
 mod tools;
 mod tools_flows;
 mod vietqr;

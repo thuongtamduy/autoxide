@@ -283,6 +283,9 @@ pub(crate) mod payment {
         /// Số thực thu lúc ghi thu (đơn vị nhỏ nhất, tiền tệ của `amount_currency`); `None`: chưa thu,
         /// hay thu trước m0012.
         pub captured_minor: Option<i64>,
+        /// Tạo khi khách là sandbox (lượt thu do bộ giả của kernel trả lời, không tới đối tác thật):
+        /// điều kiện để giả lập phản hồi của đối tác (m0013, D-20261127-sandbox-payment-simulation).
+        pub sandbox: bool,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

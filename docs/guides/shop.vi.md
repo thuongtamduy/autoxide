@@ -21,6 +21,9 @@ English: [`shop.md`](shop.md).
   Key, Secret Key), cửa hàng GHN (API token và ShopId), tài khoản eSMS có brandname đã đăng ký (ApiKey,
   SecretKey) và tài khoản SePay eInvoice (client id, client secret, provider account id). Hướng dẫn riêng của
   từng nhà cung cấp ghi chỗ lấy các giá trị này.
+- `curl` và `jq` (các ví dụ đọc câu trả lời bằng `jq`).
+- Chưa có tài khoản nhà cung cấp? Làm mục [Thử không cần tài khoản thật](#thử-không-cần-tài-khoản-thật) trước:
+  cùng các bước, trong một sandbox, nơi mọi đối tác đều là bản giả.
 - Trước khi bán cho công chúng ở Việt Nam: thông báo website bán hàng với Bộ Công Thương (Nghị định 52/2013/NĐ-CP
   và văn bản sửa đổi) và công bố điều kiện giao dịch chung; xem module `compliance`. Hướng dẫn này không thay
   cho tư vấn pháp lý.
@@ -116,6 +119,42 @@ curl -sS "$API/api/v1/shipping/methods" -H "Authorization: Bearer $TOKEN" -H 'Co
   -d "{\"org_id\": \"$ORG\", \"code\": \"ghn\", \"kind\": \"carrier\", \"names\": {\"vi\": \"Giao Hàng Nhanh\", \"en\": \"GHN\"}, \"currency\": \"VND\", \"carrier_account_id\": \"$(echo "$GHN" | jq -r .data.id)\", \"auto_book\": true}"
 ```
 
+Chưa có tài khoản hoá đơn điện tử? Dãy hoá đơn không có `einvoice_provider` vẫn đánh số hoá đơn trong Autoxide
+(chứng từ nội bộ, không gửi cơ quan thuế). Không có dãy nào thì không có hoá đơn nào phát hành khi giao hàng; có
+hai dãy cùng loại, cùng năm, cùng nút thì chọn một khi phát hành (`series_id`). Yêu cầu lại hoá đơn của một đơn
+bằng `POST /api/v1/orders/{id}/invoice`.
+
+```bash
+curl -sS "$API/api/v1/invoices/series" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"kind": "vat_invoice", "symbol": "1C26TAA", "year": 2026}'
+```
+
+**Hồ sơ thuế** — ai bán và theo quy tắc thuế nào. Thuế của giỏ hàng và thông tin người bán trên mọi hoá đơn (tên,
+mã số thuế, địa chỉ) lấy từ đây; chưa có thì thuế tính theo `vat_credit` và hoá đơn không có thông tin người bán.
+`regime` là `vat_credit`, `vat_direct`, `household` hay `exempt`; `business_lines` là `goods`, `services`,
+`production_transport` hay `other`:
+
+```bash
+curl -sS -X PUT "$API/api/v1/tax/profiles/$ORG" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"jurisdiction": "VN", "regime": "vat_credit", "tax_code": "0101234567", "legal_name": "Công ty TNHH Trà Việt",
+       "business_lines": ["goods"]}'
+```
+
+**Phí giao của chính bạn** (không có tài khoản hãng vận chuyển): một vùng, một cách giao với giá cố định theo khối
+lượng. Vùng ghi một tỉnh (`{"country": "VN", "province_code": "01"}`) thắng vùng cả nước. Hàng không ghi khối lượng
+dùng `default_item_weight_grams`:
+
+```bash
+ZONE=$(curl -sS "$API/api/v1/shipping/zones" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"org_id\": \"$ORG\", \"name\": \"Viet Nam\", \"regions\": [{\"country\": \"VN\"}]}" | jq -r .data.id)
+METHOD=$(curl -sS "$API/api/v1/shipping/methods" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"org_id\": \"$ORG\", \"code\": \"standard\", \"kind\": \"table_rate\", \"names\": {\"vi\": \"Giao tiêu chuẩn\", \"en\": \"Standard\"},
+       \"currency\": \"VND\", \"default_item_weight_grams\": 500}" | jq -r .data.id)
+curl -sS -X PUT "$API/api/v1/shipping/methods/$METHOD/rates" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{\"rates\": [{\"zone_id\": \"$ZONE\", \"min_weight_grams\": 0, \"amount\": {\"amount\": \"30000\", \"currency\": \"VND\"}}]}"
+```
+
 Trong trang quản lý của GHN, đăng ký `AUTOXIDE_HTTP_PUBLIC_URL` + `webhook_path` làm webhook trạng thái (xem
 [hướng dẫn GHN](providers/ghn.vi.md#webhook-trạng-thái)). MoMo không cần làm gì: Autoxide gửi địa chỉ nhận thông
 báo của bạn kèm mỗi lần thu tiền.
@@ -187,6 +226,17 @@ bắt buộc có (hoặc đặt một lần `momo.connection.account.return_url`
 mua trả xong, MoMo báo về máy chủ của bạn và đơn tự sang `confirmed` / `paid`. Người mua nhận SMS khi đơn được đặt
 và khi thanh toán được xác nhận.
 
+`payment_method` là `cod` (trả khi nhận hàng, khi giỏ có giao hàng), `bank_transfer`, hay một phương thức của đối tác
+thanh toán (`wallet`, `card`…); `payment_methods` của giỏ liệt kê `cod`, `bank_transfer` và `gateway`, trong đó
+`gateway` đại diện cho mọi phương thức của đối tác. Đặt hàng không cho người mua vãng lai token nào để xem đơn về
+sau: người mua xin một token bằng số đơn và số điện thoại, rồi xác nhận mã gửi qua SMS. `access_token` khi đó đi
+trong header `Order-Token` của các lời gọi `/api/v1/orders/public/orders/…`:
+
+```bash
+LOOKUP=$(curl -sS "$API/api/v1/orders/public/orders/lookup" -H 'Content-Type: application/json'   -d '{"number": "<order number>", "phone": "0912345678"}' | jq -r .data.lookup_id)
+ORDER_TOKEN=$(curl -sS "$API/api/v1/orders/public/orders/lookup/$LOOKUP/confirm" -H 'Content-Type: application/json'   -d '{"code": "<code from the SMS>"}' | jq -r .data.access_token)
+```
+
 ## 5. Giao hàng
 
 Ghi lại id của đơn trong câu trả lời đặt hàng. Yêu cầu giao hàng thì đơn được nhận (`preparing`); GHN tự đặt kiện
@@ -208,6 +258,54 @@ curl -sS "$API/api/v1/orders/$ORDER" -H "Authorization: Bearer $TOKEN" | jq '.da
 curl -sS "$API/api/v1/invoices/documents?source_module=orders&source_id=$ORDER" -H "Authorization: Bearer $TOKEN" \
   | jq '.data[0] | {status, number, authority_code}'
 ```
+
+## Thử không cần tài khoản thật
+
+Khi chưa có tài khoản nhà cung cấp, chạy cả luồng trong một [sandbox](sandbox.vi.md): bản sao để thử của một cửa
+hàng, nơi mọi đối tác là bản giả (thanh toán, giao hàng, SMS, hoá đơn điện tử) và không gì tới đối tác thật.
+Sandbox cần máy chủ nhiều khách, và thanh toán trong đó được hoàn tất bằng tay, nên bật cả hai (cả hai mặc định
+tắt):
+
+```bash
+# Next to compose.quickstart.yml: several tenants, and simulated payments allowed inside sandboxes.
+cat > compose.try.yml <<'EOF'
+services:
+  autoxide:
+    environment:
+      AUTOXIDE_TENANCY_MODE: multi
+      AUTOXIDE_LEDGER_SANDBOX_SIMULATION: "true"
+EOF
+docker compose -f compose.quickstart.yml -f compose.try.yml up -d
+
+# A shop tenant and its first administrator (the command prints the password).
+X="docker compose -f compose.quickstart.yml -f compose.try.yml exec autoxide autoxide"
+$X tenant create --slug demo --name "Demo shop"
+$X user create --tenant demo --email owner@demo.example --name "Owner" --admin
+
+# Sign in to the shop, then create a sandbox of it.
+API=http://127.0.0.1:8080
+TOKEN=$(curl -sS "$API/api/v1/auth/login" -H 'Autoxide-Tenant: demo' -H 'Content-Type: application/json' \
+  -d '{"email":"owner@demo.example","password":"<printed password>"}' | jq -r .data.access_token)
+TENANT=$(curl -sS "$API/api/v1/kernel/tenant" -H "Authorization: Bearer $TOKEN" -H 'Autoxide-Tenant: demo' | jq -r .data.id)
+SANDBOX=$(curl -sS "$API/api/v1/kernel/tenants/$TENANT/sandboxes" -H "Authorization: Bearer $TOKEN" \
+  -H 'Autoxide-Tenant: demo' -H "Idempotency-Key: $(openssl rand -hex 16)" -H 'Content-Type: application/json' \
+  -d '{"name": "First sale"}' | jq -r .data.id)
+curl -sS "$API/api/v1/kernel/tenant" -H "Authorization: Bearer $TOKEN" -H "Autoxide-Tenant: $SANDBOX" | jq .data.status
+```
+
+Trạng thái thành `active` khi sao xong (vài giây). Rồi làm bước 1 tới 5 với **hai thay đổi**:
+
+- Gửi `-H "Autoxide-Tenant: $SANDBOX"` với **mọi** lời gọi, kể cả lời gọi công khai (giỏ hàng, đặt hàng, mã địa
+  chỉ): khi không đăng nhập, header đó chọn cửa hàng. Bỏ qua tài khoản nhà cung cấp ở bước 2; ở bước 1
+  `AUTOXIDE_MODULES` vẫn nêu các bộ nối, để có bản giả của chúng.
+- Sandbox mới thì trống: nó sao cấu hình, role và trang, không sao sản phẩm, giá, tồn kho, cách giao hàng, hồ sơ
+  thuế hay dãy hoá đơn. Tạo chúng bên trong sandbox (dãy hoá đơn của bước 2 không có `einvoice_provider`, hồ sơ
+  thuế, phí giao của chính bạn; bước 3). Có nhiều đối tác thanh toán thì đặt cả đối tác mặc định trong sandbox.
+
+Sau khi đặt hàng, lượt thu đứng `pending` vì không đối tác nào báo về sandbox. Hoàn tất nó như đối tác sẽ làm: xem
+[Hoàn tất một thanh toán giả](sandbox.vi.md#hoàn-tất-một-thanh-toán-giả). Đơn thành `confirmed` / `paid`, rồi làm
+tiếp bước 5. Xong thì xoá sandbox (`DELETE /api/v1/kernel/sandboxes/{id}` từ cửa hàng, không gửi
+`Autoxide-Tenant: $SANDBOX`).
 
 ## Khi có việc không xảy ra
 
