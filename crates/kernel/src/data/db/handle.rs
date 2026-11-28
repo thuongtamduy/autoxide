@@ -305,9 +305,7 @@ impl ControlPlane {
     /// sweep all tenants, platform reports. `reason` says why, in a few words; each use is counted in the
     /// metric `kernel_all_tenant_queries{module}`, so the sweeps of a module are visible.
     pub fn all_tenants(&self, reason: &'static str) -> AllTenants<'_> {
-        metrics::counter!("kernel_all_tenant_queries", "module" => self.module).increment(1);
-        tracing::debug!(module = self.module, reason, "query across every tenant");
-        AllTenants { database: &self.database }
+        AllTenants::counted(&self.database, self.module, reason)
     }
 }
 
@@ -318,6 +316,13 @@ pub struct AllTenants<'a> {
 }
 
 impl<'a> AllTenants<'a> {
+    // Mọi đường mở handle quét mọi khách đi qua đây: đếm theo module (số đo) và ghi lý do (log debug).
+    pub(crate) fn counted(database: &'a Database, module: &str, reason: &'static str) -> Self {
+        metrics::counter!("kernel_all_tenant_queries", "module" => module.to_owned()).increment(1);
+        tracing::debug!(module, reason, "query across every tenant");
+        AllTenants { database }
+    }
+
     /// Reads across every tenant.
     pub fn read(&self) -> AllTenantsRead<'a> {
         Read { connection: self.database.read(), access: EveryTenant }

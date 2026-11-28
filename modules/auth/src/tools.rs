@@ -296,8 +296,9 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         .requires(ROLES_MANAGE),
         Tool::new(
             "replace_role",
-            "Replace the name, description and permissions of a role. You cannot add, widen or \
-             unban a permission you do not have as widely (`auth.permission_beyond_you`), nor turn \
+            "Replace the name, description and permissions of a role. You cannot add, widen, \
+             unban, remove, narrow or ban a permission you do not have as widely \
+             (`auth.permission_beyond_you`), nor turn \
              off `requires_mfa` of a role you could not give (`auth.role_beyond_you`). The built-in \
              `admin` role only changes `requires_mfa`.",
             move |tenant: TenantContext, principal: Principal, input: ReplaceRoleInput| {

@@ -252,7 +252,8 @@ pub struct InvoiceAdvice {
     pub einvoice_required: bool,
     /// The invoice kind the law sets, or `None` when the seller chooses: `cash_register_invoice` for a sale at the
     /// counter when cash register invoices are required; `sales_invoice` for a seller outside the VAT credit
-    /// method (a VAT invoice would be wrong).
+    /// method (`vat_direct`, `household`, `exempt`: a VAT invoice would be wrong). A kind the seller set
+    /// explicitly (`orders.invoice_kind`) still wins in `orders`, with a warning in the log.
     pub kind: Option<String>,
     /// Legal basis of the rules that applied.
     pub legal_basis: Vec<String>,

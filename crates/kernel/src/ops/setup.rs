@@ -140,6 +140,8 @@ pub(crate) struct SetupState {
     pub entitlements: EntitlementsHandle,
     pub translations: Translations,
     pub settings: Option<Arc<dyn TenantSettings>>,
+    /// Time limit of one source (`AUTOXIDE_SOURCE_TIMEOUT_MS`).
+    pub timeout: std::time::Duration,
 }
 
 /// Get the setup checklist.
@@ -183,9 +185,11 @@ async fn get_setup(
             wanted.push(step);
         }
     }
-    let answers = futures_util::future::join_all(wanted.iter().map(|step| async {
-        tokio::time::timeout(crate::ops::work::SOURCE_TIMEOUT, step.done(&tenant)).await
-    }))
+    let answers = futures_util::future::join_all(
+        wanted
+            .iter()
+            .map(|step| async { tokio::time::timeout(state.timeout, step.done(&tenant)).await }),
+    )
     .await;
     let mut steps = Vec::new();
     let mut incomplete = Vec::new();
