@@ -448,7 +448,7 @@ async fn create_scim_group_mapping(
     let body = CreatedScimGroupMappingResponse {
         mapping: row.into(),
         granted_user_ids: report.synced,
-        waiting_user_ids: report.waiting,
+        waiting_user_ids: report.waiting.into_iter().map(|(user_id, _)| user_id).collect(),
         failed,
     };
     Ok(Created::new(location, body))

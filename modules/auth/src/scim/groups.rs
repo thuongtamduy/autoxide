@@ -265,7 +265,8 @@ impl ScimService {
         let input = parse_group(&patch::lowercase_keys(body.clone()))?;
         let named = input.members.clone();
         let tenant = &caller.tenant;
-        let transaction = tenant.database().begin_write().await?;
+        let database = tenant.database();
+        let transaction = database.begin_write().await?;
         let saved = self.save_group(&transaction, caller, None, &input).await;
         let (row, changed) = match saved {
             Ok(saved) => saved,
@@ -276,7 +277,7 @@ impl ScimService {
         };
         transaction.commit().await?;
         self.sync_group_members(caller, row.id, changed, &named).await?;
-        let members = members_of(tenant.database().write(), tenant, &[row.id]).await?;
+        let members = members_of(database.write(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
 
@@ -313,7 +314,8 @@ impl ScimService {
     ) -> Result<Value, ScimError> {
         let tenant = &caller.tenant;
         let group_id = Uuid::try_parse(id).map_err(|_| group_not_found(id))?;
-        let transaction = tenant.database().begin_write().await?;
+        let database = tenant.database();
+        let transaction = database.begin_write().await?;
         let result = async {
             // Khoá dòng nhóm: hai PATCH thành viên cùng lúc nối đuôi nhau (D-181).
             let row = autoxide_kernel::rows::lock_one(
@@ -338,7 +340,7 @@ impl ScimService {
         };
         transaction.commit().await?;
         self.sync_group_members(caller, row.id, changed, &named).await?;
-        let members = members_of(tenant.database().write(), tenant, &[row.id]).await?;
+        let members = members_of(database.write(), tenant, &[row.id]).await?;
         Ok(render(&row, Some(members.get(&row.id).map(Vec::as_slice).unwrap_or_default())))
     }
 
@@ -570,6 +572,82 @@ impl ScimService {
         let (given, taken) = if give { (pairs, Vec::new()) } else { (Vec::new(), pairs) };
         crate::role::require_grantable(transaction, tenant, &authority, &given, &taken).await?;
         Ok(())
+    }
+}
+
+impl ScimService {
+    /// Duyệt thành viên `user_id` của nhóm `group_id`: `principal` thành người chịu trách nhiệm cho thành viên đó
+    /// (`added_by`), nên phải cấp được MỌI luật của nhóm (403 `auth.role_beyond_you`), rồi đồng bộ người đó. Gọi lại
+    /// được (duyệt lại chỉ ghi lại người duyệt và đồng bộ lại).
+    pub(crate) async fn approve_member(
+        &self,
+        tenant: &TenantContext,
+        principal: &autoxide_kernel::access::Principal,
+        group_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<super::group_sync::SyncReport, autoxide_kernel::error::Error> {
+        let transaction = tenant.database().begin_write().await?;
+        // Khoá dòng nhóm như khi ghi thành viên hay luật: mọi lần đổi của một nhóm nối đuôi nhau.
+        let found = autoxide_kernel::rows::lock_one(
+            &transaction,
+            group::Entity::find_by_id((tenant.id().as_uuid(), group_id)),
+        )
+        .await?;
+        if found.is_none() {
+            transaction.rollback().await?;
+            return Err(super::mappings::group_not_found(group_id));
+        }
+        let Some(row) = member::Entity::find()
+            .filter(member::Column::GroupId.eq(group_id))
+            .filter(member::Column::UserId.eq(user_id))
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+        else {
+            transaction.rollback().await?;
+            return Err(super::owners::member_not_found(group_id, user_id));
+        };
+        let pairs: Vec<(Uuid, Uuid)> = mapping::Entity::find()
+            .filter(mapping::Column::GroupId.eq(group_id))
+            .scoped(tenant)
+            .all(&transaction)
+            .await?
+            .into_iter()
+            .map(|rule| (rule.org_id, rule.role_id))
+            .collect();
+        if let Err(error) =
+            crate::role::require_grantable(&transaction, tenant, principal, &pairs, &[]).await
+        {
+            transaction.rollback().await?;
+            return Err(error);
+        }
+        member::Entity::update_many()
+            .col_expr(member::Column::AddedBy, Expr::value(Some(principal.user_id())))
+            .filter(member::Column::Id.eq(row.id))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
+        let event = events::ScimGroupUpdated {
+            before: Some(json!({"member": user_id, "added_by": row.added_by})),
+            after: Some(
+                json!({"member": user_id, "added_by": principal.user_id(), "approved": true}),
+            ),
+        };
+        self.outbox
+            .record(
+                &transaction,
+                tenant,
+                autoxide_kernel::event::Actor::from(principal),
+                group_subject(group_id),
+                &event,
+            )
+            .await?;
+        transaction.commit().await?;
+        tracing::info!(%group_id, %user_id, "SCIM group member approved");
+        let users = BTreeSet::from([user_id]);
+        Ok(self
+            .sync_in(tenant, autoxide_kernel::event::Actor::from(principal), principal, &users)
+            .await)
     }
 }
 

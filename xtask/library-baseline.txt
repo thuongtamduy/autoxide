@@ -80,7 +80,7 @@ raw-database 7 modules/auth/src/role/service/principal.rs
 raw-database 2 modules/auth/src/role/service/scim_grants.rs
 raw-database 3 modules/auth/src/sandbox.rs
 raw-database 2 modules/auth/src/scim/group_sync.rs
-raw-database 8 modules/auth/src/scim/groups.rs
+raw-database 7 modules/auth/src/scim/groups.rs
 raw-database 8 modules/auth/src/scim/mappings.rs
 raw-database 1 modules/auth/src/scim/mod.rs
 raw-database 5 modules/auth/src/scim/token.rs

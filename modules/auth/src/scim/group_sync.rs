@@ -53,8 +53,7 @@ impl ScimService {
         named: &BTreeSet<Uuid>,
     ) -> Result<(), ScimError> {
         let authority = self.authority(caller).await?;
-        let mut owners = Owners::new(self, &caller.tenant);
-        let pending = pending_members(&mut owners, &caller.tenant, group_id, &authority).await?;
+        let pending = pending_members(self, &caller.tenant, group_id, &authority).await?;
         let (first, rest): (Vec<Uuid>, Vec<Uuid>) =
             pending.into_iter().partition(|user_id| named.contains(user_id));
         let pending: BTreeSet<Uuid> = first.into_iter().chain(rest).take(PENDING_MAX).collect();
@@ -103,7 +102,9 @@ impl ScimService {
         users: &BTreeSet<Uuid>,
     ) -> SyncReport {
         let mut report = SyncReport::default();
-        let mut owners = Owners::new(self, tenant);
+        // Một handle database cho cả lần đồng bộ (đọc qua kết nối ghi: ngay sau commit, replica có thể trễ).
+        let database = tenant.database();
+        let mut owners = Owners::new(self, tenant, database);
         for user_id in users {
             let owners = &mut owners;
             let synced = async {
@@ -111,11 +112,17 @@ impl ScimService {
                 let (id, give, waiting) = (*user_id, &wanted.give, &wanted.waiting);
                 self.guard_link_raise(owners, tenant, actor, authority, id, give).await?;
                 self.roles
-                    .sync_scim_grants(tenant, actor, authority, id, wanted.give, waiting)
-                    .await
+                    .sync_scim_grants(tenant, actor, authority, id, wanted.give.clone(), waiting)
+                    .await?;
+                Ok::<_, autoxide_kernel::error::Error>(wanted.waiting)
             };
             match synced.await {
-                Ok(_) => report.synced.push(*user_id),
+                Ok(waiting) => {
+                    report.synced.push(*user_id);
+                    if !waiting.is_empty() {
+                        report.waiting.push((*user_id, waiting));
+                    }
+                }
                 Err(error) => {
                     // `error` đầy đủ chỉ vào log (kể cả lỗi nội bộ); ra ngoài chỉ có mã và câu chung.
                     tracing::warn!(user_id = %user_id, code = error.code(), %error, "SCIM membership sync failed for a user");
@@ -131,9 +138,9 @@ impl ScimService {
 #[derive(Debug, Default)]
 pub(crate) struct SyncReport {
     pub synced: Vec<Uuid>,
-    /// Thành viên chờ duyệt: người đưa họ vào nhóm không cấp được role của luật (D-20261128-scim-owners). Chỉ
-    /// `create_mapping` điền.
-    pub waiting: Vec<Uuid>,
+    /// Người còn chờ duyệt (đồng bộ xong) và các (nút, role) họ chờ: người đưa họ vào nhóm không cấp được
+    /// (D-20261128-scim-owners).
+    pub waiting: Vec<(Uuid, BTreeSet<(Uuid, Uuid)>)>,
     pub failed: Vec<(Uuid, autoxide_kernel::error::Error)>,
 }
 
@@ -144,13 +151,15 @@ pub(crate) struct SyncReport {
 /// [`PENDING_MAX`] chỗ, người sau không bao giờ được đồng bộ. Mỗi luật một câu; đọc qua kết nối ghi
 /// (ngay sau commit, read replica có thể trễ).
 async fn pending_members(
-    owners: &mut Owners<'_>,
+    service: &ScimService,
     tenant: &TenantContext,
     group_id: Uuid,
     authority: &Principal,
 ) -> Result<BTreeSet<Uuid>, ScimError> {
     use crate::role::entity::user_role;
-    let connection = tenant.database().write();
+    let database = tenant.database();
+    let connection = database.write();
+    let mut owners = Owners::new(service, tenant, database);
     let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
     let rules = mapping::Entity::find()
         .filter(mapping::Column::GroupId.eq(group_id))

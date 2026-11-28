@@ -13,20 +13,16 @@
 use std::collections::{BTreeSet, HashMap};
 
 use autoxide_kernel::access::Principal;
+use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
-use serde_json::json;
 use uuid::Uuid;
 
 use super::ScimService;
-use super::entity::{group, mapping, member, scim_user};
-use super::group_sync::SyncReport;
-use super::groups::group_subject;
-use super::mappings::group_not_found;
-use crate::events;
+use super::entity::{mapping, member, scim_user};
 
 /// (Nút, role).
 pub(super) type Pair = (Uuid, Uuid);
@@ -36,13 +32,19 @@ pub(super) type Pair = (Uuid, Uuid);
 pub(super) struct Owners<'a> {
     service: &'a ScimService,
     tenant: &'a TenantContext,
+    /// Database của khách, bên gọi đưa vào (một handle cho cả lần đồng bộ).
+    database: &'a Database,
     principals: HashMap<Option<Uuid>, Principal>,
     answers: HashMap<(Option<Uuid>, Pair), bool>,
 }
 
 impl<'a> Owners<'a> {
-    pub(super) fn new(service: &'a ScimService, tenant: &'a TenantContext) -> Self {
-        Owners { service, tenant, principals: HashMap::new(), answers: HashMap::new() }
+    pub(super) fn new(
+        service: &'a ScimService,
+        tenant: &'a TenantContext,
+        database: &'a Database,
+    ) -> Self {
+        Owners { service, tenant, database, principals: HashMap::new(), answers: HashMap::new() }
     }
 
     /// `owner` (người chịu trách nhiệm, tính quyền lúc này như token SCIM — `authority_of`) cấp được `pair` không.
@@ -62,7 +64,7 @@ impl<'a> Owners<'a> {
             }
         };
         // Kết nối GHI: chạy ngay sau commit nhóm / luật (read replica có thể trễ).
-        let connection = self.tenant.database().write();
+        let connection = self.database.write();
         let answer = crate::role::grantable(connection, self.tenant, principal, pair, true).await?;
         self.answers.insert((owner, pair), answer);
         Ok(answer)
@@ -86,7 +88,7 @@ impl ScimService {
         tenant: &TenantContext,
         user_id: Uuid,
     ) -> Result<Wanted, Error> {
-        let connection = tenant.database().write();
+        let connection = owners.database.write();
         let rows = member::Entity::find()
             .filter(member::Column::UserId.eq(user_id))
             .scoped(tenant)
@@ -131,7 +133,8 @@ impl ScimService {
         give: &BTreeSet<Pair>,
     ) -> Result<(), Error> {
         use crate::role::entity::user_role;
-        let connection = tenant.database().write();
+        let database = owners.database;
+        let connection = database.write();
         let Some(link) =
             scim_user::Entity::find_by_id((tenant.id().as_uuid(), user_id)).one(connection).await?
         else {
@@ -162,7 +165,7 @@ impl ScimService {
         if !raises {
             return Ok(());
         }
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = database.begin_write().await?;
         self.users.lock_out_in(tenant, &transaction, actor, user_id).await?;
         scim_user::Entity::update_many()
             .col_expr(scim_user::Column::CreatedBy, Expr::value(Some(authority.user_id())))
@@ -176,72 +179,6 @@ impl ScimService {
             "SCIM sync raised an account above its link creator: sign-in credentials revoked"
         );
         Ok(())
-    }
-
-    /// Duyệt thành viên `user_id` của nhóm `group_id`: `principal` thành người chịu trách nhiệm cho thành viên đó
-    /// (`added_by`), nên phải cấp được MỌI luật của nhóm (403 `auth.role_beyond_you`), rồi đồng bộ người đó. Gọi lại
-    /// được (duyệt lại chỉ ghi lại người duyệt và đồng bộ lại).
-    pub(crate) async fn approve_member(
-        &self,
-        tenant: &TenantContext,
-        principal: &Principal,
-        group_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<SyncReport, Error> {
-        let transaction = tenant.database().begin_write().await?;
-        // Khoá dòng nhóm như khi ghi thành viên hay luật: mọi lần đổi của một nhóm nối đuôi nhau.
-        let found = autoxide_kernel::rows::lock_one(
-            &transaction,
-            group::Entity::find_by_id((tenant.id().as_uuid(), group_id)),
-        )
-        .await?;
-        if found.is_none() {
-            transaction.rollback().await?;
-            return Err(group_not_found(group_id));
-        }
-        let Some(row) = member::Entity::find()
-            .filter(member::Column::GroupId.eq(group_id))
-            .filter(member::Column::UserId.eq(user_id))
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-        else {
-            transaction.rollback().await?;
-            return Err(member_not_found(group_id, user_id));
-        };
-        let pairs: Vec<Pair> = mapping::Entity::find()
-            .filter(mapping::Column::GroupId.eq(group_id))
-            .scoped(tenant)
-            .all(&transaction)
-            .await?
-            .into_iter()
-            .map(|rule| (rule.org_id, rule.role_id))
-            .collect();
-        if let Err(error) =
-            crate::role::require_grantable(&transaction, tenant, principal, &pairs, &[]).await
-        {
-            transaction.rollback().await?;
-            return Err(error);
-        }
-        member::Entity::update_many()
-            .col_expr(member::Column::AddedBy, Expr::value(Some(principal.user_id())))
-            .filter(member::Column::Id.eq(row.id))
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
-        let event = events::ScimGroupUpdated {
-            before: Some(json!({"member": user_id, "added_by": row.added_by})),
-            after: Some(
-                json!({"member": user_id, "added_by": principal.user_id(), "approved": true}),
-            ),
-        };
-        self.outbox
-            .record(&transaction, tenant, Actor::from(principal), group_subject(group_id), &event)
-            .await?;
-        transaction.commit().await?;
-        tracing::info!(%group_id, %user_id, "SCIM group member approved");
-        let users = BTreeSet::from([user_id]);
-        Ok(self.sync_in(tenant, Actor::from(principal), principal, &users).await)
     }
 }
 
