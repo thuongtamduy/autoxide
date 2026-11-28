@@ -131,7 +131,7 @@ impl MigrationLock {
         if held {
             Ok(())
         } else {
-            Err(MigrationError(
+            Err(MigrationError::new(
                 "the migration lock was lost (the database connection dropped); stop and run again"
                     .to_owned(),
             ))
@@ -150,7 +150,7 @@ impl MigrationLock {
                 drop(connection);
                 let closed = pool.close().await.map_err(|error| error.to_string());
                 unlocked.map_err(|error| error.to_string()).and(closed).map_err(|error| {
-                    MigrationError(format!("cannot release the migration lock: {error}"))
+                    MigrationError::new(format!("cannot release the migration lock: {error}"))
                 })
             }
             Held::File(file) => {
@@ -170,7 +170,7 @@ fn lock_path(database: PathBuf, suffix: &str) -> PathBuf {
 }
 
 fn timed_out(wait: Duration) -> MigrationError {
-    MigrationError(format!(
+    MigrationError::new(format!(
         "another process has been applying migrations for more than {} seconds; wait for it to \
          finish (or stop it) and start again",
         wait.as_secs()
@@ -184,9 +184,9 @@ async fn acquire_postgres(
 ) -> Result<Held, MigrationError> {
     let pool = crate::database::dedicated_connection(config)
         .await
-        .map_err(|error| MigrationError(format!("cannot take the migration lock: {error}")))?;
+        .map_err(|error| MigrationError::new(format!("cannot take the migration lock: {error}")))?;
     let failed = |error: sea_orm::sqlx::Error| {
-        MigrationError(format!("cannot take the migration lock: database: {error}"))
+        MigrationError::new(format!("cannot take the migration lock: database: {error}"))
     };
     let mut connection = pool.get_postgres_connection_pool().acquire().await.map_err(failed)?;
     let started = Instant::now();
@@ -206,7 +206,7 @@ async fn acquire_postgres(
 
 async fn acquire_file(path: PathBuf, wait: Duration) -> Result<Held, MigrationError> {
     let cannot = |error: std::io::Error| {
-        MigrationError(format!("cannot take the migration lock `{}`: {error}", path.display()))
+        MigrationError::new(format!("cannot take the migration lock `{}`: {error}", path.display()))
     };
     if let Some(directory) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         // Gọi hệ thống file kiểu đồng bộ: chỉ một lần lúc khởi động, như `Database::connect`.

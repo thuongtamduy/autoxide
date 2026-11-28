@@ -256,7 +256,11 @@ impl ModuleCatalog {
             })?;
         let mut info = entry.info.clone();
         if let Some(migrator) = &entry.migrator {
-            let states = migrator.status(database).await.map_err(Error::internal)?;
+            let states =
+                migrator.status(database).await.map_err(|error| match error.database_newer() {
+                    Some(newer) => newer.error(),
+                    None => Error::internal(error),
+                })?;
             info.migrations = states
                 .into_iter()
                 .map(|state| ModuleMigration { name: state.name, applied: Some(state.applied) })

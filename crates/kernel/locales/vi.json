@@ -234,6 +234,7 @@
   "kernel.job_file_not_found": "Job `{id}` không có file để tải.",
   "kernel.job_not_failed": "Job `{id}` chưa hỏng; chỉ job đã hỏng mới chạy lại được.",
   "kernel.job_not_found": "Không có job `{id}`.",
+  "kernel.database_newer": "Database đã được một bản Autoxide mới hơn chương trình này ({version}) migrate: module `{module}` có {count} migration chương trình không biết (đầu tiên: {first}); chạy bản mới hơn, hoặc dùng chính bản mới hơn đó để lùi lại (`autoxide rollback --to {version}`, hay khôi phục bản backup làm trước khi nâng cấp) rồi mới dùng bản này.",
   "kernel.migrations_pending": "Database còn {count} migration chưa áp dụng (đầu tiên: {first}); chạy `autoxide migrate up` trước, hoặc `autoxide migrate status` để xem danh sách.",
   "kernel.migration_run_busy": "Đang có một lượt chạy migration (`{run}`); hãy chờ lượt đó xong.",
   "kernel.migration_run_not_found": "Không có lượt chạy migration `{run}`.",

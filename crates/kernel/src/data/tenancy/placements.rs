@@ -716,5 +716,9 @@ pub(crate) async fn release(lock: MigrationLock) {
 }
 
 fn migration_error(error: crate::migration::MigrationError) -> Error {
-    Error::internal(format!("main: {error}"))
+    // Database mới hơn binary: 409 `kernel.database_newer` kèm cách sửa, không phải lỗi nội bộ.
+    match error.database_newer() {
+        Some(newer) => newer.error(),
+        None => Error::internal(format!("main: {error}")),
+    }
 }
