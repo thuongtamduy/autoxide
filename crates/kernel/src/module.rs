@@ -25,8 +25,7 @@
 
 pub use crate::ops::client_config::{ClientSection, TenantClientSection};
 use jiff::SignedDuration;
-use std::any::{Any, TypeId};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::migration::MigrationTrait;
@@ -41,6 +40,7 @@ use crate::i18n::Translations;
 use crate::job::{JobQueue, JobRegistration, Schedule};
 use crate::privacy::{PersonalData, PersonalDataExport};
 
+mod apis;
 mod dormant;
 mod later;
 mod manifest;
@@ -50,6 +50,7 @@ mod started;
 
 mod selection;
 
+use apis::Apis;
 pub use dormant::DormantContext;
 pub(crate) use dormant::installed;
 pub use later::Later;
@@ -100,19 +101,24 @@ pub trait Module: Send + Sync {
 
     /// The module name: lowercase letters, digits and `_`, starting with a letter. It is also the prefix of
     /// every table (`<name>_…`) and every configuration variable (`AUTOXIDE_<NAME>_…`) of the module.
-    /// Old way of [`Manifest::new`]; by default the manifest's name.
+    ///
+    /// Old way: use [`Manifest::new(name, description)`](Manifest::new) instead.
     fn name(&self) -> &'static str {
         self.manifest().name
     }
 
     /// The module's migrations, in the order they are applied. Once committed they are never edited - add a
     /// new migration at the end.
+    ///
+    /// Old way: use [`Manifest::migrations`](Manifest::migrations) instead.
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         self.manifest().migrations.map(|build| build()).unwrap_or_default()
     }
 
     /// A module's data upgrades (D-257): data upgrades that need the program's configuration (e.g.
     /// re-encrypting old secrets). Empty by default. See `autoxide_kernel::migration::DataUpgrade`.
+    ///
+    /// Old way: use [`Manifest::upgrades`](Manifest::upgrades) instead.
     fn upgrades(&self) -> Vec<Box<dyn crate::migration::DataUpgrade>> {
         self.manifest().upgrades.map(|build| build()).unwrap_or_default()
     }
@@ -122,6 +128,8 @@ pub trait Module: Send + Sync {
     /// one falls back to the shared configuration. Connections to partners (SMTP server, payment
     /// gateway...) declare `.group(CONNECTION_GROUP)` and are named `<module>.connection.<kind>.<field>`;
     /// when renaming a setting, declare the old name with `.formerly(…)`. Empty by default.
+    ///
+    /// Old way: use [`Manifest::tenant_settings`](Manifest::tenant_settings) instead.
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
         self.manifest().tenant_settings
     }
@@ -129,6 +137,8 @@ pub trait Module: Send + Sync {
     /// The module's settings inherited down the organization tree (step 34): named `<module>.<name>`, with
     /// defaults and a validator. The `organizations` module stores and serves the value per node; a node
     /// that sets none uses the value of the nearest ancestor. Empty by default.
+    ///
+    /// Old way: use [`Manifest::org_settings`](Manifest::org_settings) instead.
     fn org_settings(&self) -> Vec<crate::tenancy::OrgSetting> {
         self.manifest().org_settings
     }
@@ -136,6 +146,8 @@ pub trait Module: Send + Sync {
     /// Seeds the module's initial data for a new tenant (e.g. the `admin` role, lock rows) - called after
     /// `start`, when a tenant is created (`autoxide tenant create`, `POST /api/v1/kernel/tenants`). Must be
     /// re-runnable. Seeds nothing by default.
+    ///
+    /// Old way: use [`StartContext::seed_tenant`](StartContext::seed_tenant) instead.
     fn seed_tenant(&self) -> Option<std::sync::Arc<dyn crate::tenancy::TenantSeed>> {
         None
     }
@@ -143,6 +155,8 @@ pub trait Module: Send + Sync {
     /// The module's sample data for new tenants provisioned under a plan with `sample_data` (step 35): a
     /// few records so the tenant can see how the module is used. Runs only for modules the plan enables.
     /// Must be re-runnable and must not create duplicates. None by default.
+    ///
+    /// Old way: use [`StartContext::sample_data`](StartContext::sample_data) instead.
     fn sample_data(&self) -> Option<std::sync::Arc<dyn crate::tenancy::TenantSeed>> {
         None
     }
@@ -150,6 +164,8 @@ pub trait Module: Send + Sync {
     /// The module's tenant-level tables that must be KEPT when a tenant is permanently deleted (D-337):
     /// vouchers, accounting books, invoices kept for at least 10 years (Accounting Law 88/2015, Article 41;
     /// D-190). Empty by default: the module's data is deleted along with the tenant.
+    ///
+    /// Old way: use [`Manifest::retained_tables`](Manifest::retained_tables) instead.
     fn retained_tables(&self) -> Vec<&'static str> {
         self.manifest().retained_tables
     }
@@ -158,6 +174,8 @@ pub trait Module: Send + Sync {
     /// Called after `configure` (retention periods are read from the module's configuration); the kernel
     /// collects them into a [`RetentionCatalog`](crate::privacy::RetentionCatalog), which `compliance`
     /// publishes in the processing activity register. Empty by default.
+    ///
+    /// Old way: use [`Manifest::retention`](Manifest::retention) instead.
     fn retention(&self) -> Vec<crate::privacy::RetentionPolicy> {
         self.manifest().retention
     }
@@ -169,6 +187,8 @@ pub trait Module: Send + Sync {
     /// Every other table of the module (except `<m>_migrations`) is a tenant-level table and must have
     /// `tenant_id` - the testkit and `cargo xtask check` verify this. Empty by default: business modules
     /// have almost no tables of this kind.
+    ///
+    /// Old way: use [`Manifest::control_plane_tables`](Manifest::control_plane_tables) instead.
     fn control_plane_tables(&self) -> Vec<&'static str> {
         self.manifest().control_plane_tables
     }
@@ -176,12 +196,16 @@ pub trait Module: Send + Sync {
     /// The module's plan-based on / off features (`<module>.<name>`, step 35). The module asks with
     /// [`EntitlementsHandle::require_feature`](crate::entitlement::EntitlementsHandle) before work that
     /// needs the feature. Empty by default.
+    ///
+    /// Old way: use [`Manifest::features`](Manifest::features) instead.
     fn features(&self) -> Vec<crate::entitlement::Feature> {
         self.manifest().features
     }
 
     /// The module's plan-based quotas (`<module>.<name>`, step 35): the module reserves / releases through
     /// [`EntitlementsHandle`](crate::entitlement::EntitlementsHandle). Empty by default.
+    ///
+    /// Old way: use [`Manifest::limits`](Manifest::limits) instead.
     fn limits(&self) -> Vec<crate::entitlement::Limit> {
         self.manifest().limits
     }
@@ -189,6 +213,8 @@ pub trait Module: Send + Sync {
     /// A foundation module that a plan never blocks (login, files, audit...). Default `false`: the module
     /// is governed by plans - if not yet enabled for a tenant, its routes, MCP tools, jobs and events are
     /// blocked.
+    ///
+    /// Old way: use [`Manifest::always_enabled`](Manifest::always_enabled) instead.
     fn always_enabled(&self) -> bool {
         self.manifest().always_enabled
     }
@@ -196,6 +222,8 @@ pub trait Module: Send + Sync {
     /// The module's tier (step 70 P3): `Official` (default) runs when the installer chooses nothing;
     /// `Experimental` - API and tables may still change - runs only when explicitly enabled in
     /// `AUTOXIDE_MODULES`. An official module may depend only on official modules.
+    ///
+    /// Old way: use [`Manifest::stability`](Manifest::stability) instead.
     fn stability(&self) -> Stability {
         self.manifest().stability
     }
@@ -204,6 +232,8 @@ pub trait Module: Send + Sync {
     /// `AUTOXIDE_MODULES` is rejected. So are the modules it [`depends_on`](Self::depends_on). Default
     /// `false`. Different from [`always_enabled`](Self::always_enabled) - that one is about each tenant's
     /// PLAN, this one is about the whole installation.
+    ///
+    /// Old way: use [`Manifest::essential`](Manifest::essential) instead.
     fn essential(&self) -> bool {
         self.manifest().essential
     }
@@ -211,6 +241,8 @@ pub trait Module: Send + Sync {
     /// The records (`#[derive(Record)]`) of the module, as `RecordInfo::of::<Note>()`: at startup the kernel
     /// checks each against the live schema (table, columns, `tenant_id` for a tenant record) and refuses to
     /// start on a mismatch.
+    ///
+    /// Old way: use [`Manifest::records`](Manifest::records) instead.
     fn records(&self) -> Vec<crate::db::RecordInfo> {
         self.manifest().records
     }
@@ -219,6 +251,8 @@ pub trait Module: Send + Sync {
     /// another module (and every event of another module that it listens to) is a name here. Enabling this
     /// module enables those modules with it. Things used "if present" (`.require::<…>().ok()`) are NOT
     /// declared here. Empty by default.
+    ///
+    /// Old way: use [`Manifest::depends_on`](Manifest::depends_on) instead.
     fn depends_on(&self) -> Vec<&'static str> {
         self.manifest().depends_on
     }
@@ -246,6 +280,8 @@ pub trait Module: Send + Sync {
     /// The module's permissions. Names are written `<module name>.<action>`; the core checks them at
     /// startup. A released permission is a contract: renaming it makes roles that hold the old permission
     /// lose access.
+    ///
+    /// Old way: use [`Manifest::permissions`](Manifest::permissions) instead.
     fn permissions(&self) -> Vec<Permission> {
         self.manifest().permissions
     }
@@ -253,6 +289,8 @@ pub trait Module: Send + Sync {
     /// The events the module emits. With events the module must have a `<name>_events` table (add
     /// `autoxide_kernel::event::outbox_migration` to its migrations) and record events with
     /// [`StartContext::outbox`].
+    ///
+    /// Old way: use [`Manifest::events`](Manifest::events) instead.
     fn events(&self) -> Vec<EventInfo> {
         self.manifest().events
     }
@@ -262,11 +300,15 @@ pub trait Module: Send + Sync {
     /// can close / hide its own part without knowing the owning module. The event must be in the module's
     /// own [`events`](Self::events), the kind must be `<module name>.<kind>`, and the event's subject is
     /// `<kind>:<id>`. The kernel checks this at startup.
+    ///
+    /// Old way: use [`Manifest::resource_events`](Manifest::resource_events) instead.
     fn resource_events(&self) -> Vec<crate::resource::ResourceEvent> {
         self.manifest().resource_events
     }
 
     /// The events the module wants to receive (of every module, including itself). Called after `start`.
+    ///
+    /// Old way: use [`StartContext::subscribe`](StartContext::subscribe) (one call per subscription) instead.
     fn subscriptions(&self) -> Vec<Subscription> {
         Vec::new()
     }
@@ -284,24 +326,32 @@ pub trait Module: Send + Sync {
     /// Runners for the module's job kinds (`<name>.<action>`). With jobs the module must have a
     /// `<name>_jobs` table (add `autoxide_kernel::job::jobs_migration` to its migrations). Called after
     /// `start`.
+    ///
+    /// Old way: use [`StartContext::job`](StartContext::job) (one call each) instead.
     fn jobs(&self) -> Vec<JobRegistration> {
         Vec::new()
     }
 
     /// The module's periodic schedules: each schedule puts a job (of a kind the module itself runs) on the
     /// queue after every interval. Called after `start`.
+    ///
+    /// Old way: use [`Manifest::schedules`](Manifest::schedules) instead.
     fn schedules(&self) -> Vec<Schedule> {
         self.manifest().schedules
     }
 
     /// The module's deprecated endpoints: the kernel marks them in OpenAPI and attaches the `Deprecation` /
     /// `Sunset` / `Link` headers to responses (D-059).
+    ///
+    /// Old way: use [`Manifest::deprecations`](Manifest::deprecations) instead.
     fn deprecations(&self) -> Vec<crate::http::Deprecation> {
         self.manifest().deprecations
     }
 
     /// The module's MCP tools (D-068). Called after `start` (tools usually call into the service built
     /// then). Names are declared short (`create_note`); the kernel adds the `<module>.` prefix.
+    ///
+    /// Old way: use [`StartContext::tools`](StartContext::tools) instead.
     fn tools(&self) -> Vec<crate::mcp::Tool> {
         Vec::new()
     }
@@ -309,18 +359,24 @@ pub trait Module: Send + Sync {
     /// The module's MCP resources (step 40 P2): read-only documents for agents - guides, the JSON Schema of
     /// a record kind. Called after `start`. The path is declared short (`guide`); the kernel assembles the
     /// URI `autoxide://<module>/<path>`. Default: none.
+    ///
+    /// Old way: use [`StartContext::mcp_resource`](StartContext::mcp_resource) (one call each) instead.
     fn mcp_resources(&self) -> Vec<crate::mcp::McpResource> {
         Vec::new()
     }
 
     /// The module's MCP prompts (step 40 P2): prompt templates for common tasks. Called after `start`.
     /// Names are declared short (`draft_post`); the kernel adds the `<module>.` prefix. Default: none.
+    ///
+    /// Old way: use [`StartContext::prompt`](StartContext::prompt) (one call each) instead.
     fn prompts(&self) -> Vec<crate::mcp::Prompt> {
         Vec::new()
     }
 
     /// One English sentence saying what the module does, for `/llms.txt` and the module registry (step 40
     /// P2). Default: empty.
+    ///
+    /// Old way: use [`Manifest::new(name, description)`](Manifest::new) instead.
     fn description(&self) -> &'static str {
         self.manifest().description
     }
@@ -329,6 +385,8 @@ pub trait Module: Send + Sync {
     /// server responds, whether initial data is missing... Called after `start`. Names are declared short
     /// (`storage`); the kernel adds the `<module>.` prefix. A check is read-only, or cleans up whatever it
     /// wrote as a probe.
+    ///
+    /// Old way: use [`StartContext::check`](StartContext::check) (one call each) instead.
     fn checks(&self) -> Vec<crate::doctor::Check> {
         Vec::new()
     }
@@ -336,6 +394,8 @@ pub trait Module: Send + Sync {
     /// The module's sub-area groups and menu items for the UI (step 51 P1). The kernel collects them at
     /// startup (duplicate groups must be declared identically) and filters by tenant, plan and permission
     /// at `GET /api/v1/kernel/navigation`. Default: none.
+    ///
+    /// Old way: use [`Manifest::navigation`](Manifest::navigation) instead.
     fn navigation(&self) -> navigation::Navigation {
         self.manifest().navigation
     }
@@ -343,6 +403,8 @@ pub trait Module: Send + Sync {
     /// The module's reason lists (step 51 P18, D-223): named `<module>.<action>`, with default codes and
     /// English labels. A tenant can rename labels, enable / disable them, and add its own codes via
     /// `/api/v1/kernel/reasons`. Default: none.
+    ///
+    /// Old way: use [`Manifest::reason_lists`](Manifest::reason_lists) instead.
     fn reason_lists(&self) -> Vec<crate::ops::reasons::ReasonList> {
         self.manifest().reason_lists
     }
@@ -351,6 +413,8 @@ pub trait Module: Send + Sync {
     /// `<module>.<…>`, with a default English sentence. Error codes and error messages can never be
     /// customized. A tenant customizes them via `/api/v1/kernel/texts`; modules read them with
     /// `TextOverrides::text`. Default: none.
+    ///
+    /// Old way: use [`Manifest::overridable_texts`](Manifest::overridable_texts) instead.
     fn overridable_texts(&self) -> Vec<crate::ops::texts::OverridableText> {
         self.manifest().overridable_texts
     }
@@ -358,6 +422,8 @@ pub trait Module: Send + Sync {
     /// The module's record kinds that accept custom fields (step 51 P19, D-235). The module stores the
     /// values on the record (the `custom_fields` column) and validates with `CustomFields::validate`.
     /// Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::custom_field_targets`](UnstableManifest::custom_field_targets) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn custom_field_targets(&self) -> Vec<crate::ops::custom_fields::CustomFieldTarget> {
         self.manifest().unstable.custom_field_targets
     }
@@ -365,12 +431,16 @@ pub trait Module: Send + Sync {
     /// The module's admin commands for `autoxide task` (D-169): work an operator runs by hand, e.g.
     /// rebuilding derived data after a configuration change. Called after `start`. Names are declared short
     /// (`refresh_variants`); the kernel adds the `<module>.` prefix.
+    ///
+    /// Old way: use [`StartContext::task`](StartContext::task) (one call each) instead.
     fn tasks(&self) -> Vec<crate::task::Task> {
         Vec::new()
     }
 
     /// Routes that need a request body larger than the shared limit (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`),
     /// e.g. file uploads. Called after `configure` (the limit may come from the module's configuration).
+    ///
+    /// Old way: use [`Manifest::body_limits`](Manifest::body_limits) instead.
     fn body_limits(&self) -> Vec<crate::http::BodyLimit> {
         self.manifest().body_limits
     }
@@ -378,6 +448,8 @@ pub trait Module: Send + Sync {
     /// The module's error message translations: `(language, JSON content)`, usually
     /// `vec![("vi", include_str!("../locales/vi.json"))]`. Every error `code` of the module must have a
     /// translation (`cargo xtask check` verifies this).
+    ///
+    /// Old way: use [`Manifest::translation`](Manifest::translation) (one call per language) instead.
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         self.manifest().translations
     }
@@ -385,6 +457,8 @@ pub trait Module: Send + Sync {
     /// Non-secret configuration values the UI needs (language, upload limits...), served at
     /// `GET /api/v1/kernel/client-config` under the module name (D-271). The endpoint needs no sign-in:
     /// only put values that anyone may see. Called once after the `start` of every module.
+    ///
+    /// Old way: use [`StartContext::client_config`](StartContext::client_config) instead.
     fn client_config(&self) -> Result<Option<ClientSection>, Error> {
         Ok(None)
     }
@@ -392,6 +466,8 @@ pub trait Module: Send + Sync {
     /// The module's REST routes, with their OpenAPI documentation. Called after `start`. The core mounts
     /// them under `/api/v1/<module name>`: the routes declared as `/` and `/{id}` of module `notes` become
     /// `/api/v1/notes` and `/api/v1/notes/{id}`.
+    ///
+    /// Old way: use [`StartContext::routes`](StartContext::routes) instead.
     fn routes(&self) -> OpenApiRouter {
         OpenApiRouter::new()
     }
@@ -399,6 +475,8 @@ pub trait Module: Send + Sync {
     /// The module's REST endpoints (functions with `#[endpoint]`, listed in [`routes!`](crate::routes)), mounted
     /// like [`routes`](Self::routes) under `/api/v1/<module name>`. Called after `start`. A module uses this or
     /// `routes`; the module manifest replaces both.
+    ///
+    /// Old way: use [`StartContext::routes`](StartContext::routes) instead.
     fn endpoints(&self) -> crate::http::Routes {
         crate::http::Routes::new()
     }
@@ -408,6 +486,8 @@ pub trait Module: Send + Sync {
     /// (`<module>.…`, declared in [`events`](Self::events)) produces. The `reporting` module listens to
     /// those events and pours the figures into the aggregated report store of the tenant tree. The kernel
     /// checks the declarations at startup. Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::facts`](UnstableManifest::facts) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn facts(&self) -> Vec<crate::report::FactSource> {
         self.manifest().unstable.facts
     }
@@ -418,6 +498,8 @@ pub trait Module: Send + Sync {
     /// itself ([`TablePolicy`](crate::tenancy::TablePolicy)); plus the tenant-encrypted secret columns.
     /// Default: inferred from columns (has `org_id` -> by node; a queue -> must be empty; otherwise ->
     /// stays, with a warning in the plan) - the binary's test blocks undeclared tables.
+    ///
+    /// Old way: use [`Manifest::relocation`](Manifest::relocation) instead.
     fn relocation(&self) -> crate::tenancy::Relocation {
         self.manifest().relocation
     }
@@ -425,18 +507,24 @@ pub trait Module: Send + Sync {
     /// The module's web analytics event kinds (step 57, D-220): the website sends kind `browser`, kind
     /// `server` is derived from the module's own events. The `analytics` module accepts only declared
     /// kinds. The kernel checks the declarations at startup. Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::analytics_events`](UnstableManifest::analytics_events) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn analytics_events(&self) -> Vec<crate::analytics::AnalyticsEvent> {
         self.manifest().unstable.analytics_events
     }
 
     /// Funnels the module declares (step 57), e.g. `orders.checkout`: the steps are declared event kinds
     /// (of any module). Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::funnels`](UnstableManifest::funnels) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn funnels(&self) -> Vec<crate::analytics::Funnel> {
         self.manifest().unstable.funnels
     }
 
     /// The module's built-in automation rule templates (step 58): id `<module>.<name>`, rule body in the
     /// format of the `automations` module. Called after `start`. Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::automation_templates`](UnstableManifest::automation_templates) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn automation_templates(&self) -> Vec<crate::automation::AutomationTemplate> {
         self.manifest().unstable.automation_templates
     }
@@ -444,12 +532,16 @@ pub trait Module: Send + Sync {
     /// Copies the module's configuration into a new sandbox (step 38, D-232): called by the
     /// `kernel.sandbox_copy` job in registration order. Configuration only, never personal data,
     /// transactions or secrets. Called after `start`. Default: copies nothing.
+    ///
+    /// Old way: use [`StartContext::sandbox_copy`](StartContext::sandbox_copy) instead.
     fn sandbox_copy(&self) -> Option<Arc<dyn crate::tenancy::sandbox::SandboxCopy>> {
         None
     }
 
     /// The module's record kinds that can be pushed from a sandbox to the real tenant as drafts (step 38,
     /// D-232): `kind` is `<module>.<kind>`. Called after `start`. Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::promotable`](UnstableManifest::promotable) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn promotable(&self) -> Vec<crate::tenancy::sandbox::Promotable> {
         self.manifest().unstable.promotable
     }
@@ -458,6 +550,8 @@ pub trait Module: Send + Sync {
     /// adds `sync::changes_migration` to its migrations, records changes with `StartContext::sync_log` in
     /// the write transaction, and serves `GET <path>/changes`. The kernel checks the declarations at
     /// startup. Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::sync_resources`](UnstableManifest::sync_resources) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn sync_resources(&self) -> Vec<crate::sync::SyncResource> {
         self.manifest().unstable.sync_resources
     }
@@ -465,6 +559,8 @@ pub trait Module: Send + Sync {
     /// Blocks the module provides to block-built pages (step 67, [`crate::blocks`]). A block that needs
     /// data attaches a [`BlockData`](crate::blocks::BlockData) at `start` with
     /// [`StartContext::block_data`]. Default: none.
+    ///
+    /// Old way: use [`UnstableManifest::blocks`](UnstableManifest::blocks) (inside [`Manifest::unstable`](Manifest::unstable)) instead.
     fn blocks(&self) -> Vec<crate::blocks::BlockType> {
         self.manifest().unstable.blocks
     }
@@ -933,137 +1029,6 @@ impl StartContext<'_> {
             self.tenancy.clone(),
             self.entitlements.clone(),
         )
-    }
-}
-
-/// A contributor entry: the contributing module and the `Arc<T>` stored as `dyn Any`.
-type Contribution = (&'static str, Box<dyn Any + Send + Sync>);
-
-/// The registry of published traits, looked up by the trait's type.
-#[derive(Default)]
-struct Apis {
-    // Khoá là "danh tính" của kiểu `T` (`TypeId`); giá trị là một `Arc<T>` cất dưới
-    // dạng `dyn Any` vì mỗi mục một kiểu khác nhau. Lấy ra thì ép kiểu ngược lại
-    // có kiểm tra (`downcast_ref`) — sai kiểu trả `None` chứ không hỏng bộ nhớ.
-    provided: HashMap<TypeId, (&'static str, Box<dyn Any + Send + Sync>)>,
-    /// `(module, providing module)` each time a module `require`s a trait of another module: the module
-    /// registry and `plans` learn which module needs which (step 35). A `Mutex` because `require` only
-    /// borrows `&self`.
-    required: std::sync::Mutex<BTreeSet<(&'static str, &'static str)>>,
-    /// Traits that many parties contribute to (`contribute`): by type, a list of `(module, Arc<T>)` in
-    /// contribution order.
-    contributed: HashMap<TypeId, Vec<Contribution>>,
-    /// The filling of [`Later`] handles, run once after every module has started.
-    pending: Vec<PendingFill>,
-}
-
-/// One filling of a [`Later`] handle: receives the complete trait registry.
-type PendingFill = Box<dyn FnOnce(&Apis) + Send + Sync>;
-
-impl Apis {
-    fn provide<T>(&mut self, module: &'static str, api: Arc<T>) -> Result<(), Error>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        let contract = std::any::type_name::<T>();
-        if let Some((owner, _)) = self.provided.get(&TypeId::of::<T>()) {
-            return Err(Error::internal(format!(
-                "module `{module}` provides `{contract}`, but module `{owner}` already does; \
-                 a contract has exactly one provider"
-            )));
-        }
-        self.provided.insert(TypeId::of::<T>(), (module, Box::new(api)));
-        Ok(())
-    }
-
-    fn later<T>(&mut self) -> Later<T>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        let later = Later::empty();
-        let slot = later.clone();
-        self.pending.push(Box::new(move |apis: &Apis| slot.fill(apis.get::<T>())));
-        later
-    }
-
-    /// Fills every [`Later`] handle that was handed out (called after every module has started).
-    fn fill_later(&mut self) {
-        for fill in std::mem::take(&mut self.pending) {
-            fill(self);
-        }
-    }
-
-    fn contribute<T>(&mut self, module: &'static str, api: Arc<T>) -> Result<(), Error>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        let entries = self.contributed.entry(TypeId::of::<T>()).or_default();
-        if entries.iter().any(|(owner, _)| *owner == module) {
-            return Err(Error::internal(format!(
-                "module `{module}` contributes `{}` twice; contribute each contract once",
-                std::any::type_name::<T>()
-            )));
-        }
-        entries.push((module, Box::new(api)));
-        Ok(())
-    }
-
-    fn contributions<T>(&self) -> Vec<Arc<T>>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        self.contributed
-            .get(&TypeId::of::<T>())
-            .map(|entries| {
-                entries
-                    .iter()
-                    .filter_map(|(_, api)| api.downcast_ref::<Arc<T>>().cloned())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    fn get<T>(&self) -> Option<Arc<T>>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        self.provided
-            .get(&TypeId::of::<T>())
-            .and_then(|(_, api)| api.downcast_ref::<Arc<T>>())
-            .cloned()
-    }
-
-    /// The module that published `T`, if any.
-    fn provider_of<T>(&self) -> Option<&'static str>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        self.provided.get(&TypeId::of::<T>()).map(|(module, _)| *module)
-    }
-
-    /// The `(module, providing module)` pairs recorded.
-    fn required(&self) -> BTreeSet<(&'static str, &'static str)> {
-        self.required.lock().map(|required| required.clone()).unwrap_or_default()
-    }
-
-    fn require<T>(&self, module: &'static str) -> Result<Arc<T>, Error>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        if let Some(provider) = self.provider_of::<T>()
-            && provider != module
-            && let Ok(mut required) = self.required.lock()
-        {
-            required.insert((module, provider));
-        }
-        self.get().ok_or_else(|| {
-            Error::internal(format!(
-                "module `{module}` requires `{}`, which no enabled module registered before it \
-                 provides. The providing module must be registered before `{module}`, be named \
-                 in `Module::depends_on` of `{module}`, and not be left out by AUTOXIDE_MODULES",
-                std::any::type_name::<T>()
-            ))
-        })
     }
 }
 

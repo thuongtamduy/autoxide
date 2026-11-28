@@ -116,12 +116,15 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             `sample_data`, `sandbox_copy`), `StartContext::kernel::<H>()`; `notes` chuyển làm mẫu; luật
             `module-contract-legacy` (baseline 38 module) và `module-contract-mixed`; gỡ `legacy_default`
             (D-20261128-manifest-defaults)
-      - [ ] `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng của `StartContext` (`work_source`, `personal_data`…), hook
-            của `relocation`; chuyển 38 module theo cụm (PR 7–12); baseline rỗng thì gắn `#[deprecated]` cho hàm cũ, bản
-            sau gỡ (D-20261127-transition-paths)
+      - [ ] `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng của `StartContext` (`work_source`, `personal_data`…) và
+            `seed_tenant`/`sample_data`/`sandbox_copy`, hook của `relocation` — **làm trước khi chuyển cụm module đầu
+            tiên** (D-20261128-manifest-defaults)
+      - [ ] Chuyển 38 module theo cụm (PR 7–12); baseline rỗng thì gắn `#[deprecated]` cho hàm cũ và getter cũ của
+            `StartContext`, bản sau gỡ (D-20261127-transition-paths)
 - [ ] `#[non_exhaustive]` cho enum và struct công khai sẽ còn lớn thêm (kernel, testkit, `api` của module); mọi `#[deprecated]`
       viết tiếng Anh, nêu cái thay thế
-      - [x] Phần hợp đồng module: `Manifest`, `Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `#[deprecated]`
+      - [x] Phần hợp đồng module: `Manifest` và `UnstableManifest` (không trường công khai, thêm trường không phá vỡ),
+            `KernelHandle` niêm phong, `#[non_exhaustive]` cho `Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `#[deprecated]`
             tiếng Việt duy nhất (`legacy_default`) đã gỡ
       - [ ] Phần còn lại cùng luật `exhaustive` (danh sách ngoại lệ) và `deprecated-note` (PR 6)
 - [ ] Tách `autoxide-host` (phần chỉ binary dùng) khỏi kernel; file trên 880 dòng tách theo trách nhiệm (phần đa khách

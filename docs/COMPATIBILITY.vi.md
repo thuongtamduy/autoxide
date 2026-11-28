@@ -162,7 +162,9 @@ Hạng của **module** (`official` / `experimental`, [`docs/MODULES.vi.md`](MOD
 module official được dùng phần thử nghiệm của kernel bên trong, nhưng `api` của nó không bao giờ lộ chúng.
 
 Enum và struct công khai của hạng ổn định có thể còn lớn thêm mang `#[non_exhaustive]` (dựng struct bằng hàm dựng, thêm
-nhánh `_ =>` khi `match` enum); thêm biến thể hay trường cho chúng không phải phá vỡ.
+nhánh `_ =>` khi `match` enum); thêm biến thể hay trường cho chúng không phải phá vỡ. Hiện đã làm cho hợp đồng module
+(`Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `Manifest` không có trường công khai) và một số kiểu
+vận hành; phần còn lại của hạng ổn định được gắn, kèm phép kiểm trong `cargo xtask check`, trước 1.0.
 
 ### SDK TypeScript
 

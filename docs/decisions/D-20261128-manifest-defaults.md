@@ -13,7 +13,11 @@ trong một vỏ (`module/started.rs`) trả các thứ đó qua đúng các hà
 check` chặn (`module-contract-mixed`). Module còn theo đường cũ đếm ở `xtask/module-contract-legacy.txt`
 (`module-contract-legacy`, chỉ giảm). Handle của kernel lấy bằng `StartContext::kernel::<H>()` (trait niêm phong
 `KernelHandle`, mỗi handle cài bằng đúng getter cũ). `migrations`/`upgrades` của manifest là con trỏ hàm để dựng lại
-manifest rẻ. Chưa làm ở bước này: `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng (`work_source`,
+manifest rẻ. Chuyển tiếp, sẽ thay: `StartContext::seed_tenant`, `sample_data`, `sandbox_copy` (sẽ thành
+`contribute::<dyn TenantSeed>` / `<dyn SampleData>` / `<dyn SandboxCopy>`) và các getter cũ (`outbox()`, `sync_log()`,
+`entitlements()`…, thay bằng `kernel::<H>()`); làm `contribute` trước khi chuyển cụm module đầu tiên, để module không phải
+chuyển hai lần. Module có manifest mà còn cài hàm cũ thì đăng ký module lỗi (hàm tĩnh, so với manifest) hay khởi động lỗi
+(hàm "sau start"), nêu tên module và hàm. Chưa làm ở bước này: `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng (`work_source`,
 `personal_data`…), hook của `relocation`, feature `unstable` (manifest có sẵn `Manifest::unstable` không gắn `cfg`).
 
 Lý do: kernel, app và testkit đọc các hàm cũ ở khoảng 200 chỗ (137 chỗ chỉ riêng `.name()`); đổi hết sang đọc

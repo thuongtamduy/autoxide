@@ -65,10 +65,39 @@ niệm thuộc hạng thử nghiệm ([tương thích](COMPATIBILITY.vi.md#các-
 `Manifest::unstable`.
 
 Các hàm khác của trait `Module` (`name`, `permissions`, `routes`, `tools`, `subscriptions`…) là đường cũ, giữ tới khi
-mọi module trong repo đã chuyển; mỗi hàm ứng với hàm cùng tên của manifest hay `StartContext`. Module đã cài
-`manifest` thì không cài hàm cũ nào (`cargo xtask check`, luật `module-contract-mixed`), và module theo đường cũ không
-đăng ký được trên `StartContext`. Module còn theo đường cũ nằm trong `xtask/module-contract-legacy.txt`; các bước dưới
-đây còn nhắc vài hàm cũ — hiểu là hàm cùng tên của manifest.
+mọi module trong repo đã chuyển. Module đã cài `manifest` thì không cài hàm cũ nào: `cargo xtask check` (luật
+`module-contract-mixed`) và lúc khởi động đều từ chối, và module theo đường cũ không đăng ký được trên `StartContext`.
+Module còn theo đường cũ nằm trong `xtask/module-contract-legacy.txt`. Các bước dưới đây còn nhắc vài hàm cũ; bảng này
+cho đường mới của từng hàm:
+
+| Hàm cũ của `Module` | Đường mới |
+| --- | --- |
+| `name`, `description` | `Manifest::new(name, description)` |
+| `stability`, `essential`, `always_enabled`, `depends_on`, `migrations`, `upgrades`, `records`, `tenant_settings`, `org_settings`, `retained_tables`, `retention`, `control_plane_tables`, `features`, `limits`, `permissions`, `events`, `resource_events`, `schedules`, `deprecations`, `body_limits`, `navigation`, `reason_lists`, `overridable_texts`, `relocation` | hàm cùng tên của `Manifest` |
+| `translations` | `Manifest::translation` (mỗi ngôn ngữ một lần gọi) |
+| `custom_field_targets` | `UnstableManifest::custom_field_targets` (trong `Manifest::unstable`) |
+| `facts` | `UnstableManifest::facts` (trong `Manifest::unstable`) |
+| `analytics_events` | `UnstableManifest::analytics_events` (trong `Manifest::unstable`) |
+| `funnels` | `UnstableManifest::funnels` (trong `Manifest::unstable`) |
+| `automation_templates` | `UnstableManifest::automation_templates` (trong `Manifest::unstable`) |
+| `promotable` | `UnstableManifest::promotable` (trong `Manifest::unstable`) |
+| `sync_resources` | `UnstableManifest::sync_resources` (trong `Manifest::unstable`) |
+| `blocks` | `UnstableManifest::blocks` (trong `Manifest::unstable`) |
+| `subscriptions` | `StartContext::subscribe` (mỗi đăng ký một lần gọi) |
+| `routes`, `endpoints` | `StartContext::routes` |
+| `tools` | `StartContext::tools` |
+| `jobs` | `StartContext::job` (mỗi thứ một lần gọi) |
+| `tasks` | `StartContext::task` (mỗi thứ một lần gọi) |
+| `checks` | `StartContext::check` (mỗi thứ một lần gọi) |
+| `prompts` | `StartContext::prompt` (mỗi thứ một lần gọi) |
+| `mcp_resources` | `StartContext::mcp_resource` (mỗi thứ một lần gọi) |
+| `client_config` | `StartContext::client_config` |
+| `seed_tenant` | `StartContext::seed_tenant` |
+| `sample_data` | `StartContext::sample_data` |
+| `sandbox_copy` | `StartContext::sandbox_copy` |
+
+`StartContext::outbox()`, `sync_log()` và các getter khác vẫn chạy; code mới dùng một cách duy nhất là
+`StartContext::kernel::<H>()`.
 
 ## Từng bước
 
@@ -877,7 +906,8 @@ Luật core tự giữ:
   mới mới phải chờ bản major của Autoxide; phiên bản Rust tối thiểu mới hơn chỉ đến ở bản minor,
   không bao giờ ở bản patch. Toàn bộ chính sách, cả cho HTTP API, ở
   [`docs/COMPATIBILITY.vi.md`](COMPATIBILITY.vi.md).
-- `Module` chỉ lớn thêm bằng hàm có thân mặc định: module viết cho bản cũ vẫn biên dịch.
+- Hợp đồng module chỉ lớn thêm bằng hàm builder mới của `Manifest` và hàm đăng ký mới của `StartContext`:
+  module viết cho bản cũ vẫn biên dịch.
 - Kiểu công khai sẽ còn lớn thêm được đánh dấu `#[non_exhaustive]`: dựng chúng bằng hàm
   tạo, không bằng struct literal, và `match` enum của chúng có nhánh `_`.
 - Thứ công khai sắp bỏ được đánh dấu `#[deprecated]` (nói dùng gì thay) ít nhất một bản

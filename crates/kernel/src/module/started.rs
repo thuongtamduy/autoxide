@@ -220,13 +220,115 @@ pub(crate) struct Started {
 impl Started {
     /// Wraps `module` after its `start` when it is built with a manifest; a module still on the old functions
     /// is returned as it is (it could not register anything, see `StartContext::registered`).
-    pub(crate) fn wrap(module: Box<dyn Module>, registered: Registered) -> Box<dyn Module> {
-        if module.manifest().declared {
-            Box::new(Started { inner: module, registered })
-        } else {
-            module
+    pub(crate) fn wrap(
+        module: Box<dyn Module>,
+        registered: Registered,
+    ) -> Result<Box<dyn Module>, String> {
+        if !module.manifest().declared {
+            return Ok(module);
         }
+        // Vỏ trả thứ đăng ký trong `start` thay cho hàm cũ: module còn cài hàm cũ "gọi sau start" thì phần đó sẽ mất
+        // im lặng — báo lỗi khởi động thay vì bỏ qua.
+        let old = runtime_overrides(module.as_ref());
+        if !old.is_empty() {
+            return Err(mixed_message(module.name(), &old));
+        }
+        Ok(Box::new(Started { inner: module, registered }))
     }
+}
+
+/// The message for a module that implements `Module::manifest` and old declaration functions too.
+pub(crate) fn mixed_message(module: &str, old: &[&str]) -> String {
+    let list = old.iter().map(|name| format!("`Module::{name}`")).collect::<Vec<_>>().join(", ");
+    format!(
+        "module `{module}` implements `Module::manifest` and also {list}: the core reads only one of them; declare \
+         it in the manifest (or register it on `StartContext` in `start`) and remove the old function"
+    )
+}
+
+/// Old declaration functions that a module with a manifest still implements, found by comparing each one with its
+/// manifest (the default of an old function reads the manifest, so the two differ only when the function is
+/// overridden). Lists are compared by length, which every element type supports.
+pub(crate) fn static_overrides(module: &dyn Module) -> Vec<&'static str> {
+    let manifest = module.manifest();
+    if !manifest.declared {
+        return Vec::new();
+    }
+    let unstable = &manifest.unstable;
+    let mut old = Vec::new();
+    let mut differs = |name: &'static str, different: bool| {
+        if different {
+            old.push(name);
+        }
+    };
+    differs("name", module.name() != manifest.name);
+    differs("description", module.description() != manifest.description);
+    differs("stability", module.stability() != manifest.stability);
+    differs("essential", module.essential() != manifest.essential);
+    differs("always_enabled", module.always_enabled() != manifest.always_enabled);
+    differs("depends_on", module.depends_on() != manifest.depends_on);
+    differs(
+        "migrations",
+        module.migrations().len() != manifest.migrations.map_or(0, |build| build().len()),
+    );
+    differs(
+        "upgrades",
+        module.upgrades().len() != manifest.upgrades.map_or(0, |build| build().len()),
+    );
+    differs("records", module.records() != manifest.records);
+    differs("tenant_settings", module.tenant_settings().len() != manifest.tenant_settings.len());
+    differs("org_settings", module.org_settings().len() != manifest.org_settings.len());
+    differs("retained_tables", module.retained_tables() != manifest.retained_tables);
+    differs("retention", module.retention() != manifest.retention);
+    differs("control_plane_tables", module.control_plane_tables() != manifest.control_plane_tables);
+    differs("features", module.features() != manifest.features);
+    differs("limits", module.limits() != manifest.limits);
+    differs("permissions", module.permissions() != manifest.permissions);
+    differs("events", module.events() != manifest.events);
+    differs("resource_events", module.resource_events() != manifest.resource_events);
+    differs("schedules", module.schedules() != manifest.schedules);
+    differs("deprecations", module.deprecations() != manifest.deprecations);
+    differs("body_limits", module.body_limits() != manifest.body_limits);
+    differs("translations", module.translations() != manifest.translations);
+    differs("navigation", module.navigation() != manifest.navigation);
+    differs("reason_lists", module.reason_lists() != manifest.reason_lists);
+    differs("overridable_texts", module.overridable_texts() != manifest.overridable_texts);
+    differs("custom_field_targets", module.custom_field_targets() != unstable.custom_field_targets);
+    differs("facts", module.facts().len() != unstable.facts.len());
+    differs("analytics_events", module.analytics_events().len() != unstable.analytics_events.len());
+    differs("funnels", module.funnels() != unstable.funnels);
+    differs("automation_templates", module.automation_templates() != unstable.automation_templates);
+    differs("promotable", module.promotable().len() != unstable.promotable.len());
+    differs("sync_resources", module.sync_resources() != unstable.sync_resources);
+    differs("blocks", module.blocks().len() != unstable.blocks.len());
+    old
+}
+
+/// Old "after start" functions that a module with a manifest still implements: their defaults are empty, so
+/// anything there comes from an override. Called after the module's `start`, when such functions have data.
+fn runtime_overrides(module: &dyn Module) -> Vec<&'static str> {
+    let has_paths =
+        |router: utoipa_axum::router::OpenApiRouter| !router.get_openapi().paths.paths.is_empty();
+    let mut old = Vec::new();
+    let mut found = |name: &'static str, present: bool| {
+        if present {
+            old.push(name);
+        }
+    };
+    found("subscriptions", !module.subscriptions().is_empty());
+    found("routes", has_paths(module.routes()));
+    found("endpoints", has_paths(module.endpoints().into_router()));
+    found("tools", !module.tools().is_empty());
+    found("jobs", !module.jobs().is_empty());
+    found("tasks", !module.tasks().is_empty());
+    found("checks", !module.checks().is_empty());
+    found("prompts", !module.prompts().is_empty());
+    found("mcp_resources", !module.mcp_resources().is_empty());
+    found("client_config", !matches!(module.client_config(), Ok(None)));
+    found("seed_tenant", module.seed_tenant().is_some());
+    found("sample_data", module.sample_data().is_some());
+    found("sandbox_copy", module.sandbox_copy().is_some());
+    old
 }
 
 // Chỉ cài `manifest`, các hàm vòng đời và các hàm "gọi sau start". Hàm khai báo tĩnh (`permissions`, `events`…) để

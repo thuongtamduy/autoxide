@@ -95,6 +95,37 @@ struct Nameless;
 
 impl Module for Nameless {}
 
+/// Module có manifest mà còn cài hàm khai báo cũ (tĩnh): bị từ chối ngay lúc đăng ký.
+struct MixedStatic;
+
+impl Module for MixedStatic {
+    fn manifest(&self) -> Manifest {
+        Manifest::new("mixed_static", "Declares twice.")
+    }
+
+    fn permissions(&self) -> Vec<Permission> {
+        vec![MEMO_READ]
+    }
+}
+
+/// Module có manifest mà còn cài hàm cũ "gọi sau start": bị từ chối lúc khởi động, không mất im lặng.
+struct MixedRuntime;
+
+impl Module for MixedRuntime {
+    fn manifest(&self) -> Manifest {
+        Manifest::new("mixed_runtime", "Declares tools the old way.")
+    }
+
+    fn tools(&self) -> Vec<Tool> {
+        vec![
+            Tool::new("count", "Count.", |_: TenantContext, _: Principal, _: NoInput| async move {
+                Ok(0)
+            })
+            .read_only(),
+        ]
+    }
+}
+
 async fn connect(database: &TestDatabase) -> Database {
     let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
     let mut reader = ConfigReader::new(&source);
@@ -169,6 +200,29 @@ async fn kernel_handle_giu_luat_cua_getter_cu() {
         let mut modules = Modules::new(vec![Box::new(NoEvents)]).unwrap();
         let error = modules.start(&db).unwrap_err().to_string();
         assert!(error.contains("declares no events"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
+#[test]
+fn manifest_cung_ham_cu_tinh_bi_tu_choi() {
+    let error = Modules::new(vec![Box::new(MixedStatic)]).unwrap_err().to_string();
+    assert!(
+        error.contains(
+            "module `mixed_static` implements `Module::manifest` and also `Module::permissions`"
+        ),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn manifest_cung_ham_cu_sau_start_bi_tu_choi() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let mut modules = Modules::new(vec![Box::new(MixedRuntime)]).unwrap();
+        let error = modules.start(&db).unwrap_err().to_string();
+        assert!(error.contains("`mixed_runtime`") && error.contains("`Module::tools`"), "{error}");
     })
     .await
     .unwrap();

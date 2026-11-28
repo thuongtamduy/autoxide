@@ -65,11 +65,39 @@ they are. Concepts of the experimental tier ([compatibility](COMPATIBILITY.md#co
 go through `Manifest::unstable`.
 
 The other functions of the `Module` trait (`name`, `permissions`, `routes`, `tools`, `subscriptions`…) are the
-old way, kept until every module in this repository has moved; each maps to the manifest or `StartContext`
-function of the same name. A module that implements `manifest` implements none of them (`cargo xtask check`,
-rule `module-contract-mixed`), and a module on the old way cannot register on `StartContext`. Modules still on
-the old way are listed in `xtask/module-contract-legacy.txt`; the steps below still name some old functions —
-read them as the manifest function of the same name.
+old way, kept until every module in this repository has moved. A module that implements `manifest` implements none of
+them: `cargo xtask check` (rule `module-contract-mixed`) and startup refuse it, and a module on the old way cannot
+register on `StartContext`. Modules still on the old way are listed in `xtask/module-contract-legacy.txt`. The steps
+below still name some old functions; this table gives the new way for each:
+
+| Old `Module` function | New way |
+| --- | --- |
+| `name`, `description` | `Manifest::new(name, description)` |
+| `stability`, `essential`, `always_enabled`, `depends_on`, `migrations`, `upgrades`, `records`, `tenant_settings`, `org_settings`, `retained_tables`, `retention`, `control_plane_tables`, `features`, `limits`, `permissions`, `events`, `resource_events`, `schedules`, `deprecations`, `body_limits`, `navigation`, `reason_lists`, `overridable_texts`, `relocation` | the `Manifest` function of the same name |
+| `translations` | `Manifest::translation` (one call per language) |
+| `custom_field_targets` | `UnstableManifest::custom_field_targets` (inside `Manifest::unstable`) |
+| `facts` | `UnstableManifest::facts` (inside `Manifest::unstable`) |
+| `analytics_events` | `UnstableManifest::analytics_events` (inside `Manifest::unstable`) |
+| `funnels` | `UnstableManifest::funnels` (inside `Manifest::unstable`) |
+| `automation_templates` | `UnstableManifest::automation_templates` (inside `Manifest::unstable`) |
+| `promotable` | `UnstableManifest::promotable` (inside `Manifest::unstable`) |
+| `sync_resources` | `UnstableManifest::sync_resources` (inside `Manifest::unstable`) |
+| `blocks` | `UnstableManifest::blocks` (inside `Manifest::unstable`) |
+| `subscriptions` | `StartContext::subscribe` (one call per subscription) |
+| `routes`, `endpoints` | `StartContext::routes` |
+| `tools` | `StartContext::tools` |
+| `jobs` | `StartContext::job` (one call each) |
+| `tasks` | `StartContext::task` (one call each) |
+| `checks` | `StartContext::check` (one call each) |
+| `prompts` | `StartContext::prompt` (one call each) |
+| `mcp_resources` | `StartContext::mcp_resource` (one call each) |
+| `client_config` | `StartContext::client_config` |
+| `seed_tenant` | `StartContext::seed_tenant` |
+| `sample_data` | `StartContext::sample_data` |
+| `sandbox_copy` | `StartContext::sandbox_copy` |
+
+`StartContext::outbox()`, `sync_log()` and the other getters keep working; `StartContext::kernel::<H>()` is the one
+way for new code.
 
 ## Step by step
 
@@ -901,8 +929,8 @@ Rules the core follows:
   version of a vocabulary library waits for a major release of Autoxide; a newer minimum Rust
   version comes only in a minor release, never in a patch release. The whole policy, for the HTTP
   API too, is in [`docs/COMPATIBILITY.md`](COMPATIBILITY.md).
-- `Module` only grows by functions with a default body: a module written for an older
-  release keeps compiling.
+- The module contract only grows by new builder functions of `Manifest` and new registration functions
+  of `StartContext`: a module written for an older release keeps compiling.
 - Public types that will grow are `#[non_exhaustive]`: build them with their
   constructor, not a struct literal, and match their enums with a `_` arm.
 - A public item that is going away is `#[deprecated]` (with what to use instead) for at

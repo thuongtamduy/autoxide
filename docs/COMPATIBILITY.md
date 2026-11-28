@@ -168,7 +168,10 @@ The tier of a **module** (`official` / `experimental`, [`docs/MODULES.md`](MODUL
 the kernel API: an official module may use experimental kernel items inside, but its `api` never exposes them.
 
 Public enums and structs of the stable tier that are expected to grow are `#[non_exhaustive]` (build structs with
-their constructor, add a `_ =>` arm when matching enums); adding a variant or a field to them is not a break.
+their constructor, add a `_ =>` arm when matching enums); adding a variant or a field to them is not a break. Today
+this is done for the module contract (`Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `Manifest`
+has no public fields) and for some operations types; the rest of the stable tier gets it, with a check in
+`cargo xtask check`, before 1.0.
 
 ### TypeScript SDK
 
