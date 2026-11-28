@@ -91,7 +91,7 @@ impl Esms {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl SmsSender for Esms {
     fn provider(&self) -> &'static str {
         PROVIDER
@@ -122,7 +122,7 @@ impl SmsSender for Esms {
 // Thử kết nối từ trang cài đặt (`POST /api/v1/kernel/settings/{name}/test`): hàm lấy số dư là lời
 // gọi rẻ nhất có xác thực, key nằm trong thân (hàm lấy danh sách brandname đặt key trong URL nên
 // không dùng). Số dư không được trả ra.
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl ConnectionProbe for Esms {
     fn connection(&self) -> &'static str {
         CONNECTION
