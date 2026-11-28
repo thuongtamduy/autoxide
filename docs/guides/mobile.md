@@ -72,7 +72,7 @@ curl -sS "$API/api/v1/notifications/me/device-tokens" -H "Authorization: Bearer 
 
 ## 5. Upload photos straight to storage
 
-Do not send large photos through the API server. Ask for a signed upload link, send the bytes from the phone straight to S3, then complete the upload — see [Uploading large files straight to storage](direct-uploads.md). Compute `size` and `sha256` of the exact bytes you will send (after resizing on the phone). This server keeps files on its own disk, so it answers `409 media.direct_upload_unavailable`: the app then uploads through `POST /api/v1/media` (multipart) instead.
+Do not send large photos through the API server. Ask for a signed upload link, send the bytes from the phone straight to S3, then complete the upload — see [Uploading large files straight to storage](direct-uploads.md). Compute `size` and `sha256` of the exact bytes you will send (after resizing on the phone). This server keeps files on its own disk, so it answers `409 media.direct_upload_unavailable`: the app then uploads through `POST /api/v1/media?name=…` instead, with the file itself as the body and its type in `Content-Type` (not a multipart form, which is refused with `415`).
 
 <!-- example: start-upload -->
 ```bash

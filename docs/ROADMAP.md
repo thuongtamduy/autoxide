@@ -141,10 +141,10 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 ### G2 — Không để thư viện níu chân (D-20261126-library-isolation)
 
-- [ ] Sửa `docs/COMPATIBILITY.md`, `docs/MODULE_GUIDE.md` (EN + VI) theo quyết định: bỏ "thư viện đổi bản lớn thì
+- [x] Sửa `docs/COMPATIBILITY.md`, `docs/MODULE_GUIDE.md` (EN + VI) theo quyết định: bỏ "thư viện đổi bản lớn thì
       Autoxide đổi bản lớn"
-- [ ] Quyết định thiết kế lớp của kernel cho: truy vấn và entity, route và schema API, kiểm đầu vào, migration; nêu kiểu nào
-      bọc, kiểu nào để thư viện, đường chuyển
+- [x] Quyết định thiết kế lớp của kernel cho: truy vấn và entity, route và schema API, kiểm đầu vào, migration; nêu kiểu nào
+      bọc, kiểu nào để thư viện, đường chuyển (D-20261128-library-layer-plan: bảng bốn vùng, thứ tự bảy cụm module)
 - [ ] Làm lớp của kernel; chữ ký công khai hạng ổn định của kernel và testkit không còn kiểu của SeaORM, sea-query, axum,
       utoipa (gate kiểm)
       - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
@@ -157,7 +157,8 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng
       - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
             của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
-            (D-20261127-http-layer-choices)
+            (D-20261127-http-layer-choices). Đã quyết: bỏ — derive sinh mã kiểm của kernel, impl chung gỡ khi module cuối
+            bỏ `validator` (D-20261128-library-layer-plan mục 2); còn phần làm
       - [ ] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
             cần chúng
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào

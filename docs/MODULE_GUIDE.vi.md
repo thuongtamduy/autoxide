@@ -120,9 +120,13 @@ Mỗi migration là một file trong `src/migration/` và một dòng ở cuối
   `migrations.extend(autoxide_kernel::migration::helper_tables("<module>", &[HelperTable::Events, HelperTable::Jobs]))`,
   thay vì liệt kê từng bước lịch sử như các module có sẵn.
 
-Entity dùng SeaORM (`src/entity.rs`). Đọc bằng `Database::read()`, ghi bằng
-`Database::write()`, nhiều lệnh ghi đi cùng nhau thì `Database::begin_write()`. Giữ
-transaction ghi ngắn: không gọi mạng, không hash mật khẩu bên trong.
+Bản ghi khai bằng `#[derive(Record)]` và truy vấn qua `autoxide_kernel::db` (`src/entity.rs` và
+`src/service.rs` của `modules/notes`): đọc bằng `tenant.db().read()`, nhiều lệnh ghi đi cùng nhau
+thì `tenant.db().begin_write()`. Handle tự lọc mọi bản ghi cấp khách theo khách, nên quên lọc là
+không biên dịch được. Giữ transaction ghi ngắn: không gọi mạng, không hash mật khẩu bên trong. Phần
+lớn module có sẵn còn dùng entity SeaORM và `Database::read()` / `write()` / `begin_write()`; đường
+đó còn tới khi chúng chuyển xong, nhưng module mới không dùng (nó kéo theo phụ thuộc vào thư viện
+kernel đã bọc; xem [Độ ổn định của hợp đồng module](#độ-ổn-định-của-hợp-đồng-module)).
 
 ### Đa khách: phân loại mọi bảng, lọc mọi truy vấn
 
@@ -830,7 +834,7 @@ tới module chạy được, có test; [`examples/external-module`](../examples
 module đó và máy chủ của nó, được CI build và test trên cả hai database.
 
 Dùng phiên bản Rust của bản phát hành đó (`rust-toolchain.toml`) hoặc mới hơn, và cùng
-phiên bản lớn của các thư viện công khai (bảng bên dưới), nếu không trình biên dịch báo
+phiên bản lớn của các thư viện từ vựng (bảng bên dưới), nếu không trình biên dịch báo
 hai bản của cùng một kiểu.
 
 `cargo xtask check-module <thư mục>` (chạy từ một bản checkout của repo này) áp các luật đọc mã
@@ -843,33 +847,35 @@ khác, `tenant_id` đứng đầu mọi index — do test của testkit kiểm (
 ## Độ ổn định của hợp đồng module
 
 Thứ module dựa vào là **hợp đồng module**: các thứ công khai của `autoxide-kernel` và
-`autoxide-testkit`, điểm vào `autoxide::Autoxide`, `api` của các module chính thức
-(`autoxide_<tên>::api`), cùng các thư viện có kiểu xuất hiện trong đó.
+`autoxide-testkit`, điểm vào `autoxide::Autoxide`, và `api` của các module chính thức
+(`autoxide_<tên>::api`). Module không phụ thuộc vào các thư viện kernel dùng bên dưới: một thư
+viện đó lên phiên bản lớn mới thì kernel sửa, module của bạn không phải sửa, và Autoxide không vì
+thế mà ra bản major.
 
-| Thư viện | Phiên bản | Gặp ở |
+Hai loại thư viện:
+
+| Loại | Thư viện | Module… |
 | --- | --- | --- |
-| `axum` | 0.8 | handler, extractor |
-| `sea-orm`, `sea-orm-migration` | 2 | entity, `Database`, `Module::migrations` |
-| `utoipa` | 6 | `ToSchema`, `#[utoipa::path]` |
-| `utoipa-axum` | 0.3 | `Module::routes` (`OpenApiRouter`) |
-| `tokio` | 1 | runtime async |
-| `serde`, `serde_json` | 1 | thân request, event, tham số tool |
-| `uuid` | 1 (v7) | ID |
-| `jiff` | 1 | khoảng thời gian và múi giờ (thời điểm là `autoxide_kernel::time::Timestamp`) |
-| `async-trait` | 0.1 | trait gọi qua `dyn` |
-| `validator` | 0.21 | `ValidJson<T>` |
+| Từ vựng — thuộc hợp đồng | `serde`, `serde_json` 1, `uuid` 1 (v7), `tokio` 1, `tracing` 0.1, `futures-core`, `bytes` 1 | khai trực tiếp; được xuất hiện trong chữ ký của kernel (không có kiểu nào của `tokio`) |
+| Nằm sau lớp của kernel — không thuộc hợp đồng | `sea-orm`, `sea-query`, `sqlx` → `autoxide_kernel::db`, `migration`; `axum`, `axum-core`, `http`, `matchit`, `tower`, `utoipa`, `utoipa-axum`, `validator` → `autoxide_kernel::http` (`#[endpoint]`, `routes!`, `Schema`, `Params`, `Validate`, `Path`, `Query`, `State`); `jiff` → `autoxide_kernel::time`; `async-trait` → `autoxide_kernel::async_trait` | **không** khai (`cargo xtask check` / `check-module`: luật `wrapped-libraries`); `tower` được ở `[dev-dependencies]` |
+
+Thư viện khác (`reqwest`, `image`, `argon2`…) là việc riêng của module: module tự khai, tự nâng, và
+không để kiểu của chúng lọt ra `api`. Danh sách thư viện đã bọc nằm ở một file,
+`xtask/wrapped-libraries.txt`. Tới 1.0 vài thứ của kernel còn lộ kiểu của thư viện đã bọc
+(`Database::read()` cũ, `Module::routes`, kiểu `http` của testkit…) trong lúc các module chuyển sang
+lớp mới; mỗi thứ đều có cái thay thế hay kế hoạch, và 1.0 chỉ phát hành khi chúng đã ra khỏi phần
+công khai hạng ổn định.
 
 Luật core tự giữ:
 
 - Khi phiên bản còn `0.x`, thay đổi phá vỡ hợp đồng chỉ đến ở bản minor (`0.7` → `0.8`)
   và được ghi ở mục **Changed** hoặc **Removed** của `CHANGELOG.md`, phần Rust ở mục
-  `### Breaking (Rust)`. Bản patch (`0.8.0` → `0.8.1`) không bao giờ phá vỡ hợp đồng. Một thư
-  viện trong bảng lên phiên bản lớn mới, hay phiên bản Rust tối thiểu mới hơn, là một thay đổi
-  như vậy.
+  `### Breaking (Rust)`. Bản patch (`0.8.0` → `0.8.1`) không bao giờ phá vỡ hợp đồng. Phiên bản
+  Rust tối thiểu mới hơn là một thay đổi như vậy; thư viện đã bọc lên phiên bản lớn mới thì không.
 - Từ `1.0` hợp đồng theo Semantic Versioning: thay đổi phá vỡ chỉ đến ở bản major, và
-  `cargo semver-checks` chặn bản phát hành lỡ phá vỡ nó. Khi đó, thư viện trong bảng lên phiên
-  bản lớn mới phải chờ bản major của Autoxide; phiên bản Rust tối thiểu mới hơn chỉ đến ở bản
-  minor, không bao giờ ở bản patch. Toàn bộ chính sách, cả cho HTTP API, ở
+  `cargo semver-checks` chặn bản phát hành lỡ phá vỡ nó. Chỉ thư viện từ vựng lên phiên bản lớn
+  mới mới phải chờ bản major của Autoxide; phiên bản Rust tối thiểu mới hơn chỉ đến ở bản minor,
+  không bao giờ ở bản patch. Toàn bộ chính sách, cả cho HTTP API, ở
   [`docs/COMPATIBILITY.vi.md`](COMPATIBILITY.vi.md).
 - `Module` chỉ lớn thêm bằng hàm có thân mặc định: module viết cho bản cũ vẫn biên dịch.
 - Kiểu công khai sẽ còn lớn thêm được đánh dấu `#[non_exhaustive]`: dựng chúng bằng hàm
