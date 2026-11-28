@@ -191,7 +191,7 @@ impl Distributor {
     /// Records the distribution `item` of parent tenant `parent` to `targets`, on `connection`: the parent
     /// tenant's WRITE transaction (the same transaction as the record change). Returns the distribution ID;
     /// if the same (kind, record, version) already exists, returns the old ID and adds no target or job.
-    pub async fn publish<C: ConnectionTrait>(
+    pub async fn publish<C: crate::db::Executor>(
         &self,
         connection: &C,
         parent: &TenantContext,
@@ -199,6 +199,7 @@ impl Distributor {
         item: DistributionItem,
         targets: Targets,
     ) -> Result<Uuid, Error> {
+        let connection = &crate::db::Via::of(connection);
         if item.parent != parent.id() {
             return Err(Error::internal("a distribution item must name the publishing tenant"));
         }

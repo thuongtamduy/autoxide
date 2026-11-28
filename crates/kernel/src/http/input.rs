@@ -75,8 +75,8 @@ pub trait Validate {
     fn check(&self) -> Result<(), Error>;
 }
 
-// Kiểu derive bằng `validator` (module chưa chuyển) và bằng `#[derive(Validate)]` của kernel (sinh impl của trait
-// `validator::Validate` qua đường riêng) đều qua đây; khi bỏ `validator`, chỉ đổi impl này và derive.
+// Đường cũ: kiểu derive bằng `validator` (module chưa chuyển). `#[derive(Validate)]` của kernel cài thẳng trait này
+// (hàm kiểm ở `http::check`). Gỡ impl chung khi module cuối bỏ `validator` (D-20261128-library-layer-plan mục 2).
 impl<T: validator::Validate> Validate for T {
     fn check(&self) -> Result<(), Error> {
         self.validate().map_err(Error::from)
@@ -87,7 +87,7 @@ impl<T: validator::Validate> Validate for T {
 mod tests {
     use super::*;
     use autoxide_macros::Validate as DeriveValidate;
-    // Derive của `validator` gọi `.validate()` của trường lồng: cần trait của nó trong phạm vi.
+    // Derive của `validator` (bản để so) gọi `.validate()` của trường lồng: cần trait của nó trong phạm vi.
     use validator::Validate as _;
 
     // Derive của kernel dùng đường `::autoxide_kernel`, mà trong crate kernel thì đó là chính crate (lib.rs khai
@@ -112,13 +112,12 @@ mod tests {
         email: Option<String>,
     }
 
-    // Lỗi thô của `validator` (`ValidationErrors`) dạng JSON có khoá sắp theo tên: so trực tiếp kết quả của hai derive,
-    // trước bước kernel chuyển sang `Error`.
-    fn raw<T: validator::Validate>(value: &T) -> serde_json::Value {
-        serde_json::to_value(value.validate().err()).unwrap_or_default()
+    // Lỗi cuối (`Error`: danh sách trường với mã, câu, tham số) của một đầu vào, để so hai derive.
+    fn errors<T: Validate>(value: &T) -> String {
+        format!("{:?}", value.check())
     }
 
-    // Derive của kernel cho đúng lỗi như derive của `validator` (mã, tham số, thứ tự).
+    // Derive của kernel (hàm kiểm của kernel) cho đúng lỗi như derive của `validator` (mã, tham số, câu, đường dẫn).
     #[test]
     fn derive_cua_kernel_bao_loi_nhu_validator() {
         let cases = [
@@ -130,12 +129,7 @@ mod tests {
         for (title, count, email) in cases {
             let new = New { title: title.into(), count, email: email.map(Into::into) };
             let old = Old { title: title.into(), count, email: email.map(Into::into) };
-            assert_eq!(raw(&new), raw(&old), "{title}");
-            let (new, old) = (new.check(), old.check());
-            assert_eq!(new.is_ok(), old.is_ok(), "{title}");
-            if let (Err(new), Err(old)) = (new, old) {
-                assert_eq!(format!("{new:?}"), format!("{old:?}"), "{title}");
-            }
+            assert_eq!(errors(&new), errors(&old), "{title}");
         }
     }
 
@@ -205,9 +199,7 @@ mod tests {
             };
             let new = NewOrder { lines: new_lines, first: new_first, percent };
             let old = OldOrder { lines: old_lines, first: old_first, percent };
-            assert_eq!(raw(&new), raw(&old), "{percent}");
-            let (new, old) = (new.check(), old.check());
-            assert_eq!(format!("{new:?}"), format!("{old:?}"), "{percent}");
+            assert_eq!(errors(&new), errors(&old), "{percent}");
         }
     }
 
@@ -227,16 +219,18 @@ mod tests {
         count: Option<i64>,
     }
 
-    // `range` có cận mở (`exclusive_*`), mã và câu riêng: lỗi thô giống nhau.
+    // `range` có cận mở (`exclusive_*`), mã và câu riêng: lỗi giống nhau.
     #[test]
     fn derive_range_can_mo_nhu_validator() {
-        // Phép so có nghĩa: ca sai cho lỗi thật (không phải hai `null`).
-        let failing = raw(&NewShare { ratio: 1.0, count: Some(11) });
-        assert!(failing["ratio"].is_array() && failing["count"].is_array(), "{failing}");
+        // Phép so có nghĩa: ca sai cho lỗi thật ở cả hai trường.
+        let failing = NewShare { ratio: 1.0, count: Some(11) }.check().err();
+        let fields: Vec<_> =
+            failing.iter().flat_map(|error| error.fields()).map(|f| f.field.clone()).collect();
+        assert_eq!(fields, ["count", "ratio"], "{failing:?}");
         for (ratio, count) in [(0.0, Some(0)), (0.5, Some(10)), (1.0, Some(11)), (0.25, None)] {
             assert_eq!(
-                raw(&NewShare { ratio, count }),
-                raw(&OldShare { ratio, count }),
+                errors(&NewShare { ratio, count }),
+                errors(&OldShare { ratio, count }),
                 "{ratio} {count:?}"
             );
         }

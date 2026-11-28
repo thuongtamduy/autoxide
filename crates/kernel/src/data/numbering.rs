@@ -34,11 +34,12 @@ pub const MAX_SCOPE_LEN: usize = 200;
 /// must be the WRITE transaction (`Database::begin_write`) on the tenant's database, the same transaction
 /// as the record that carries the number; outside it the number is still in order, but a later failure of
 /// the record leaves a skipped number.
-pub async fn next<C: ConnectionTrait>(
+pub async fn next<C: crate::db::Executor>(
     transaction: &C,
     tenant: TenantId,
     scope: &str,
 ) -> Result<i64, Error> {
+    let transaction = &crate::db::Via::of(transaction);
     check_scope(scope)?;
     let table = Alias::new(TABLE);
     let now = Timestamp::now();
@@ -67,11 +68,12 @@ pub async fn next<C: ConnectionTrait>(
 
 /// The last number issued in the sequence (0 when none has been issued). For viewing only: to issue a
 /// number call [`next`], do not read then add one.
-pub async fn current<C: ConnectionTrait>(
+pub async fn current<C: crate::db::Executor>(
     connection: &C,
     tenant: TenantId,
     scope: &str,
 ) -> Result<i64, Error> {
+    let connection = &crate::db::Via::of(connection);
     check_scope(scope)?;
     let select = Query::select()
         .column(Alias::new("last_value"))

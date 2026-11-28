@@ -493,20 +493,31 @@ fn collect_fields(prefix: &str, errors: &ValidationErrors, fields: &mut Vec<Fiel
 /// The error for field `path` from one validator error: an English template built from its code and
 /// parameters (translatable like any template).
 fn field_message(path: String, problem: &validator::ValidationError) -> FieldError {
-    let code = problem.code.to_string();
-    if let Some(message) = &problem.message {
+    describe_field(path, &problem.code, problem.message.as_deref(), |name| problem.params.get(name))
+}
+
+/// The error for field `path` with code `code`, an optional custom sentence and the rule's parameters (JSON). One
+/// place for both input checks: the kernel's own (`http::check`) and the old `validator` path.
+pub(crate) fn describe_field<'a>(
+    path: String,
+    code: &str,
+    message: Option<&str>,
+    params: impl Fn(&str) -> Option<&'a serde_json::Value>,
+) -> FieldError {
+    let code = code.to_owned();
+    if let Some(message) = message {
         // Câu riêng khai ở `#[validate(… message = "…")]`: chưa có bản dịch (không module nào dùng).
         return FieldError::new(path, code, "{message}").with_param("message", message);
     }
     // Tham số là JSON; chuỗi thì bỏ dấu nháy bao quanh.
     let param = |name: &str| {
-        problem.params.get(name).map(|value| match value {
+        params(name).map(|value| match value {
             serde_json::Value::String(text) => text.clone(),
             other => other.to_string(),
         })
     };
     let (min, max, equal) = (param("min"), param("max"), param("equal"));
-    match problem.code.as_ref() {
+    match code.as_str() {
         "required" => FieldError::new(path.clone(), code.clone(), "is required"),
         "email" => FieldError::new(path.clone(), code.clone(), "must be a valid email address"),
         "url" => FieldError::new(path.clone(), code.clone(), "must be a valid URL"),

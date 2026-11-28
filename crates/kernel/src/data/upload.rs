@@ -127,12 +127,13 @@ impl DirectUploads {
     }
 
     /// Records a new attempt for tenant `tenant`.
-    pub async fn insert<C: ConnectionTrait>(
+    pub async fn insert<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         new: NewDirectUpload,
     ) -> Result<DirectUpload, Error> {
+        let connection = &crate::db::Via::of(connection);
         let size = i64::try_from(new.size).map_err(Error::internal)?;
         let now = Timestamp::now();
         let expires_at = new.expires_at;
@@ -178,12 +179,13 @@ impl DirectUploads {
     }
 
     /// Attempt `id` of tenant `tenant`, if it exists.
-    pub async fn find<C: ConnectionTrait>(
+    pub async fn find<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Option<DirectUpload>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let select = self.select_one(tenant, id);
         connection.query_one(&select).await?.map(|row| parse(&row)).transpose()
     }
@@ -191,12 +193,13 @@ impl DirectUploads {
     /// Like [`find`](Self::find), and locks the row until the end of `transaction` (`FOR UPDATE` on
     /// Postgres; SQLite has only one write transaction at a time anyway): the second confirm command waits
     /// for the first to finish and then sees the attempt as `completed`.
-    pub async fn lock<C: ConnectionTrait>(
+    pub async fn lock<C: crate::db::Executor>(
         &self,
         transaction: &C,
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<Option<DirectUpload>, Error> {
+        let transaction = &crate::db::Via::of(transaction);
         let mut select = self.select_one(tenant, id);
         select.lock_exclusive();
         transaction.query_one(&select).await?.map(|row| parse(&row)).transpose()
@@ -204,12 +207,13 @@ impl DirectUploads {
 
     /// Marks attempt `id` as confirmed (call it in the transaction that creates the record, after
     /// [`lock`](Self::lock)). `false`: the attempt is no longer in the `pending` state.
-    pub async fn complete<C: ConnectionTrait>(
+    pub async fn complete<C: crate::db::Executor>(
         &self,
         transaction: &C,
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<bool, Error> {
+        let transaction = &crate::db::Via::of(transaction);
         let now = Timestamp::now();
         let mut update = Query::update();
         update
@@ -223,12 +227,13 @@ impl DirectUploads {
     }
 
     /// Deletes the row of attempt `id` (tenant `tenant_id`).
-    pub async fn delete<C: ConnectionTrait>(
+    pub async fn delete<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant_id: TenantId,
         id: Uuid,
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         let mut delete = Query::delete();
         delete
             .from_table(Alias::new(&*self.table))
@@ -240,12 +245,13 @@ impl DirectUploads {
 
     /// Up to `limit` attempts (of every tenant on this database) still `pending` that expired before `before`,
     /// oldest first, for the cleanup job.
-    pub async fn expired<C: ConnectionTrait>(
+    pub async fn expired<C: crate::db::Executor>(
         &self,
         connection: &C,
         before: Timestamp,
         limit: u64,
     ) -> Result<Vec<DirectUpload>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let mut select = Query::select();
         select
             .columns(COLUMNS.map(Alias::new))
@@ -260,11 +266,12 @@ impl DirectUploads {
 
     /// Deletes the rows of attempts confirmed before `before` (the record exists; the row remained only so
     /// a confirm command called again returns the same result). Returns the number of rows deleted.
-    pub async fn forget_completed<C: ConnectionTrait>(
+    pub async fn forget_completed<C: crate::db::Executor>(
         &self,
         connection: &C,
         before: Timestamp,
     ) -> Result<u64, Error> {
+        let connection = &crate::db::Via::of(connection);
         let mut delete = Query::delete();
         delete
             .from_table(Alias::new(&*self.table))

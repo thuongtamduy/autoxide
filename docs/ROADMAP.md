@@ -153,22 +153,37 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       utoipa (gate kiểm)
       - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
             `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
-            (D-20261126-kernel-data-layer). Đã có: hàm kernel tự dựng câu nhận `db::Executor` thay `ConnectionTrait`.
-            Còn: cầu chỉ còn giữ cho chỗ module chạy câu SeaORM trên handle (OAuth của `auth`, `ledger`, `compliance`
-            `phone_locks`, `conversations` `voice/recordings`, `orders` `payment_attempts`) — chuyển các chỗ đó sang
-            `Record` rồi gỡ cầu; `raw-database` về rỗng theo cụm (D-20261128-library-layer-plan mục 5, 6)
+            (D-20261126-kernel-data-layer). Đã có (#615 và PR kế): hàm kernel tự dựng câu nhận `db::Executor` thay
+            `ConnectionTrait` — `Outbox::record`, `SyncLog`, kiểm quyền, `OneTimeTokens`, `JobQueue::enqueue*`,
+            `job::runs::{track, progress, set_result}`, `OrgTree::*`, `DirectUploads::*`, `SearchIndex::enqueue`,
+            `Distribution::publish`, `custom_fields::write_index`, `numbering::{next, current}`, `antispam` (`Checked::claim`,
+            `purge_nonces`). Hoãn so với D-20261128-library-layer-plan mục 5 (D-20261128-handle-bridge-by-cluster):
+            đưa chỗ dùng cầu về kết nối cũ thì nâng baseline `raw-database` (cấm), chuyển sang `Record` là chuyển một
+            phần module mà các phiên khác đang sửa — nên làm ở cụm của từng module. Còn: (a) chỗ module chạy câu
+            SeaORM trên handle, chuyển sang `Record` rồi mới gỡ cầu: `auth` `oauth/` (gồm `fetch_page` trên handle ở
+            `grants.rs`), `ledger` `reconcile.rs` / `payment_refunds.rs` / `simulate.rs`, `compliance` `phone_locks.rs`,
+            `conversations` `voice/recordings.rs`, `orders` `payment_attempts.rs`; (b) hàm kernel chạy câu do module dựng
+            (`fetch_page*`, `rows::lock*`) không nhận handle, gỡ cùng đường cũ; (c) thứ tự khi gỡ cầu: xoá hai `impl
+            ConnectionTrait` của `Read`/`Tx` trước, rồi thêm `impl Executor` riêng cho chúng; (d) `raw-database` về rỗng
+            theo cụm (D-20261128-library-layer-plan mục 6)
       - [x] Lớp HTTP: `#[endpoint]` (khai rõ ai được gọi, 401/403 chuẩn tự sinh), `routes!`, `Routes`,
             `#[derive(Schema/Params/Validate)]`, `Path`/`Query`/`State`, `NoContent`, `Download`, `async_trait`;
             `notes` không còn khai thư viện bọc ở `[dependencies]` (D-20261126-kernel-web-layer)
       - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
             `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng. Đã có: `autoxide_testkit::http`
             (`StatusCode`, `Method`, `Client` cho bench), `status_code()`; `notes`, `esms`, `einvoice_sepay` bỏ `axum`
-            khỏi `[dev-dependencies]`. Còn: `idempotency` (test tự dựng endpoint trả mã và header tuỳ ý — cần response
-            thô của lớp HTTP, làm ở cụm 1); `status()` trả kiểu testkit ở PR gỡ đường cũ
+            khỏi `[dev-dependencies]`; `examples/external-module` dùng `autoxide_testkit::http`. Còn: `idempotency`
+            (test tự dựng endpoint trả mã và header tuỳ ý — cần response thô của lớp HTTP, làm ở cụm 1);
+            `http::Client::new(axum::Router)` và `TestApp::router()` lộ `axum` — đổi khi `autoxide_kernel::http::build`
+            thôi trả `axum::Router`; `TestResponse::status()` / `headers()` / `body(Body)` và trường
+            `McpClientError::status` (kiểu `http`) gắn `#[deprecated]` khi không test nào trong repo còn gọi, gỡ bản minor
+            sau; `status_code()` là hàm ở lại sau 1.0 (không đổi kiểu trả về của `status()`)
       - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
             của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
-            (D-20261127-http-layer-choices). Đã quyết: bỏ — derive sinh mã kiểm của kernel, impl chung gỡ khi module cuối
-            bỏ `validator` (D-20261128-library-layer-plan mục 2); còn phần làm
+            (D-20261127-http-layer-choices). Đã quyết: bỏ (D-20261128-library-layer-plan mục 2). Đã làm: derive của kernel
+            cài thẳng `http::Validate`, gọi hàm kiểm của kernel (`http::check`), lỗi trùng từng trường với derive của
+            `validator` (test so). Còn: gỡ impl chung `impl<T: validator::Validate> Validate for T` và `From<ValidationErrors>
+            for Error` khi module cuối bỏ `validator` (theo cụm)
       - [ ] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
             cần chúng
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
