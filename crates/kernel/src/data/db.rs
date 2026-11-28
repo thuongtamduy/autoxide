@@ -96,8 +96,8 @@
 //! struct Order { id: uuid::Uuid, tenant_id: TenantKey }
 //! ```
 //!
-//! The library types stay inside the kernel; a few library *trait impls* on these types (to let kernel
-//! functions that still take a connection accept a handle) are not part of the contract.
+//! The library types stay inside the kernel. Kernel functions that write alongside a module take
+//! `&impl Executor`, which every handle is.
 
 mod bounded;
 mod check;
@@ -120,12 +120,14 @@ pub(crate) use check::register_control_plane;
 pub use check::register_control_plane_for_tests;
 #[doc(hidden)]
 pub use handle::Connection;
+pub(crate) use handle::Via;
 #[cfg(feature = "testing")]
 #[doc(hidden)]
 pub use handle::all_tenants_for_tests;
 pub use handle::{
     AcceptedBy, Access, AllTenants, AllTenantsRead, AllTenantsTx, ControlPlane, ControlPlaneOnly,
-    EveryTenant, GlobalRead, GlobalTx, Handle, InTenant, Read, TenantDb, TenantRead, TenantTx, Tx,
+    EveryTenant, Executor, GlobalRead, GlobalTx, Handle, InTenant, Read, TenantDb, TenantRead,
+    TenantTx, Tx,
 };
 pub use query::{Find, Grouped, HasId, Queries, Sub};
 pub use record::{

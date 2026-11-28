@@ -120,8 +120,9 @@ Rules, as in [Cargo's SemVer guide](https://doc.rust-lang.org/cargo/reference/se
   required trait method without a default, …) happens only in a **major** release.
 - Before it is removed, an item is marked `#[deprecated]` with a note naming the replacement, for at
   least one minor release.
-- New features for modules arrive as new trait methods **with a default implementation**, so existing
-  modules compile unchanged.
+- New features for modules arrive as new builder functions of `Manifest` or new registration functions
+  of `StartContext` (see [Declaring a module](MODULE_GUIDE.md#declaring-a-module)), so existing modules
+  compile unchanged.
 - `cargo-semver-checks` compares these crates with the previous release on every pull request that
   touches them and on every release pull request; from 1.0 a break fails the check.
 - A new major version of a third-party library does **not** force a major release of Autoxide, and
@@ -141,6 +142,37 @@ Rules, as in [Cargo's SemVer guide](https://doc.rust-lang.org/cargo/reference/se
 - The minimum supported Rust version follows recent stable Rust (`rust-toolchain.toml`). Raising it
   happens only in a minor release, never in a patch release, and is listed in the changelog.
 
+#### Contract tiers of the Rust API
+
+The public Rust API has three tiers (D-20261126-contract-tiers). Only the first is covered by the rules above.
+
+| Tier | Where | Promise |
+| ---- | ----- | ------- |
+| **Stable** | `autoxide_kernel::<module>`, `autoxide_testkit`, `autoxide::Autoxide`, `api` of core and official modules | Semantic Versioning from 1.0: breaks only in a major release, `#[deprecated]` for at least one minor release first |
+| **Experimental** | `autoxide_kernel::unstable::<module>`, behind the kernel Cargo feature `unstable` (off by default) | May change in any minor release; every change is in the changelog. A module that uses it turns the feature on, so it is plain what it relies on |
+| **Internal** | The `autoxide-host` crate: what only the `autoxide` binary uses (backup, transfer, logging setup, kernel routes…) | None: not a dependency of modules |
+
+The experimental tier holds the contracts of provider connectors (`einvoice`, `zns`, `voice`, `sms`, `push`,
+`payment`), features whose shape is still settling (`blocks`, `analytics`, `report`, `automation`,
+`custom_fields`, `sync`, the operations helpers such as `find`, `suggest`, `summary`, `work`, `tags`, `bulk`…)
+and the advanced multi-tenant parts (`tenancy::{sandbox, distribution, moves, domains, site, link_token}`). The
+full list is in [`docs/research/kernel-contract-1-0.md`](research/kernel-contract-1-0.md#21-phân-loại-70-mô-đun-hiện-có)
+(§2.1); moving an item to the stable tier is a recorded decision. In a [`Manifest`](MODULE_GUIDE.md#declaring-a-module)
+the experimental concepts are declared through `Manifest::unstable`.
+
+Before 1.0 these items still live at their current paths; they move to `unstable::` (and `bench_seed` to the
+testkit) in one release before 1.0, listed under **Breaking (Rust)** in the changelog. Until then, treat the items
+in the list above as experimental wherever they are.
+
+The tier of a **module** (`official` / `experimental`, [`docs/MODULES.md`](MODULES.md)) is separate from the tier of
+the kernel API: an official module may use experimental kernel items inside, but its `api` never exposes them.
+
+Public enums and structs of the stable tier that are expected to grow are `#[non_exhaustive]` (build structs with
+their constructor, add a `_ =>` arm when matching enums); adding a variant or a field to them is not a break. Today
+this is done for the module contract (`Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `Manifest`
+has no public fields) and for some operations types; the rest of the stable tier gets it, with a check in
+`cargo xtask check`, before 1.0.
+
 ### TypeScript SDK
 
 The SDK (`sdk/typescript`) is generated from `docs/openapi.json` and carries the same version. It
@@ -158,6 +190,8 @@ These may change in any release, including patch releases where it fixes a bug:
 - Anything marked **experimental** elsewhere: OpenAPI operations with `"x-stability":
   "experimental"`, MCP tools with `"stability": "experimental"`, and features whose documentation
   says "experimental".
+- The experimental and internal tiers of the Rust API (see [Contract tiers of the Rust
+  API](#contract-tiers-of-the-rust-api)).
 - Rust items that are not public: `pub(crate)` and private items, `#[doc(hidden)]` items, and
   everything in a module crate outside `api` and `module(…)`. The sample module `notes` and the
   `xtask` crate are not part of the contract at all.

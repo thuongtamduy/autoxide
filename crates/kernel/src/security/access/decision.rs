@@ -185,12 +185,13 @@ impl Principal {
     /// The single decision function for one record: whether the caller may use `permission` on `target`.
     /// [`require_at`](Self::require_at) turns the result into an error; lists use
     /// [`scope_condition`](Self::scope_condition), generated from the same rule.
-    pub async fn check<D: ConnectionTrait>(
+    pub async fn check<D: crate::db::Executor>(
         &self,
         db: &D,
         permission: &Permission,
         target: OrgTarget,
     ) -> Result<Decision, Error> {
+        let db = &crate::db::Via::of(db);
         let Some(reach) = self.reach(permission) else { return Ok(Decision::Missing) };
         self.fresh_for(permission)?;
         Ok(if reach.covers(db, target).await? { Decision::Allow } else { Decision::OutOfScope })
@@ -233,12 +234,13 @@ impl Principal {
     /// Checks `permission` on a record (read / edit / delete) or the target node of a create / move command:
     /// missing permission -> `permission_denied`; outside the scope -> `org_out_of_scope`. For a read outside
     /// the scope the service returns 404 instead of this error (the record's existence is not revealed).
-    pub async fn require_at<D: ConnectionTrait>(
+    pub async fn require_at<D: crate::db::Executor>(
         &self,
         db: &D,
         permission: &Permission,
         target: OrgTarget,
     ) -> Result<(), Error> {
+        let db = &crate::db::Via::of(db);
         match self.check(db, permission, target).await? {
             Decision::Allow => Ok(()),
             Decision::Missing => Err(self.refuse(permission)),
@@ -248,12 +250,13 @@ impl Principal {
 
     /// Like [`require_at`](Self::require_at), plus: the target node and all its ancestors must be active
     /// (otherwise `org_frozen`). Call it INSIDE the module's write transaction.
-    pub async fn require_write_at<D: ConnectionTrait>(
+    pub async fn require_write_at<D: crate::db::Executor>(
         &self,
         transaction: &D,
         permission: &Permission,
         target: OrgTarget,
     ) -> Result<(), Error> {
+        let transaction = &crate::db::Via::of(transaction);
         self.require_at(transaction, permission, target).await?;
         OrgTree::ensure_writable(transaction, self.tenant_id(), target.org).await
     }

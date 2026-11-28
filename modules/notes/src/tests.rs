@@ -9,9 +9,9 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
 
 use autoxide_kernel::db::Queries as _;
+use autoxide_testkit::http::{Method, StatusCode};
 use autoxide_testkit::mcp::McpClient;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
-use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -51,7 +51,7 @@ async fn rest(
     who: &str,
     body: Option<Value>,
 ) -> (StatusCode, Value) {
-    let method = Method::from_bytes(method.as_bytes()).unwrap();
+    let method = Method::from_name(method).unwrap();
     let mut request = app
         .request(method, &format!("/api/v1/notes{uri}"))
         .token(who)
@@ -60,7 +60,7 @@ async fn rest(
         request = request.json(body);
     }
     let answer = request.send().await.unwrap();
-    (answer.status(), answer.json())
+    (answer.status_code(), answer.json())
 }
 
 async fn mcp(app: &TestApp, who: &str) -> McpClient {
@@ -392,7 +392,7 @@ async fn permission_cua_toi_kem_mo_ta_va_rui_ro() {
         let answer =
             app.get("/api/v1/me/permissions").token("bob").header("accept-language", "vi").send();
         let answer = answer.await.unwrap();
-        assert_eq!(answer.status(), StatusCode::OK);
+        assert_eq!(answer.status_code(), StatusCode::OK);
         assert_eq!(
             answer.json()["data"],
             json!([{"name": "notes.read", "description": "Xem ghi chú trong phạm vi của bạn (độ sâu `own`: chỉ ghi chú của chính bạn).", "risk": "read"}])
@@ -404,7 +404,7 @@ async fn permission_cua_toi_kem_mo_ta_va_rui_ro() {
         assert_eq!(names, ["notes.read", "notes.write"]);
         assert_eq!(english.json()["data"][1]["description"], "Create, change and delete the notes in your scope (with scope `own`: only your own).");
         let anonymous = app.get("/api/v1/me/permissions").send().await.unwrap();
-        assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(anonymous.status_code(), StatusCode::UNAUTHORIZED);
     })
     .await
     .unwrap();

@@ -119,5 +119,7 @@
   "text:ready for pickup at the store": "đã sẵn sàng để nhận tại cửa hàng",
   "text:collected at the store": "đã được nhận tại cửa hàng",
   "text:cancelled": "đã huỷ",
-  "text:reported lost by the carrier; the shop will contact you": "hãng vận chuyển báo thất lạc; cửa hàng sẽ liên hệ với bạn"
+  "text:reported lost by the carrier; the shop will contact you": "hãng vận chuyển báo thất lạc; cửa hàng sẽ liên hệ với bạn",
+  "shipping.load_too_large": "Hàng nặng hơn {max_grams} gram (cân thật hay cân quy đổi), mức tối đa của một lần giao. Hãy kiểm tra cân nặng và kích thước đã gửi, hoặc chia hàng thành nhiều vận đơn.",
+  "field:must be 0 to {max}": "phải từ 0 đến {max}"
 }

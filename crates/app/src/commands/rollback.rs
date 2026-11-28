@@ -344,7 +344,19 @@ mod tests {
     use autoxide_kernel::tenancy::{NewPlacement, PlacementKind, TenancyConfig, TenancyMode};
     use autoxide_testkit::TestDatabase;
 
+    /// Migration cũ nhất của kernel có ở bản "mới" của bảng phiên bản giả; mọi migration kernel sau nó cũng thuộc bản
+    /// mới (migration sau thêm vào không làm bài này đỏ).
     const NEWEST: &str = "kernel/m0043_migration_run_kind";
+
+    /// Các migration kernel từ [`NEWEST`] trở đi, theo thứ tự chạy.
+    fn newest(names: &[String]) -> Vec<String> {
+        names
+            .iter()
+            .skip_while(|name| name.as_str() != NEWEST)
+            .filter(|name| name.starts_with("kernel/"))
+            .cloned()
+            .collect()
+    }
 
     fn arguments(dry_run: bool, accept: bool, yes: bool) -> Arguments {
         Arguments {
@@ -418,7 +430,10 @@ mod tests {
             let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
             let settings = crate::settings::read(&source).unwrap();
             let migrator = settings.modules.migrator().unwrap().keyed_on(&setup.database);
-            let releases = releases(migrator.names(), &[NEWEST]);
+            let newer = newest(&migrator.names());
+            assert_eq!(newer.first().map(String::as_str), Some(NEWEST));
+            let releases =
+                releases(migrator.names(), &newer.iter().map(String::as_str).collect::<Vec<_>>());
             let context = Context {
                 releases: &releases,
                 migrator: &migrator,
@@ -440,8 +455,16 @@ mod tests {
                 "{}",
                 dry.output
             );
-            // `kind` chỉ có giá trị mặc định (`placements`), hai cột phiên bản toàn NULL: lùi không mất gì.
-            assert!(!dry.output.contains("Drops"), "{}", dry.output);
+            // `kind` chỉ có giá trị mặc định (`placements`), hai cột phiên bản toàn NULL, bảng mới của các migration
+            // sau còn trống: lùi không mất gì (bảng trống bị bỏ vẫn được liệt kê, với 0 dòng).
+            assert!(
+                dry.output
+                    .lines()
+                    .filter(|line| line.starts_with("Drops"))
+                    .all(|line| line.starts_with("Drops table") && line.ends_with("(0 row(s))")),
+                "{}",
+                dry.output
+            );
             assert!(
                 migrator.pending(&setup.database).await.unwrap().is_empty(),
                 "chạy thử không đổi gì"
@@ -461,7 +484,7 @@ mod tests {
                 done.output
             );
             for target in [&setup.database, &setup.p1] {
-                assert_eq!(pending(&migrator, target).await, [NEWEST]);
+                assert_eq!(pending(&migrator, target).await, newer);
             }
             let again =
                 execute(&arguments(true, false, false), &context, &mut main_lock).await.unwrap();

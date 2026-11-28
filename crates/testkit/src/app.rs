@@ -42,6 +42,7 @@ use std::sync::Arc;
 
 use crate::statements::StatementLog;
 
+use crate::http::Method;
 use crate::mcp::{CallToolRequestParams, McpClient};
 use autoxide_kernel::access::{Authenticator, Grant, Principal};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
@@ -56,7 +57,7 @@ use autoxide_kernel::tenancy::{
 };
 use axum::Router;
 use axum::body::Body;
-use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode, header};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, Request, StatusCode, header};
 use serde_json::Value;
 use tower::ServiceExt as _;
 use utoipa::openapi::OpenApi;
@@ -272,13 +273,19 @@ impl TestApp {
     }
 
     /// Starts a request. `uri` is the full path, e.g. `/api/v1/notes/{id}`.
-    pub fn request(&self, method: Method, uri: &str) -> TestRequest<'_> {
+    pub fn request(&self, method: impl Into<Method>, uri: &str) -> TestRequest<'_> {
+        let method = method.into();
+        let builder = match method.to_http() {
+            Ok(http_method) => Request::builder().method(http_method),
+            // Tên method đã được `Method` kiểm là token; còn lỗi thì để `send` báo qua bộ dựng.
+            Err(_) => Request::builder().method(method.as_str()),
+        };
         TestRequest {
             app: self,
             method: method.to_string(),
             path: uri.split('?').next().unwrap_or(uri).to_owned(),
             checked: true,
-            builder: Request::builder().method(method).uri(uri),
+            builder: builder.uri(uri),
             body: None,
         }
     }
@@ -842,8 +849,16 @@ pub struct TestResponse {
 }
 
 impl TestResponse {
+    /// The status as the `http` crate's type. Old path: new tests use [`status_code`](Self::status_code), so they
+    /// do not depend on `http` / `axum`; from 1.0 `status()` returns the test kit's type.
     pub fn status(&self) -> StatusCode {
         self.status
+    }
+
+    /// The status (`assert_eq!(response.status_code(), StatusCode::CREATED)` with
+    /// [`autoxide_testkit::http::StatusCode`](crate::http::StatusCode)).
+    pub fn status_code(&self) -> crate::http::StatusCode {
+        crate::http::StatusCode::from(self.status)
     }
 
     pub fn headers(&self) -> &HeaderMap {

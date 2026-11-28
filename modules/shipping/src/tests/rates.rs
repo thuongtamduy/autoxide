@@ -422,3 +422,61 @@ async fn tool_mcp_bao_gia_nhu_rest() {
     .await
     .unwrap();
 }
+
+/// P17: cân nặng, kích thước, số lượng vượt trần hay tải quá trần một lần giao báo 422 có mã, không bão
+/// hoà về `i64::MAX`; phí bậc tràn `i64` báo `money.overflow` thay vì bão hoà.
+#[tokio::test]
+async fn can_nang_vuot_tran_bao_loi_khong_bao_hoa() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = shop(test).await;
+        standard(&app, &tree).await;
+        let ask = |items: Value| {
+            json!({"org_id": tree.a.as_uuid(), "destination": hanoi(), "items": items,
+                   "order_value": vnd(0)})
+        };
+        // Một món nặng hơn 10 tấn, số lượng quá trần, cạnh quá dài: lỗi theo trường, báo một lần.
+        let wild = json!([{"variant_id": Uuid::now_v7(), "quantity": i64::MAX,
+                           "weight_grams": i64::MAX, "length_mm": i64::MAX}]);
+        let (status, problem) = call(&app, "POST", "/quote", "boss", Some(ask(wild))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let fields: Vec<&str> =
+            problem["errors"].as_array().unwrap().iter().filter_map(|e| e["field"].as_str()).collect();
+        assert_eq!(
+            fields,
+            ["items[0].quantity", "items[0].weight_grams", "items[0].length_mm"],
+            "{problem}"
+        );
+        // Từng món trong trần nhưng cộng lại quá trần một lần giao (10 tấn × 101 > 1 000 tấn).
+        let (status, problem) =
+            call(&app, "POST", "/quote", "boss", Some(ask(json!([item(10_000_000, 101)])))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["code"], "shipping.load_too_large", "{problem}");
+        // Cân quy đổi của một hộp cực lớn cũng vậy.
+        let huge = json!([{"variant_id": Uuid::now_v7(), "quantity": 1, "weight_grams": 1,
+                           "length_mm": 10_000_000, "width_mm": 10_000_000, "height_mm": 10_000_000}]);
+        let (status, problem) = call(&app, "POST", "/quote", "boss", Some(ask(huge))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["code"], "shipping.load_too_large", "{problem}");
+        // Đúng trần vẫn báo giá được.
+        let max = quote(&app, "boss", tree.a, hanoi(), json!([item(10_000_000, 100)]), 0).await;
+        assert_eq!(max["options"][0]["chargeable_weight_grams"], 1_000_000_000_i64, "{max}");
+
+        // Bậc phí có bước rất đắt: số bước × giá bước tràn `i64` → `money.overflow`, không bão hoà.
+        let all = zone(&app, "boss", tree.chain, "Ca nuoc", json!([{"country": "VN"}])).await;
+        let bulk = method(&app, "boss", tree.chain, "bulk", json!({})).await;
+        rates(
+            &app,
+            "boss",
+            &bulk,
+            json!([{"zone_id": all, "min_weight_grams": 0, "amount": vnd(0),
+                    "step_grams": 1, "step_amount": vnd(i64::MAX / 2)}]),
+        )
+        .await;
+        let (status, problem) =
+            call(&app, "POST", "/quote", "boss", Some(ask(json!([item(1_000, 1)])))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["code"], "money.overflow", "{problem}");
+    })
+    .await
+    .unwrap();
+}

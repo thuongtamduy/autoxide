@@ -11,5 +11,6 @@
   "ghn.address_not_recognized": "GHN không nhận ra địa chỉ (tên tỉnh / phường xã). Hãy kiểm tra địa chỉ rồi thử lại.",
   "ghn.route_not_supported": "GHN không phục vụ tuyến này với dịch vụ đã chọn. Hãy chọn dịch vụ hoặc hãng khác.",
   "ghn.order_not_found": "GHN không tìm thấy đơn này trong tài khoản.",
-  "ghn.webhook_body": "Thân webhook không phải JSON như tài liệu của GHN mô tả."
+  "ghn.webhook_body": "Thân webhook không phải JSON như tài liệu của GHN mô tả.",
+  "ghn.parcel_too_large": "Các kiện nặng hơn {max_grams} gram cộng lại, hoặc có cạnh dài hơn {max_side_mm} mm. Hãy kiểm tra cân nặng và kích thước của các kiện."
 }
