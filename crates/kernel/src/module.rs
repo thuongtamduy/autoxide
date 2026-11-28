@@ -982,14 +982,30 @@ impl StartContext<'_> {
     ///
     /// It is also the one way to plug into the kernel's extension points: initial data for a new tenant
     /// (`dyn TenantSeed`), sample data (`dyn SampleData`), sandbox copy (`dyn SandboxCopy`), personal data
-    /// (`dyn PersonalData`), work inbox, search, summary metrics, list exports, bulk actions, code resolvers,
+    /// (`dyn PersonalData`), relocation switch hooks (`dyn SwitchHook`), work inbox, search, summary metrics,
+    /// list exports, bulk actions, code resolvers,
     /// setup steps, connection probes, references and the posting verifier — see the table in the
     /// `module::contribute` source, and `docs/MODULE_GUIDE.md`. The older one-function-per-concept
     /// registrations (`personal_data`, `work_source`…) still work during the transition.
+    ///
+    /// Always name the trait: `contribute::<dyn Trait>(…)`. Without it the compiler picks the concrete type
+    /// (`contribute(Arc::new(seed))` contributes a `Seed`, not a `dyn TenantSeed`) and nobody would ever read it;
+    /// such a call is an error at start.
     pub fn contribute<T>(&mut self, api: Arc<T>) -> Result<(), Error>
     where
         T: ?Sized + Send + Sync + 'static,
     {
+        // Thiếu `::<dyn Trait>` thì `T` là kiểu cụ thể (có kích thước cố định): con trỏ tới nó là con trỏ "mỏng", bằng
+        // con trỏ thường. Con trỏ tới `dyn Trait` là con trỏ "béo" (kèm bảng hàm) nên to gấp đôi. Không ai đọc đóng
+        // góp theo kiểu cụ thể, nên chặn ngay thay vì để mất im lặng.
+        if std::mem::size_of::<*const T>() == std::mem::size_of::<*const ()>() {
+            return Err(Error::internal(format!(
+                "module `{}` contributes `{}`, a concrete type, so nobody would read it: name the trait, \
+                 `context.contribute::<dyn Trait>(Arc::new(…))`",
+                self.module,
+                std::any::type_name::<T>()
+            )));
+        }
         // `&api` (một `&Arc<T>`) tự đổi thành `&dyn Any` để kernel thử từng registry của nó.
         if let Some(registered) = self.contribute_to_kernel(&api) {
             return registered;

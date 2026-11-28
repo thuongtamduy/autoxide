@@ -126,6 +126,8 @@ impl MigrationTrait for CreateShop {
 struct Shop {
     /// Hook của bước chuyển (D-20261119-relocation-switch-hook), nếu test cần.
     hook: Option<std::sync::Arc<Gate>>,
+    /// Hook đóng góp trong `start` (`contribute::<dyn SwitchHook>`, D-20261128-contribute) thay cho `on_switch`.
+    contributed: Option<std::sync::Arc<Gate>>,
 }
 
 /// Hook mẫu: lỗi khi `fail` bật, ghi lại các lượt đã chạy qua.
@@ -170,6 +172,18 @@ impl Module for Shop {
             ),
             autoxide_kernel::event::outbox_access_migration("k0001_event_access", "shop"),
         ]
+    }
+
+    fn start(
+        &mut self,
+        context: &mut autoxide_kernel::module::StartContext<'_>,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        match &self.contributed {
+            Some(hook) => {
+                context.contribute::<dyn autoxide_kernel::tenancy::SwitchHook>(hook.clone())
+            }
+            None => Ok(()),
+        }
     }
 
     fn relocation(&self) -> Relocation {
@@ -765,10 +779,25 @@ async fn relocation_api_chi_nhan_su_nen_tang_mac_dinh_dry_run_khach_chi_gui_yeu_
 /// đứng ở `verified`; hết lỗi thì chạy tiếp và hook thấy đúng loại, nguồn, đích.
 #[tokio::test]
 async fn hook_buoc_chuyen_loi_thi_khach_moi_khong_mo() {
+    switch_hook_case(false).await;
+}
+
+/// Như trên, với hook đóng góp trong `start` bằng `contribute::<dyn SwitchHook>` (đường mới).
+#[tokio::test]
+async fn hook_dong_gop_bang_contribute_chay_o_buoc_chuyen() {
+    switch_hook_case(true).await;
+}
+
+async fn switch_hook_case(contributed: bool) {
     TestDatabase::run(async |test| {
         let gate = std::sync::Arc::new(Gate::default());
         gate.fail.store(true, std::sync::atomic::Ordering::SeqCst);
-        let app = app_with(test, Shop { hook: Some(gate.clone()) }).await;
+        let shop = if contributed {
+            Shop { hook: None, contributed: Some(gate.clone()) }
+        } else {
+            Shop { hook: Some(gate.clone()), contributed: None }
+        };
+        let app = app_with(test, shop).await;
         let seeded = seed(&app).await;
         let service = app.api::<TenantRelocations>().unwrap();
         let started =

@@ -16,8 +16,8 @@ use autoxide_kernel::module::{Manifest, Module, Modules, StartContext};
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::tenancy::sandbox::{CopyContext, SandboxCopy};
 use autoxide_kernel::tenancy::{
-    DatabaseRegistry, NewTenant, SampleData, TenancyConfig, TenancyMode, TenantAdmin,
-    TenantContext, TenantId, TenantSeed,
+    DatabaseRegistry, NewTenant, Relocation, RelocationSwitch, SampleData, SwitchHook,
+    TenancyConfig, TenancyMode, TenantAdmin, TenantContext, TenantId, TenantSeed,
 };
 use autoxide_testkit::TestDatabase;
 use serde_json::{Value, json};
@@ -112,6 +112,50 @@ impl Module for TwiceCopy {
     }
 }
 
+/// Hook của bước chuyển không làm gì.
+struct NoHook;
+
+#[async_trait::async_trait]
+impl SwitchHook for NoHook {
+    async fn switch(
+        &self,
+        _control: &sea_orm::DatabaseTransaction,
+        _relocation: &RelocationSwitch,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Module kiểu cũ thêm hook bằng `Relocation::on_switch` và còn đóng góp `dyn SwitchHook`.
+struct TwiceHook;
+
+impl Module for TwiceHook {
+    fn name(&self) -> &'static str {
+        "twice_hook"
+    }
+
+    fn relocation(&self) -> Relocation {
+        Relocation::new().on_switch(Arc::new(NoHook))
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        context.contribute::<dyn SwitchHook>(Arc::new(NoHook))
+    }
+}
+
+/// Gọi `contribute` thiếu `::<dyn …>`: kiểu cụ thể, không ai đọc — bị chặn.
+struct Untyped;
+
+impl Module for Untyped {
+    fn manifest(&self) -> Manifest {
+        Manifest::new("untyped", "Forgets the trait.")
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        context.contribute(Arc::new(Counter::default()))
+    }
+}
+
 /// Đóng góp một trait của kernel hai lần: registry của kernel báo lỗi như hàm đăng ký cũ.
 struct TwicePersonal;
 
@@ -199,6 +243,18 @@ async fn ham_cu_va_contribute_cung_khai_niem_bi_tu_choi() {
     })
     .await
     .unwrap();
+    TestDatabase::run(async |test| {
+        let (hook, _) = started(test, vec![Box::new(TwiceHook)]).await;
+        let error = hook.err().unwrap();
+        assert!(
+            error.contains(
+                "`twice_hook` adds a switch hook with `Relocation::on_switch` and also contributes"
+            ),
+            "{error}"
+        );
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -207,6 +263,20 @@ async fn dong_gop_trung_vao_registry_cua_kernel_bi_tu_choi() {
         let (modules, _) = started(test, vec![Box::new(TwicePersonal)]).await;
         let error = modules.err().unwrap();
         assert!(error.contains("twice_personal"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn contribute_thieu_dyn_trait_bi_chan() {
+    TestDatabase::run(async |test| {
+        let (modules, _) = started(test, vec![Box::new(Untyped)]).await;
+        let error = modules.err().unwrap();
+        assert!(
+            error.contains("module `untyped` contributes") && error.contains("a concrete type"),
+            "{error}"
+        );
     })
     .await
     .unwrap();
