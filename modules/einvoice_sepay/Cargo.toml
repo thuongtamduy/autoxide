@@ -21,7 +21,6 @@ serde_json.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
-axum.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 

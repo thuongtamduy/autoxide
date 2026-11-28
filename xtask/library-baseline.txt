@@ -3,7 +3,7 @@
 # xoá dòng của nó (gate chỉ cảnh báo khi số thật nhỏ hơn). Không thêm dòng cho code mới.
 #
 # - `wrapped-libraries`: module còn khai thư viện trong `wrapped-libraries.txt` ở `[dependencies]` (đếm theo số thư viện).
-# - `wrapped-libraries-dev`: như trên, ở `[dev-dependencies]` (test, bench); chờ testkit bọc kiểu `http`.
+# - `wrapped-libraries-dev`: như trên, ở `[dev-dependencies]` (test, bench); test dùng `autoxide_testkit::http` thay kiểu `http`.
 # - `raw-sql`: số chỗ gọi `.sql(` trong mã không phải test của file.
 # - `raw-database`: số chỗ gọi `.database()` (database thô, không lọc khách) trong mã không phải test của file.
 
@@ -45,10 +45,7 @@ wrapped-libraries 7 modules/shipping/Cargo.toml
 wrapped-libraries 7 modules/support/Cargo.toml
 wrapped-libraries 6 modules/tax/Cargo.toml
 wrapped-libraries 7 modules/webhooks/Cargo.toml
-wrapped-libraries-dev 1 modules/einvoice_sepay/Cargo.toml
-wrapped-libraries-dev 1 modules/esms/Cargo.toml
 wrapped-libraries-dev 3 modules/idempotency/Cargo.toml
-wrapped-libraries-dev 1 modules/notes/Cargo.toml
 raw-database 3 modules/ai/src/usage.rs
 raw-database 6 modules/analytics/src/ingest.rs
 raw-database 3 modules/analytics/src/privacy.rs

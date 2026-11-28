@@ -182,9 +182,12 @@ impl<A: Access> Tx<A> {
 #[doc(hidden)]
 pub struct Connection<'a>(Inner<'a>);
 
+#[derive(Clone, Copy)]
 enum Inner<'a> {
     Read(&'a DatabaseConnection),
     Write(&'a DatabaseTransaction),
+    // Kết nối của đường cũ (`Database::read()`, `begin_write()`…) đi qua `Executor` trong lúc chuyển.
+    Legacy(&'a (dyn RawConnection + 'a)),
 }
 
 impl Connection<'_> {
@@ -192,13 +195,17 @@ impl Connection<'_> {
         match self.0 {
             Inner::Read(connection) => connection.get_database_backend(),
             Inner::Write(transaction) => transaction.get_database_backend(),
+            Inner::Legacy(connection) => connection.backend(),
         }
     }
 
     pub(crate) async fn all(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr> {
         match self.0 {
-            Inner::Read(connection) => connection.query_all_raw(statement).await,
-            Inner::Write(transaction) => transaction.query_all_raw(statement).await,
+            Inner::Read(connection) => ConnectionTrait::query_all_raw(connection, statement).await,
+            Inner::Write(transaction) => {
+                ConnectionTrait::query_all_raw(transaction, statement).await
+            }
+            Inner::Legacy(connection) => connection.raw_query_all(statement).await,
         }
     }
 
@@ -213,16 +220,19 @@ impl Connection<'_> {
             Inner::Read(connection) => {
                 super::bounded::all_within(connection, statement, limit).await
             }
-            Inner::Write(_) => {
-                Err(Error::internal("a time limit applies to reads on a read handle"))
+            Inner::Write(_) | Inner::Legacy(_) => {
+                Err(Error::internal("a time limit applies only to reads on a read handle of `db`"))
             }
         }
     }
 
     pub(crate) async fn execute(&self, statement: Statement) -> Result<u64, DbErr> {
         Ok(match self.0 {
-            Inner::Read(connection) => connection.execute_raw(statement).await?,
-            Inner::Write(transaction) => transaction.execute_raw(statement).await?,
+            Inner::Read(connection) => ConnectionTrait::execute_raw(connection, statement).await?,
+            Inner::Write(transaction) => {
+                ConnectionTrait::execute_raw(transaction, statement).await?
+            }
+            Inner::Legacy(connection) => connection.raw_execute(statement).await?,
         }
         .rows_affected())
     }
@@ -330,10 +340,119 @@ where
     if R::Scope::TENANT { handle.access().tenant() } else { None }
 }
 
-// Cầu chuyển tiếp (D-20261126-kernel-data-layer): các hàm kernel hiện còn nhận `&impl ConnectionTrait`
-// (`Outbox::record`, `SyncLog::changed`, `Principal::require_write_at`…) nhận được handle của khách mà module
-// không phải đụng tới SeaORM. KHÔNG thuộc hợp đồng (impl trait của thư viện trên kiểu của kernel); gỡ khi các
-// hàm đó chuyển sang nhận handle (PR 16 của đợt chuyển).
+/// What a kernel function that reads or writes alongside a module accepts (`Outbox::record`, `SyncLog`,
+/// `Principal::require_at`, `OneTimeTokens`…): a handle of `db` ([`TenantTx`], [`TenantRead`]…), so the kernel's
+/// own statements join the module's transaction. These functions build their statements themselves and filter
+/// by tenant themselves: through `Executor`, a handle only runs the kernel's own statements. Pass a write
+/// transaction to a function that writes; a read handle refuses writes when the statement runs.
+///
+/// Until every module has moved to `db`, the connections of the old path (`Database::read()`,
+/// `Database::begin_write()`) are accepted too; that part is not in the contract and goes away before 1.0.
+pub trait Executor: sealed_executor::Sealed + Sync {
+    #[doc(hidden)]
+    fn executor(&self) -> Connection<'_>;
+}
+
+mod sealed_executor {
+    // Niêm phong: chỉ kernel quyết kiểu nào là `Executor` (module ngoài không tự cài được).
+    pub trait Sealed {}
+    impl<C: sea_orm::ConnectionTrait> Sealed for C {}
+}
+
+// Mọi kết nối là `Executor`: kết nối SeaORM của module chưa chuyển, và — qua cầu `ConnectionTrait` ở dưới — handle
+// của `db`. Thứ tự khi gỡ cầu (D-20261128-library-layer-plan mục 5): xoá hai `impl ConnectionTrait` của `Read`/`Tx`
+// ở cuối file TRƯỚC, rồi mới thêm `impl Executor` + `impl Sealed` riêng cho chúng (trả `Inner::Read` /
+// `Inner::Write`) — còn cầu thì hai impl đó xung đột với impl chung. Impl chung ở lại tới khi module cuối đã chuyển.
+impl<C: ConnectionTrait> Executor for C {
+    fn executor(&self) -> Connection<'_> {
+        Connection(Inner::Legacy(self))
+    }
+}
+
+// Phần gọi được qua `dyn` của `ConnectionTrait` (trait đó có hàm generic nên không dùng `dyn` trực tiếp được).
+#[async_trait::async_trait]
+pub(crate) trait RawConnection: Sync {
+    fn backend(&self) -> DbBackend;
+    async fn raw_execute(&self, statement: Statement) -> Result<ExecResult, DbErr>;
+    async fn raw_execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr>;
+    async fn raw_query_one(&self, statement: Statement) -> Result<Option<QueryResult>, DbErr>;
+    async fn raw_query_all(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr>;
+}
+
+#[async_trait::async_trait]
+impl<C: ConnectionTrait> RawConnection for C {
+    fn backend(&self) -> DbBackend {
+        self.get_database_backend()
+    }
+    async fn raw_execute(&self, statement: Statement) -> Result<ExecResult, DbErr> {
+        ConnectionTrait::execute_raw(self, statement).await
+    }
+    async fn raw_execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr> {
+        ConnectionTrait::execute_unprepared(self, sql).await
+    }
+    async fn raw_query_one(&self, statement: Statement) -> Result<Option<QueryResult>, DbErr> {
+        ConnectionTrait::query_one_raw(self, statement).await
+    }
+    async fn raw_query_all(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr> {
+        ConnectionTrait::query_all_raw(self, statement).await
+    }
+}
+
+/// The connection of an [`Executor`], as a `ConnectionTrait` for the kernel's own statements. Kernel-only: it is
+/// never handed to a module.
+pub(crate) struct Via<'a>(Connection<'a>);
+
+impl<'a> Via<'a> {
+    pub(crate) fn of<E: Executor + ?Sized>(executor: &'a E) -> Self {
+        Via(executor.executor())
+    }
+}
+
+#[async_trait::async_trait]
+impl ConnectionTrait for Via<'_> {
+    fn get_database_backend(&self) -> DbBackend {
+        self.0.backend()
+    }
+    async fn execute_raw(&self, statement: Statement) -> Result<ExecResult, DbErr> {
+        match self.0.0 {
+            Inner::Read(connection) => ConnectionTrait::execute_raw(connection, statement).await,
+            Inner::Write(transaction) => ConnectionTrait::execute_raw(transaction, statement).await,
+            Inner::Legacy(connection) => connection.raw_execute(statement).await,
+        }
+    }
+    async fn execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr> {
+        match self.0.0 {
+            Inner::Read(connection) => ConnectionTrait::execute_unprepared(connection, sql).await,
+            Inner::Write(transaction) => {
+                ConnectionTrait::execute_unprepared(transaction, sql).await
+            }
+            Inner::Legacy(connection) => connection.raw_execute_unprepared(sql).await,
+        }
+    }
+    async fn query_one_raw(&self, statement: Statement) -> Result<Option<QueryResult>, DbErr> {
+        match self.0.0 {
+            Inner::Read(connection) => ConnectionTrait::query_one_raw(connection, statement).await,
+            Inner::Write(transaction) => {
+                ConnectionTrait::query_one_raw(transaction, statement).await
+            }
+            Inner::Legacy(connection) => connection.raw_query_one(statement).await,
+        }
+    }
+    async fn query_all_raw(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr> {
+        match self.0.0 {
+            Inner::Read(connection) => ConnectionTrait::query_all_raw(connection, statement).await,
+            Inner::Write(transaction) => {
+                ConnectionTrait::query_all_raw(transaction, statement).await
+            }
+            Inner::Legacy(connection) => connection.raw_query_all(statement).await,
+        }
+    }
+}
+
+// Cầu chuyển tiếp (D-20261126-kernel-data-layer). KHÔNG thuộc hợp đồng (impl trait của thư viện trên kiểu của
+// kernel). Hàm kernel đã nhận `Executor`, nên cầu chỉ còn giữ cho các chỗ module chạy câu SeaORM tự dựng trên handle
+// (OAuth của `auth`, `ledger`, `compliance`, `conversations`, `orders` — câu đó KHÔNG qua bộ lọc khách của handle).
+// Gỡ khi các chỗ đó chuyển sang `Record` (D-20261128-library-layer-plan mục 5); không thêm chỗ dùng mới.
 #[async_trait::async_trait]
 impl<A: Access> ConnectionTrait for Read<'_, A> {
     fn get_database_backend(&self) -> DbBackend {

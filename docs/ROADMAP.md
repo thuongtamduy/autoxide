@@ -134,12 +134,18 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       utoipa (gate kiểm)
       - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
             `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
-            (D-20261126-kernel-data-layer)
+            (D-20261126-kernel-data-layer). Đã có: hàm kernel tự dựng câu nhận `db::Executor` thay `ConnectionTrait`.
+            Còn: cầu chỉ còn giữ cho chỗ module chạy câu SeaORM trên handle (OAuth của `auth`, `ledger`, `compliance`
+            `phone_locks`, `conversations` `voice/recordings`, `orders` `payment_attempts`) — chuyển các chỗ đó sang
+            `Record` rồi gỡ cầu; `raw-database` về rỗng theo cụm (D-20261128-library-layer-plan mục 5, 6)
       - [x] Lớp HTTP: `#[endpoint]` (khai rõ ai được gọi, 401/403 chuẩn tự sinh), `routes!`, `Routes`,
             `#[derive(Schema/Params/Validate)]`, `Path`/`Query`/`State`, `NoContent`, `Download`, `async_trait`;
             `notes` không còn khai thư viện bọc ở `[dependencies]` (D-20261126-kernel-web-layer)
       - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
-            `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng
+            `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng. Đã có: `autoxide_testkit::http`
+            (`StatusCode`, `Method`, `Client` cho bench), `status_code()`; `notes`, `esms`, `einvoice_sepay` bỏ `axum`
+            khỏi `[dev-dependencies]`. Còn: `idempotency` (test tự dựng endpoint trả mã và header tuỳ ý — cần response
+            thô của lớp HTTP, làm ở cụm 1); `status()` trả kiểu testkit ở PR gỡ đường cũ
       - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
             của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
             (D-20261127-http-layer-choices). Đã quyết: bỏ — derive sinh mã kiểm của kernel, impl chung gỡ khi module cuối
