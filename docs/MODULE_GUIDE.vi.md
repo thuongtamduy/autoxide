@@ -111,6 +111,10 @@ mà hàm riêng cũ đăng ký:
 | `ops::summary::SummaryMetric`, `ops::list_exports::ExportSource`, `ops::bulk::BulkAction` | `summary_metric`, `export_source`, `bulk_action` |
 | `ops::resolve::CodeResolver`, `ops::setup::SetupStep`, `ops::connections::ConnectionProbe`, `ops::usages::ReferenceSource` | `code_resolver`, `setup_step`, `connection_probe`, `reference_source` |
 
+Luôn ghi rõ trait: `contribute(Arc::new(x))` thiếu `::<dyn Trait>` là đóng góp kiểu cụ thể, không ai đọc, và lỗi khi
+khởi động. Hook của bước chuyển đóng góp chạy sau hook khai bằng `Relocation::on_switch`; module đang nghỉ không khởi động
+nên không có hook đóng góp (D-20261128-contributed-switch-hooks).
+
 Đăng ký gắn một khoá với cài đặt giữ lệnh riêng: `resource_type`, `badge_source`, `block_data`, `taggable`,
 `usage_counter`, `search_documents`, `search_backend`. Getter cũ (`outbox()`, `sync_log()`, `entitlements()`…) và các hàm
 đăng ký cũ ở trên vẫn chạy trong lúc chuyển; code mới dùng `context.kernel::<H>()` và `contribute`, `cargo xtask check`
@@ -578,8 +582,8 @@ Module như `comments` gắn dữ liệu vào bản ghi của module khác mà k
 - `context.badge_source(kind, &["seller"], resolver)` tính nhãn của tác giả trên bản ghi của loại bất
   kỳ, vd `seller` cho người quản lý sản phẩm. Mỗi nhãn của một loại do một module tính; nhãn là mã ổn
   định, không phải câu chữ.
-- `context.posting_verifier(…)` (một module trong cả chương trình) trả lời tài khoản đã xác thực để
-  đăng nội dung chưa (số điện thoại hay định danh); `context.posting_verification()` để hỏi. Chưa ai
+- `context.contribute::<dyn PostingVerifier>(…)` (một module trong cả chương trình) trả lời tài khoản đã xác thực để
+  đăng nội dung chưa (số điện thoại hay định danh); `context.kernel::<PostingVerification>()` để hỏi. Chưa ai
   đăng ký thì mọi tài khoản đăng nhập tính là đã xác thực.
 
 ### Dữ liệu cá nhân
@@ -773,11 +777,11 @@ của nó (bước 51). Mọi mục dưới đây đều tuỳ chọn (mặc đ�
 
 - **Menu**: `Module::navigation` — nhóm và mục kèm permission, tính năng của gói, bộ đếm việc. Nhãn
   viết tiếng Anh, dịch qua khoá `text:` của module.
-- **Hộp việc**: `context.work_source(…)` — một `WorkSource` tính việc từ dữ liệu (không có cờ "đã
+- **Hộp việc**: `context.contribute::<dyn WorkSource>(…)` — một `WorkSource` tính việc từ dữ liệu (không có cờ "đã
   xong"), kèm số đếm cho menu. Mỗi việc có khoá ổn định `<nguồn>:<id bản ghi>`, nên người dùng hoãn
   và giao được.
-- **Tìm và mã**: `context.finder_source(…)` (một `FinderSource`; `fields` và `scoped` khi nó hiểu
-  `trường:giá trị` và `scope=`) và `context.code_resolver(…)` (số đơn, đường dẫn trang… cho
+- **Tìm và mã**: `context.contribute::<dyn FinderSource>(…)` (một `FinderSource`; `fields` và `scoped` khi nó hiểu
+  `trường:giá trị` và `scope=`) và `context.contribute::<dyn CodeResolver>(…)` (số đơn, đường dẫn trang… cho
   `GET /api/v1/kernel/resolve`).
 - **Chỉ mục tìm kiếm** (bảng lớn, bước 40 P7): `context.search_documents(kind, source)` khai một loại
   tài liệu tìm được (`SearchKind`: trường kèm trọng số, bộ lọc so bằng, permission để đọc) và một
@@ -788,13 +792,13 @@ của nó (bước 51). Mọi mục dưới đây đều tuỳ chọn (mặc đ�
   máy. Bộ máy mặc định là database; module khác thêm bộ máy bằng `context.search_backend(name, …)`,
   chọn bằng `AUTOXIDE_SEARCH_BACKEND`, không module nào phải sửa. `autoxide task kernel.reindex`
   dựng lại chỉ mục.
-- **Số liệu và thiết lập**: `context.summary_metric(…)` (`MetricInfo` luôn kèm câu định nghĩa) và
-  `context.setup_step(…)` (xong hay chưa tính từ dữ liệu).
+- **Số liệu và thiết lập**: `context.contribute::<dyn SummaryMetric>(…)` (`MetricInfo` luôn kèm câu định nghĩa) và
+  `context.contribute::<dyn SetupStep>(…)` (xong hay chưa tính từ dữ liệu).
 - **Hoạt động**: `EventInfo::activity(…)` cho event một câu đọc được; ghi chú và lịch sử của mọi bản
   ghi trong sổ đối tượng do kernel lo.
 - **Danh sách**: mọi endpoint danh sách (`GET` có `cursor`) tự có `x-autoxide-filters` từ chính
-  tham số query của nó — giữ chúng trong một struct `IntoParams`. Xuất: `context.export_source(…)`
-  với id của danh sách. Thao tác hàng loạt: `context.bulk_action(…)`; hành động phải chịu được việc
+  tham số query của nó — giữ chúng trong một struct `IntoParams`. Xuất: `context.contribute::<dyn ExportSource>(…)`
+  với id của danh sách. Thao tác hàng loạt: `context.contribute::<dyn BulkAction>(…)`; hành động phải chịu được việc
   làm lại.
 - **Lệnh rủi ro**: thêm `("x-approval" = json!("agent"))` vào `extensions` của route; tool MCP làm
   cùng việc gọi `.requires_approval_for_agent()`.
@@ -805,7 +809,7 @@ của nó (bước 51). Mọi mục dưới đây đều tuỳ chọn (mặc đ�
   bằng `CustomFields::validate`, thêm `custom_fields::index_migration` và ghi index bằng
   `CustomFields::write_index` trong cùng transaction với bản ghi.
 - **Kết nối đối tác**: cấu hình tên `<module>.connection.<loại>.<trường>`;
-  `context.connection_probe(…)` để thử, `ConnectionStatus::record` sau mỗi lần dùng.
+  `context.contribute::<dyn ConnectionProbe>(…)` để thử, `ConnectionStatus::record` sau mỗi lần dùng.
 - **Khối của trang** (bước 67): `Module::blocks` khai khối module cung cấp cho trang dựng từ khối —
   `BlockType::new("<module>.<khối>", nhóm, nhãn, gợi_ý_cho_AI, schema_props)`, kèm `.with_data()`,
   `.with_children()`, `.requires(tính_năng)`. Schema props là phần con JSON Schema của

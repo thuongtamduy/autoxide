@@ -80,6 +80,8 @@ pub(crate) struct KernelModule {
     export_days: i64,
     /// `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (step 51 P16).
     job_file_days: u32,
+    /// `AUTOXIDE_SOURCE_TIMEOUT_MS`: time limit of one module source (work inbox, find, summary, setup, resolve).
+    source_timeout: std::time::Duration,
     /// The kernel's job queue (list export); available after `start`.
     jobs: Option<crate::job::JobQueue>,
     /// Event stream settings (step 40 P5); filled at `configure`.
@@ -133,6 +135,7 @@ impl KernelModule {
             migration_runs: None,
             export_days: 30,
             job_file_days: 7,
+            source_timeout: crate::ops::work::SOURCE_TIMEOUT,
             jobs: None,
             stream_config: Default::default(),
             stream: None,
@@ -391,6 +394,7 @@ impl Module for KernelModule {
             .get_with(&crate::ops::list_exports::FILE_RETENTION_DAYS, |raw| {
                 crate::config::parse_in_range(raw, 1u32, 365)
             });
+        let source_timeout = crate::ops::work::read_source_timeout(reader);
         let backup_config = crate::backup::scheduled::BackupConfig::read(reader);
         let provider_bytes = crate::contracts::provider::read_setting(reader);
         if let Some(seconds) = request_timeout(reader) {
@@ -404,6 +408,7 @@ impl Module for KernelModule {
         self.templates = crate::template::TemplateEngine::new(template_bytes?);
         self.export_days = export_days?;
         self.job_file_days = job_file_days?;
+        self.source_timeout = source_timeout?;
         self.stream_config = stream_config?;
         self.search_backend = search_backend?;
         self.relocations.set(relocation_drain?);
@@ -593,11 +598,13 @@ impl Module for KernelModule {
                 self.catalog.work_sources(),
                 entitlements.clone(),
                 self.translations.clone(),
+                self.source_timeout,
             );
             routes = routes.merge(crate::ops::work::routes(state));
             let find = crate::ops::find::FindState {
                 sources: self.catalog.finder_sources(),
                 entitlements: entitlements.clone(),
+                timeout: self.source_timeout,
             };
             routes = routes.merge(crate::ops::find::routes(find));
             routes = routes.merge(crate::ops::setup::routes(crate::ops::setup::SetupState {
@@ -608,15 +615,18 @@ impl Module for KernelModule {
                     let settings: Arc<dyn crate::tenancy::settings::TenantSettings> = settings;
                     settings
                 }),
+                timeout: self.source_timeout,
             }));
             routes = routes.merge(crate::ops::resolve::routes(crate::ops::resolve::ResolveState {
                 resolvers: self.catalog.code_resolvers(),
                 entitlements: entitlements.clone(),
+                timeout: self.source_timeout,
             }));
             let summary = crate::ops::summary::SummaryState {
                 metrics: self.catalog.summary_metrics(),
                 entitlements: entitlements.clone(),
                 translations: self.translations.clone(),
+                timeout: self.source_timeout,
             };
             routes = routes.merge(crate::ops::summary::routes(summary));
         }

@@ -107,13 +107,18 @@ async fn nguoi_goi_thoi_cho_thi_cau_dung_that() {
         let backend = database.backend();
         quick(&tenant).await;
         let marker = "kernel-within-dropped";
-        // Số kết nối đang mở của pool đọc SQLite trước khi chạy (câu dùng lại một kết nối rảnh).
+        let read = tenant.db().read();
+        // `Box::pin`: chờ câu qua `as_mut()` mà future vẫn còn sống sau khi hết 500 ms, rồi mới drop nó.
+        let mut running = Box::pin(
+            read.sql(&slow(backend, marker)).within(Duration::from_secs(600)).all::<(Uuid,)>(),
+        );
+        assert!(tokio::time::timeout(Duration::from_millis(500), running.as_mut()).await.is_err());
+        // Số kết nối đang mở của pool đọc SQLite lúc câu còn giữ kết nối của nó. Đo ở đây, không đo trước khi chạy:
+        // kết nối của câu nhanh trước đó về pool bằng một task riêng (sqlx ping rồi mới xếp vào hàng rảnh), máy bận
+        // thì nó chưa rảnh kịp và câu chậm mở kết nối mới — số đếm lúc trước khi chạy khi đó không còn là mốc.
         let sqlite_open = (backend == DatabaseBackend::Sqlite)
             .then(|| database.read().get_sqlite_connection_pool().size());
-        let read = tenant.db().read();
-        let running =
-            read.sql(&slow(backend, marker)).within(Duration::from_secs(600)).all::<(Uuid,)>();
-        assert!(tokio::time::timeout(Duration::from_millis(500), running).await.is_err());
+        drop(running);
 
         // Dưới 5 giây: sqlx bỏ chờ đóng kết nối sau 5 giây (`CLOSE_ON_DROP_TIMEOUT`) dù câu còn chạy, nên chỉ câu đã
         // dừng thật mới làm kết nối đóng trước trần này.
