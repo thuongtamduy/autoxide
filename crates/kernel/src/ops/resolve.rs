@@ -93,6 +93,8 @@ pub(crate) struct ResolveQuery {
 pub(crate) struct ResolveState {
     pub resolvers: CodeResolvers,
     pub entitlements: EntitlementsHandle,
+    /// Time limit of one source (`AUTOXIDE_SOURCE_TIMEOUT_MS`).
+    pub timeout: std::time::Duration,
 }
 
 /// Open a record by its code.
@@ -135,11 +137,8 @@ async fn resolve_code(
         {
             continue;
         }
-        let answer = tokio::time::timeout(
-            crate::ops::work::SOURCE_TIMEOUT,
-            resolver.resolve(&tenant, &principal, code),
-        )
-        .await;
+        let answer =
+            tokio::time::timeout(state.timeout, resolver.resolve(&tenant, &principal, code)).await;
         match answer {
             Ok(Ok(Some(found))) => {
                 return Ok(Data {

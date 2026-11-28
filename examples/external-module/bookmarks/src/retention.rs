@@ -5,11 +5,10 @@
 //! with backoff, so it must be safe to run again.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
-use autoxide_kernel::time::{SignedDuration, Timestamp};
+use autoxide_kernel::time::{Duration, Timestamp};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::entity::{Column, Entity};
@@ -19,7 +18,7 @@ use crate::service::BookmarkService;
 pub(crate) const CLEANUP: &str = "bookmarks.cleanup";
 
 pub(crate) fn schedule() -> Schedule {
-    Schedule::new(CLEANUP, CLEANUP, Duration::from_secs(24 * 3600))
+    Schedule::new(CLEANUP, CLEANUP, std::time::Duration::from_secs(24 * 3600))
 }
 
 pub(crate) struct Cleanup {
@@ -39,7 +38,7 @@ impl JobHandler for Cleanup {
         if days == 0 {
             return Ok(());
         }
-        let cutoff = Timestamp::now() - SignedDuration::from_hours(24 * i64::from(days));
+        let cutoff = Timestamp::now() - Duration::from_days(i64::from(days));
         // tenant-scope: the retention job of a database deletes the old bookmarks of every tenant
         // in it; the setting is one for the whole installation.
         let removed = Entity::delete_many()
