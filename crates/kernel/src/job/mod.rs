@@ -128,8 +128,9 @@ impl JobContext {
     /// is counted in the metric `kernel_all_tenant_queries{module}` like
     /// [`ControlPlane::all_tenants`](crate::db::ControlPlane::all_tenants).
     pub fn all_tenants(&self, reason: &'static str) -> crate::db::AllTenants<'_> {
-        // Tên module là phần trước dấu chấm đầu tiên của loại job (`idempotency.cleanup` → `idempotency`).
-        let module = self.kind.split('.').next().unwrap_or_default();
+        // Tên module là phần trước dấu chấm đầu tiên của loại job (`idempotency.cleanup` → `idempotency`); loại job
+        // được kiểm có tiền tố module lúc đăng ký, nên nhãn của số đo chỉ nhận tên module.
+        let module = module_of(&self.kind).unwrap_or_default();
         crate::db::AllTenants::counted(&self.database, module, reason)
     }
 }
