@@ -19,6 +19,12 @@ Quyết định:
 - **Thời hạn một lượt (`DELIVERY_TIMEOUT`, 50 giây) giữ nguyên** để không ai nhận lại event đang chia (D-158). Bên
   quá giờ tính một lần lỗi; các bên sau chưa kịp tới lượt được ghi dòng thử lại với `attempts = 0`, tới hạn ngay —
   lượt sau giao riêng từng bên, không bên nào phải chờ bên chậm.
+- **Giới hạn với bên TREO:** lượt chia vẫn tuần tự, nên một bên treo vẫn làm các bên sau chờ trong lượt (tối đa
+  50 giây mỗi event, và các event sau trong cùng lô chờ theo — tối đa 100 event × 50 giây); bên bị cắt vì hết thời
+  gian lượt tính một lần lỗi kể cả khi nó bắt đầu muộn. G1 sửa trọn cho bên trả lỗi hay panic; với bên treo chỉ đỡ
+  một phần (bên sau không bị bỏ, chỉ bị trễ). Giao song song hay hạn riêng cho từng bên để sau, khi đo thấy cần.
+- **Module phát đang tắt (chế độ nghỉ) hay đã gỡ:** lần thử lại của event của nó được hoãn một giờ, không tính lần
+  thử, không vào dead-letter — bật lại thì giao tiếp; gỡ hẳn thì dòng nằm chờ và hiện ở `events_pending`.
 - **Đơn vị là module nhận**, không phải từng `Subscription`: một module có hai đăng ký khớp cùng event mà cái thứ
   hai lỗi thì lần thử lại chạy cả hai (bên nhận chịu nhận lại — D-054).
 - **Thử lại tới module không còn nhận** (đã gỡ, đang tắt, hay gói của khách không còn module đó): bỏ qua, đánh dấu
@@ -33,6 +39,9 @@ Quyết định:
   cách cũ cũng đã làm vậy mỗi lần thử. Event đã hỏng hẳn theo cách cũ (`failed_at`) giữ nguyên trong dead-letter;
   người vận hành muốn giao lại thì xoá `failed_at` của dòng đó, event được chia lại cho mọi bên. `failed_at` trên
   `<module>_events` từ nay chỉ còn cho dòng không đọc được (D-158) hay bản sao bỏ lại ở placement cũ.
+- **Lùi bản (`autoxide rollback`) qua `m0044` xoá bảng thử lại:** các lần giao còn chờ của bên lỗi mất, và bản cũ
+  thấy event đã đánh dấu giao nên không giao lại. Trước khi lùi, chờ `events_pending` về 0 (hay chấp nhận mất các
+  lần giao đó); ghi trong `docs/RUNBOOK.md`.
 - Migration mới của kernel `m0044_create_event_deliveries` (có `down`); bảng là hàng đợi nên dời khách mang theo,
   tách / gộp khách đòi trống (như `<module>_events`), xuất dữ liệu khách bỏ qua.
 

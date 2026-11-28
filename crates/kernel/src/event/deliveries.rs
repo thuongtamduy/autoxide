@@ -4,7 +4,7 @@
 //! Only that subscriber is retried, with its own backoff and its own dead-letter (`failed_at`); the others are
 //! not held up. A fan-out where every subscriber succeeds writes nothing here.
 //!
-//! The table is a tenant-level queue of the kernel (like `kernel_jobs`): it exists on every data database,
+//! The table is a tenant-level queue of the kernel (like the `<module>_jobs` queues): it exists on every data database,
 //! moves with the tenant, and must be empty for a split / merge.
 
 use crate::migration::prelude::*;
@@ -51,6 +51,12 @@ pub(super) async fn finish_fan_out(
     missed: &[(&'static str, Missed)],
 ) -> Result<(), Error> {
     let now = Timestamp::now();
+    if missed.is_empty() {
+        // Mọi bên đã nhận: một `UPDATE` như trước, không mở transaction.
+        database.write().execute(&mark_delivered(events_table, event.id, now)).await?;
+        metrics::counter!("events_delivered_total").increment(1);
+        return Ok(());
+    }
     let transaction = database.begin_write().await?;
     for (subscriber, missed) in missed {
         let (attempts, next_attempt_at, error) = match missed {
@@ -113,16 +119,24 @@ pub(super) async fn finish_fan_out(
             );
         transaction.execute(&insert).await?;
     }
-    let mut update = Query::update();
-    update
-        .table(events_table.clone())
-        .value(Alias::new("delivered_at"), now)
-        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
-        .and_where(Expr::col(Alias::new("id")).eq(event.id));
-    transaction.execute(&update).await?;
+    transaction.execute(&mark_delivered(events_table, event.id, now)).await?;
     transaction.commit().await?;
     metrics::counter!("events_delivered_total").increment(1);
     Ok(())
+}
+
+/// The statement marking event `id` of `events_table` delivered (fan-out finished).
+fn mark_delivered(
+    events_table: &Alias,
+    id: Uuid,
+    now: Timestamp,
+) -> sea_orm::sea_query::UpdateStatement {
+    Query::update()
+        .table(events_table.clone())
+        .value(Alias::new("delivered_at"), now)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
+        .and_where(Expr::col(Alias::new("id")).eq(id))
+        .to_owned()
 }
 
 /// Up to `limit` retry rows due now, oldest first.
@@ -269,12 +283,17 @@ pub(super) async fn cleanup_retries(database: &Database, before: Timestamp) -> R
     Ok(())
 }
 
-/// The tenant of a moving tenant's retry: retry later, without counting an attempt.
-pub(super) async fn postpone(database: &Database, id: Uuid) -> Result<(), Error> {
+/// Retry `id` cannot run now (its tenant is moving, its emitting module is turned off): retry after `wait`,
+/// without counting an attempt.
+pub(super) async fn postpone(
+    database: &Database,
+    id: Uuid,
+    wait: SignedDuration,
+) -> Result<(), Error> {
     let mut update = Query::update();
     update
         .table(table())
-        .value(Alias::new("next_attempt_at"), Timestamp::now() + SignedDuration::from_secs(30))
+        .value(Alias::new("next_attempt_at"), Timestamp::now() + wait)
         .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .and_where(Expr::col(Alias::new("id")).eq(id));
     database.write().execute(&update).await?;

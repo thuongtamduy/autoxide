@@ -387,3 +387,48 @@ async fn don_event_giu_event_con_ben_chua_nhan() {
     .await
     .unwrap();
 }
+
+/// Lần thử lại của event do module đang tắt hay đã gỡ phát: hoãn một giờ, không tính lần thử, không vào dead-letter.
+#[tokio::test]
+async fn module_phat_khong_hoat_dong_thi_hoan_khong_bo() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, Arc::new(Recorder::default()), Arc::new(Recorder::default())).await;
+        let now = Timestamp::now();
+        let insert = Query::insert()
+            .into_table(Alias::new("kernel_event_deliveries"))
+            .columns(
+                [
+                    "id",
+                    "tenant_id",
+                    "module",
+                    "event_id",
+                    "subscriber",
+                    "attempts",
+                    "next_attempt_at",
+                    "created_at",
+                ]
+                .map(Alias::new),
+            )
+            .values_panic([
+                Uuid::now_v7().into(),
+                TenantContext::default_on(setup.database.clone()).id().as_uuid().into(),
+                "ghost".into(),
+                Uuid::now_v7().into(),
+                "alpha".into(),
+                2i32.into(),
+                now.into(),
+                now.into(),
+            ])
+            .to_owned();
+        setup.database.write().execute(&insert).await.unwrap();
+
+        let dispatcher = setup.modules.dispatcher().unwrap();
+        assert_eq!(dispatcher.run_once().await.unwrap(), 1);
+        assert_eq!(dispatcher.run_once().await.unwrap(), 0, "postponed, not due again");
+        assert_eq!(retries(&setup).await, [("alpha".to_owned(), 2, false, false)]);
+        let later = "SELECT COUNT(*) AS n FROM kernel_event_deliveries WHERE claimed_until IS NULL";
+        assert_eq!(count(&setup, later).await, 1);
+    })
+    .await
+    .unwrap();
+}

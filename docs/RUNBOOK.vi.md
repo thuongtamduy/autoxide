@@ -63,6 +63,8 @@ Dấu hiệu: cảnh báo `AutoxideJobsStuck`, `AutoxideEventsBacklog`, `Autoxid
    `event_id`), kèm `last_error`. Sửa nguyên nhân, rồi chạy
    `UPDATE kernel_event_deliveries SET failed_at = NULL, attempts = 0 WHERE id = '<id>';` để chỉ thử lại module đó.
    Dòng của `<module>_events` có `failed_at` là dòng không đọc được (payload hỏng, khách không còn).
+   Trước khi `autoxide rollback` về bản cũ hơn bảng `kernel_event_deliveries`, chờ `events_pending` về 0: lùi bản xoá
+   bảng đó, nên các lần thử lại đang chờ của từng module mất, và bản cũ thấy các event đó đã giao nên không gửi lại.
 6. Vẫn trễ dù worker khoẻ: tăng `AUTOXIDE_JOBS_CONCURRENCY` hay chạy thêm worker process.
 
 ## Lộ key

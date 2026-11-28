@@ -237,7 +237,7 @@ impl Dispatcher {
                 continue; // tiến trình khác vừa nhận việc giao event này
             }
             handled += 1;
-            let missed = self.fan_out(&event).await;
+            let missed = self.fan_out(&event, DELIVERY_TIMEOUT).await;
             deliveries::finish_fan_out(database, &table, module, &event, &missed).await?;
         }
         Ok(handled)
@@ -258,10 +258,14 @@ impl Dispatcher {
             handled += 1;
             let Some(module) = self.modules.iter().copied().find(|module| *module == retry.module)
             else {
-                // Module phát không còn trong bản cài: không đọc được event nữa.
-                let error =
-                    format!("module `{}` that emitted the event is not installed", retry.module);
-                deliveries::mark_dead(database, retry.id, &error).await?;
+                // Module phát đang tắt (chế độ nghỉ) hay đã gỡ: bảng event của nó không thuộc bộ phát lúc này. Hoãn,
+                // không tính lần thử — bật lại thì giao tiếp; gỡ hẳn thì dòng nằm chờ, hiện ở số đo tồn đọng.
+                tracing::warn!(
+                    retry_id = %retry.id,
+                    module = %retry.module,
+                    "the module that emitted this event is not active; its retry waits an hour"
+                );
+                deliveries::postpone(database, retry.id, SignedDuration::from_hours(1)).await?;
                 continue;
             };
             let event = match self.load_event(database, module, retry.event_id).await {
@@ -281,7 +285,7 @@ impl Dispatcher {
                 }
             };
             if event.tenant.status() == TenantStatus::Moving {
-                deliveries::postpone(database, retry.id).await?;
+                deliveries::postpone(database, retry.id, SignedDuration::from_secs(30)).await?;
                 continue;
             }
             if event.tenant.placement() != placement {
@@ -349,9 +353,12 @@ impl Dispatcher {
     /// to receive it. A module that fails, panics or runs past the fan-out's [`DELIVERY_TIMEOUT`] is
     /// [`Missed::Failed`]; modules not reached before that deadline are [`Missed::NotReached`]. Neither stops the
     /// modules after it, nor kills the dispatcher of the whole process (D-158).
-    async fn fan_out(&self, event: &Delivered) -> Vec<(&'static str, Missed)> {
+    ///
+    /// A subscriber that hangs still makes the ones after it wait, up to the deadline; the one cut off by the
+    /// deadline counts one failed attempt even if it started late. `budget` is [`DELIVERY_TIMEOUT`] outside tests.
+    async fn fan_out(&self, event: &Delivered, budget: Duration) -> Vec<(&'static str, Missed)> {
         let all = async {
-            let deadline = tokio::time::Instant::now() + DELIVERY_TIMEOUT;
+            let deadline = tokio::time::Instant::now() + budget;
             let mut missed = Vec::new();
             for subscriber in self.subscribers_of(&event.name) {
                 let left = deadline.saturating_duration_since(tokio::time::Instant::now());
@@ -583,6 +590,63 @@ fn now() -> Timestamp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::config::{ConfigReader, ConfigSource, DatabaseConfig};
+    use crate::event::EventHandler;
+    use crate::tenancy::{TenancyConfig, TenantContext};
+    use autoxide_testkit::TestDatabase;
+
+    // Bên nhận chờ `wait` rồi nhận.
+    struct Sleeper(Duration);
+
+    #[async_trait::async_trait]
+    impl EventHandler for Sleeper {
+        async fn handle(&self, _event: &Delivered) -> Result<(), Error> {
+            tokio::time::sleep(self.0).await;
+            Ok(())
+        }
+    }
+
+    // Hết thời gian của lượt: bên đang chạy bị cắt (một lần lỗi), bên sau chưa tới lượt (`NotReached`, thử lại
+    // ngay không tính lần thử); bên trước đã nhận thì không có trong danh sách.
+    #[tokio::test]
+    async fn het_thoi_gian_luot_ben_sau_chua_toi_luot() {
+        TestDatabase::run(async |test| {
+            let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+            let mut reader = ConfigReader::new(&source);
+            let config = DatabaseConfig::read(&mut reader);
+            let config = reader.finish(config).unwrap().0;
+            let database = Database::connect(&config).await.unwrap();
+            let registry =
+                DatabaseRegistry::new(database.clone(), config, TenancyConfig::default());
+            let quick: Arc<dyn EventHandler> = Arc::new(Sleeper(Duration::ZERO));
+            let stuck: Arc<dyn EventHandler> = Arc::new(Sleeper(Duration::from_secs(30)));
+            let subscriptions = vec![
+                ("first", Subscription::new("notes.note_created", quick.clone())),
+                ("stuck", Subscription::new("notes.note_created", stuck)),
+                ("later", Subscription::new("notes.note_created", quick)),
+            ];
+            let dispatcher =
+                Dispatcher::new(registry, vec!["notes"], subscriptions, Arc::new(Notify::new()));
+            let event = Delivered::new(
+                TenantContext::default_on(database),
+                "notes",
+                "notes.note_created",
+                serde_json::json!({}),
+            );
+
+            let missed = dispatcher.fan_out(&event, Duration::from_millis(200)).await;
+            assert_eq!(missed.len(), 2, "{missed:?}");
+            assert_eq!(missed[0].0, "stuck");
+            assert!(
+                matches!(&missed[0].1, Missed::Failed(error) if error.contains("took longer")),
+                "{missed:?}"
+            );
+            assert_eq!(missed[1], ("later", Missed::NotReached));
+        })
+        .await
+        .unwrap();
+    }
 
     #[test]
     fn backoff_tang_dan_va_co_tran() {

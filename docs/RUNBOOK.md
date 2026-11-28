@@ -65,6 +65,9 @@ Signs: alerts `AutoxideJobsStuck`, `AutoxideEventsBacklog`, `AutoxideDeadLetterG
    event (`module`, `event_id`), with `last_error`. Fix the cause, then run
    `UPDATE kernel_event_deliveries SET failed_at = NULL, attempts = 0 WHERE id = '<id>';` to retry that module only.
    A row of `<module>_events` with `failed_at` set could not be read at all (damaged payload, tenant gone).
+   Before `autoxide rollback` to a release older than the `kernel_event_deliveries` table, let `events_pending` reach 0:
+   the rollback drops that table, so waiting per-module retries are lost and the older release, which sees those
+   events as delivered, does not send them again.
 6. Still behind with a healthy worker: raise `AUTOXIDE_JOBS_CONCURRENCY` or start more worker processes.
 
 ## A key leaked
