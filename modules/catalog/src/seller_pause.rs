@@ -14,14 +14,13 @@
 //! `catalog.product_status_changed` với tác nhân hệ thống. Gọi lại vô hại (D-054): chỉ dòng còn `active` bị đổi. Định danh lại xong
 //! thì người bán tự mở bán lại — không tự bật lại hàng (người bán có thể đã muốn tắt).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use autoxide_kernel::db::{Queries as _, Record, TenantKey};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
-use autoxide_kernel::tenancy::{OrgId, Site, TenantContext, TenantId, root_of};
+use autoxide_kernel::tenancy::{OrgId, ScopeExt, Site, TenantContext, TenantId, root_of};
 use sea_orm::sea_query::{Expr, ExprTrait};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
 use crate::entity::product;
@@ -30,15 +29,23 @@ use crate::service::CatalogService;
 /// Job hằng ngày kiểm lại người bán của mọi sàn (mọi database).
 pub(crate) const SELLER_KYC_SWEEP: &str = "catalog.seller_kyc_sweep";
 
-/// Sản phẩm và nút bán của nó — chỉ các cột việc kiểm lại cần, đọc qua lớp `db` của kernel (lọc theo khách).
-#[derive(Record, Clone, Debug)]
-#[record(table = "catalog_products", scope = tenant)]
-pub(crate) struct OnSale {
-    #[record(primary_key)]
-    id: Uuid,
-    tenant_id: TenantKey,
-    org_id: Uuid,
-    status: String,
+/// (sản phẩm, nút bán) của hàng `active` thuộc nút khác gốc của khách, đọc qua `connection` người gọi đưa (đã lọc
+/// theo khách).
+pub(crate) async fn on_sale<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+) -> Result<Vec<(Uuid, Uuid)>, Error> {
+    let root = root_of(tenant.id()).as_uuid();
+    Ok(product::Entity::find()
+        .select_only()
+        .column(product::Column::Id)
+        .column(product::Column::OrgId)
+        .filter(product::Column::Status.eq("active"))
+        .filter(product::Column::OrgId.ne(root))
+        .scoped(tenant)
+        .into_tuple()
+        .all(connection)
+        .await?)
 }
 
 /// Mã lỗi nghĩa là "người bán này không được bán" (khác lỗi tạm thời như database). `site_not_found`: nút không
@@ -51,28 +58,21 @@ fn refused(error: &Error) -> bool {
 }
 
 impl CatalogService {
-    /// Kiểm lại người bán có hàng `active` (trong nhánh `within`, hay cả khách khi `None`) và dừng hàng của người
-    /// bán không còn qua được cổng định danh. Khách không phải sàn: không làm gì. Trả số sản phẩm đã dừng.
+    /// Kiểm lại người bán của hàng đang bán `on_sale` ((sản phẩm, nút bán) — trong nhánh `within`, hay cả khách khi
+    /// `None`) và dừng hàng của người bán không còn qua được cổng định danh. Khách không phải sàn: không làm gì. Trả
+    /// số sản phẩm đã dừng.
     pub(crate) async fn pause_unverified_sellers(
         &self,
         tenant: &TenantContext,
         within: Option<OrgId>,
+        on_sale: Vec<(Uuid, Uuid)>,
     ) -> Result<u64, Error> {
-        if !self.is_marketplace(tenant).await? {
+        if on_sale.is_empty() || !self.is_marketplace(tenant).await? {
             return Ok(0);
         }
-        let root = root_of(tenant.id()).as_uuid();
-        let rows = tenant
-            .db()
-            .read()
-            .find::<OnSale>()
-            .filter(OnSale::STATUS.eq("active".to_owned()))
-            .filter(OnSale::ORG_ID.ne(root))
-            .all()
-            .await?;
         let mut by_seller: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::new();
-        for row in rows {
-            by_seller.entry(row.org_id).or_default().push(row.id);
+        for (id, org) in on_sale {
+            by_seller.entry(org).or_default().push(id);
         }
         let mut paused = 0;
         for (seller, products) in by_seller {
@@ -119,24 +119,27 @@ pub(crate) struct SellerKycSweep(pub std::sync::Arc<CatalogService>);
 impl JobHandler for SellerKycSweep {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         // tenant-scope: việc nền quét mọi khách của database để tìm sàn có hàng của người bán; mỗi khách sau đó
-        // đọc và ghi qua `TenantContext` của chính nó
-        let rows: Vec<(Uuid, Uuid)> = product::Entity::find()
+        // ghi qua `TenantContext` của chính nó
+        let rows: Vec<(Uuid, Uuid, Uuid)> = product::Entity::find()
             .select_only()
             .column(product::Column::TenantId)
+            .column(product::Column::Id)
             .column(product::Column::OrgId)
-            .distinct()
             .filter(product::Column::Status.eq("active"))
             .filter(Expr::col(product::Column::OrgId).not_equals(product::Column::TenantId))
             .into_tuple()
             .all(job.database.read())
             .await?;
-        let tenants: BTreeSet<Uuid> = rows.into_iter().map(|(tenant, _)| tenant).collect();
+        let mut tenants: BTreeMap<Uuid, Vec<(Uuid, Uuid)>> = BTreeMap::new();
+        for (tenant, id, org) in rows {
+            tenants.entry(tenant).or_default().push((id, org));
+        }
         // Lỗi của một khách không chặn việc kiểm các khách khác; job vẫn báo lỗi để chạy lại.
         let mut failed = None;
-        for tenant in tenants {
+        for (tenant, on_sale) in tenants {
             let result = async {
                 let context = self.0.databases.tenant(TenantId::from_uuid(tenant)).await?;
-                self.0.pause_unverified_sellers(&context, None).await
+                self.0.pause_unverified_sellers(&context, None, on_sale).await
             }
             .await;
             if let Err(error) = result {

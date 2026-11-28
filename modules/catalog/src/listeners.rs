@@ -78,6 +78,8 @@ impl EventHandler for CatalogService {
         if let Some(user_id) = deleted_user(event) {
             return Self::forget_user(event, user_id).await;
         }
+        // Database của khách (đọc / ghi) cho các nhánh bên dưới.
+        let database = event.tenant.database();
         if event.name == INVENTORY_COST_CHANGED {
             let after = &event.payload["after"];
             let parsed = (|| {
@@ -102,8 +104,7 @@ impl EventHandler for CatalogService {
                 return Ok(());
             }
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
-            let write = event.tenant.database().write();
-            return self.queue_variants(write, &event.tenant, variants).await;
+            return self.queue_variants(database.write(), &event.tenant, variants).await;
         }
         if event.name == ORDERS_ORDER_COMPLETED {
             let Some((order, lines)) = crate::recommend::completed_order(&event.payload) else {
@@ -165,16 +166,17 @@ impl EventHandler for CatalogService {
                 return Ok(());
             };
             let node = Some(autoxide_kernel::tenancy::OrgId::from_uuid(org));
-            return self.pause_unverified_sellers(&event.tenant, node).await.map(|_| ());
+            let on_sale = crate::seller_pause::on_sale(database.read(), &event.tenant).await?;
+            return self.pause_unverified_sellers(&event.tenant, node, on_sale).await.map(|_| ());
         }
         if event.name == UNIT_MOVED || event.name == UNIT_STATUS_CHANGED {
             if event.name == UNIT_MOVED {
                 // Cửa hàng con chuyển sang dưới người bán chưa định danh: hàng của nó không còn được bán (LG-3b).
-                self.pause_unverified_sellers(&event.tenant, None).await?;
+                let on_sale = crate::seller_pause::on_sale(database.read(), &event.tenant).await?;
+                self.pause_unverified_sellers(&event.tenant, None, on_sale).await?;
             }
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
-            let write = event.tenant.database().write();
-            return self.queue_all(write, &event.tenant).await;
+            return self.queue_all(database.write(), &event.tenant).await;
         }
         Ok(())
     }
