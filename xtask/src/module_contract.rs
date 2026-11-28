@@ -5,6 +5,9 @@
 //!   và đăng ký trong `start`.
 //! - `module-contract-mixed`: một `impl Module` đã cài `manifest` thì không cài hàm cũ nào (kernel chỉ đọc một
 //!   đường; hàm cũ cài thêm sẽ lặng lẽ thắng manifest). Không có danh sách chỗ cũ.
+//! - `start-context-legacy`: chỗ gọi `context.<getter cũ>()` (thay bằng `context.kernel::<H>()`) hay
+//!   `context.<hàm đăng ký cũ>(…)` (thay bằng `context.contribute::<dyn Trait>(…)`) trong mã module, đếm theo file, cùng
+//!   [`BASELINE`] chỉ giảm (D-20261128-contribute). Bỏ qua thân `fn dormant` (`DormantContext` có hàm cùng tên).
 
 use std::fs;
 
@@ -68,6 +71,144 @@ const LEGACY: &[&str] = &[
     "sync_resources",
     "blocks",
 ];
+
+/// Getter cũ của `StartContext` → handle thay thế (`context.kernel::<H>()`).
+const OLD_GETTERS: &[(&str, &str)] = &[
+    ("outbox", "Outbox"),
+    ("jobs", "JobQueue"),
+    ("sync_log", "SyncLog"),
+    ("control_plane", "ControlPlane"),
+    ("tenancy", "DatabaseRegistry"),
+    ("org_settings", "OrgSettingCatalog"),
+    ("entitlements", "EntitlementsHandle"),
+    ("personal_data_export", "PersonalDataExport"),
+    ("retention_catalog", "RetentionCatalog"),
+    ("resources", "ResourceDirectory"),
+    ("posting_verification", "PostingVerification"),
+    ("suggest_sources", "SuggestSources"),
+    ("summary_metrics", "SummaryMetrics"),
+    ("reason_codes", "ReasonCodes"),
+    ("custom_fields", "CustomFields"),
+    ("text_overrides", "TextOverrides"),
+    ("connection_status", "ConnectionStatus"),
+    ("blocks", "Blocks"),
+    ("analytics_catalog", "AnalyticsCatalog"),
+    ("automation_directory", "AutomationDirectory"),
+    ("distributor", "Distributor"),
+];
+
+/// Hàm đăng ký cũ của `StartContext` → trait đóng góp thay thế (`context.contribute::<dyn T>(…)`).
+const OLD_REGISTRATIONS: &[(&str, &str)] = &[
+    ("personal_data", "PersonalData"),
+    ("posting_verifier", "PostingVerifier"),
+    ("work_source", "WorkSource"),
+    ("finder_source", "FinderSource"),
+    ("suggest_source", "SuggestSource"),
+    ("summary_metric", "SummaryMetric"),
+    ("export_source", "ExportSource"),
+    ("bulk_action", "BulkAction"),
+    ("code_resolver", "CodeResolver"),
+    ("setup_step", "SetupStep"),
+    ("connection_probe", "ConnectionProbe"),
+    ("reference_source", "ReferenceSource"),
+];
+
+/// Vi phạm `start-context-legacy` trong mã không phải test của mọi module.
+pub fn check_start_context(workspace: &Workspace) -> Result<Vec<Violation>, String> {
+    let mut violations = Vec::new();
+    for package in workspace.packages.iter().filter(|package| package.role == Role::Module) {
+        let src = workspace.root.join(&package.dir).join("src");
+        for file in rust_files(&src)? {
+            if file.rsplit('/').next().unwrap_or(&file).contains("test") || file.contains("/tests/")
+            {
+                continue;
+            }
+            let text = fs::read_to_string(workspace.root.join(&package.dir).join(&file))
+                .map_err(|error| format!("{file}: {error}"))?;
+            violations.extend(start_context_violations(
+                &format!("{}/{file}", package.dir),
+                &without_dormant(&without_tests(&text)),
+            ));
+        }
+    }
+    Ok(violations)
+}
+
+/// Bỏ thân các `fn dormant(` (giữ số dòng): `DormantContext` có `personal_data`, `sync_log`… là đường đúng ở đó.
+fn without_dormant(text: &str) -> String {
+    let mut kept = Vec::new();
+    let mut depth: Option<i32> = None;
+    for line in text.lines() {
+        if depth.is_none() && fn_name(line) == Some("dormant") {
+            depth = Some(0);
+        }
+        match depth.as_mut() {
+            Some(current) => {
+                *current += brace_delta(line);
+                let opened = line.contains('{') || *current != 0;
+                kept.push("");
+                if opened && *current <= 0 && line.contains('}') {
+                    depth = None;
+                }
+            }
+            None => kept.push(line),
+        }
+    }
+    kept.join("\n")
+}
+
+/// Chỗ gọi `context . <tên> (` (cho phép xuống dòng giữa các phần) với tên trong hai bảng cũ.
+fn start_context_violations(path: &str, text: &str) -> Vec<Violation> {
+    let bytes = text.as_bytes();
+    let is_ident = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    let skip_space = |mut at: usize| {
+        while at < bytes.len() && bytes[at].is_ascii_whitespace() {
+            at += 1;
+        }
+        at
+    };
+    let mut violations = Vec::new();
+    let mut from = 0;
+    while let Some(found) = text[from..].find("context") {
+        let start = from + found;
+        from = start + "context".len();
+        if start > 0 && is_ident(bytes[start - 1]) || from < bytes.len() && is_ident(bytes[from]) {
+            continue;
+        }
+        let dot = skip_space(from);
+        if bytes.get(dot) != Some(&b'.') {
+            continue;
+        }
+        let name_start = skip_space(dot + 1);
+        let mut name_end = name_start;
+        while name_end < bytes.len() && is_ident(bytes[name_end]) {
+            name_end += 1;
+        }
+        if bytes.get(skip_space(name_end)) != Some(&b'(') {
+            continue;
+        }
+        let name = &text[name_start..name_end];
+        let message = if let Some((_, handle)) = OLD_GETTERS.iter().find(|(old, _)| *old == name) {
+            format!(
+                "`context.{name}()` is the old way to get a kernel handle: use `context.kernel::<{handle}>()`"
+            )
+        } else if let Some((_, contract)) = OLD_REGISTRATIONS.iter().find(|(old, _)| *old == name) {
+            format!(
+                "`context.{name}(…)` is the old registration: use `context.contribute::<dyn {contract}>(…)`"
+            )
+        } else {
+            continue;
+        };
+        // Dòng tính tới chữ `context` (dòng của tên có thể khác nếu xuống dòng).
+        let line = text[..start].matches('\n').count() + 1;
+        violations.push(Violation {
+            rule: "start-context-legacy",
+            location: format!("{path}:{line}"),
+            message,
+        });
+    }
+    violations
+}
 
 /// Vi phạm của cả hai luật trong mã không phải test của mọi module (trừ ví dụ ngoài repo, có gate riêng).
 pub fn check(workspace: &Workspace) -> Result<Vec<Violation>, String> {
@@ -242,6 +383,37 @@ impl Other for Old {
     }
 }
 ";
+
+    #[test]
+    fn getter_va_ham_dang_ky_cu_cua_start_context_bi_dem() {
+        let text = "\
+fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+    let outbox = context.outbox()?;
+    let log = context
+        .sync_log();
+    context.personal_data(service.clone())?;
+    let fine = context.kernel::<Outbox>()?;
+    context.contribute::<dyn PersonalData>(service)?;
+    let other = my_context.outbox();
+    Ok(())
+}
+
+fn dormant(&self, context: &mut DormantContext<'_>) -> Result<(), Error> {
+    context.personal_data(part.clone())?;
+    let sync = context.sync_log();
+    Ok(())
+}
+";
+        let found = start_context_violations("modules/x/src/lib.rs", &without_dormant(text));
+        let lines: Vec<&str> = found.iter().map(|violation| violation.location.as_str()).collect();
+        assert_eq!(
+            lines,
+            ["modules/x/src/lib.rs:2", "modules/x/src/lib.rs:3", "modules/x/src/lib.rs:5"]
+        );
+        assert!(found.iter().all(|violation| violation.rule == "start-context-legacy"));
+        assert!(found[0].message.contains("context.kernel::<Outbox>()"));
+        assert!(found[2].message.contains("contribute::<dyn PersonalData>"));
+    }
 
     #[test]
     fn ham_cu_duoc_dem_theo_dong() {

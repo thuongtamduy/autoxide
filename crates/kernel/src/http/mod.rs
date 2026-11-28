@@ -143,7 +143,6 @@ pub(crate) use mcp::{
     call_tool as call_mcp_tool, module_allowed as mcp_module_allowed,
     tool_allowed as mcp_tool_allowed,
 };
-pub use metrics::metrics_routes;
 pub(crate) use oauth::admit_audience;
 pub use oauth::{AUTHORIZATION_SERVER_PATH, PROTECTED_RESOURCE_PATH};
 pub(crate) use openapi::untranslated_text;

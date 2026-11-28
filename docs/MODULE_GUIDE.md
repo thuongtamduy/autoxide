@@ -35,7 +35,8 @@ A module tells the core about itself in two places, one way for each concept (D-
   so the core can read it without starting anything (migrations, `.env.example`, module selection, docs).
 - **`Module::start`** builds the module's services and registers on `StartContext` what needs them: routes, MCP
   tools, event subscriptions, jobs, tasks, doctor checks, traits for other modules. Kernel handles come from
-  `context.kernel::<Handle>()` (`Outbox`, `SyncLog`, `EntitlementsHandle`, `JobQueue`…).
+  `context.kernel::<Handle>()` (`Outbox`, `SyncLog`, `EntitlementsHandle`, `JobQueue`…); the module plugs into the
+  kernel's extension points with `context.contribute::<dyn Trait>(…)` (table below).
 
 ```rust
 impl Module for NotesModule {
@@ -92,12 +93,32 @@ below still name some old functions; this table gives the new way for each:
 | `prompts` | `StartContext::prompt` (one call each) |
 | `mcp_resources` | `StartContext::mcp_resource` (one call each) |
 | `client_config` | `StartContext::client_config` |
-| `seed_tenant` | `StartContext::seed_tenant` |
-| `sample_data` | `StartContext::sample_data` |
-| `sandbox_copy` | `StartContext::sandbox_copy` |
+| `seed_tenant` | `context.contribute::<dyn TenantSeed>(…)` |
+| `sample_data` | `context.contribute::<dyn SampleData>(…)` (`tenancy::SampleData`) |
+| `sandbox_copy` | `context.contribute::<dyn SandboxCopy>(…)` (experimental) |
 
-`StartContext::outbox()`, `sync_log()` and the other getters keep working; `StartContext::kernel::<H>()` is the one
-way for new code.
+**Kernel extension points: `contribute`** (D-20261128-contribute). Every "many modules plug in an implementation"
+concept of the kernel takes the same call, `context.contribute::<dyn Trait>(Arc::new(…))?`; the kernel recognises the
+trait and registers it where the older one-function-per-concept call did:
+
+| Contribute `dyn …` | Replaces `StartContext::…` |
+| --- | --- |
+| `tenancy::TenantSeed`, `tenancy::SampleData`, `tenancy::sandbox::SandboxCopy` | `Module::seed_tenant`, `sample_data`, `sandbox_copy` |
+| `tenancy::SwitchHook` | `Relocation::on_switch` |
+| `privacy::PersonalData` | `personal_data` |
+| `access::PostingVerifier` | `posting_verifier` |
+| `ops::work::WorkSource`, `ops::find::FinderSource`, `ops::suggest::SuggestSource` | `work_source`, `finder_source`, `suggest_source` |
+| `ops::summary::SummaryMetric`, `ops::list_exports::ExportSource`, `ops::bulk::BulkAction` | `summary_metric`, `export_source`, `bulk_action` |
+| `ops::resolve::CodeResolver`, `ops::setup::SetupStep`, `ops::connections::ConnectionProbe`, `ops::usages::ReferenceSource` | `code_resolver`, `setup_step`, `connection_probe`, `reference_source` |
+
+Name the trait every time: `contribute(Arc::new(x))` without `::<dyn Trait>` contributes the concrete type, which nobody
+reads, and fails at start. Contributed switch hooks run after the hooks declared with `Relocation::on_switch`; a dormant
+module does not start, so it contributes no hook (D-20261128-contributed-switch-hooks).
+
+Registrations that bind a key to an implementation keep their own call: `resource_type`, `badge_source`, `block_data`,
+`taggable`, `usage_counter`, `search_documents`, `search_backend`. The old getters (`outbox()`, `sync_log()`,
+`entitlements()`…) and the old registrations above keep working during the transition; new code uses
+`context.kernel::<H>()` and `contribute`, and `cargo xtask check` counts the old calls (`start-context-legacy`).
 
 ## Step by step
 
@@ -215,7 +236,8 @@ set `tenant_id` yourself. Trait methods of `api` that read or change data take a
 change; a clean-up that sweeps every tenant uses `enqueue_database` and a `_sweep_idx` index.
 
 **What a new tenant starts with.** Data a tenant needs before its first request (an `admin`
-role, a lock row, a counter) is created by `Module::seed_tenant`, a `TenantSeed` that runs when
+role, a lock row, a counter) is created by a `TenantSeed` the module contributes in `start`
+(`context.contribute::<dyn TenantSeed>(…)`), which runs when
 the tenant is created. It must be safe to run again: `autoxide tenant provision` repeats a
 creation that stopped half-way.
 
@@ -347,14 +369,12 @@ sandbox never reaches the partner: it gets a fixed simulated result (references 
 in business code; a partner contract that your module defines itself (like the carriers of
 `shipping`) must swap in its simulated implementation for a sandbox in one place.
 
-**Copy your configuration** with `Module::sandbox_copy`. The kernel calls it once, in registration
-order, while the sandbox is created and before anyone can enter it:
+**Copy your configuration** with a `SandboxCopy` contributed in `start`. The kernel calls it once, in
+registration order, while the sandbox is created and before anyone can enter it:
 
 ```rust
-fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
-    let service = self.service.clone()?;
-    Some(Arc::new(ShopCopy { service }))
-}
+// In `Module::start`:
+context.contribute::<dyn SandboxCopy>(Arc::new(ShopCopy { service: service.clone() }))?;
 
 #[async_trait::async_trait]
 impl SandboxCopy for ShopCopy {
@@ -574,8 +594,8 @@ Modules such as `comments` attach data to records of other modules without depen
 - `context.badge_source(kind, &["seller"], resolver)` computes badges of an author on a record of
   any kind, e.g. `seller` for someone who manages a product. Each badge of a kind comes from one
   module; badges are stable codes, never sentences.
-- `context.posting_verifier(…)` (one module in the whole program) answers whether an account is
-  verified to post content (phone or identity); `context.posting_verification()` asks it. With no
+- `context.contribute::<dyn PostingVerifier>(…)` (one module in the whole program) answers whether an account is
+  verified to post content (phone or identity); `context.kernel::<PostingVerification>()` asks it. With no
   verifier registered every signed-in account counts as verified.
 
 ### Personal data
@@ -584,7 +604,7 @@ A module that keeps data about users takes part in data export and account delet
 (see `autoxide_kernel::privacy`):
 
 - implement `PersonalData` (return the user's data as JSON, without secrets) and register
-  it in `Module::start` with `context.personal_data(…)`; it then appears in
+  it in `Module::start` with `context.contribute::<dyn PersonalData>(…)`; it then appears in
   `GET /api/v1/auth/me/export` under the module's name;
 - subscribe to `privacy::USER_DELETED` in `Module::subscriptions` and delete the user's
   rows when it arrives (`privacy::deleted_user(event)` gives the id). It may arrive twice;
@@ -777,11 +797,11 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
 
 - **Menu**: `Module::navigation` — groups and items with permissions, plan features and a
   work counter. Labels are English, translated through the module's `text:` keys.
-- **Work inbox**: `context.work_source(…)` — a `WorkSource` computes the work from data (no "done"
+- **Work inbox**: `context.contribute::<dyn WorkSource>(…)` — a `WorkSource` computes the work from data (no "done"
   flag), with a count for the menu. Items have a stable key `<source>:<record id>`, so people
   snooze and assign them.
-- **Search and codes**: `context.finder_source(…)` (a `FinderSource`; `fields` and `scoped` when
-  it understands `field:value` and `scope=`) and `context.code_resolver(…)` (order numbers, page
+- **Search and codes**: `context.contribute::<dyn FinderSource>(…)` (a `FinderSource`; `fields` and `scoped` when
+  it understands `field:value` and `scope=`) and `context.contribute::<dyn CodeResolver>(…)` (order numbers, page
   addresses… for `GET /api/v1/kernel/resolve`).
 - **Search index** (large tables, step 40 P7): `context.search_documents(kind, source)` declares a
   searchable kind (`SearchKind`: fields with weights, equality filters, read permission) and a
@@ -792,13 +812,13 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
   units inside the engine. The engine is the database by default; a module adds another with
   `context.search_backend(name, …)`, chosen by `AUTOXIDE_SEARCH_BACKEND`, without changes to other
   modules. `autoxide task kernel.reindex` rebuilds the index.
-- **Figures and setup**: `context.summary_metric(…)` (a `MetricInfo` always carries its
-  definition) and `context.setup_step(…)` (done is computed from data).
+- **Figures and setup**: `context.contribute::<dyn SummaryMetric>(…)` (a `MetricInfo` always carries its
+  definition) and `context.contribute::<dyn SetupStep>(…)` (done is computed from data).
 - **Activity**: `EventInfo::activity(…)` gives an event a readable sentence; notes and history of
   any record of the resource directory come from the kernel.
 - **Lists**: every list endpoint (a `GET` with `cursor`) gets `x-autoxide-filters` from its own
-  query parameters — keep them in one `IntoParams` struct. Exports: `context.export_source(…)` with
-  the list's id. Bulk actions: `context.bulk_action(…)`; the action must be safe to repeat.
+  query parameters — keep them in one `IntoParams` struct. Exports: `context.contribute::<dyn ExportSource>(…)` with
+  the list's id. Bulk actions: `context.contribute::<dyn BulkAction>(…)`; the action must be safe to repeat.
 - **Risky commands**: add `("x-approval" = json!("agent"))` to the route's `extensions`; an MCP
   tool doing the same calls `.requires_approval_for_agent()`.
 - **Tenant choices**: `Module::reason_lists` (codes with English labels; legal ones stay on),
@@ -809,7 +829,7 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
   `custom_fields::index_migration` and writes the index with `CustomFields::write_index` in the
   same transaction as the record.
 - **Connections to partners**: settings named `<module>.connection.<kind>.<field>`;
-  `context.connection_probe(…)` to test one, `ConnectionStatus::record` after each use.
+  `context.contribute::<dyn ConnectionProbe>(…)` to test one, `ConnectionStatus::record` after each use.
 - **Page blocks** (step 67): `Module::blocks` declares the blocks the module offers to pages built
   from blocks — `BlockType::new("<module>.<block>", category, label, ai_hint, props_schema)`, with
   `.with_data()`, `.with_children()`, `.requires(feature)`. The props schema is the JSON Schema

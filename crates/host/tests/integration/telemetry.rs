@@ -1,5 +1,5 @@
 //! Xuất trace qua OTLP/HTTP tới một collector. Bộ xuất và bộ đọc `traceparent` là
-//! toàn tiến trình, nên file này (một tiến trình test riêng) chỉ có MỘT bài test.
+//! toàn tiến trình, nên file này chỉ có MỘT bài test bật bộ xuất.
 
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 // Clippy chỉ tự miễn cho hàm `#[test]`, không miễn cho hàm phụ, nên khai ở đây.
@@ -8,9 +8,10 @@
 
 use std::sync::{Arc, Mutex};
 
+use autoxide_host::logging;
+use autoxide_host::telemetry::TraceExport;
 use autoxide_kernel::config::{LogConfig, LogFormat, LogLevel, TraceConfig};
-use autoxide_kernel::logging;
-use autoxide_kernel::telemetry::{TraceExport, remote_context};
+use autoxide_kernel::telemetry::remote_context;
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::State;

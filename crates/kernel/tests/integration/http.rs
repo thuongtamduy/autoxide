@@ -9,9 +9,7 @@
 use autoxide_kernel::time::Timestamp;
 use std::time::{Duration, Instant};
 
-use autoxide_kernel::config::{
-    ConfigReader, ConfigSource, CorsOrigins, HttpConfig, LogConfig, LogFormat, LogLevel,
-};
+use autoxide_kernel::config::{ConfigReader, ConfigSource, CorsOrigins, HttpConfig};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{self, Api, Shutdown, ValidJson};
 use autoxide_kernel::response::{Data, Problem};
@@ -23,6 +21,7 @@ use axum::response::Response;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tower::ServiceExt;
+use tracing::level_filters::LevelFilter;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -787,11 +786,30 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogBuffer {
     }
 }
 
+/// Bộ ghi log JSON giống dạng `AUTOXIDE_LOG_FORMAT=json` của binary (`autoxide_host::logging`): trường của sự kiện
+/// ở cấp cao nhất, kèm trường của span hiện tại. Kernel không phụ thuộc `autoxide-host`, nên test tự dựng.
+pub(crate) fn json_subscriber<W>(
+    level: LevelFilter,
+    writer: W,
+) -> impl tracing::Subscriber + Send + Sync
+where
+    W: for<'a> tracing_subscriber::fmt::MakeWriter<'a> + Send + Sync + 'static,
+{
+    tracing_subscriber::fmt()
+        .json()
+        .flatten_event(true)
+        .with_current_span(true)
+        .with_span_list(false)
+        .with_ansi(false)
+        .with_max_level(level)
+        .with_writer(writer)
+        .finish()
+}
+
 /// Gửi `request` với log JSON ở mức `level` được bắt lại; trả về các dòng log.
-async fn logged(level: LogLevel, request: Request<Body>) -> Vec<serde_json::Value> {
+async fn logged(level: LevelFilter, request: Request<Body>) -> Vec<serde_json::Value> {
     let buffer = LogBuffer::default();
-    let config = LogConfig::new(level, LogFormat::Json);
-    let subscriber = autoxide_kernel::logging::subscriber(&config, buffer.clone(), Vec::new());
+    let subscriber = json_subscriber(level, buffer.clone());
     // Bộ nhận log này chỉ có hiệu lực trên thread hiện tại, tới khi `_guard` bị drop.
     // `tracing` nhớ, cho cả process, "dòng log này có ai nghe không". Khi chỉ một bộ nhận
     // đang sống, nó hỏi bộ nhận mặc định của THREAD vừa chạm dòng log lần đầu — có thể là
@@ -814,7 +832,7 @@ async fn moi_request_mot_dong_log_kem_request_id() {
         .body(Body::empty())
         .unwrap();
 
-    let lines = logged(LogLevel::Info, request).await;
+    let lines = logged(LevelFilter::INFO, request).await;
 
     assert_eq!(lines.len(), 1, "{lines:?}");
     let line = &lines[0];
@@ -836,7 +854,7 @@ async fn moi_request_mot_dong_log_kem_request_id() {
 
 #[tokio::test]
 async fn loi_5xx_duoc_ghi_kem_nguyen_nhan_goc() {
-    let lines = logged(LogLevel::Info, get("/api/v1/notes/panic")).await;
+    let lines = logged(LevelFilter::INFO, get("/api/v1/notes/panic")).await;
 
     let line = lines.last().unwrap();
     assert_eq!(line["level"], "ERROR");
@@ -848,14 +866,14 @@ async fn loi_5xx_duoc_ghi_kem_nguyen_nhan_goc() {
 
 #[tokio::test]
 async fn request_khong_khop_route_va_health_check_duoc_ghi_dung_muc() {
-    let lines = logged(LogLevel::Info, get("/nowhere/s3cr3t")).await;
+    let lines = logged(LevelFilter::INFO, get("/nowhere/s3cr3t")).await;
     assert_eq!(lines[0]["route"], "unmatched");
     assert!(!lines[0].to_string().contains("s3cr3t"), "{}", lines[0]);
     assert_eq!(lines[0]["status"], 404);
 
     // Health check ghi ở mức debug: ở mức info thì không có dòng nào.
-    assert!(logged(LogLevel::Info, get("/health/live")).await.is_empty());
-    let lines = logged(LogLevel::Debug, get("/health/live")).await;
+    assert!(logged(LevelFilter::INFO, get("/health/live")).await.is_empty());
+    let lines = logged(LevelFilter::DEBUG, get("/health/live")).await;
     assert!(lines.iter().any(|line| line["level"] == "DEBUG"), "{lines:?}");
 }
 

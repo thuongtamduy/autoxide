@@ -249,6 +249,8 @@ pub trait SwitchHook: Send + Sync {
 
 impl Relocation {
     /// Runs `hook` in the switch step of every split / merge run ([`SwitchHook`]).
+    ///
+    /// Old way: contribute the hook in `start` with `context.contribute::<dyn SwitchHook>(…)` instead.
     pub fn on_switch(mut self, hook: Arc<dyn SwitchHook>) -> Self {
         self.switch_hooks.push(hook);
         self

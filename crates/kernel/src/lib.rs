@@ -29,8 +29,8 @@ pub use data::{
     transfer, upload, version,
 };
 pub use ops::{
-    automation, bench_seed, bulk, connections, custom_fields, doctor, find, list_exports, logging,
-    metrics, reasons, resolve, setup, suggest, summary, tags, task, telemetry, texts, usages, work,
+    automation, bench_seed, bulk, connections, custom_fields, doctor, find, list_exports, reasons,
+    resolve, setup, suggest, summary, tags, task, telemetry, texts, usages, work,
 };
 pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use security::{

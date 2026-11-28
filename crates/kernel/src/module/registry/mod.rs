@@ -2,6 +2,7 @@
 //! translations, configuration and migrations, then starts each module in registration order. The contract
 //! with modules (the `Module` trait, `StartContext`) is in `module.rs`.
 
+mod contributed;
 mod sandbox;
 
 use jiff::SignedDuration;
@@ -614,16 +615,27 @@ impl Modules {
         self.automations.fill(self.tools().unwrap_or_default(), templates);
         self.fill_sandbox()?;
         self.client_configs.fill(&self.modules);
-        self.seeds.fill(
-            self.modules
-                .iter()
-                .filter_map(|module| module.seed_tenant().map(|seed| (module.name(), seed)))
-                .collect(),
-            self.modules
-                .iter()
-                .filter_map(|module| module.sample_data().map(|seed| (module.name(), seed)))
-                .collect(),
-        );
+        let seeds = self.per_module::<dyn crate::tenancy::TenantSeed>("seed_tenant", |module| {
+            module.seed_tenant()
+        })?;
+        // Phần cấp khách chạy mọi thứ dưới dạng `TenantSeed`: hàm cũ trả sẵn dạng đó, đóng góp `dyn SampleData` được bọc.
+        let samples = self
+            .per_module::<dyn crate::tenancy::SampleData>("sample_data", |module| {
+                module.sample_data().map(|seed| {
+                    Arc::new(crate::tenancy::SeedAsSample(seed))
+                        as Arc<dyn crate::tenancy::SampleData>
+                })
+            })?
+            .into_iter()
+            .map(|(name, sample)| {
+                (
+                    name,
+                    Arc::new(crate::tenancy::SampleSeed(sample))
+                        as Arc<dyn crate::tenancy::TenantSeed>,
+                )
+            })
+            .collect();
+        self.seeds.fill(seeds, samples);
         let migrator = self.migrator().map_err(|error| ModuleError(error.to_string()))?;
         let placements = crate::tenancy::Placements::new(
             registry.clone(),
@@ -636,10 +648,25 @@ impl Modules {
         let mut control_plane = self.control_plane_tables();
         control_plane.extend(self.dormant.iter().flat_map(|module| module.control_plane_tables()));
         // Chính sách tách / gộp (bước 38): bảng thuộc chính module, không khai hai lần.
-        let policies = crate::tenancy::relocate::Policies::collect(
+        let mut policies = crate::tenancy::relocate::Policies::collect(
             every().map(|module| (module.name(), module.relocation())).collect(),
         )
         .map_err(|problems| ModuleError(problems.join("; ")))?;
+        // Hook của bước chuyển cần service nên đóng góp trong `start` (D-20261128-contribute); `Relocation::on_switch`
+        // là đường cũ. Hook đóng góp chạy SAU mọi hook cũ; module đang nghỉ không `start` nên không có hook đóng góp
+        // (D-20261128-contributed-switch-hooks).
+        let hooks = self.apis.contributions_named::<dyn crate::tenancy::SwitchHook>();
+        for (module, _) in &hooks {
+            if self.modules.iter().any(|known| {
+                known.name() == *module && !known.relocation().switch_hooks().is_empty()
+            }) {
+                return Err(ModuleError(format!(
+                    "module `{module}` adds a switch hook with `Relocation::on_switch` and also contributes \
+                     `dyn SwitchHook` in `start`: keep the contribution and remove `on_switch`"
+                )));
+            }
+        }
+        policies.add_switch_hooks(hooks.into_iter().map(|(_, hook)| hook).collect());
         let dormant = super::dormant::migrators(&self.dormant, &self.keys, registry)?;
         self.moves.fill(crate::tenancy::moves::Setup {
             modules: self.names(),

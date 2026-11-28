@@ -1,37 +1,4 @@
-//! The `/metrics` endpoint for Prometheus, and the HTTP layer's own measurements.
-
-use axum::extract::State;
-use axum::http::header;
-use axum::response::IntoResponse;
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
-
-use crate::metrics::Metrics;
-
-/// Content type of the Prometheus text format.
-const PROMETHEUS_CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
-
-/// The `/metrics` route, mounted at the root (outside `/api/v1`).
-pub fn metrics_routes(metrics: Metrics) -> OpenApiRouter {
-    OpenApiRouter::new().routes(routes!(scrape)).with_state(metrics)
-}
-
-/// Metrics in the Prometheus text format.
-///
-/// Includes `http_requests_total` (by method, route and status) and
-/// `http_request_duration_seconds`. Served only when enabled in the configuration.
-#[utoipa::path(
-    get,
-    path = "/metrics",
-    // Không đăng nhập: máy thu số đo gọi; chỉ có khi bật `AUTOXIDE_HTTP_METRICS` (D-245).
-    extensions(("x-public" = json!(true))),
-    tag = "health",
-    operation_id = "metrics",
-    responses((status = 200, description = "Current metrics.", body = String, content_type = "text/plain"))
-)]
-async fn scrape(State(metrics): State<Metrics>) -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, PROMETHEUS_CONTENT_TYPE)], metrics.render())
-}
+//! The HTTP layer's own measurements. Serving them at `/metrics` is the binary's job (`autoxide-host`).
 
 /// Records measurements for a finished request. `route` is the route PATTERN (e.g.
 /// `/api/v1/notes/{id}`), not the raw path - so the number of metric series does not grow

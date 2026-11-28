@@ -144,7 +144,7 @@ Phần Rust công khai chia ba hạng (D-20261126-contract-tiers). Chỉ hạng 
 | ---- | ----- | ------- |
 | **Ổn định** | `autoxide_kernel::<mô-đun>`, `autoxide_testkit`, `autoxide::Autoxide`, `api` của module core và official | Semantic Versioning từ 1.0: chỉ phá vỡ ở bản major, có `#[deprecated]` trước ít nhất một bản minor |
 | **Thử nghiệm** | `autoxide_kernel::unstable::<mô-đun>`, sau Cargo feature `unstable` của kernel (tắt mặc định) | Đổi được ở bất kỳ bản minor nào; mọi thay đổi có trong changelog. Module dùng nó phải bật feature, nên thấy rõ mình dựa vào gì |
-| **Nội bộ** | Crate `autoxide-host`: thứ chỉ binary `autoxide` dùng (backup, transfer, cài đặt log, route của kernel…) | Không cam kết: không phải phụ thuộc của module |
+| **Nội bộ** | Crate `autoxide-host`: thứ chỉ binary `autoxide` dùng (cài đặt log, bộ thu Prometheus và `/metrics`, xuất trace; backup, transfer và route của kernel chuyển sang khi chính kernel không còn gọi chúng, D-20261128-host-crate) | Không cam kết: module không được phụ thuộc |
 
 Hạng thử nghiệm gồm hợp đồng của bộ nối nhà cung cấp (`einvoice`, `zns`, `voice`, `sms`, `push`, `payment`), tính
 năng chưa chốt hình dạng (`blocks`, `analytics`, `report`, `automation`, `custom_fields`, `sync`, các công cụ vận hành như

@@ -41,3 +41,42 @@ module-contract-legacy 16 modules/shipping/src/lib.rs
 module-contract-legacy 14 modules/support/src/lib.rs
 module-contract-legacy 16 modules/tax/src/lib.rs
 module-contract-legacy 16 modules/webhooks/src/lib.rs
+
+# Chỗ gọi getter / hàm đăng ký cũ của `StartContext` (luật `start-context-legacy`, D-20261128-contribute): thay bằng
+# `context.kernel::<H>()` / `context.contribute::<dyn Trait>(…)`, rồi hạ số hay xoá dòng. Chỉ giảm.
+start-context-legacy 2 modules/address/src/lib.rs
+start-context-legacy 1 modules/ai/src/lib.rs
+start-context-legacy 4 modules/analytics/src/lib.rs
+start-context-legacy 2 modules/audit/src/lib.rs
+start-context-legacy 14 modules/auth/src/lib.rs
+start-context-legacy 6 modules/automations/src/lib.rs
+start-context-legacy 4 modules/bookings/src/lib.rs
+start-context-legacy 7 modules/catalog/src/lib.rs
+start-context-legacy 9 modules/comments/src/lib.rs
+start-context-legacy 8 modules/compliance/src/lib.rs
+start-context-legacy 19 modules/content/src/lib.rs
+start-context-legacy 7 modules/conversations/src/lib.rs
+start-context-legacy 6 modules/customers/src/lib.rs
+start-context-legacy 2 modules/einvoice_sepay/src/lib.rs
+start-context-legacy 1 modules/esms/src/lib.rs
+start-context-legacy 4 modules/files/src/lib.rs
+start-context-legacy 6 modules/forms/src/lib.rs
+start-context-legacy 5 modules/inventory/src/lib.rs
+start-context-legacy 3 modules/invoices/src/lib.rs
+start-context-legacy 3 modules/ledger/src/lib.rs
+start-context-legacy 4 modules/mail/src/lib.rs
+start-context-legacy 7 modules/media/src/lib.rs
+start-context-legacy 4 modules/menus/src/lib.rs
+start-context-legacy 2 modules/momo/src/lib.rs
+start-context-legacy 9 modules/newsletter/src/lib.rs
+start-context-legacy 4 modules/notifications/src/lib.rs
+start-context-legacy 7 modules/orders/src/lib.rs
+start-context-legacy 4 modules/organizations/src/lib.rs
+start-context-legacy 4 modules/plans/src/lib.rs
+start-context-legacy 5 modules/promotions/src/lib.rs
+start-context-legacy 2 modules/reporting/src/lib.rs
+start-context-legacy 2 modules/sepay/src/lib.rs
+start-context-legacy 6 modules/shipping/src/lib.rs
+start-context-legacy 6 modules/support/src/lib.rs
+start-context-legacy 2 modules/tax/src/lib.rs
+start-context-legacy 1 modules/webhooks/src/lib.rs

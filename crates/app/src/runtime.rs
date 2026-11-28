@@ -2,6 +2,7 @@
 //! các module, ghép router. Mọi lệnh cần "cả hệ thống" (`serve`, `openapi`) đi qua
 //! [`start`], nên chúng thấy đúng cùng một hệ thống.
 
+use autoxide_host::metrics::{self, Metrics};
 use autoxide_kernel::access::Authenticator;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::database::Database;
@@ -9,7 +10,6 @@ use autoxide_kernel::event::Dispatcher;
 use autoxide_kernel::http::{self, Api};
 use autoxide_kernel::idempotency::IdempotencyStore;
 use autoxide_kernel::job::Worker;
-use autoxide_kernel::metrics::Metrics;
 use autoxide_kernel::module::Modules;
 use autoxide_kernel::secret::SecretKey;
 
@@ -106,7 +106,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
                 metrics.spawn_upkeep();
                 if config.http.metrics_address.is_some() {
                     // Port riêng: số đo không có xác thực, nên không để chung port công khai.
-                    let (router, _) = http::metrics_routes(metrics).split_for_parts();
+                    let (router, _) = metrics::routes(metrics).split_for_parts();
                     metrics_router = Some(router);
                 } else {
                     tracing::warn!(
@@ -114,7 +114,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
                          is served on the public port without authentication. Set a separate \
                          address, or block /metrics at your proxy."
                     );
-                    root = root.merge(http::metrics_routes(metrics));
+                    root = root.merge(metrics::routes(metrics));
                 }
             }
             Err(error) => {
