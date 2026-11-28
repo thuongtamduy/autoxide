@@ -1,5 +1,8 @@
 # CodeQL: phân tích tĩnh mã Rust, TypeScript của SDK và chính các workflow (D-20261126-road-to-1-0, G8). Kết quả vào
 # tab Security → Code scanning. Chạy khi push main, trên pull request, và mỗi tuần (lỗ hổng mới trong bộ truy vấn).
+# Pull request không chạm Rust (`scripts/rust-changed.sh`, cùng danh sách `scripts/rust-free-paths.txt` với gate) thì bỏ
+# `analyze (rust)` — phần mất hơn 20 phút; push main, lịch hằng tuần và chạy tay luôn quét đủ ba ngôn ngữ
+# (D-20261128-codeql-rust-on-change).
 # Chỉ chạy khi repo công khai (D-197): repo riêng tư cần GitHub Advanced Security có phí.
 name: CodeQL
 
@@ -19,9 +22,34 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Pull request có chạm Rust không. Chỉ chạy trên pull request; sự kiện khác thì job bị bỏ qua, output rỗng và
+  # `analyze` quét đủ. Không lỗi mở theo hướng bỏ quét: job này đỏ, bị huỷ hay không xác định được mốc so sánh thì output
+  # khác `false` và Rust vẫn được quét.
+  plan:
+    name: plan
+    if: ${{ github.event_name == 'pull_request' && !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      rust: ${{ steps.rust.outputs.rust }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Does the pull request touch Rust
+        id: rust
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: echo "rust=$(scripts/rust-changed.sh "$BASE_SHA")" >> "$GITHUB_OUTPUT"
+
   analyze:
     name: analyze (${{ matrix.language }})
-    if: ${{ !github.event.repository.private }}
+    needs: plan
+    # `!cancelled()`: vẫn chạy khi `plan` bị bỏ qua (không phải pull request) hay đỏ (khi đó quét đủ).
+    if: ${{ !cancelled() && !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -30,8 +58,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # `rust` và `actions` không cần build (build-mode none); JS/TS cũng vậy.
-        language: [rust, javascript-typescript, actions]
+        # `rust` và `actions` không cần build (build-mode none); JS/TS cũng vậy. JS/TS và actions mỗi phần chỉ chừng một
+        # phút nên luôn chạy; `rust` bỏ khi `plan` nói chắc chắn PR không chạm Rust (đúng chuỗi `false`). Ngôn ngữ bị bỏ
+        # không tạo check nào, nên không có check đỏ hay "pending" treo.
+        language: ${{ fromJSON(needs.plan.outputs.rust == 'false' && '["javascript-typescript", "actions"]' || '["rust", "javascript-typescript", "actions"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
