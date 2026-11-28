@@ -675,3 +675,69 @@ async fn tai_khoan_nha_cung_cap_doi_xac_thuc_lai_gan_day() {
     .await
     .unwrap();
 }
+
+/// Cấu hình là của cả khách: `kernel.settings.manage` giữ qua membership ở một nhánh (permission không
+/// `scoped` có độ sâu `tenant` ở nút nào cũng được) hay qua API key gắn nhánh không đổi được cấu hình như
+/// `kernel.business_model`, qua cả REST lẫn tool MCP; người giữ ở nút gốc đổi được và mỗi lần đổi có
+/// một dòng event (nguồn của nhật ký audit) mang người làm.
+#[tokio::test]
+async fn cau_hinh_cap_khach_can_quyen_o_nut_goc() {
+    use autoxide_kernel::access::{Grant, Scope};
+    use autoxide_kernel::tenancy::OrgId;
+    TestDatabase::run(async |test| {
+        let branch = OrgId::from_uuid(Uuid::now_v7());
+        let manage = "kernel.settings.manage".to_owned();
+        let app = TestApp::builder(test)
+            .module(Demo)
+            .user("owner", 1, &["kernel.settings.manage"])
+            .principal(
+                "branch",
+                Principal::with_grants(
+                    Uuid::from_u128(2),
+                    [(manage.clone(), Grant::new(branch, Scope::Tenant))],
+                ),
+            )
+            .principal("fenced", Principal::new(Uuid::from_u128(3), [manage]).with_fence(branch))
+            .build()
+            .await
+            .unwrap();
+        let model = "/api/v1/kernel/settings/kernel.business_model";
+        let body = json!({"value": "marketplace"});
+        for who in ["branch", "fenced"] {
+            let put = app.put(model).token(who).json(body.clone()).send().await.unwrap();
+            assert_eq!(
+                (put.status(), put.json()["code"].clone()),
+                (StatusCode::FORBIDDEN, json!("org_out_of_scope")),
+                "{who}: {}",
+                put.json()
+            );
+            let deleted = app.delete(model).token(who).send().await.unwrap();
+            assert_eq!(deleted.status(), StatusCode::FORBIDDEN, "{who}");
+            let client = app.mcp(who).await.unwrap();
+            let args = json!({"name": "kernel.business_model", "value": "marketplace"});
+            let refused = client.call_tool(tool("kernel.set_setting", args)).await;
+            assert!(format!("{refused:?}").contains("org_out_of_scope"), "{who}: {refused:?}");
+            let args = json!({"name": "kernel.business_model"});
+            let refused = client.call_tool(tool("kernel.delete_setting", args)).await;
+            assert!(format!("{refused:?}").contains("org_out_of_scope"), "{who}: {refused:?}");
+            client.cancel().await.unwrap();
+        }
+        let events = "SELECT payload FROM kernel_events";
+        assert!(texts(app.database(), events).await.is_empty(), "lệnh bị từ chối không ghi gì");
+
+        let put = app.put(model).token("owner").json(body).send().await.unwrap();
+        assert_eq!(put.status(), StatusCode::OK, "{}", put.json());
+        let client = app.mcp("owner").await.unwrap();
+        let args = json!({"name": "kernel.business_model"});
+        client.call_tool(tool("kernel.delete_setting", args)).await.unwrap();
+        client.cancel().await.unwrap();
+        let with_actor = texts(
+            app.database(),
+            "SELECT CAST(COUNT(*) AS TEXT) FROM kernel_events WHERE actor_user_id IS NOT NULL",
+        )
+        .await;
+        assert_eq!(with_actor, ["2"], "đặt và bỏ đều ghi người làm");
+    })
+    .await
+    .unwrap();
+}

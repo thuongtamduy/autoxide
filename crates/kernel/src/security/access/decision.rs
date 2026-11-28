@@ -14,9 +14,9 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use super::{OrgTarget, Permission, Principal, Scope, org_out_of_scope};
+use super::{Grants, OrgTarget, Permission, Principal, Scope, org_out_of_scope};
 use crate::error::Error;
-use crate::tenancy::{OrgId, OrgTree, TenantId};
+use crate::tenancy::{OrgId, OrgTree, TenantId, root_of};
 
 /// Outcome of one permission decision on a record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -259,5 +259,37 @@ impl Principal {
         let transaction = &crate::db::Via::of(transaction);
         self.require_at(transaction, permission, target).await?;
         OrgTree::ensure_writable(transaction, self.tenant_id(), target.org).await
+    }
+
+    /// Checks that the caller holds `permission` at the tenant's root node: a grant held through the
+    /// membership of the root (or every permission), and no fence below the root. For data of the whole
+    /// tenant that has no node (tenant settings): a permission that is not `scoped` held through a
+    /// branch membership counts across the tenant for records, but must not change what the whole
+    /// tenant shares. Missing -> `permission_denied`; held only below the root -> `org_out_of_scope`.
+    pub fn require_at_root(&self, permission: &Permission) -> Result<(), Error> {
+        self.require(permission)?;
+        let root = root_of(self.tenant_id());
+        // Nhân sự nền tảng vào khách bằng `kernel.tenants.operate` giữ grant ở nút gốc của khách nền
+        // tảng (`operating`); uỷ quyền và hỗ trợ dựng grant ở nút của khách đích — không trùng gốc nhà.
+        let home_root = self.operator_from().map(root_of);
+        // `Principal::new` (độ sâu `tenant`, D-303 mục 3) đặt grant ở gốc của khách mặc định rồi `in_tenant` đổi khách mà
+        // không dời grant: grant đó nghĩa là "cả khách", không phải một nhánh. Gốc khách mặc định không bao giờ là nút
+        // nhánh của khách khác (ID nút là ID riêng của từng khách).
+        let legacy_root = root_of(crate::tenancy::DEFAULT_TENANT);
+        // Grant của permission không `scoped` ở nút nhánh vẫn có độ sâu `tenant` (D-303 mục 3), nên
+        // phải xem nút của grant gốc (`grant_map`), không xem `grants()` (đã mở rộng ra cả khách).
+        let at_root = match &self.grants {
+            Grants::All => true,
+            Grants::Only(map) => map.get(permission.name).is_some_and(|grants| {
+                grants.iter().any(|grant| {
+                    grant.org == root || grant.org == legacy_root || Some(grant.org) == home_root
+                })
+            }),
+        };
+        if at_root && self.fence().is_none() {
+            Ok(())
+        } else {
+            Err(org_out_of_scope(root, permission))
+        }
     }
 }
