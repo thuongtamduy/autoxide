@@ -119,9 +119,19 @@ Luật, theo [hướng dẫn SemVer của Cargo](https://doc.rust-lang.org/cargo
   có biên dịch được mà không phải sửa.
 - `cargo-semver-checks` so các crate này với bản phát hành trước ở mọi pull request chạm vào chúng và
   ở mọi pull request phát hành; từ 1.0, có phá vỡ thì kiểm tra đỏ.
-- Các thư viện có kiểu lộ ra trong API này (`axum`, `sea-orm`, `utoipa`, `tokio`, `serde`… — bảng ở
-  [`docs/MODULE_GUIDE.vi.md`](MODULE_GUIDE.vi.md#độ-ổn-định-của-hợp-đồng-module)) là một phần của
-  nó: đưa một thư viện trong đó lên phiên bản lớn mới là thay đổi phá vỡ, nên phải chờ bản major.
+- Thư viện bên thứ ba ra phiên bản lớn mới **không** buộc Autoxide ra bản major, và không buộc
+  module phải sửa code. Module chạm database, HTTP, OpenAPI, kiểm đầu vào, migration và thời gian qua
+  các lớp riêng của kernel (`autoxide_kernel::db`, `http`, `migration`, `time`…), và phần công khai
+  hạng ổn định của kernel và testkit không có kiểu nào của các thư viện nằm dưới các lớp đó
+  (`sea-orm`, `sea-query`, `sqlx`, `axum`, `http`, `tower`, `utoipa`, `validator`, `jiff`,
+  `async-trait`). Một trong số đó lên phiên bản lớn mới thì chỉ kernel sửa. Chỉ nhóm nhỏ thư viện
+  *từ vựng* (`serde`, `serde_json`, `uuid`, `tokio`, `tracing`, `futures-core`, `bytes`) được xuất
+  hiện trong hợp đồng; một trong số đó lên phiên bản lớn mới (hiếm: `serde` 2) là thay đổi thư viện
+  duy nhất tính là phá vỡ. Bảng ở
+  [`docs/MODULE_GUIDE.vi.md`](MODULE_GUIDE.vi.md#độ-ổn-định-của-hợp-đồng-module).
+- Tới 1.0, các module đang được chuyển sang các lớp đó và đường cũ vẫn còn; `cargo xtask check` (và
+  `check-module` cho module ở repo riêng) chặn module phụ thuộc thẳng vào thư viện kernel đã bọc, trừ
+  các module còn trong danh sách chờ chuyển. 1.0 chỉ phát hành khi mọi module đã chuyển xong.
 - Phiên bản Rust tối thiểu theo bản Rust ổn định gần đây (`rust-toolchain.toml`). Nâng nó chỉ ở bản
   minor, không bao giờ ở bản patch, và có ghi trong changelog.
 

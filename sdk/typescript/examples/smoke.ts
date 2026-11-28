@@ -31,3 +31,27 @@ export async function example(): Promise<void> {
   }
   void labels;
 }
+
+// `requestWithHeaders` + `ifMatch`, and the `refresh` option: added without changing the calls above.
+let access = "";
+const refreshing = createClient({
+  baseUrl: "https://api.example.com",
+  token: () => access,
+  refresh: async () => {
+    access = "next";
+  },
+});
+
+export async function readThenChange(id: string): Promise<void> {
+  const { data, etag, status, headers } = await refreshing.requestWithHeaders("get", "/api/v1/menus/{id}", { path: { id } });
+  const key: string = data.key; // no `{ notModified: true }` here: no `ifNoneMatch` was passed
+  const code: number = status;
+  const requestId: string | null = headers.get("X-Request-Id");
+  void [key, code, requestId];
+  await refreshing.put("/api/v1/menus/{id}", { path: { id }, ifMatch: etag, body: { items: [] } });
+
+  const again = await refreshing.requestWithHeaders("get", "/api/v1/menus/{id}", { path: { id }, ifNoneMatch: etag });
+  if ("notModified" in again.data) return;
+  const same: string = again.data.key;
+  void same;
+}

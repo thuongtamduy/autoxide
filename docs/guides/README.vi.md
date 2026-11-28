@@ -8,6 +8,7 @@ Tiếng Anh: [`README.md`](README.md).
 Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`curl --version`). Với curl cũ hơn, thay
 `--json '…'` bằng `-H 'Content-Type: application/json' -H 'Accept: application/json' -d '…'`.
 
+- [Dựng ứng dụng web](web-app.vi.md): CORS, client TypeScript, token và refresh, permission, `ETag`, lỗi, tải ảnh, việc nào gọi endpoint nào, cả file `api.ts`
 - [Hiện bài viết và ảnh trên website](website.vi.md): endpoint công khai, `srcset` và WebP, ETag và 304
 - [Mở một cửa hàng: đơn đầu tiên từ sản phẩm tới hoá đơn điện tử](shop.vi.md): bật bộ nối, tài khoản nhà cung cấp, sản phẩm, giỏ vãng lai, MoMo, GHN, eSMS, SePay eInvoice
 - [Dựng trang chủ của cửa hàng từ API](storefront.vi.md): vị trí và banner, bộ sưu tập, thương hiệu và liên hệ, cache

@@ -96,6 +96,28 @@ curl -sS "$API/api/v1/content/public/resolve?locale=en&path=/blog/hello-world" -
 # expect: 304
 ```
 
+## Cache, và xem bài vừa đăng
+
+Đọc công khai không đăng nhập (bài viết, trang, chuyên mục, khung trang, sitemap, feed) trả
+`Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300`:
+
+- **trình duyệt** giữ một bản nhưng lần nào cũng hỏi lại máy chủ (`max-age=0`), rẻ nhờ `ETag` / `304`;
+- **cache dùng chung** — CDN, reverse proxy, cache phía máy chủ của framework — được trả bản của nó trong 60 giây
+  (`s-maxage`, đặt bằng `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS`), và trả bản cũ hơn thêm 5 phút trong lúc lấy bản mới
+  ở nền (`stale-while-revalidate`).
+
+Vì vậy khi có cache đứng trước, lần tải lại đầu tiên sau khi đăng hay sửa bài vẫn có thể thấy bản cũ; lần sau
+mới thấy bản mới. Request có header `Authorization` không bao giờ được cache dùng chung giữ lại.
+
+Muốn thấy thay đổi ngay — nút "xem trước" trong trang quản trị, ngay sau khi đăng:
+
+- gọi từ trình duyệt bằng `fetch(url, { cache: "no-cache" })`: trình duyệt hỏi lại máy chủ và tự gửi `ETag`;
+- hoặc gửi request kèm access token: câu trả lời khi đã đăng nhập là `private` và không qua cache dùng chung;
+- hoặc, với SDK, giữ `ETag` đã nhận và gửi lại bằng `ifNoneMatch`: `304` nghĩa là bản của bạn đang mới nhất.
+
+Bản nháp hoàn toàn không công khai: hiện bản nháp bằng endpoint cần đăng nhập (`GET /api/v1/content/entries/{id}`)
+hoặc link xem trước (`POST /api/v1/content/entries/{id}/preview-token`, đọc bằng `GET /api/v1/content/public/preview`).
+
 ## Với SDK
 
 ```ts
