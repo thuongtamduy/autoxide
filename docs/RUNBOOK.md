@@ -200,6 +200,8 @@ label by design; look a tenant up in logs and traces).
 | `http_rate_limited_total`, `http_api_key_rate_limited_total`, `http_tenant_rate_limited_total` | near 0 | `AutoxideRateLimitedClients` above 1/s for 15 min | "Mass revocation" |
 | `webhooks_failed_total` vs `webhooks_delivered_total`     | under 5% failing                 | `AutoxideWebhooksFailing` above 20% for 30 min    | the receivers' owners        |
 | `mail_bounces_total{kind="hard"}`                         | few                              | `AutoxideMailHardBounces` above 20 per hour       | `DEPLOY.md` "Mail that bounces" |
+| `inventory_delivery_unissued_total`, `inventory_order_event_unapplied_total`, `inventory_delivery_after_manual_release_total` | 0 | `AutoxideStockNotIssued` | `INVENTORY.md` "Stock that did not leave with a delivery" |
+| `orders_payment_currency_mismatch_total`                  | 0                                | `AutoxidePaymentCurrencyMismatch`                 | `MONEY.md` "A payment in another currency" |
 
 Other series worth a panel (no alert by default): `database_write_retries_total` (write contention),
 `kernel_request_log_dropped_total` (request log overloaded), `entitlement_denials_total` (plan limits hit),

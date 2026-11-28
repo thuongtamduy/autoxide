@@ -365,11 +365,13 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
 - [ ] Chạy thử vòng 1 bằng agent đóng vai người dùng (`docs/trials/rc-trial-r1/`, agent đóng vai, không phải người thật) —
       các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
-  - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
-        `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
-    - [ ] UT-1 tiếp: xuất kho lỗi 4xx hiện chỉ `warn` — thêm cảnh báo / đối soát cho người vận hành; đối soát các đơn giao
+  - [x] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
+        `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập (#589)
+    - [x] UT-1 tiếp: xuất kho lỗi 4xx hiện chỉ `warn` — thêm cảnh báo / đối soát cho người vận hành; đối soát các đơn giao
           trước bản sửa; `inventory`: chỗ giữ do nhân viên trả tay (`release_reason=manual`) rồi hàng vẫn giao hiện chỉ log
-          `debug` — đổi thành `warn` + metric
+          `debug` — đổi thành `warn` + metric (metric `inventory_order_event_unapplied_total`,
+          `inventory_delivery_after_manual_release_total`, luật cảnh báo `AutoxideStockNotIssued`, mục đối soát ở
+          `docs/INVENTORY.md`)
   - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
         chạm bảo mật nên qua kiểm độc lập
   - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
@@ -692,12 +694,16 @@ thật (P7).
         để báo 422 lúc tạo)
   - [ ] Bản ghi đã gắn `org_id` không có trong cây từ trước PT-8: vẫn hiện trong danh sách của người có quyền toàn
         khách nhưng mở / sửa / xoá theo ID bị 404 / 403 — cần lệnh báo cáo và dọn (gắn về nút gốc hay nút đúng)
-  - [ ] `orders.payment_currency_mismatch` bỏ qua kiểm khi `PosPayment.currencies` rỗng (chỉ REST điền) — thêm
+  - [x] `orders.payment_currency_mismatch` bỏ qua kiểm khi `PosPayment.currencies` rỗng (chỉ REST điền) — thêm
         đường gọi mới (tool MCP bán ở quầy) dễ quên; nên bắt buộc tiền tệ trong kiểu dữ liệu của service
-  - [ ] Bậc phí vận chuyển, cân nặng gửi GHN bão hoà về `i64::MAX` thay vì báo 422 — cần trần cân nặng / kích thước
-        ở đầu vào (như catalog 1e7 mm)
-  - [ ] Khoản thanh toán khác tiền tệ của đơn (`orders/src/payments.rs`, sau đối soát chấp nhận khoản nhận) nay vào
-        dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
+        (`PosPayment::new` nhận `Money`, trường riêng tư)
+  - [x] Bậc phí vận chuyển, cân nặng gửi GHN bão hoà về `i64::MAX` thay vì báo 422 — cần trần cân nặng / kích thước
+        ở đầu vào (như catalog 1e7 mm) — trần món 1e7 g / 1e7 mm, một lần giao 1e9 g (`shipping.load_too_large`,
+        `ghn.parcel_too_large`), phí bậc tràn → `money.overflow`
+  - [x] Khoản thanh toán khác tiền tệ của đơn (`orders/src/payments.rs`, sau đối soát chấp nhận khoản nhận) nay vào
+        dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành (mã
+        `orders.payment_received_currency_mismatch`, metric + luật cảnh báo `AutoxidePaymentCurrencyMismatch`, test,
+        mục "A payment in another currency" ở `docs/MONEY.md`)
   - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
   - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút; lần sai liên tiếp đếm bền (client lạ khoá từ 90, mọi client từ

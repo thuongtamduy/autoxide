@@ -156,15 +156,43 @@ fn order_id(after: &Value) -> Option<Uuid> {
     after.get("order_id").and_then(Value::as_str).and_then(|id| id.parse().ok())
 }
 
-/// Lỗi nghiệp vụ không sửa được bằng cách giao lại event: ghi log và thôi (giao lại mãi cũng vậy).
+/// Lỗi nghiệp vụ không sửa được bằng cách giao lại event: ghi cảnh báo, đếm
+/// `inventory_order_event_unapplied_total{event}` cho người vận hành (luật cảnh báo
+/// `AutoxideStockNotIssued`, cách đối soát ở docs/INVENTORY.md) và thôi (giao lại mãi cũng vậy).
 fn settle(event: &Delivered, outcome: Result<(), Error>) -> Result<(), Error> {
     match outcome {
         Err(error) if error.kind().status() < 500 => {
-            tracing::warn!(event_id = %event.id, event = %event.name, code = error.code(), "order event not applied to stock");
+            metrics::counter!("inventory_order_event_unapplied_total", "event" => event_label(&event.name))
+                .increment(1);
+            tracing::warn!(event_id = %event.id, event = %event.name, code = error.code(), "order event not applied to stock; reconcile the stock level by hand");
             Ok(())
         }
         other => other,
     }
+}
+
+/// Đơn không có hàng theo dõi tồn (hàng số, dịch vụ) thì `orders` không giữ chỗ, nên xác nhận đơn gặp
+/// `inventory.reservation_not_found`: không có gì để xác nhận — không đếm, không cảnh báo (như `issue`). Chỗ
+/// giữ đã hết hạn / đã trả (`inventory.reservation_expired`) thì vẫn là lỗi cần người xem.
+fn nothing_to_confirm(outcome: Result<(), Error>) -> Result<(), Error> {
+    match outcome {
+        Err(error) if error.code() == "inventory.reservation_not_found" => Ok(()),
+        other => other,
+    }
+}
+
+/// Nhãn `event` của số đo: chỉ tên event `inventory` nghe (tập nhỏ cố định), còn lại `other`.
+fn event_label(name: &str) -> &'static str {
+    const KNOWN: [&str; 7] = [
+        ORDER_CONFIRMED,
+        ORDER_CANCELLED,
+        RETURN_RECEIVED,
+        PREORDER_CANCELLED,
+        ORDER_DELIVERED,
+        FULFILLMENT_DELIVERED,
+        LINE_SERIALS_RECORDED,
+    ];
+    KNOWN.into_iter().find(|known| *known == name).unwrap_or("other")
 }
 
 #[async_trait::async_trait]
@@ -176,8 +204,7 @@ impl EventHandler for OrderEvents {
             ORDER_CONFIRMED => {
                 let Some(order) = order_id(after) else { return Ok(()) };
                 let outcome = self.0.confirm(tenant, order).await.map(|_| ());
-                // Đơn không có hàng theo dõi tồn (hàng số, dịch vụ) thì không có chỗ giữ.
-                settle(event, outcome)
+                settle(event, nothing_to_confirm(outcome))
             }
             ORDER_CANCELLED => {
                 let Some(order) = order_id(after) else { return Ok(()) };
@@ -335,5 +362,24 @@ impl OrderEvents {
             Err(error) if error.kind().status() < 500 => Ok(true),
             Err(error) => Err(error),
         }
+    }
+}
+
+#[cfg(test)]
+mod label_tests {
+    use super::*;
+
+    #[test]
+    fn nhan_so_do_chi_thuoc_tap_co_dinh() {
+        assert_eq!(event_label(ORDER_DELIVERED), ORDER_DELIVERED);
+        assert_eq!(event_label("orders.something_new"), "other");
+    }
+
+    #[test]
+    fn xac_nhan_don_khong_co_cho_giu_khong_dem() {
+        let order = Uuid::now_v7();
+        assert!(nothing_to_confirm(Err(crate::reservations::not_found(order))).is_ok());
+        let expired = nothing_to_confirm(Err(crate::reservations::expired(order))).unwrap_err();
+        assert_eq!(expired.code(), "inventory.reservation_expired");
     }
 }
