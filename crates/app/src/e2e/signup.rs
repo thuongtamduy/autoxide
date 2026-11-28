@@ -34,6 +34,9 @@ async fn app(test: &TestDatabase, verifier: Arc<FakeIdentityVerifier>) -> TestAp
         .setting("AUTOXIDE_PLANS_CACHE_SECONDS", "0")
         .setting("AUTOXIDE_PLANS_SIGNUP", "true")
         .setting("AUTOXIDE_ANTISPAM_MIN_FILL_SECONDS", "0")
+        // Trang quay về do người vận hành cấu hình: `compliance` tin địa chỉ `plans` truyền qua `KycGate`, không
+        // so với tên miền của khách nền tảng (D-20261128-return-url-kernel) — lượt đăng ký cần KYC không bị 422.
+        .setting("AUTOXIDE_PLANS_SIGNUP_RETURN_URL", "https://signup.platform.example/done?id={id}")
         .provide::<dyn IdentityVerifier>(verifier)
         .tenant("beta")
         .user("ops", 1, &OPS);

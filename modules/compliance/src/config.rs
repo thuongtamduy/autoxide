@@ -102,7 +102,6 @@ pub(crate) const CASE_TRACKING_URL: Setting = Setting::new(
      carries the API path `GET /api/v1/compliance/public/cases/{id}?token=…`.",
 );
 
-/// Trang theo dõi vụ việc theo từng khách (D-20261125-tenant-link-templates).
 /// Origin khách cho phép làm địa chỉ quay về sau khi xác minh danh tính, ngoài tên miền đã xác minh (L-11,
 /// D-20261128-return-url-kernel).
 pub(crate) const KYC_RETURN_ORIGINS: autoxide_kernel::tenancy::TenantSetting =
@@ -128,6 +127,7 @@ fn check_return_origins(raw: &str) -> Result<(), autoxide_kernel::error::FieldEr
     .with_param("items", bad.join(", ")))
 }
 
+/// Trang theo dõi vụ việc theo từng khách (D-20261125-tenant-link-templates).
 pub(crate) const CASE_TRACKING_LINK: autoxide_kernel::tenancy::TenantSetting =
     autoxide_kernel::tenancy::TenantSetting::link(
         "compliance.link.case_tracking",

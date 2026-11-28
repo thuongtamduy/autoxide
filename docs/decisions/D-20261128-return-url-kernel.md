@@ -5,8 +5,13 @@ Chủ đề: Xác thực, phân quyền, bảo mật
 Quyết định: kernel có `tenancy::check_return_url(tenant, url, domains, listed)` và `invalid_return_origins(raw)` — cùng
 luật của D-20261125-return-url-allowlist (origin đọc như trình duyệt; `https://` trên tên miền đã xác minh của khách, hay
 origin trong danh sách khách khai). `compliance` kiểm `return_url` của `POST /api/v1/compliance/kyc/profiles/{id}/sessions`
-(và mọi đường gọi `start_session`, gồm `KycGate` cho module khác) bằng hàm đó, với cấu hình theo khách mới
+(và `/me/kyc/sessions`) bằng hàm đó, với cấu hình theo khách mới
 `compliance.kyc.return_origins`; sai thì 422, lỗi ô `return_url` mã `compliance.return_url_not_allowed` (hay `format`).
+Chỉ kiểm địa chỉ do NGƯỜI GỌI API gửi (REST, MCP — `start_caller_session`). `KycGate::start` (module gọi module) tin địa
+chỉ module truyền vào: trách nhiệm của module gọi, ghi trên doc của trait — vd `plans` truyền
+`AUTOXIDE_PLANS_SIGNUP_RETURN_URL` của người vận hành, vốn không nằm trên tên miền hay cấu hình của khách nền tảng (kiểm
+kiểu đó làm mọi lượt đăng ký cần KYC trả 422). Kiểu riêng `ReturnUrl` trong `compliance` buộc mọi đường gọi
+`start_session` chọn rõ một trong hai.
 Chuỗi gửi nhà cung cấp là chuỗi đã chuẩn hoá. `ledger` còn bản riêng (`ledger/src/return_url.rs`) — chuyển sang hàm
 kernel là việc dọn, không đổi hành vi, làm khi phiên sửa `ledger`.
 
