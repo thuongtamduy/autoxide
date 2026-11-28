@@ -11,7 +11,8 @@
 #
 # Dùng ở: gate.yml (pull request: job `build tests`, các shard test, `external module example` bỏ qua phần nặng),
 # gate.sh (`--pr` và `--quick`: bỏ clippy) và job `plan` của ci.yml (job MSRV; push lên main so với lần CI xanh gần nhất
-# trên main, D-20261127-ci-runner-budget). Gate của push lên main, tag và chạy tay không gọi script này: luôn chạy đủ.
+# trên main, D-20261127-ci-runner-budget), job `plan` của codeql.yml (pull request: bỏ `analyze (rust)`,
+# D-20261128-codeql-rust-on-change). Gate của push lên main, tag và chạy tay không gọi script này: luôn chạy đủ.
 # Lý do chọn file nào bỏ qua được ghi ngay trong danh sách; cùng luật khớp viết lại ở `xtask/src/rust_free.rs` (test
 # so hai bản).
 set -euo pipefail
