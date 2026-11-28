@@ -195,10 +195,12 @@ pub(crate) async fn put_shared_section(
 ///
 /// Requires `content.write` at its unit; `If-Match` is required. A section still used by a page
 /// (its draft or its published version) is not deleted: `409` with the number of pages.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/shared-sections/{id}",
-    extensions(("x-permissions" = json!(["content.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.write"]))),
     operation_id = "delete_content_shared_section",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the shared section."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),

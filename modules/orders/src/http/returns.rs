@@ -593,10 +593,12 @@ pub(crate) struct RefundRequestBody {
 /// Requires `orders.refund` at the order's shop. Paid through the payment partner when the
 /// payment came through it; otherwise (cash on delivery, cash) recorded as `manual`: the shop
 /// pays the buyer back itself. The total refunded never exceeds what was paid.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/{id}/refunds",
-    extensions(("x-permissions" = json!(["orders.refund"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["orders.refund"]))),
     operation_id = "refund_order",
     params(("id" = Uuid, Path, description = "Id of the order.")),
     request_body = RefundRequestBody,

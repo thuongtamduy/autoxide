@@ -336,10 +336,12 @@ async fn receive_transfer(
 ///
 /// Requires `inventory.transfer` covering the destination. Record a loss with an adjustment if
 /// needed.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/transfers/{id}/close",
-    extensions(("x-permissions" = json!(["inventory.transfer"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["inventory.transfer"]))),
     operation_id = "close_inventory_transfer",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the transfer.")),

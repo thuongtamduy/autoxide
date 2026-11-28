@@ -182,10 +182,12 @@ pub(crate) async fn get_team(
 ///
 /// Requires `support.settings.manage` at the team's unit. Its members and routing rules go too;
 /// tickets of the team keep their assignee but lose the team.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/teams/{id}",
-    extensions(("x-permissions" = json!(["support.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["support.settings.manage"]))),
     operation_id = "delete_support_team",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the team.")),
@@ -254,10 +256,12 @@ pub(crate) async fn set_member(
 /// Remove a member from a support team.
 ///
 /// Requires `support.settings.manage` at the team's unit.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/teams/{id}/members/{user_id}",
-    extensions(("x-permissions" = json!(["support.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["support.settings.manage"]))),
     operation_id = "remove_support_team_member",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the team."), ("user_id" = Uuid, Path, description = "The member.")),
@@ -403,10 +407,12 @@ pub(crate) async fn create_rule(
 /// Delete a routing rule.
 ///
 /// Requires `support.settings.manage` at the rule's unit.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/routing-rules/{id}",
-    extensions(("x-permissions" = json!(["support.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["support.settings.manage"]))),
     operation_id = "delete_support_routing_rule",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the rule.")),

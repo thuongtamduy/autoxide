@@ -66,10 +66,12 @@ pub(super) async fn set_override(
 /// Remove an override of a tenant.
 ///
 /// Platform staff with `plans.subscriptions.manage`.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/tenants/{tenant_id}/overrides/{id}",
-    extensions(("x-permissions" = json!(["plans.subscriptions.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.subscriptions.manage"]))),
     operation_id = "remove_override",
     security(("bearer" = [])),
     params(("tenant_id" = Uuid, Path, description = "Id of the tenant."), ("id" = Uuid, Path, description = "Id of the override.")),

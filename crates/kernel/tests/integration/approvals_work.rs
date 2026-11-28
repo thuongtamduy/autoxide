@@ -132,7 +132,8 @@ async fn yeu_cau_duyet_vao_hop_viec_va_tool_mcp() {
     .unwrap();
 }
 
-/// Ghi thẳng một yêu cầu duyệt của `requested_by` cần `permission`, trạng thái `status`.
+/// Ghi thẳng một yêu cầu duyệt của `requested_by` cần `permission` (rỗng: lệnh không đòi permission nào), trạng
+/// thái `status`.
 async fn insert_request(
     app: &TestApp,
     requested_by: u128,
@@ -169,7 +170,8 @@ async fn insert_request(
             Uuid::from_u128(requested_by).into(),
             "DELETE /api/v1/shop/things/1".into(),
             "h".into(),
-            format!("[\"{permission}\"]").into(),
+            if permission.is_empty() { "[]".to_owned() } else { format!("[\"{permission}\"]") }
+                .into(),
             status.into(),
             (now + SignedDuration::from_hours(1)).into(),
             now.into(),
@@ -294,6 +296,72 @@ async fn nguoi_duyet_co_permission_chua_gach_duoi_thay_yeu_cau() {
             .collect();
         assert_eq!(ids, visible, "{page}");
         assert_eq!(page["pagination"]["total"], 3);
+    })
+    .await
+    .unwrap();
+}
+
+// Lệnh không đòi permission (việc của chính người gọi, vd huỷ đơn của mình): chính chủ của agent duyệt trong phiên
+// đăng nhập của họ; người khác — kể cả có mọi quyền — không duyệt thay, agent không tự duyệt
+// (D-20261128-agent-approval-audit).
+#[tokio::test]
+async fn lenh_khong_permission_do_chinh_chu_duyet() {
+    TestDatabase::run(async |test| {
+        let robot = Principal::new(Uuid::from_u128(1), Vec::<String>::new())
+            .via_api_key(Uuid::from_u128(10))
+            .with_actor_kind(ActorKind::Agent);
+        let app = TestApp::builder(test)
+            .user("owner", 1, &[])
+            .user("other", 2, &["kernel.views.share"])
+            .principal("robot", robot)
+            .build()
+            .await
+            .unwrap();
+        let first = insert_request(&app, 1, "", "pending").await;
+        let decide = |who: &'static str, id: String| {
+            let app = &app;
+            async move {
+                app.post(&format!("/api/v1/kernel/approvals/{id}/approve"))
+                    .token(who)
+                    .send()
+                    .await
+                    .unwrap()
+            }
+        };
+        let other = decide("other", first.clone()).await;
+        assert_ne!(other.status(), StatusCode::OK, "người khác không duyệt thay chính chủ");
+        let robot = decide("robot", first.clone()).await;
+        assert_ne!(robot.status(), StatusCode::OK, "agent không tự duyệt");
+        let owner = decide("owner", first.clone()).await;
+        assert_eq!(owner.status(), StatusCode::OK);
+        assert_eq!(owner.json()["data"]["status"], "approved");
+    })
+    .await
+    .unwrap();
+}
+
+// Lệnh xoá của kernel mang `x-approval` (D-20261128-agent-approval-audit): agent gọi thì chưa có gì chạy, nhận 202
+// và yêu cầu duyệt; người gọi cùng lệnh thì chạy thẳng tới handler.
+#[tokio::test]
+async fn agent_xoa_tag_phai_cho_duyet() {
+    TestDatabase::run(async |test| {
+        let robot = Principal::new(Uuid::from_u128(1), ["kernel.tags.manage".to_owned()])
+            .via_api_key(Uuid::from_u128(10))
+            .with_actor_kind(ActorKind::Agent);
+        let app = TestApp::builder(test)
+            .user("owner", 1, &["kernel.tags.manage"])
+            .principal("robot", robot)
+            .build()
+            .await
+            .unwrap();
+        let path = format!("/api/v1/kernel/tags/{}", Uuid::now_v7());
+        let agent = app.delete(&path).token("robot").send().await.unwrap();
+        assert_eq!(agent.status(), StatusCode::ACCEPTED);
+        let body = agent.json();
+        assert_eq!(body["data"]["status"], "pending", "{body}");
+        assert_eq!(body["data"]["permissions"], json!(["kernel.tags.manage"]));
+        let person = app.delete(&path).token("owner").send().await.unwrap();
+        assert_ne!(person.status(), StatusCode::ACCEPTED);
     })
     .await
     .unwrap();

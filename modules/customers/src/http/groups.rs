@@ -192,10 +192,12 @@ pub(crate) async fn update_group(
 ///
 /// Requires `customers.segments.manage` covering the group's unit. Price lists and promotions
 /// that name the group stop matching anyone.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/groups/{id}",
-    extensions(("x-permissions" = json!(["customers.segments.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["customers.segments.manage"]))),
     operation_id = "delete_customer_group",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the group.")),
@@ -285,10 +287,12 @@ pub(crate) async fn add_member(
 ///
 /// Requires `customers.segments.manage` covering the group's unit and `customers.read` covering
 /// the customer. Removing a non-member does nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/groups/{id}/members/{profile_id}",
-    extensions(("x-permissions" = json!(["customers.segments.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["customers.segments.manage"]))),
     operation_id = "remove_customer_group_member",
     security(("bearer" = [])),
     params(

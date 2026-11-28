@@ -595,10 +595,12 @@ pub(crate) async fn get_recording(
 ///
 /// Requires `conversations.voice.manage` at the unit of the call — for example when the customer
 /// asks. Deleting again changes nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/calls/{id}/recording",
-    extensions(("x-permissions" = json!(["conversations.voice.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["conversations.voice.manage"]))),
     operation_id = "delete_conversation_call_recording",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the call.")),

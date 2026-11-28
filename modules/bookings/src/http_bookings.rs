@@ -485,10 +485,12 @@ async fn no_show_booking(
 /// The shop (`bookings.manage`) at any time, with the whole deposit refunded; the customer until the
 /// start: within the free window (`bookings.free_cancel_hours`) the whole deposit is refunded, later
 /// the unit keeps `bookings.late_cancel_retain_percent` of it. Refunds go through the payment partner.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/bookings/{id}/cancel",
-    extensions(("x-permissions" = json!([]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!([]))),
     operation_id = "cancel_booking",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the booking.")),

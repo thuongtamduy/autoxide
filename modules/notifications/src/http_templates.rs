@@ -249,10 +249,12 @@ async fn put_draft(
 /// Throw the draft of a template away.
 ///
 /// Requires `notifications.templates.manage`. The published version, if any, stays in use.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/templates/{kind}/{channel}/{locale}/draft",
-    extensions(("x-permissions" = json!(["notifications.templates.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["notifications.templates.manage"]))),
     operation_id = "delete_notification_template_draft",
     security(("bearer" = [])),
     params(
@@ -439,10 +441,12 @@ async fn rollback(
 ///
 /// Requires `notifications.templates.manage`. The replaced text (`PUT /templates/…`) or the default
 /// text applies again; the versions are kept for a rollback.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/templates/{kind}/{channel}/{locale}/published",
-    extensions(("x-permissions" = json!(["notifications.templates.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["notifications.templates.manage"]))),
     operation_id = "unpublish_notification_template",
     security(("bearer" = [])),
     params(

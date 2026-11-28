@@ -405,10 +405,12 @@ async fn replace_role(
 ///
 /// Requires `auth.roles.manage`. Users who had the role lose it, so you can only delete a role
 /// you could take away: you have its permissions as widely, and every permission it bans.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/roles/{id}",
-    extensions(("x-permissions" = json!(["auth.roles.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.roles.manage"]))),
     operation_id = "delete_role",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the role.")),

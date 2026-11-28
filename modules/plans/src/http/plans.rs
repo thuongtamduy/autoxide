@@ -145,10 +145,12 @@ pub(super) async fn replace_plan(
 ///
 /// Platform staff with `plans.plans.manage`. The plan is no longer sold or the default; tenants on
 /// it keep it. A plan is never deleted.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/plans/{id}/retire",
-    extensions(("x-permissions" = json!(["plans.plans.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.plans.manage"]))),
     operation_id = "retire_plan",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the plan.")),

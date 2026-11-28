@@ -236,10 +236,12 @@ async fn update_template(
 ///
 /// Requires `invoices.templates_manage` on the template's unit. Documents then print with the
 /// tenant's template or the built-in one.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/templates/{id}",
-    extensions(("x-permissions" = json!(["invoices.templates_manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["invoices.templates_manage"]))),
     operation_id = "delete_invoice_template",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the template.")),

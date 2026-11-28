@@ -131,10 +131,12 @@ async fn extend_sandbox(
 ///
 /// Requires `kernel.sandboxes.manage`, in the real tenant of the sandbox. Everything tried in it is
 /// deleted now and cannot be recovered; promote what you want to keep first.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/sandboxes/{id}",
-    extensions(("x-permissions" = json!(["kernel.sandboxes.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.sandboxes.manage"]))),
     operation_id = "delete_sandbox",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the sandbox.")),

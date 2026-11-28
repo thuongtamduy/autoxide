@@ -271,10 +271,12 @@ async fn update_document(
 /// Delete a draft.
 ///
 /// Requires `invoices.write` on the unit. Issued documents are accounting records and are kept.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/documents/{id}",
-    extensions(("x-permissions" = json!(["invoices.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["invoices.write"]))),
     operation_id = "delete_invoice_document",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the document.")),
@@ -301,10 +303,12 @@ async fn delete_document(
 /// Requires `invoices.issue` on the unit. Gives the next number of the series (no gaps), books the
 /// sale, and sends the e-invoice when the series has a provider. Issuing again returns the same
 /// document and number; a rejected e-invoice is sent again with the same number.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/documents/{id}/issue",
-    extensions(("x-permissions" = json!(["invoices.issue"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["invoices.issue"]))),
     operation_id = "issue_invoice_document",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the document.")),
@@ -372,10 +376,12 @@ pub(crate) struct CancelRequest {
 /// Cancelling a cancelled document returns it. An e-invoice sent to the tax authority cannot be cancelled
 /// where the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01): use `adjust` (decrease) or
 /// `replace` instead. An e-invoice the tax authority rejected is cancelled here only.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/documents/{id}/cancel",
-    extensions(("x-permissions" = json!(["invoices.correct"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["invoices.correct"]))),
     operation_id = "cancel_invoice_document",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the document.")),
@@ -428,10 +434,12 @@ pub(crate) struct ReplaceRequest {
 ///
 /// Requires `invoices.correct` on the unit. Writes a draft linked to the document; issuing the draft
 /// marks the document `adjusted` and books the difference.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/documents/{id}/adjust",
-    extensions(("x-permissions" = json!(["invoices.correct"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["invoices.correct"]))),
     operation_id = "adjust_invoice_document",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the issued document.")),
@@ -467,10 +475,12 @@ async fn adjust_document(
 ///
 /// Requires `invoices.correct` on the unit. Writes a draft linked to the document; issuing the draft
 /// marks the document `replaced` and reverses its booking.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/documents/{id}/replace",
-    extensions(("x-permissions" = json!(["invoices.correct"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["invoices.correct"]))),
     operation_id = "replace_invoice_document",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the issued document.")),

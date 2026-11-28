@@ -9,6 +9,10 @@ const FIXES: &[(&str, &str)] = &[
         "Build the key with `autoxide_kernel::throttle::address_key(kind, ip)` so IPv6 clients are limited by block; if the string is already built from a bucketed value, add `// address-key: <reason>` on that line or the one above.",
     ),
     (
+        "api-approval",
+        "Add `approval = \"agent\"` to `#[endpoint]` (or `(\"x-approval\" = json!(\"agent\"))` to `extensions` of `#[utoipa::path]`), say in the doc that an AI agent's call waits for a person (202), then run `cargo xtask regen`; only a revocation or the caller's own small data may go in xtask/approval-allow.txt, with the reason.",
+    ),
+    (
         "api-closed-body",
         "Add `#[serde(deny_unknown_fields)]` to the request type, or list the operation in xtask/api-shape-allow.txt only if it is an old one waiting to be fixed.",
     ),
@@ -98,6 +102,10 @@ const FIXES: &[(&str, &str)] = &[
         "Remove the `#[allow(clippy::unwrap_used …)]` from src/; return an error instead. Only `#[cfg(test)]` code and tests/ may allow them.",
     ),
     ("lints", "Add `[lints]` with `workspace = true` to the crate's Cargo.toml."),
+    (
+        "mcp-approval",
+        "Add `.requires_approval_for_agent()` to the destructive tool, matching `approval = \"agent\"` on its REST endpoint, then run `cargo xtask regen`.",
+    ),
     (
         "mcp-page-count",
         "Make the MCP list tool take the same `limit`/`cursor` as the REST endpoint and return `pagination`.",

@@ -53,6 +53,7 @@
 
 mod address_keys;
 mod affected;
+mod api_approval;
 mod api_diff;
 mod api_shape;
 mod baseline;
@@ -422,6 +423,12 @@ fn check() -> ExitCode {
             eprintln!("{warning}");
         }
         violations.extend(shape.violations);
+        // Lệnh rủi ro chờ người duyệt khi agent gọi (D-20261128-agent-approval-audit).
+        let approval = api_approval::check(&workspace.root)?;
+        for warning in &approval.warnings {
+            eprintln!("{warning}");
+        }
+        violations.extend(approval.violations);
         let lengths = lengths::check(&workspace.root)?;
         if let Some(warning) = lengths.warning {
             eprintln!("{warning}");

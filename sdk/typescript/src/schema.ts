@@ -34971,6 +34971,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -35743,6 +35744,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -35994,6 +35996,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -36035,6 +36038,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -36418,6 +36422,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -36474,6 +36479,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -36499,6 +36505,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -36512,6 +36519,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; passkey_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -36645,6 +36653,7 @@ export interface paths {
     delete: {
       parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -36853,6 +36862,7 @@ export interface paths {
       requestBody: CancelBookingRequest;
       responses: {
         200: Data_BookingRecord;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -36966,6 +36976,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -37302,6 +37313,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -37435,6 +37447,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -37476,6 +37489,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -37655,6 +37669,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -37887,6 +37902,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -37970,6 +37986,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; document_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -38013,6 +38030,7 @@ export interface paths {
       parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; media_id: string; locale: string }; };
       responses: {
         200: Data_CatalogProduct;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -38091,6 +38109,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; locale: string }; };
       responses: {
         200: Data_CatalogProduct;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -38407,6 +38426,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -39558,6 +39578,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         default: Problem;
@@ -39986,6 +40007,7 @@ export interface paths {
       requestBody: ComplianceSubjectRequestFulfil;
       responses: {
         200: Data_ComplianceSubjectRequestResult;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -40066,6 +40088,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -40173,6 +40196,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; page_kind: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -40255,6 +40279,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -40323,6 +40348,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -40950,6 +40976,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -41027,6 +41054,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -41294,6 +41322,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -41321,6 +41350,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_ScheduleResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -41398,6 +41428,7 @@ export interface paths {
     delete: {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -41581,6 +41612,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -41662,6 +41694,7 @@ export interface paths {
     delete: {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -41833,6 +41866,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -41901,6 +41935,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_ConversationCall;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -42492,6 +42527,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_GiftCard;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -42556,6 +42592,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -42581,6 +42618,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; profile_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -43061,6 +43099,7 @@ export interface paths {
       requestBody: AdjustPointsRequest;
       responses: {
         200: Data_CustomerPoints;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -43091,6 +43130,7 @@ export interface paths {
       requestBody: AdjustStoreCreditRequest;
       responses: {
         200: Data_StoreCredit;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -43769,6 +43809,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_InventoryPurchaseOrder;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -44085,6 +44126,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_InventoryTransfer;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -44203,6 +44245,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -44220,6 +44263,7 @@ export interface paths {
       responses: {
         200: Data_InvoicesDocument;
         201: Data_InvoicesDocument;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -44236,6 +44280,7 @@ export interface paths {
       requestBody: InvoicesCancelRequest;
       responses: {
         200: Data_InvoicesDocument;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -44267,6 +44312,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_InvoicesDocument;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -44312,6 +44358,7 @@ export interface paths {
       responses: {
         200: Data_InvoicesDocument;
         201: Data_InvoicesDocument;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -44564,6 +44611,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -44750,6 +44798,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -44842,6 +44891,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -45212,6 +45262,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; id: string; note_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         404: Problem;
@@ -45256,6 +45307,7 @@ export interface paths {
       responses: {
         200: Data_RelocationPlan;
         201: Data_TenantRelocation;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -45324,6 +45376,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -45390,6 +45443,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { name: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -45503,6 +45557,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -45533,6 +45588,7 @@ export interface paths {
       requestBody: MergeTag;
       responses: {
         200: Data_TagView;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -45640,6 +45696,7 @@ export interface paths {
       requestBody: EraseRequest;
       responses: {
         200: Data_TenantErasure;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -45723,6 +45780,7 @@ export interface paths {
       responses: {
         200: Data_TenantMovePlan;
         201: Data_TenantMove;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -45806,6 +45864,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; name: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -45847,6 +45906,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { locale: string; key: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -46169,6 +46229,7 @@ export interface paths {
       responses: {
         200: Data_LedgerEntry;
         201: Data_LedgerEntry;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -46378,6 +46439,7 @@ export interface paths {
       responses: {
         200: Data_LedgerRefund;
         201: Data_LedgerRefund;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -46423,6 +46485,7 @@ export interface paths {
       responses: {
         200: Data_LedgerPayout;
         201: Data_LedgerPayout;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         409: Problem;
@@ -46465,6 +46528,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_LedgerPeriodResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -47239,6 +47303,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -47318,6 +47383,7 @@ export interface paths {
     delete: {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -47414,6 +47480,7 @@ export interface paths {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_CampaignResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -47458,6 +47525,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { email?: string }; };
       responses: {
         200: Data_NewsletterErased;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         422: Problem;
@@ -47523,6 +47591,7 @@ export interface paths {
     delete: {
       parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -47682,6 +47751,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -47720,6 +47790,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -48010,6 +48081,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -48048,6 +48120,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -48091,6 +48164,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { kind: string; channel: string; locale: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -48394,6 +48468,7 @@ export interface paths {
       requestBody: CancelMyOrderRequest;
       responses: {
         200: Data_OrdersOrder;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -48498,6 +48573,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_OrdersPaymentAction;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49081,6 +49157,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_OrdersCodBlock;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49119,6 +49196,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_OrdersCodRule;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49279,6 +49357,7 @@ export interface paths {
       responses: {
         200: Data_OrdersRefund;
         201: Data_OrdersRefund;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49380,6 +49459,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -49420,6 +49500,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; org_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -49520,6 +49601,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { code: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -49673,6 +49755,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; key: string }; };
       responses: {
         200: Data_UnitSettingResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49729,6 +49812,7 @@ export interface paths {
       requestBody: MarkPaidRequest;
       responses: {
         200: Data_BillingPeriodResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49744,6 +49828,7 @@ export interface paths {
       requestBody: PayRequest;
       responses: {
         200: Data_PayResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49760,6 +49845,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_BillingPeriodResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -49901,6 +49987,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_PlanResponse;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -50071,6 +50158,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { store: string; product_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -50127,6 +50215,7 @@ export interface paths {
       requestBody: CancelRequest;
       responses: {
         200: Data_PlanSubscription;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -50247,6 +50336,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string; id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -50288,6 +50378,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
       responses: {
         200: Data_PlanSubscription;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -50302,6 +50393,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
       requestBody: SuspendRequest;
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -50475,6 +50567,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -51074,6 +51167,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; day: string }; };
       responses: {
         200: Data_ShippingCalendar;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -51351,6 +51445,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -51480,6 +51575,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_ShippingShipment;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -51635,6 +51731,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -51728,6 +51825,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -51880,6 +51978,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
       responses: {
         200: Data_SupportPolicyInForce;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         default: Problem;
@@ -52029,6 +52128,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -52079,6 +52179,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -52105,6 +52206,7 @@ export interface paths {
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
       responses: {
+        202: Record<string, unknown>;
         204: void;
         401: Problem;
         403: Problem;
@@ -52204,6 +52306,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; target: string }; };
       responses: {
         200: Data_Vec_String;
+        202: Record<string, unknown>;
         401: Problem;
         403: Problem;
         404: Problem;

@@ -241,10 +241,12 @@ async fn attach_asset(
 ///
 /// Requires `catalog.products.write` on the unit owning the product. Refused while buyers can
 /// still download it, and for the last file of a product on sale.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/digital-assets/{id}",
-    extensions(("x-permissions" = json!(["catalog.products.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.products.write"]))),
     operation_id = "remove_catalog_digital_asset",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the file.")),

@@ -53,10 +53,12 @@ pub(crate) struct MoveRequest {
 /// answers `503 tenant_maintenance` while a background job copies its data, switches it to the new
 /// placement and deletes the old copy; follow it at the `Location` of the answer. Sending the same
 /// move again resumes one that stopped half-way.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/tenants/{id}/move",
-    extensions(("x-permissions" = json!(["kernel.tenants.move"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.tenants.move"]))),
     operation_id = "move_tenant",
     security(("bearer" = [])),
     params(("id" = String, Path, description = "Id or slug of the tenant.")),
@@ -201,7 +203,8 @@ pub(crate) fn tools(moves: Arc<TenantMoves>) -> Vec<Tool> {
             },
         )
         .requires(TENANTS_MOVE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
         Tool::new(
             "get_tenant_move",
             "Get a move of a tenant to another placement (platform staff only): its `state` \

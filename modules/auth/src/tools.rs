@@ -337,7 +337,8 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             },
         )
         .requires(ROLES_MANAGE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
         Tool::new(
             "get_user_roles",
             "List the roles of a user (`id` is the user's id), by name; follow \
@@ -943,7 +944,8 @@ fn oidc(state: &Arc<HttpState>) -> Vec<Tool> {
             },
         )
         .requires(OIDC_MANAGE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
         Tool::new(
             "list_my_identities",
             "List the outside sign-ins (Google, Microsoft, GitHub…) linked to your own account.",

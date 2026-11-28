@@ -766,10 +766,12 @@ async fn get_entry(
 ///
 /// Requires `ledger.reverse` on the book's unit. Posts a new entry with debits and credits swapped,
 /// dated in an open period. An entry is reversed at most once (a reversal may itself be reversed).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/entries/{id}/reverse",
-    extensions(("x-permissions" = json!(["ledger.reverse"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["ledger.reverse"]))),
     operation_id = "reverse_ledger_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry to reverse.")),
@@ -882,10 +884,12 @@ async fn list_periods(
 /// Requires `ledger.periods_close` on the book's unit. The period must have ended and every
 /// earlier period be closed. Closing records each account's closing balance; no entry can be dated
 /// in it afterwards. Cannot be undone; closing a closed period again returns it.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/periods/{id}/close",
-    extensions(("x-permissions" = json!(["ledger.periods_close"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["ledger.periods_close"]))),
     operation_id = "close_ledger_period",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the period.")),

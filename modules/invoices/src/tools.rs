@@ -169,7 +169,8 @@ pub(crate) fn all(service: &Arc<InvoicesService>) -> Vec<Tool> {
                 async move { service.issue_manual(&tenant, &principal, input.document_id).await }
             },
         )
-        .requires(ISSUE),
+        .requires(ISSUE)
+        .requires_approval_for_agent(),
         Tool::new(
             "print",
             "Print a document as HTML with its print template (the unit's, the tenant's or the built-in \

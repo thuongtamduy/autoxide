@@ -256,10 +256,12 @@ pub(crate) async fn put_theme_variant(
 ///
 /// Requires `content.themes.manage` at its unit; `If-Match` is required. Pause an active variant
 /// first (`409`).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/theme-variants/{id}",
-    extensions(("x-permissions" = json!(["content.themes.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.themes.manage"]))),
     operation_id = "delete_content_theme_variant",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the variant."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),

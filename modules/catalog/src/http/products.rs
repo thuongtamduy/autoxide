@@ -238,10 +238,12 @@ async fn update_product(
 ///
 /// Requires `catalog.products.write` covering the product. A product that was on sale once can
 /// only be archived (`POST /products/{id}/status`).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/products/{id}",
-    extensions(("x-permissions" = json!(["catalog.products.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.products.write"]))),
     operation_id = "delete_catalog_product",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the product.")),
@@ -348,10 +350,12 @@ async fn put_product_translation(
 ///
 /// Requires `catalog.products.write` covering the product. The default language cannot be
 /// removed.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/products/{id}/translations/{locale}",
-    extensions(("x-permissions" = json!(["catalog.products.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.products.write"]))),
     operation_id = "delete_catalog_product_translation",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the product."), ("locale" = String, Path, description = "Language, e.g. `en`.")),
@@ -698,10 +702,12 @@ async fn update_variant(
 /// Delete a variant.
 ///
 /// Requires `catalog.products.write` covering its product. A product keeps at least one variant.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/variants/{id}",
-    extensions(("x-permissions" = json!(["catalog.products.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.products.write"]))),
     operation_id = "delete_catalog_variant",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the variant.")),

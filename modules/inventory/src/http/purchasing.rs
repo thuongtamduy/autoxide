@@ -602,10 +602,12 @@ async fn order_purchase_order(
 /// Close a purchase order: what has not arrived stops counting as `incoming`.
 ///
 /// Requires `inventory.purchasing.manage` covering the receiving warehouse.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/purchase-orders/{id}/close",
-    extensions(("x-permissions" = json!(["inventory.purchasing.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["inventory.purchasing.manage"]))),
     operation_id = "close_inventory_purchase_order",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the purchase order.")),

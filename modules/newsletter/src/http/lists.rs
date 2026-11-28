@@ -256,10 +256,12 @@ pub(crate) async fn update_list(
 ///
 /// Requires `newsletter.manage`. `If-Match` is required. Deletes every subscription to the
 /// list. Refused while the list has a draft, scheduled, sending or paused campaign.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/lists/{id}",
-    extensions(("x-permissions" = json!(["newsletter.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_list",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the list."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),

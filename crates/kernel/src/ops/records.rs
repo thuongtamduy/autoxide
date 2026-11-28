@@ -371,10 +371,12 @@ async fn create_record_note(
 /// Delete your note on a record.
 ///
 /// Only the note's author, who must still be able to read the record.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/records/{kind}/{id}/notes/{note_id}",
-    extensions(("x-permissions" = json!([]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!([]))),
     operation_id = "delete_record_note",
     security(("bearer" = [])),
     params(

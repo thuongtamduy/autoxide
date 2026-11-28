@@ -134,6 +134,7 @@ pub(crate) fn all(service: &Arc<OrgService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(GROUPS_MANAGE),
+        .requires(GROUPS_MANAGE)
+        .requires_approval_for_agent(),
     ]
 }

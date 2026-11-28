@@ -159,10 +159,12 @@ async fn put_template(
 /// Go back to the default text of a kind on one channel and language.
 ///
 /// Requires `notifications.templates.manage`.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/templates/{kind}/{channel}/{locale}",
-    extensions(("x-permissions" = json!(["notifications.templates.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["notifications.templates.manage"]))),
     operation_id = "delete_notification_template",
     security(("bearer" = [])),
     params(

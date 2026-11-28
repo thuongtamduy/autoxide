@@ -188,8 +188,10 @@ pub(crate) async fn lookup_gift_card(
 /// Void a gift card (lost, fraud).
 ///
 /// Requires `customers.stored_value.manage`. The remaining balance is gone.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
-    post, path = "/gift-cards/{id}/void", extensions(("x-permissions" = json!(["customers.stored_value.manage"]))),
+    post, path = "/gift-cards/{id}/void", extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["customers.stored_value.manage"]))),
     operation_id = "void_gift_card", security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the gift card.")),
     responses(
@@ -214,8 +216,10 @@ pub(crate) async fn void_gift_card(
 ///
 /// Requires `customers.stored_value.manage` and `customers.read` covering the customer. Store credit
 /// only comes from compensation or refunds; it cannot be bought, withdrawn or transferred.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
-    post, path = "/{id}/store-credit/adjustments", extensions(("x-permissions" = json!(["customers.stored_value.manage"]))),
+    post, path = "/{id}/store-credit/adjustments", extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["customers.stored_value.manage"]))),
     operation_id = "adjust_store_credit", security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the customer profile.")),
     request_body = AdjustStoreCreditRequest,

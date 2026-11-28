@@ -95,7 +95,8 @@ pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
             },
         )
         .requires(SETTINGS_MANAGE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
         Tool::new(
             "list_settings",
             "List the settings of the current tenant: every setting the installed modules take \

@@ -356,10 +356,12 @@ pub(crate) async fn update_subscriber(
 ///
 /// Requires `newsletter.manage`. Deletes the subscriber for good, with their subscriptions,
 /// delivery history and pending confirmation links. A suppression of the address is kept.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/subscribers/{id}",
-    extensions(("x-permissions" = json!(["newsletter.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_subscriber",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the subscriber.")),
@@ -480,10 +482,12 @@ pub(crate) async fn get_email_data(
 /// person the data is about). A suppression of the address is kept, so that it never gets
 /// mail again after a bounce or complaint; delete it with `DELETE /suppressions/{id}` if the
 /// person asks. The event `newsletter.subscriber_erased` does not carry the address.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/data",
-    extensions(("x-permissions" = json!(["newsletter.export"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["newsletter.export"]))),
     operation_id = "erase_newsletter_email_data",
     security(("bearer" = [])),
     params(EmailQuery),

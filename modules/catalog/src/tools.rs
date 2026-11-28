@@ -286,7 +286,8 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
             },
         )
         .requires(PRODUCTS_WRITE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
         Tool::new(
             "upsert_variant",
             "Create a variant (give `product_id` and `create`) or change one (give `id` and \

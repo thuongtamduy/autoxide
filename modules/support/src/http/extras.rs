@@ -65,10 +65,12 @@ pub(crate) async fn add_link(
 /// Remove a link from a ticket.
 ///
 /// Requires `support.tickets.reply` covering the ticket.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/tickets/{id}/links/{target}",
-    extensions(("x-permissions" = json!(["support.tickets.reply"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["support.tickets.reply"]))),
     operation_id = "remove_support_link",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the ticket."), ("target" = String, Path, description = "The linked record, `<module>.<type>:<id>`.")),
@@ -372,10 +374,12 @@ pub(crate) async fn update_macro(
 /// Delete a saved reply.
 ///
 /// Requires `support.settings.manage` at its unit.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/macros/{id}",
-    extensions(("x-permissions" = json!(["support.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["support.settings.manage"]))),
     operation_id = "delete_support_macro",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the saved reply.")),

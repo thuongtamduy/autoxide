@@ -321,10 +321,12 @@ pub(super) async fn update_custom_field(
 ///
 /// Requires `kernel.custom_fields.manage`. The field stops being shown and accepted; values already
 /// on records stay (a field is never deleted with its data).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/custom-fields/{id}",
-    extensions(("x-permissions" = json!(["kernel.custom_fields.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.custom_fields.manage"]))),
     operation_id = "delete_custom_field",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the field.")),

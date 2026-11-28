@@ -110482,7 +110482,7 @@
     },
     "/api/v1/auth/guardrails/{tenant_id}": {
       "delete": {
-        "description": "Requires `auth.guardrails.manage`. Guardrails set by other tenants above stay.",
+        "description": "Requires `auth.guardrails.manage`. Guardrails set by other tenants above stay.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_remove_guardrail",
         "parameters": [
           {
@@ -110522,6 +110522,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The guardrail was removed."
           },
@@ -110575,6 +110585,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.guardrails.manage"
         ]
@@ -116760,7 +116771,7 @@
     },
     "/api/v1/auth/oidc-providers/{id}": {
       "delete": {
-        "description": "Requires `auth.oidc.manage`. Every account link to it goes too; people who signed in only\nwith it reset their password by email.",
+        "description": "Requires `auth.oidc.manage`. Every account link to it goes too; people who signed in only\nwith it reset their password by email.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_delete_oidc_provider",
         "parameters": [
           {
@@ -116800,6 +116811,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -116853,6 +116874,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.oidc.manage"
         ]
@@ -118719,7 +118741,7 @@
     },
     "/api/v1/auth/roles/{id}": {
       "delete": {
-        "description": "Requires `auth.roles.manage`. Users who had the role lose it, so you can only delete a role\nyou could take away: you have its permissions as widely, and every permission it bans.",
+        "description": "Requires `auth.roles.manage`. Users who had the role lose it, so you can only delete a role\nyou could take away: you have its permissions as widely, and every permission it bans.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_delete_role",
         "parameters": [
           {
@@ -118759,6 +118781,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The role was deleted."
           },
@@ -118822,6 +118854,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.roles.manage"
         ]
@@ -119366,7 +119399,7 @@
     },
     "/api/v1/auth/scim/group-mappings/{id}": {
       "delete": {
-        "description": "Requires `auth.scim.manage`, and you must be able to give the rule's role at its unit yourself.\nMembers of the group lose the role at once, unless another group or a hand-made membership gives\nit too.",
+        "description": "Requires `auth.scim.manage`, and you must be able to give the rule's role at its unit yourself.\nMembers of the group lose the role at once, unless another group or a hand-made membership gives\nit too.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_delete_scim_group_mapping",
         "parameters": [
           {
@@ -119406,6 +119439,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The rule was removed."
           },
@@ -119469,6 +119512,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.scim.manage"
         ]
@@ -122625,7 +122669,7 @@
     },
     "/api/v1/auth/users/{id}": {
       "delete": {
-        "description": "Requires `auth.users.manage`, and every permission the user has. Data kept by other\nmodules is deleted shortly after. This cannot be undone; to only stop someone from\nsigning in, disable the account with `PATCH /api/v1/auth/users/{id}` instead.",
+        "description": "Requires `auth.users.manage`, and every permission the user has. Data kept by other\nmodules is deleted shortly after. This cannot be undone; to only stop someone from\nsigning in, disable the account with `PATCH /api/v1/auth/users/{id}` instead.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_delete_user",
         "parameters": [
           {
@@ -122665,6 +122709,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The account was deleted."
           },
@@ -122728,6 +122782,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.users.manage"
         ]
@@ -123404,7 +123459,7 @@
     },
     "/api/v1/auth/users/{id}/mfa": {
       "delete": {
-        "description": "Requires `auth.users.manage`. The user signs in with the password alone and can\nset up a new device. Check who is asking before using this.",
+        "description": "Requires `auth.users.manage`. The user signs in with the password alone and can\nset up a new device. Check who is asking before using this.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_reset_user_mfa",
         "parameters": [
           {
@@ -123444,6 +123499,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Two-step sign-in is off for this user (also when it was not on)."
           },
@@ -123497,6 +123562,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.users.manage"
         ]
@@ -123504,7 +123570,7 @@
     },
     "/api/v1/auth/users/{id}/passkeys": {
       "delete": {
-        "description": "Requires `auth.passkeys.manage`, and that the user has no permission you lack. The user\nsigns in with the password and can add new passkeys. The password and sessions stay as they\nare. Answers 204 also when the user had none.",
+        "description": "Requires `auth.passkeys.manage`, and that the user has no permission you lack. The user\nsigns in with the password and can add new passkeys. The password and sessions stay as they\nare. Answers 204 also when the user had none.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_remove_user_passkeys",
         "parameters": [
           {
@@ -123544,6 +123610,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Every passkey of the user is removed."
           },
@@ -123597,6 +123673,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.passkeys.manage"
         ]
@@ -123761,7 +123838,7 @@
     },
     "/api/v1/auth/users/{id}/passkeys/{passkey_id}": {
       "delete": {
-        "description": "Requires `auth.passkeys.manage`, and that the user has no permission you lack. The passkey\nstops working at once. The password and the user's sessions stay as they are (like\n`DELETE /api/v1/auth/users/{id}/mfa`). Check who is asking before using this. The event\n`auth.passkey_removed` records `by_administrator`.",
+        "description": "Requires `auth.passkeys.manage`, and that the user has no permission you lack. The passkey\nstops working at once. The password and the user's sessions stay as they are (like\n`DELETE /api/v1/auth/users/{id}/mfa`). Check who is asking before using this. The event\n`auth.passkey_removed` records `by_administrator`.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "auth_remove_user_passkey",
         "parameters": [
           {
@@ -123811,6 +123888,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -123864,6 +123951,7 @@
         "tags": [
           "auth"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "auth.passkeys.manage"
         ]
@@ -124761,7 +124849,7 @@
     },
     "/api/v1/automations/rules/{id}": {
       "delete": {
-        "description": "Requires `automations.manage` covering the rule. The log of its runs stays until it expires.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `automations.manage` covering the rule. The log of its runs stays until it expires.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_delete_automation_rule",
         "parameters": [
           {
@@ -124813,6 +124901,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -124876,6 +124974,7 @@
         "tags": [
           "automations"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "automations.manage"
         ],
@@ -126965,7 +127064,7 @@
     },
     "/api/v1/bookings/bookings/{id}/cancel": {
       "post": {
-        "description": "The shop (`bookings.manage`) at any time, with the whole deposit refunded; the customer until the\nstart: within the free window (`bookings.free_cancel_hours`) the whole deposit is refunded, later\nthe unit keeps `bookings.late_cancel_retain_percent` of it. Refunds go through the payment partner.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "The shop (`bookings.manage`) at any time, with the whole deposit refunded; the customer until the\nstart: within the free window (`bookings.free_cancel_hours`) the whole deposit is refunded, later\nthe unit keeps `bookings.late_cancel_retain_percent` of it. Refunds go through the payment partner.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_cancel_booking",
         "parameters": [
           {
@@ -127024,6 +127123,16 @@
               }
             },
             "description": "The booking, now `cancelled`."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -127095,6 +127204,7 @@
         "tags": [
           "bookings"
         ],
+        "x-approval": "agent",
         "x-permissions": [],
         "x-stability": "experimental"
       }
@@ -128034,7 +128144,7 @@
     },
     "/api/v1/bookings/exceptions/{id}": {
       "delete": {
-        "description": "Requires `bookings.services.manage` at the resource's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `bookings.services.manage` at the resource's unit.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_delete_booking_exception",
         "parameters": [
           {
@@ -128074,6 +128184,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -128127,6 +128247,7 @@
         "tags": [
           "bookings"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "bookings.services.manage"
         ],
@@ -131064,7 +131185,7 @@
     },
     "/api/v1/catalog/categories/{id}": {
       "delete": {
-        "description": "Requires `catalog.categories.manage`. The category must have no subcategories or products.",
+        "description": "Requires `catalog.categories.manage`. The category must have no subcategories or products.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_category",
         "parameters": [
           {
@@ -131104,6 +131225,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -131167,6 +131298,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.categories.manage"
         ]
@@ -132202,7 +132334,7 @@
     },
     "/api/v1/catalog/collections/{id}": {
       "delete": {
-        "description": "Requires `catalog.collections.manage` for its unit. Banners and menu items pointing to it stop\nshowing. To keep it, archive it instead (`status` = `archived`).",
+        "description": "Requires `catalog.collections.manage` for its unit. Banners and menu items pointing to it stop\nshowing. To keep it, archive it instead (`status` = `archived`).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_collection",
         "parameters": [
           {
@@ -132242,6 +132374,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -132295,6 +132437,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.collections.manage"
         ]
@@ -132830,7 +132973,7 @@
     },
     "/api/v1/catalog/digital-assets/{id}": {
       "delete": {
-        "description": "Requires `catalog.products.write` on the unit owning the product. Refused while buyers can\nstill download it, and for the last file of a product on sale.",
+        "description": "Requires `catalog.products.write` on the unit owning the product. Refused while buyers can\nstill download it, and for the last file of a product on sale.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_remove_catalog_digital_asset",
         "parameters": [
           {
@@ -132870,6 +133013,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -132933,6 +133086,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.products.write"
         ]
@@ -134410,7 +134564,7 @@
     },
     "/api/v1/catalog/price-guards/{id}": {
       "delete": {
-        "description": "Requires `catalog.prices.write` covering the rule.",
+        "description": "Requires `catalog.prices.write` covering the rule.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_price_guard",
         "parameters": [
           {
@@ -134450,6 +134604,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -134503,6 +134667,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.prices.write"
         ]
@@ -136513,7 +136678,7 @@
     },
     "/api/v1/catalog/products/{id}": {
       "delete": {
-        "description": "Requires `catalog.products.write` covering the product. A product that was on sale once can\nonly be archived (`POST /products/{id}/status`).",
+        "description": "Requires `catalog.products.write` covering the product. A product that was on sale once can\nonly be archived (`POST /products/{id}/status`).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_product",
         "parameters": [
           {
@@ -136553,6 +136718,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -136616,6 +136791,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.products.write"
         ]
@@ -137581,7 +137757,7 @@
     },
     "/api/v1/catalog/products/{id}/documents/{document_id}": {
       "delete": {
-        "description": "Requires `catalog.documents.manage` covering the product.",
+        "description": "Requires `catalog.documents.manage` covering the product.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_product_document",
         "parameters": [
           {
@@ -137631,6 +137807,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -137684,6 +137870,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.documents.manage"
         ]
@@ -137818,7 +138005,7 @@
     },
     "/api/v1/catalog/products/{id}/media/{media_id}/alts/{locale}": {
       "delete": {
-        "description": "Requires `catalog.products.write` covering the product. Public pages fall back as described\nfor `PUT`.",
+        "description": "Requires `catalog.products.write` covering the product. Public pages fall back as described\nfor `PUT`.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_product_media_alt",
         "parameters": [
           {
@@ -137907,6 +138094,16 @@
               }
             }
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -137977,6 +138174,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.products.write"
         ]
@@ -138607,7 +138805,7 @@
     },
     "/api/v1/catalog/products/{id}/translations/{locale}": {
       "delete": {
-        "description": "Requires `catalog.products.write` covering the product. The default language cannot be\nremoved.",
+        "description": "Requires `catalog.products.write` covering the product. The default language cannot be\nremoved.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_product_translation",
         "parameters": [
           {
@@ -138665,6 +138863,16 @@
               }
             },
             "description": "The product after the change."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -138726,6 +138934,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.products.write"
         ]
@@ -142121,7 +142330,7 @@
     },
     "/api/v1/catalog/variants/{id}": {
       "delete": {
-        "description": "Requires `catalog.products.write` covering its product. A product keeps at least one variant.",
+        "description": "Requires `catalog.products.write` covering its product. A product keeps at least one variant.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "catalog_delete_catalog_variant",
         "parameters": [
           {
@@ -142161,6 +142370,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -142224,6 +142443,7 @@
         "tags": [
           "catalog"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "catalog.products.write"
         ]
@@ -153062,7 +153282,7 @@
     },
     "/api/v1/compliance/me/phone": {
       "delete": {
-        "description": "Any signed-in user. Calling it again does nothing. Places that need phone verification refuse\nyour posts until you verify a number again.",
+        "description": "Any signed-in user. Calling it again does nothing. Places that need phone verification refuse\nyour posts until you verify a number again.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "compliance_remove_my_phone",
         "parameters": [
           {
@@ -153092,6 +153312,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed (or there was none)."
           },
@@ -153125,6 +153355,7 @@
         "tags": [
           "compliance"
         ],
+        "x-approval": "agent",
         "x-permissions": []
       }
     },
@@ -156610,7 +156841,7 @@
     },
     "/api/v1/compliance/subject-requests/{id}/fulfil": {
       "post": {
-        "description": "Requires `compliance.privacy.manage`. `access` of a user returns the personal data every module\nkeeps about them (send it to the person; it is not stored); `erasure` of an email address or\nphone number empties it from the consent ledger; erasing a whole account is\n`DELETE /api/v1/auth/users/{id}`. Other kinds are done by hand and only recorded.",
+        "description": "Requires `compliance.privacy.manage`. `access` of a user returns the personal data every module\nkeeps about them (send it to the person; it is not stored); `erasure` of an email address or\nphone number empties it from the consent ledger; erasing a whole account is\n`DELETE /api/v1/auth/users/{id}`. Other kinds are done by hand and only recorded.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "compliance_fulfil_compliance_subject_request",
         "parameters": [
           {
@@ -156669,6 +156900,16 @@
               }
             },
             "description": "What was done."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -156750,6 +156991,7 @@
         "tags": [
           "compliance"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "compliance.privacy.manage"
         ]
@@ -157184,7 +157426,7 @@
     },
     "/api/v1/compliance/tracking-tags/{id}": {
       "delete": {
-        "description": "Requires `compliance.tracking.manage` on its unit.",
+        "description": "Requires `compliance.tracking.manage` on its unit.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "compliance_delete_compliance_tracking_tag",
         "parameters": [
           {
@@ -157224,6 +157466,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -157277,6 +157529,7 @@
         "tags": [
           "compliance"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "compliance.tracking.manage"
         ]
@@ -158238,7 +158491,7 @@
     },
     "/api/v1/compliance/websites/{id}/pages/{page_kind}": {
       "delete": {
-        "description": "Requires `compliance.legal.manage`. Unlinking a page not linked changes nothing.",
+        "description": "Requires `compliance.legal.manage`. Unlinking a page not linked changes nothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "compliance_unlink_compliance_website_page",
         "parameters": [
           {
@@ -158287,6 +158540,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Unlinked."
           },
@@ -158340,6 +158603,7 @@
         "tags": [
           "compliance"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "compliance.legal.manage"
         ]
@@ -158915,7 +159179,7 @@
     },
     "/api/v1/content/authors/{id}": {
       "delete": {
-        "description": "Requires `content.manage`. It is removed from every entry; the entries stay.",
+        "description": "Requires `content.manage`. It is removed from every entry; the entries stay.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_author",
         "parameters": [
           {
@@ -158955,6 +159219,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -159008,6 +159282,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.manage"
         ]
@@ -159629,7 +159904,7 @@
     },
     "/api/v1/content/banners/{id}": {
       "delete": {
-        "description": "Requires `content.banners` for its organization unit. To keep its history, archive it\ninstead (`PATCH` with `status` = `archived`).",
+        "description": "Requires `content.banners` for its organization unit. To keep its history, archive it\ninstead (`PATCH` with `status` = `archived`).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_banner",
         "parameters": [
           {
@@ -159669,6 +159944,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -159722,6 +160007,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.banners"
         ]
@@ -166137,7 +166423,7 @@
     },
     "/api/v1/content/page-templates/{id}": {
       "delete": {
-        "description": "Requires `content.write` at the template's unit. Pages made from it are not changed.",
+        "description": "Requires `content.write` at the template's unit. Pages made from it are not changed.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_page_template",
         "parameters": [
           {
@@ -166177,6 +166463,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -166230,6 +166526,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.write"
         ]
@@ -166593,7 +166890,7 @@
     },
     "/api/v1/content/placements/{key}": {
       "delete": {
-        "description": "Requires `content.manage`. Refused while it has banners (archived ones too).",
+        "description": "Requires `content.manage`. Refused while it has banners (archived ones too).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_placement",
         "parameters": [
           {
@@ -166632,6 +166929,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -166695,6 +167002,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.manage"
         ]
@@ -169421,7 +169729,7 @@
     },
     "/api/v1/content/redirects/{id}": {
       "delete": {
-        "description": "Requires `content.manage`. The old address then answers 404.",
+        "description": "Requires `content.manage`. The old address then answers 404.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_redirect",
         "parameters": [
           {
@@ -169461,6 +169769,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -169514,6 +169832,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.manage"
         ]
@@ -169940,7 +170259,7 @@
     },
     "/api/v1/content/schedules/{id}": {
       "delete": {
-        "description": "Requires `content.publish`.",
+        "description": "Requires `content.publish`.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_cancel_content_schedule",
         "parameters": [
           {
@@ -169989,6 +170308,16 @@
               }
             },
             "description": "Canceled."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -170050,6 +170379,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.publish"
         ]
@@ -170439,7 +170769,7 @@
     },
     "/api/v1/content/shared-sections/{id}": {
       "delete": {
-        "description": "Requires `content.write` at its unit; `If-Match` is required. A section still used by a page\n(its draft or its published version) is not deleted: `409` with the number of pages.",
+        "description": "Requires `content.write` at its unit; `If-Match` is required. A section still used by a page\n(its draft or its published version) is not deleted: `409` with the number of pages.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_shared_section",
         "parameters": [
           {
@@ -170488,6 +170818,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -170571,6 +170911,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.write"
         ]
@@ -172234,7 +172575,7 @@
     },
     "/api/v1/content/terms/{id}": {
       "delete": {
-        "description": "Requires `content.manage`. It is removed from every entry. A category with\nsubcategories cannot be deleted.",
+        "description": "Requires `content.manage`. It is removed from every entry. A category with\nsubcategories cannot be deleted.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_term",
         "parameters": [
           {
@@ -172274,6 +172615,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -172337,6 +172688,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.manage"
         ]
@@ -173045,7 +173397,7 @@
     },
     "/api/v1/content/theme-variants/{id}": {
       "delete": {
-        "description": "Requires `content.themes.manage` at its unit; `If-Match` is required. Pause an active variant\nfirst (`409`).",
+        "description": "Requires `content.themes.manage` at its unit; `If-Match` is required. Pause an active variant\nfirst (`409`).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_theme_variant",
         "parameters": [
           {
@@ -173094,6 +173446,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -173177,6 +173539,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.themes.manage"
         ]
@@ -174618,7 +174981,7 @@
     },
     "/api/v1/content/types/{key}": {
       "delete": {
-        "description": "Requires `content.types.manage`. A type that still has entries is not deleted (`409`).",
+        "description": "Requires `content.types.manage`. A type that still has entries is not deleted (`409`).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "content_delete_content_type",
         "parameters": [
           {
@@ -174657,6 +175020,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -174720,6 +175093,7 @@
         "tags": [
           "content"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "content.types.manage"
         ]
@@ -175451,7 +175825,7 @@
     },
     "/api/v1/conversations/calls/{id}/recording": {
       "delete": {
-        "description": "Requires `conversations.voice.manage` at the unit of the call — for example when the customer\nasks. Deleting again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `conversations.voice.manage` at the unit of the call — for example when the customer\nasks. Deleting again changes nothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_delete_conversation_call_recording",
         "parameters": [
           {
@@ -175500,6 +175874,16 @@
               }
             },
             "description": "Deleted; the call stays."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -175561,6 +175945,7 @@
         "tags": [
           "conversations"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "conversations.voice.manage"
         ],
@@ -181021,7 +181406,7 @@
     },
     "/api/v1/customers/gift-cards/{id}/void": {
       "post": {
-        "description": "Requires `customers.stored_value.manage`. The remaining balance is gone.",
+        "description": "Requires `customers.stored_value.manage`. The remaining balance is gone.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "customers_void_gift_card",
         "parameters": [
           {
@@ -181070,6 +181455,16 @@
               }
             },
             "description": "Voided."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -181131,6 +181526,7 @@
         "tags": [
           "customers"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "customers.stored_value.manage"
         ]
@@ -181401,7 +181797,7 @@
     },
     "/api/v1/customers/groups/{id}": {
       "delete": {
-        "description": "Requires `customers.segments.manage` covering the group's unit. Price lists and promotions\nthat name the group stop matching anyone.",
+        "description": "Requires `customers.segments.manage` covering the group's unit. Price lists and promotions\nthat name the group stop matching anyone.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "customers_delete_customer_group",
         "parameters": [
           {
@@ -181441,6 +181837,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -181494,6 +181900,7 @@
         "tags": [
           "customers"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "customers.segments.manage"
         ]
@@ -181728,7 +182135,7 @@
     },
     "/api/v1/customers/groups/{id}/members/{profile_id}": {
       "delete": {
-        "description": "Requires `customers.segments.manage` covering the group's unit and `customers.read` covering\nthe customer. Removing a non-member does nothing.",
+        "description": "Requires `customers.segments.manage` covering the group's unit and `customers.read` covering\nthe customer. Removing a non-member does nothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "customers_remove_customer_group_member",
         "parameters": [
           {
@@ -181778,6 +182185,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The customer is not a member."
           },
@@ -181841,6 +182258,7 @@
         "tags": [
           "customers"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "customers.segments.manage"
         ]
@@ -186037,7 +186455,7 @@
     },
     "/api/v1/customers/{id}/points/adjustments": {
       "post": {
-        "description": "Requires `customers.loyalty.adjust` covering the customer's unit (and `customers.read`). The\nsame `reference` never applies twice; every change is in the history with its reason.",
+        "description": "Requires `customers.loyalty.adjust` covering the customer's unit (and `customers.read`). The\nsame `reference` never applies twice; every change is in the history with its reason.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "customers_adjust_customer_points",
         "parameters": [
           {
@@ -186096,6 +186514,16 @@
               }
             },
             "description": "Points after the change."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -186167,6 +186595,7 @@
         "tags": [
           "customers"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "customers.loyalty.adjust"
         ]
@@ -186333,7 +186762,7 @@
     },
     "/api/v1/customers/{id}/store-credit/adjustments": {
       "post": {
-        "description": "Requires `customers.stored_value.manage` and `customers.read` covering the customer. Store credit\nonly comes from compensation or refunds; it cannot be bought, withdrawn or transferred.",
+        "description": "Requires `customers.stored_value.manage` and `customers.read` covering the customer. Store credit\nonly comes from compensation or refunds; it cannot be bought, withdrawn or transferred.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "customers_adjust_store_credit",
         "parameters": [
           {
@@ -186392,6 +186821,16 @@
               }
             },
             "description": "Store credit after the change."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -186463,6 +186902,7 @@
         "tags": [
           "customers"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "customers.stored_value.manage"
         ]
@@ -192831,7 +193271,7 @@
     },
     "/api/v1/inventory/purchase-orders/{id}/close": {
       "post": {
-        "description": "Requires `inventory.purchasing.manage` covering the receiving warehouse.",
+        "description": "Requires `inventory.purchasing.manage` covering the receiving warehouse.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "inventory_close_inventory_purchase_order",
         "parameters": [
           {
@@ -192880,6 +193320,16 @@
               }
             },
             "description": "The purchase order, now `closed`."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -192941,6 +193391,7 @@
         "tags": [
           "inventory"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "inventory.purchasing.manage"
         ]
@@ -195839,7 +196290,7 @@
     },
     "/api/v1/inventory/transfers/{id}/close": {
       "post": {
-        "description": "Requires `inventory.transfer` covering the destination. Record a loss with an adjustment if\nneeded.",
+        "description": "Requires `inventory.transfer` covering the destination. Record a loss with an adjustment if\nneeded.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "inventory_close_inventory_transfer",
         "parameters": [
           {
@@ -195888,6 +196339,16 @@
               }
             },
             "description": "The transfer, now `closed`."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -195949,6 +196410,7 @@
         "tags": [
           "inventory"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "inventory.transfer"
         ]
@@ -196790,7 +197252,7 @@
     },
     "/api/v1/invoices/documents/{id}": {
       "delete": {
-        "description": "Requires `invoices.write` on the unit. Issued documents are accounting records and are kept.",
+        "description": "Requires `invoices.write` on the unit. Issued documents are accounting records and are kept.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "invoices_delete_invoice_document",
         "parameters": [
           {
@@ -196830,6 +197292,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -196893,6 +197365,7 @@
         "tags": [
           "invoices"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "invoices.write"
         ]
@@ -197127,7 +197600,7 @@
     },
     "/api/v1/invoices/documents/{id}/adjust": {
       "post": {
-        "description": "Requires `invoices.correct` on the unit. Writes a draft linked to the document; issuing the draft\nmarks the document `adjusted` and books the difference.",
+        "description": "Requires `invoices.correct` on the unit. Writes a draft linked to the document; issuing the draft\nmarks the document `adjusted` and books the difference.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "invoices_adjust_invoice_document",
         "parameters": [
           {
@@ -197205,6 +197678,16 @@
               }
             }
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -197275,6 +197758,7 @@
         "tags": [
           "invoices"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "invoices.correct"
         ]
@@ -197282,7 +197766,7 @@
     },
     "/api/v1/invoices/documents/{id}/cancel": {
       "post": {
-        "description": "Requires `invoices.correct` on the unit. Tells the e-invoice provider, and reverses the booking.\nCancelling a cancelled document returns it. An e-invoice sent to the tax authority cannot be cancelled\nwhere the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01): use `adjust` (decrease) or\n`replace` instead. An e-invoice the tax authority rejected is cancelled here only.",
+        "description": "Requires `invoices.correct` on the unit. Tells the e-invoice provider, and reverses the booking.\nCancelling a cancelled document returns it. An e-invoice sent to the tax authority cannot be cancelled\nwhere the seller's tax jurisdiction forbids it (Vietnam since 2025-06-01): use `adjust` (decrease) or\n`replace` instead. An e-invoice the tax authority rejected is cancelled here only.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "invoices_cancel_invoice_document",
         "parameters": [
           {
@@ -197341,6 +197825,16 @@
               }
             },
             "description": "The cancelled document."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -197412,6 +197906,7 @@
         "tags": [
           "invoices"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "invoices.correct"
         ]
@@ -197557,7 +198052,7 @@
     },
     "/api/v1/invoices/documents/{id}/issue": {
       "post": {
-        "description": "Requires `invoices.issue` on the unit. Gives the next number of the series (no gaps), books the\nsale, and sends the e-invoice when the series has a provider. Issuing again returns the same\ndocument and number; a rejected e-invoice is sent again with the same number.",
+        "description": "Requires `invoices.issue` on the unit. Gives the next number of the series (no gaps), books the\nsale, and sends the e-invoice when the series has a provider. Issuing again returns the same\ndocument and number; a rejected e-invoice is sent again with the same number.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "invoices_issue_invoice_document",
         "parameters": [
           {
@@ -197606,6 +198101,16 @@
               }
             },
             "description": "The issued document."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -197677,6 +198182,7 @@
         "tags": [
           "invoices"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "invoices.issue"
         ]
@@ -197936,7 +198442,7 @@
     },
     "/api/v1/invoices/documents/{id}/replace": {
       "post": {
-        "description": "Requires `invoices.correct` on the unit. Writes a draft linked to the document; issuing the draft\nmarks the document `replaced` and reverses its booking.",
+        "description": "Requires `invoices.correct` on the unit. Writes a draft linked to the document; issuing the draft\nmarks the document `replaced` and reverses its booking.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "invoices_replace_invoice_document",
         "parameters": [
           {
@@ -198014,6 +198520,16 @@
               }
             }
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -198084,6 +198600,7 @@
         "tags": [
           "invoices"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "invoices.correct"
         ]
@@ -200041,7 +200558,7 @@
     },
     "/api/v1/invoices/templates/{id}": {
       "delete": {
-        "description": "Requires `invoices.templates_manage` on the template's unit. Documents then print with the\ntenant's template or the built-in one.",
+        "description": "Requires `invoices.templates_manage` on the template's unit. Documents then print with the\ntenant's template or the built-in one.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "invoices_delete_invoice_template",
         "parameters": [
           {
@@ -200081,6 +200598,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -200134,6 +200661,7 @@
         "tags": [
           "invoices"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "invoices.templates_manage"
         ]
@@ -201727,7 +202255,7 @@
     },
     "/api/v1/kernel/custom-fields/{id}": {
       "delete": {
-        "description": "Requires `kernel.custom_fields.manage`. The field stops being shown and accepted; values already\non records stay (a field is never deleted with its data).",
+        "description": "Requires `kernel.custom_fields.manage`. The field stops being shown and accepted; values already\non records stay (a field is never deleted with its data).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_delete_custom_field",
         "parameters": [
           {
@@ -201767,6 +202295,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Turned off."
           },
@@ -201820,6 +202358,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.custom_fields.manage"
         ]
@@ -202806,7 +203345,7 @@
     },
     "/api/v1/kernel/domains/{id}": {
       "delete": {
-        "description": "Requires `kernel.domains.manage`. The domain becomes `revoked`: requests to it no longer reach\nthe tenant (other servers follow within `AUTOXIDE_TENANCY_CACHE_SECONDS`) and no new TLS\ncertificate is issued for it. Removing it again changes nothing.",
+        "description": "Requires `kernel.domains.manage`. The domain becomes `revoked`: requests to it no longer reach\nthe tenant (other servers follow within `AUTOXIDE_TENANCY_CACHE_SECONDS`) and no new TLS\ncertificate is issued for it. Removing it again changes nothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_remove_tenant_domain",
         "parameters": [
           {
@@ -202846,6 +203385,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The domain is removed."
           },
@@ -202899,6 +203448,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.domains.manage"
         ]
@@ -206245,7 +206795,7 @@
     },
     "/api/v1/kernel/records/{kind}/{id}/notes/{note_id}": {
       "delete": {
-        "description": "Only the note's author, who must still be able to read the record.",
+        "description": "Only the note's author, who must still be able to read the record.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_delete_record_note",
         "parameters": [
           {
@@ -206303,6 +206853,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -206346,6 +206906,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": []
       }
     },
@@ -206649,7 +207210,7 @@
     },
     "/api/v1/kernel/relocations": {
       "post": {
-        "description": "Requires `kernel.tenants.relocate` and an account of the platform tenant. With `dry_run` (the\ndefault) nothing changes: the answer lists what blocks, the conflicts (rows pointing across the\nboundary, unique values the target already has) and the rows of every table. With\n`\"dry_run\": false` the tenants answer `503 tenant_maintenance` while a background job copies the\nrows (keeping their ids), checks them, switches the tenants and cleans the source; follow it at\nthe `Location` of the answer. Source and target must be two databases.",
+        "description": "Requires `kernel.tenants.relocate` and an account of the platform tenant. With `dry_run` (the\ndefault) nothing changes: the answer lists what blocks, the conflicts (rows pointing across the\nboundary, unique values the target already has) and the rows of every table. With\n`\"dry_run\": false` the tenants answer `503 tenant_maintenance` while a background job copies the\nrows (keeping their ids), checks them, switches the tenants and cleans the source; follow it at\nthe `Location` of the answer. Source and target must be two databases.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_relocate_tenant",
         "parameters": [
           {
@@ -206716,6 +207277,16 @@
                 }
               }
             }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -206797,6 +207368,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.tenants.relocate"
         ]
@@ -207292,7 +207864,7 @@
     },
     "/api/v1/kernel/sandboxes/{id}": {
       "delete": {
-        "description": "Requires `kernel.sandboxes.manage`, in the real tenant of the sandbox. Everything tried in it is\ndeleted now and cannot be recovered; promote what you want to keep first.",
+        "description": "Requires `kernel.sandboxes.manage`, in the real tenant of the sandbox. Everything tried in it is\ndeleted now and cannot be recovered; promote what you want to keep first.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_delete_sandbox",
         "parameters": [
           {
@@ -207332,6 +207904,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -207385,6 +207967,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.sandboxes.manage"
         ]
@@ -207781,7 +208364,7 @@
     },
     "/api/v1/kernel/settings/{name}": {
       "delete": {
-        "description": "Requires `kernel.settings.manage` held at the tenant's root unit, like setting one. The\nserver-wide configuration applies again. Removing a setting this tenant never set changes\nnothing.",
+        "description": "Requires `kernel.settings.manage` held at the tenant's root unit, like setting one. The\nserver-wide configuration applies again. Removing a setting this tenant never set changes\nnothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_delete_tenant_setting",
         "parameters": [
           {
@@ -207820,6 +208403,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The setting is unset (or never was)."
           },
@@ -207873,6 +208466,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.settings.manage"
         ]
@@ -208716,7 +209310,7 @@
     },
     "/api/v1/kernel/tags/{id}": {
       "delete": {
-        "description": "Requires `kernel.tags.manage`. Records that carried it lose it.",
+        "description": "Requires `kernel.tags.manage`. Records that carried it lose it.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_delete_tag",
         "parameters": [
           {
@@ -208756,6 +209350,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -208809,6 +209413,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.tags.manage"
         ]
@@ -209076,7 +209681,7 @@
     },
     "/api/v1/kernel/tags/{id}/merge": {
       "post": {
-        "description": "Requires `kernel.tags.manage`. Every record carrying this tag carries `into` instead; this tag\nis deleted.",
+        "description": "Requires `kernel.tags.manage`. Every record carrying this tag carries `into` instead; this tag\nis deleted.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_merge_tag",
         "parameters": [
           {
@@ -209135,6 +209740,16 @@
               }
             },
             "description": "The tag merged into."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -209196,6 +209811,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.tags.manage"
         ]
@@ -210126,7 +210742,7 @@
     },
     "/api/v1/kernel/tenants/{id}/erase": {
       "post": {
-        "description": "Requires `kernel.tenants.delete` and an account of the platform tenant. Cannot be undone. The\ntenant must be suspended first (`PATCH /tenants/{id}` with `status: suspended`); export its data\nbefore if it is wanted (`POST /tenants/{id}/exports`). Every row of the tenant in its database\nand every file of it is deleted, except the tables modules must keep (accounting records); its\ndomains are released. The tenant stays listed with status `deleted`, and every request to it\nanswers `404 tenant_not_found`.",
+        "description": "Requires `kernel.tenants.delete` and an account of the platform tenant. Cannot be undone. The\ntenant must be suspended first (`PATCH /tenants/{id}` with `status: suspended`); export its data\nbefore if it is wanted (`POST /tenants/{id}/exports`). Every row of the tenant in its database\nand every file of it is deleted, except the tables modules must keep (accounting records); its\ndomains are released. The tenant stays listed with status `deleted`, and every request to it\nanswers `404 tenant_not_found`.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_erase_tenant",
         "parameters": [
           {
@@ -210184,6 +210800,16 @@
               }
             },
             "description": "Deleted; what was removed."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -210255,6 +210881,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.tenants.delete"
         ]
@@ -210879,7 +211506,7 @@
     },
     "/api/v1/kernel/tenants/{id}/move": {
       "post": {
-        "description": "Requires `kernel.tenants.move` and an account of the platform tenant (not one entered with\n`Autoxide-Tenant`). With `dry_run` (the default) nothing changes: the answer lists what blocks\nthe move and the rows of the tenant that would be copied. With `\"dry_run\": false` the tenant\nanswers `503 tenant_maintenance` while a background job copies its data, switches it to the new\nplacement and deletes the old copy; follow it at the `Location` of the answer. Sending the same\nmove again resumes one that stopped half-way.",
+        "description": "Requires `kernel.tenants.move` and an account of the platform tenant (not one entered with\n`Autoxide-Tenant`). With `dry_run` (the default) nothing changes: the answer lists what blocks\nthe move and the rows of the tenant that would be copied. With `\"dry_run\": false` the tenant\nanswers `503 tenant_maintenance` while a background job copies its data, switches it to the new\nplacement and deletes the old copy; follow it at the `Location` of the answer. Sending the same\nmove again resumes one that stopped half-way.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_move_tenant",
         "parameters": [
           {
@@ -210955,6 +211582,16 @@
                 }
               }
             }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -211036,6 +211673,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.tenants.move"
         ]
@@ -211612,7 +212250,7 @@
     },
     "/api/v1/kernel/tenants/{id}/settings/{name}": {
       "delete": {
-        "description": "Requires `kernel.tenants.manage` and an account of the platform tenant. The server-wide\nconfiguration applies to that tenant again. Removing a setting the tenant never set changes\nnothing.",
+        "description": "Requires `kernel.tenants.manage` and an account of the platform tenant. The server-wide\nconfiguration applies to that tenant again. Removing a setting the tenant never set changes\nnothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_delete_setting_of_tenant",
         "parameters": [
           {
@@ -211660,6 +212298,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The setting is unset (or never was)."
           },
@@ -211733,6 +212381,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.tenants.manage"
         ]
@@ -212067,7 +212716,7 @@
     },
     "/api/v1/kernel/texts/{locale}/{key}": {
       "delete": {
-        "description": "Requires `kernel.texts.manage`. Answers 204 even when the tenant had not replaced it.",
+        "description": "Requires `kernel.texts.manage`. Answers 204 even when the tenant had not replaced it.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "kernel_delete_text",
         "parameters": [
           {
@@ -212115,6 +212764,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Back to the default."
           },
@@ -212158,6 +212817,7 @@
         "tags": [
           "kernel"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "kernel.texts.manage"
         ]
@@ -215209,7 +215869,7 @@
     },
     "/api/v1/ledger/entries/{id}/reverse": {
       "post": {
-        "description": "Requires `ledger.reverse` on the book's unit. Posts a new entry with debits and credits swapped,\ndated in an open period. An entry is reversed at most once (a reversal may itself be reversed).",
+        "description": "Requires `ledger.reverse` on the book's unit. Posts a new entry with debits and credits swapped,\ndated in an open period. An entry is reversed at most once (a reversal may itself be reversed).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "ledger_reverse_ledger_entry",
         "parameters": [
           {
@@ -215287,6 +215947,16 @@
               }
             }
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -215357,6 +216027,7 @@
         "tags": [
           "ledger"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "ledger.reverse"
         ]
@@ -217306,7 +217977,7 @@
     },
     "/api/v1/ledger/payments/{id}/refunds": {
       "post": {
-        "description": "Requires `ledger.refunds_create` on the unit that received it. The partner pays the money back;\nthe book gets the entry when the partner confirms. Refunds never add up to more than the\npayment, even when sent at the same time.",
+        "description": "Requires `ledger.refunds_create` on the unit that received it. The partner pays the money back;\nthe book gets the entry when the partner confirms. Refunds never add up to more than the\npayment, even when sent at the same time.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "ledger_create_ledger_refund",
         "parameters": [
           {
@@ -217383,6 +218054,16 @@
                 }
               }
             }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -217464,6 +218145,7 @@
         "tags": [
           "ledger"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "ledger.refunds_create"
         ]
@@ -217775,7 +218457,7 @@
         ]
       },
       "post": {
-        "description": "Requires `ledger.payouts_create` on the seller's unit, and the seller must be in the\n`partner_collect` mode. The balance is taken first, then the payout partner pays from its\ncollection account; if it refuses, the amount goes back to the balance. Payouts never exceed\nthe available balance, even when sent at the same time.",
+        "description": "Requires `ledger.payouts_create` on the seller's unit, and the seller must be in the\n`partner_collect` mode. The balance is taken first, then the payout partner pays from its\ncollection account; if it refuses, the amount goes back to the balance. Payouts never exceed\nthe available balance, even when sent at the same time.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "ledger_create_ledger_payout",
         "parameters": [
           {
@@ -217842,6 +218524,16 @@
                 }
               }
             }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -217913,6 +218605,7 @@
         "tags": [
           "ledger"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "ledger.payouts_create"
         ]
@@ -218179,7 +218872,7 @@
     },
     "/api/v1/ledger/periods/{id}/close": {
       "post": {
-        "description": "Requires `ledger.periods_close` on the book's unit. The period must have ended and every\nearlier period be closed. Closing records each account's closing balance; no entry can be dated\nin it afterwards. Cannot be undone; closing a closed period again returns it.",
+        "description": "Requires `ledger.periods_close` on the book's unit. The period must have ended and every\nearlier period be closed. Closing records each account's closing balance; no entry can be dated\nin it afterwards. Cannot be undone; closing a closed period again returns it.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "ledger_close_ledger_period",
         "parameters": [
           {
@@ -218228,6 +218921,16 @@
               }
             },
             "description": "The closed period."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -218289,6 +218992,7 @@
         "tags": [
           "ledger"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "ledger.periods_close"
         ]
@@ -225429,7 +226133,7 @@
     },
     "/api/v1/menus/{id}": {
       "delete": {
-        "description": "Requires `menus.manage`. Deletes the menu and all its items; it cannot be restored.",
+        "description": "Requires `menus.manage`. Deletes the menu and all its items; it cannot be restored.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "menus_delete_menu",
         "parameters": [
           {
@@ -225469,6 +226173,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -225522,6 +226236,7 @@
         "tags": [
           "menus"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "menus.manage"
         ]
@@ -226210,7 +226925,7 @@
     },
     "/api/v1/newsletter/campaigns/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a campaign that never sent (a\ndraft, a scheduled one, or one cancelled before sending) can be deleted.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a campaign that never sent (a\ndraft, a scheduled one, or one cancelled before sending) can be deleted.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_campaign",
         "parameters": [
           {
@@ -226259,6 +226974,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -226342,6 +227067,7 @@
         "tags": [
           "newsletter"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "newsletter.manage"
         ],
@@ -227359,7 +228085,7 @@
     },
     "/api/v1/newsletter/campaigns/{id}/send": {
       "post": {
-        "description": "Requires `newsletter.send`. `If-Match` is required, so that exactly the version you read\nis sent. Takes every confirmed subscriber of the list at that moment, then hands the mails\nto the mail queue in batches at `AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`. Suppressed,\nblocked and unsubscribed people are skipped. Needs `AUTOXIDE_HTTP_PUBLIC_URL` and\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL` (and `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` for\nadvertising). Follow the progress with `GET /campaigns/{id}`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `newsletter.send`. `If-Match` is required, so that exactly the version you read\nis sent. Takes every confirmed subscriber of the list at that moment, then hands the mails\nto the mail queue in batches at `AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`. Suppressed,\nblocked and unsubscribed people are skipped. Needs `AUTOXIDE_HTTP_PUBLIC_URL` and\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL` (and `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` for\nadvertising). Follow the progress with `GET /campaigns/{id}`.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_send_newsletter_campaign",
         "parameters": [
           {
@@ -227425,6 +228151,16 @@
                 }
               }
             }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -227516,6 +228252,7 @@
         "tags": [
           "newsletter"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "newsletter.send"
         ],
@@ -227655,7 +228392,7 @@
     },
     "/api/v1/newsletter/data": {
       "delete": {
-        "description": "Requires `newsletter.export`. Deletes for good the subscriber with this address, their\nsubscriptions, consent records, delivery history and confirmation links (a request of the\nperson the data is about). A suppression of the address is kept, so that it never gets\nmail again after a bounce or complaint; delete it with `DELETE /suppressions/{id}` if the\nperson asks. The event `newsletter.subscriber_erased` does not carry the address.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `newsletter.export`. Deletes for good the subscriber with this address, their\nsubscriptions, consent records, delivery history and confirmation links (a request of the\nperson the data is about). A suppression of the address is kept, so that it never gets\nmail again after a bounce or complaint; delete it with `DELETE /suppressions/{id}` if the\nperson asks. The event `newsletter.subscriber_erased` does not carry the address.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_erase_newsletter_email_data",
         "parameters": [
           {
@@ -227704,6 +228441,16 @@
               }
             },
             "description": "Whether a subscriber was deleted."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -227755,6 +228502,7 @@
         "tags": [
           "newsletter"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "newsletter.export"
         ],
@@ -228121,7 +228869,7 @@
     },
     "/api/v1/newsletter/lists/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. `If-Match` is required. Deletes every subscription to the\nlist. Refused while the list has a draft, scheduled, sending or paused campaign.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `newsletter.manage`. `If-Match` is required. Deletes every subscription to the\nlist. Refused while the list has a draft, scheduled, sending or paused campaign.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_list",
         "parameters": [
           {
@@ -228170,6 +228918,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted, with its subscriptions."
           },
@@ -228253,6 +229011,7 @@
         "tags": [
           "newsletter"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "newsletter.manage"
         ],
@@ -229562,7 +230321,7 @@
     },
     "/api/v1/newsletter/subscribers/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. Deletes the subscriber for good, with their subscriptions,\ndelivery history and pending confirmation links. A suppression of the address is kept.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `newsletter.manage`. Deletes the subscriber for good, with their subscriptions,\ndelivery history and pending confirmation links. A suppression of the address is kept.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_subscriber",
         "parameters": [
           {
@@ -229602,6 +230361,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -229655,6 +230424,7 @@
         "tags": [
           "newsletter"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "newsletter.manage"
         ],
@@ -230196,7 +230966,7 @@
     },
     "/api/v1/newsletter/suppressions/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. Its soft-bounce count starts again from zero.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `newsletter.manage`. Its soft-bounce count starts again from zero.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_suppression",
         "parameters": [
           {
@@ -230236,6 +231006,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -230289,6 +231069,7 @@
         "tags": [
           "newsletter"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "newsletter.manage"
         ],
@@ -232549,7 +233330,7 @@
     },
     "/api/v1/notifications/templates/{kind}/{channel}/{locale}": {
       "delete": {
-        "description": "Requires `notifications.templates.manage`.",
+        "description": "Requires `notifications.templates.manage`.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "notifications_delete_notification_template",
         "parameters": [
           {
@@ -232606,6 +233387,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed; the default text applies."
           },
@@ -232669,6 +233460,7 @@
         "tags": [
           "notifications"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "notifications.templates.manage"
         ]
@@ -232808,7 +233600,7 @@
     },
     "/api/v1/notifications/templates/{kind}/{channel}/{locale}/draft": {
       "delete": {
-        "description": "Requires `notifications.templates.manage`. The published version, if any, stays in use.",
+        "description": "Requires `notifications.templates.manage`. The published version, if any, stays in use.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "notifications_delete_notification_template_draft",
         "parameters": [
           {
@@ -232865,6 +233657,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -232928,6 +233730,7 @@
         "tags": [
           "notifications"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "notifications.templates.manage"
         ]
@@ -233466,7 +234269,7 @@
     },
     "/api/v1/notifications/templates/{kind}/{channel}/{locale}/published": {
       "delete": {
-        "description": "Requires `notifications.templates.manage`. The replaced text (`PUT /templates/…`) or the default\ntext applies again; the versions are kept for a rollback.",
+        "description": "Requires `notifications.templates.manage`. The replaced text (`PUT /templates/…`) or the default\ntext applies again; the versions are kept for a rollback.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "notifications_unpublish_notification_template",
         "parameters": [
           {
@@ -233523,6 +234326,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "No longer in use."
           },
@@ -233586,6 +234399,7 @@
         "tags": [
           "notifications"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "notifications.templates.manage"
         ]
@@ -236301,7 +237115,7 @@
     },
     "/api/v1/orders/me/orders/{id}/cancel": {
       "post": {
-        "description": "Signed in: an order you placed. Allowed until the status the shop's policy says\n(`orders.buyer_cancel_until`, by default while the order is not being prepared yet); a paid\norder is refunded through the payment partner.",
+        "description": "Signed in: an order you placed. Allowed until the status the shop's policy says\n(`orders.buyer_cancel_until`, by default while the order is not being prepared yet); a paid\norder is refunded through the payment partner.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "orders_cancel_my_order",
         "parameters": [
           {
@@ -236347,6 +237161,16 @@
               }
             },
             "description": "The cancelled order."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -236403,6 +237227,7 @@
         "tags": [
           "orders"
         ],
+        "x-approval": "agent",
         "x-permissions": []
       }
     },
@@ -237186,7 +238011,7 @@
     },
     "/api/v1/orders/me/orders/{id}/payments": {
       "post": {
-        "description": "Signed in: for your order with pre-ordered items paid in part, once the balance is asked (the\nitems are ready). Returns the balance payment to follow; a link that expired is opened again\nwhile the time to pay lasts. Calling again returns the same payment.",
+        "description": "Signed in: for your order with pre-ordered items paid in part, once the balance is asked (the\nitems are ready). Returns the balance payment to follow; a link that expired is opened again\nwhile the time to pay lasts. Calling again returns the same payment.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "orders_pay_my_order_balance",
         "parameters": [
           {
@@ -237222,6 +238047,16 @@
               }
             },
             "description": "The balance payment."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -237278,6 +238113,7 @@
         "tags": [
           "orders"
         ],
+        "x-approval": "agent",
         "x-permissions": []
       }
     },
@@ -242152,7 +242988,7 @@
     },
     "/api/v1/orders/risk/cod-blocks/{id}": {
       "delete": {
-        "description": "Requires `orders.risk.manage`. Lifting again changes nothing.",
+        "description": "Requires `orders.risk.manage`. Lifting again changes nothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "orders_lift_cod_block",
         "parameters": [
           {
@@ -242188,6 +243024,16 @@
               }
             },
             "description": "The lifted block."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -242234,6 +243080,7 @@
         "tags": [
           "orders"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "orders.risk.manage"
         ]
@@ -242470,7 +243317,7 @@
     },
     "/api/v1/orders/risk/cod-rules/{id}": {
       "delete": {
-        "description": "Requires `orders.risk.manage` at the node. The rule stops applying now; it is kept.",
+        "description": "Requires `orders.risk.manage` at the node. The rule stops applying now; it is kept.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "orders_end_cod_rule",
         "parameters": [
           {
@@ -242506,6 +243353,16 @@
               }
             },
             "description": "The ended rule."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -242552,6 +243409,7 @@
         "tags": [
           "orders"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "orders.risk.manage"
         ]
@@ -243763,7 +244621,7 @@
         ]
       },
       "post": {
-        "description": "Requires `orders.refund` at the order's shop. Paid through the payment partner when the\npayment came through it; otherwise (cash on delivery, cash) recorded as `manual`: the shop\npays the buyer back itself. The total refunded never exceeds what was paid.",
+        "description": "Requires `orders.refund` at the order's shop. Paid through the payment partner when the\npayment came through it; otherwise (cash on delivery, cash) recorded as `manual`: the shop\npays the buyer back itself. The total refunded never exceeds what was paid.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "orders_refund_order",
         "parameters": [
           {
@@ -243827,6 +244685,16 @@
                 }
               }
             }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -243903,6 +244771,7 @@
         "tags": [
           "orders"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "orders.refund"
         ]
@@ -244462,7 +245331,7 @@
     },
     "/api/v1/organizations/groups/{id}": {
       "delete": {
-        "description": "Requires `organizations.groups.manage`. The units and the report facts stay; only the group and\nits member list go.",
+        "description": "Requires `organizations.groups.manage`. The units and the report facts stay; only the group and\nits member list go.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "organizations_delete_unit_group",
         "parameters": [
           {
@@ -244502,6 +245371,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -244555,6 +245434,7 @@
         "tags": [
           "organizations"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "organizations.groups.manage"
         ]
@@ -245111,7 +245991,7 @@
     },
     "/api/v1/organizations/groups/{id}/members/{org_id}": {
       "delete": {
-        "description": "Requires `organizations.groups.manage`. Removing a unit that is not in the group also answers\n204.",
+        "description": "Requires `organizations.groups.manage`. Removing a unit that is not in the group also answers\n204.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "organizations_remove_unit_group_member",
         "parameters": [
           {
@@ -245161,6 +246041,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "The unit is not in the group (any more)."
           },
@@ -245214,6 +246104,7 @@
         "tags": [
           "organizations"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "organizations.groups.manage"
         ]
@@ -245905,7 +246796,7 @@
     },
     "/api/v1/organizations/unit-types/{code}": {
       "delete": {
-        "description": "Requires `organizations.types.manage`. A type still used by a unit cannot be deleted.",
+        "description": "Requires `organizations.types.manage`. A type still used by a unit cannot be deleted.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "organizations_delete_unit_type",
         "parameters": [
           {
@@ -245944,6 +246835,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -246007,6 +246908,7 @@
         "tags": [
           "organizations"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "organizations.types.manage"
         ]
@@ -247425,7 +248327,7 @@
     },
     "/api/v1/organizations/units/{id}/settings/{key}": {
       "delete": {
-        "description": "Requires `organizations.settings.write` covering the unit; the unit must be active. Clearing a\nsetting the unit does not set changes nothing.",
+        "description": "Requires `organizations.settings.write` covering the unit; the unit must be active. Clearing a\nsetting the unit does not set changes nothing.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "organizations_clear_unit_setting",
         "parameters": [
           {
@@ -247484,6 +248386,16 @@
             },
             "description": "The setting at this unit, now inherited."
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -247534,6 +248446,7 @@
         "tags": [
           "organizations"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "organizations.settings.write"
         ]
@@ -248045,7 +248958,7 @@
     },
     "/api/v1/plans/billing-periods/{id}/mark-paid": {
       "post": {
-        "description": "Platform staff with `plans.subscriptions.manage`, for payments checked by hand (no payment\nprovider yet). A past-due or suspended subscription becomes active again.",
+        "description": "Platform staff with `plans.subscriptions.manage`, for payments checked by hand (no payment\nprovider yet). A past-due or suspended subscription becomes active again.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_mark_billing_period_paid",
         "parameters": [
           {
@@ -248104,6 +249017,16 @@
               }
             },
             "description": "The billing period, now `paid`."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -248165,6 +249088,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.subscriptions.manage"
         ]
@@ -248172,7 +249096,7 @@
     },
     "/api/v1/plans/billing-periods/{id}/pay": {
       "post": {
-        "description": "Requires `plans.billing.manage` and a billing profile. Starts a payment with the operator's\npayment partner and returns its checkout page; the period is marked paid when the partner reports\nthe payment. Calling again returns the payment still waiting, or starts a new one when the last\none expired.",
+        "description": "Requires `plans.billing.manage` and a billing profile. Starts a payment with the operator's\npayment partner and returns its checkout page; the period is marked paid when the partner reports\nthe payment. Calling again returns the payment still waiting, or starts a new one when the last\none expired.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_pay_billing_period",
         "parameters": [
           {
@@ -248231,6 +249155,16 @@
               }
             },
             "description": "The payment to complete."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -248312,6 +249246,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.billing.manage"
         ]
@@ -248319,7 +249254,7 @@
     },
     "/api/v1/plans/billing-periods/{id}/void": {
       "post": {
-        "description": "Platform staff with `plans.subscriptions.manage`. When the period already has an invoice, it is cancelled\nafterwards by a background job, not within this request: an e-invoice the tax rules no longer let cancel\n(Vietnam since 2025-06-01) gets a full decrease adjustment instead. Read the invoice later to see the result.",
+        "description": "Platform staff with `plans.subscriptions.manage`. When the period already has an invoice, it is cancelled\nafterwards by a background job, not within this request: an e-invoice the tax rules no longer let cancel\n(Vietnam since 2025-06-01) gets a full decrease adjustment instead. Read the invoice later to see the result.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_void_billing_period",
         "parameters": [
           {
@@ -248368,6 +249303,16 @@
               }
             },
             "description": "The billing period, now `void`; its invoice is cancelled or adjusted asynchronously."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -248429,6 +249374,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.subscriptions.manage"
         ]
@@ -249643,7 +250589,7 @@
     },
     "/api/v1/plans/plans/{id}/retire": {
       "post": {
-        "description": "Platform staff with `plans.plans.manage`. The plan is no longer sold or the default; tenants on\nit keep it. A plan is never deleted.",
+        "description": "Platform staff with `plans.plans.manage`. The plan is no longer sold or the default; tenants on\nit keep it. A plan is never deleted.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_retire_plan",
         "parameters": [
           {
@@ -249692,6 +250638,16 @@
               }
             },
             "description": "The plan, now `retired`."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -249743,6 +250699,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.plans.manage"
         ]
@@ -250996,7 +251953,7 @@
     },
     "/api/v1/plans/store/products/{store}/{product_id}": {
       "delete": {
-        "description": "Platform staff with `plans.plans.manage`. Subscriptions already bought keep their plan until\nthe store period ends; new purchases of the product are refused.",
+        "description": "Platform staff with `plans.plans.manage`. Subscriptions already bought keep their plan until\nthe store period ends; new purchases of the product are refused.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_unlink_store_product",
         "parameters": [
           {
@@ -251044,6 +252001,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Unlinked (or was not linked)."
           },
@@ -251097,6 +252064,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.plans.manage"
         ]
@@ -251595,7 +252563,7 @@
     },
     "/api/v1/plans/subscription/cancel": {
       "post": {
-        "description": "Requires `plans.billing.manage`. By default at the end of the current period (undo with\n`POST /subscription/resume`).",
+        "description": "Requires `plans.billing.manage`. By default at the end of the current period (undo with\n`POST /subscription/resume`).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_cancel_own_subscription",
         "parameters": [
           {
@@ -251644,6 +252612,16 @@
               }
             },
             "description": "The subscription after the change."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -251705,6 +252683,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.billing.manage"
         ]
@@ -252741,7 +253720,7 @@
     },
     "/api/v1/plans/tenants/{tenant_id}/overrides/{id}": {
       "delete": {
-        "description": "Platform staff with `plans.subscriptions.manage`.",
+        "description": "Platform staff with `plans.subscriptions.manage`.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_remove_override",
         "parameters": [
           {
@@ -252791,6 +253770,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed."
           },
@@ -252844,6 +253833,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.subscriptions.manage"
         ]
@@ -253080,7 +254070,7 @@
     },
     "/api/v1/plans/tenants/{tenant_id}/subscription/cancel": {
       "post": {
-        "description": "Platform staff with `plans.subscriptions.manage`. The tenant becomes read-only; its data is kept\nfor the plan's retention days.",
+        "description": "Platform staff with `plans.subscriptions.manage`. The tenant becomes read-only; its data is kept\nfor the plan's retention days.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_cancel_tenant_subscription",
         "parameters": [
           {
@@ -253129,6 +254119,16 @@
               }
             },
             "description": "The subscription, now `canceled`."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -253190,6 +254190,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.subscriptions.manage"
         ]
@@ -253197,7 +254198,7 @@
     },
     "/api/v1/plans/tenants/{tenant_id}/subscription/suspend": {
       "post": {
-        "description": "Platform staff with `plans.subscriptions.manage`. Unlike a suspended subscription (read-only),\nevery request of the tenant is refused (`tenant_suspended`), reads included. Reactivate with\n`PATCH /api/v1/kernel/tenants/{id}` (`status: active`).",
+        "description": "Platform staff with `plans.subscriptions.manage`. Unlike a suspended subscription (read-only),\nevery request of the tenant is refused (`tenant_suspended`), reads included. Reactivate with\n`PATCH /api/v1/kernel/tenants/{id}` (`status: active`).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "plans_suspend_tenant",
         "parameters": [
           {
@@ -253247,6 +254248,16 @@
           "required": true
         },
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Suspended."
           },
@@ -253310,6 +254321,7 @@
         "tags": [
           "plans"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "plans.subscriptions.manage"
         ]
@@ -254886,7 +255898,7 @@
     },
     "/api/v1/promotions/promotions/{id}": {
       "delete": {
-        "description": "Requires `promotions.write`. Only drafts; end or cancel a promotion that was turned on.",
+        "description": "Requires `promotions.write`. Only drafts; end or cancel a promotion that was turned on.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "promotions_delete_promotion",
         "parameters": [
           {
@@ -254926,6 +255938,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -254989,6 +256011,7 @@
         "tags": [
           "promotions"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "promotions.write"
         ]
@@ -261017,6 +262040,7 @@
     },
     "/api/v1/shipping/calendars/{id}/days/{day}": {
       "delete": {
+        "description": "An AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "shipping_delete_shipping_calendar_day",
         "parameters": [
           {
@@ -261076,6 +262100,16 @@
             },
             "description": "The calendar after the change."
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -261126,6 +262160,7 @@
         "tags": [
           "shipping"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "shipping.settings.manage"
         ]
@@ -263507,7 +264542,7 @@
     },
     "/api/v1/shipping/methods/{id}": {
       "delete": {
-        "description": "Shipments already created keep their copy of the method.",
+        "description": "Shipments already created keep their copy of the method.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "shipping_delete_shipping_method",
         "parameters": [
           {
@@ -263547,6 +264582,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -263600,6 +264645,7 @@
         "tags": [
           "shipping"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "shipping.settings.manage"
         ]
@@ -264938,7 +265984,7 @@
     },
     "/api/v1/shipping/shipments/{id}/cancel": {
       "post": {
-        "description": "Needs `shipping.shipments.manage`. A booked shipment is cancelled at the carrier too; once the\ncarrier picked it up it cannot be cancelled.",
+        "description": "Needs `shipping.shipments.manage`. A booked shipment is cancelled at the carrier too; once the\ncarrier picked it up it cannot be cancelled.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "shipping_cancel_shipping_shipment",
         "parameters": [
           {
@@ -264987,6 +266033,16 @@
               }
             },
             "description": "Cancelled."
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
           },
           "401": {
             "content": {
@@ -265058,6 +266114,7 @@
         "tags": [
           "shipping"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "shipping.shipments.manage"
         ]
@@ -266124,7 +267181,7 @@
     },
     "/api/v1/shipping/zones/{id}": {
       "delete": {
-        "description": "Its rates in every method go with it.",
+        "description": "Its rates in every method go with it.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).",
         "operationId": "shipping_delete_shipping_zone",
         "parameters": [
           {
@@ -266164,6 +267221,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -266217,6 +267284,7 @@
         "tags": [
           "shipping"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "shipping.settings.manage"
         ]
@@ -267083,7 +268151,7 @@
     },
     "/api/v1/support/macros/{id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at its unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.settings.manage` at its unit.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_delete_support_macro",
         "parameters": [
           {
@@ -267123,6 +268191,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -267176,6 +268254,7 @@
         "tags": [
           "support"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "support.settings.manage"
         ],
@@ -268307,7 +269386,7 @@
     },
     "/api/v1/support/policies/{org_id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the unit. The unit then inherits the policy of the units\nabove (or the defaults).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.settings.manage` at the unit. The unit then inherits the policy of the units\nabove (or the defaults).\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_reset_support_policy",
         "parameters": [
           {
@@ -268357,6 +269436,16 @@
             },
             "description": "The policy now in force."
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -268397,6 +269486,7 @@
         "tags": [
           "support"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "support.settings.manage"
         ],
@@ -269823,7 +270913,7 @@
     },
     "/api/v1/support/routing-rules/{id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the rule's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.settings.manage` at the rule's unit.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_delete_support_routing_rule",
         "parameters": [
           {
@@ -269863,6 +270953,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -269916,6 +271016,7 @@
         "tags": [
           "support"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "support.settings.manage"
         ],
@@ -270189,7 +271290,7 @@
     },
     "/api/v1/support/teams/{id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the team's unit. Its members and routing rules go too;\ntickets of the team keep their assignee but lose the team.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.settings.manage` at the team's unit. Its members and routing rules go too;\ntickets of the team keep their assignee but lose the team.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_delete_support_team",
         "parameters": [
           {
@@ -270229,6 +271330,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Deleted."
           },
@@ -270282,6 +271393,7 @@
         "tags": [
           "support"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "support.settings.manage"
         ],
@@ -270384,7 +271496,7 @@
     },
     "/api/v1/support/teams/{id}/members/{user_id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the team's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.settings.manage` at the team's unit.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_remove_support_team_member",
         "parameters": [
           {
@@ -270434,6 +271546,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "204": {
             "description": "Removed (or was not a member)."
           },
@@ -270487,6 +271609,7 @@
         "tags": [
           "support"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "support.settings.manage"
         ],
@@ -271581,7 +272704,7 @@
     },
     "/api/v1/support/tickets/{id}/links/{target}": {
       "delete": {
-        "description": "Requires `support.tickets.reply` covering the ticket.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
+        "description": "Requires `support.tickets.reply` covering the ticket.\n\nAn AI agent's call waits for a person's approval (202, see `x-approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_remove_support_link",
         "parameters": [
           {
@@ -271640,6 +272763,16 @@
             },
             "description": "The links left."
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Called by an AI agent (API key of kind `agent`): nothing was done yet. The body is the approval request (`data`); once a person approves it, send the same request again, with the same `Idempotency-Key`, and the header `Autoxide-Approval: <id>`."
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -271690,6 +272823,7 @@
         "tags": [
           "support"
         ],
+        "x-approval": "agent",
         "x-permissions": [
           "support.tickets.reply"
         ],

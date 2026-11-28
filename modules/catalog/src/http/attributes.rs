@@ -779,10 +779,12 @@ async fn add_product_document(
 /// Remove a document from a product.
 ///
 /// Requires `catalog.documents.manage` covering the product.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/products/{id}/documents/{document_id}",
-    extensions(("x-permissions" = json!(["catalog.documents.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.documents.manage"]))),
     operation_id = "delete_catalog_product_document",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the product."), ("document_id" = Uuid, Path, description = "Id of the document.")),

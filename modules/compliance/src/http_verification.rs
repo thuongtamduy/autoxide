@@ -224,10 +224,12 @@ async fn confirm_phone_verification(
 ///
 /// Any signed-in user. Calling it again does nothing. Places that need phone verification refuse
 /// your posts until you verify a number again.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/me/phone",
-    extensions(("x-permissions" = json!([]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!([]))),
     operation_id = "remove_my_phone",
     security(("bearer" = [])),
     responses(

@@ -458,10 +458,12 @@ pub(crate) async fn update_banner(
 ///
 /// Requires `content.banners` for its organization unit. To keep its history, archive it
 /// instead (`PATCH` with `status` = `archived`).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/banners/{id}",
-    extensions(("x-permissions" = json!(["content.banners"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.banners"]))),
     operation_id = "delete_content_banner",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the banner.")),

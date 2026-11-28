@@ -259,10 +259,12 @@ pub(crate) async fn set_day(
 }
 
 /// Remove a special day of a delivery calendar.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/calendars/{id}/days/{day}",
-    extensions(("x-permissions" = json!(["shipping.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["shipping.settings.manage"]))),
     operation_id = "delete_shipping_calendar_day",
     security(("bearer" = [])),
     params(

@@ -193,7 +193,8 @@ pub(crate) fn all(service: &Arc<ShippingService>) -> Vec<Tool> {
             },
         )
         .requires(SHIPMENTS_MANAGE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
         Tool::new(
             "update_status",
             "Set the status of a shipment by hand (own delivery staff, store pickup); only moves \

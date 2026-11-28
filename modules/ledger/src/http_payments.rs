@@ -342,10 +342,12 @@ pub(crate) struct RefundRequest {
 /// Requires `ledger.refunds_create` on the unit that received it. The partner pays the money back;
 /// the book gets the entry when the partner confirms. Refunds never add up to more than the
 /// payment, even when sent at the same time.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/payments/{id}/refunds",
-    extensions(("x-permissions" = json!(["ledger.refunds_create"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["ledger.refunds_create"]))),
     operation_id = "create_ledger_refund",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the payment.")),

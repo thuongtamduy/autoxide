@@ -142,10 +142,12 @@ async fn link_store_product(
 ///
 /// Platform staff with `plans.plans.manage`. Subscriptions already bought keep their plan until
 /// the store period ends; new purchases of the product are refused.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/store/products/{store}/{product_id}",
-    extensions(("x-permissions" = json!(["plans.plans.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.plans.manage"]))),
     operation_id = "unlink_store_product",
     security(("bearer" = [])),
     params(

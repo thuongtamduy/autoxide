@@ -366,10 +366,12 @@ async fn update_collection(
 ///
 /// Requires `catalog.collections.manage` for its unit. Banners and menu items pointing to it stop
 /// showing. To keep it, archive it instead (`status` = `archived`).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/collections/{id}",
-    extensions(("x-permissions" = json!(["catalog.collections.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.collections.manage"]))),
     operation_id = "delete_catalog_collection",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the collection.")),

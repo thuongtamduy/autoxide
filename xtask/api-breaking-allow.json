@@ -142,5 +142,89 @@
     "rule": "tool.parameter_type_changed",
     "at": "auth.create_oidc_provider $.realm",
     "decision": "D-20261127-inline-field-docs"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "auth.delete_oidc_provider",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "auth.delete_role",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "bookings.cancel_booking",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "catalog.delete_product",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "invoices.issue",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "kernel.delete_setting",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "kernel.move_tenant",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "ledger.create_payout",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "menus.delete_menu",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "newsletter.send_campaign",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "orders.refund_order",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "organizations.remove_group_member",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "plans.retire_plan",
+    "decision": "D-20261128-agent-approval-audit"
+  },
+  {
+    "base": "v0.20.0",
+    "rule": "tool.approval_added",
+    "at": "shipping.cancel_shipment",
+    "decision": "D-20261128-agent-approval-audit"
   }
 ]

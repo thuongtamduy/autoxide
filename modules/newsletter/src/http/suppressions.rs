@@ -139,10 +139,12 @@ pub(crate) async fn create_suppression(
 /// Take an address off the suppression list.
 ///
 /// Requires `newsletter.manage`. Its soft-bounce count starts again from zero.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/suppressions/{id}",
-    extensions(("x-permissions" = json!(["newsletter.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_suppression",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the suppression.")),

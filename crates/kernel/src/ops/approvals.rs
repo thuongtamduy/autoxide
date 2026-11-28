@@ -377,9 +377,17 @@ fn may_see(principal: &Principal, approval: &ApprovalView) -> bool {
 
 fn may_decide(principal: &Principal, approval: &ApprovalView) -> bool {
     // Duyệt là việc của người trong phiên đăng nhập: không API key, không client OAuth (D-20261126-mcp-oauth).
-    principal.is_session()
-        && matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support)
-        && approval.permissions.iter().any(|permission| principal.allows(permission))
+    if !principal.is_session()
+        || !matches!(principal.actor_kind(), ActorKind::Human | ActorKind::Support)
+    {
+        return false;
+    }
+    // Lệnh không đòi permission nào (việc của chính người gọi: huỷ đơn của mình, trả tiền đơn của mình…): người
+    // duyệt là chính chủ của agent, trong phiên đăng nhập của họ (D-20261128-agent-approval-audit).
+    if approval.permissions.is_empty() {
+        return approval.requested_by == principal.user_id();
+    }
+    approval.permissions.iter().any(|permission| principal.allows(permission))
 }
 
 /// Which approval requests.

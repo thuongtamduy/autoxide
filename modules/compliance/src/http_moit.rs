@@ -678,10 +678,12 @@ async fn link_page(
 /// Unlink a mandatory page from a website.
 ///
 /// Requires `compliance.legal.manage`. Unlinking a page not linked changes nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/websites/{id}/pages/{page_kind}",
-    extensions(("x-permissions" = json!(["compliance.legal.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["compliance.legal.manage"]))),
     operation_id = "unlink_compliance_website_page",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the website."), ("page_kind" = String, Path, description = "Kind of mandatory page.")),

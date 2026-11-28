@@ -84,10 +84,12 @@ async fn put_media_alt(
 ///
 /// Requires `catalog.products.write` covering the product. Public pages fall back as described
 /// for `PUT`.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/products/{id}/media/{media_id}/alts/{locale}",
-    extensions(("x-permissions" = json!(["catalog.products.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.products.write"]))),
     operation_id = "delete_catalog_product_media_alt",
     security(("bearer" = [])),
     params(
