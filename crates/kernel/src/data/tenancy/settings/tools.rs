@@ -74,6 +74,8 @@ pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: SetSetting| {
                 let service = setter.clone();
                 async move {
+                    // Cùng luật với REST: cấu hình là của cả khách, cần quyền ở nút gốc.
+                    principal.require_at_root(&SETTINGS_MANAGE)?;
                     service.put_plain(&tenant, &principal, &input.name, &input.value).await
                 }
             },
@@ -86,6 +88,7 @@ pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: DeleteSetting| {
                 let service = remover.clone();
                 async move {
+                    principal.require_at_root(&SETTINGS_MANAGE)?;
                     service.delete(&tenant, &principal, &input.name).await?;
                     Ok(SettingDeleted { name: input.name, deleted: true })
                 }
@@ -103,9 +106,10 @@ pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
                 let service = service.clone();
                 async move {
                     // Cùng kiểu tham số trang và cùng hàm với REST.
-                    let page = crate::mcp::PageInput::new(filter.limit, filter.cursor, filter.order)
-                        .with_count(filter.count.unwrap_or(false))
-                        .natural_page()?;
+                    let page =
+                        crate::mcp::PageInput::new(filter.limit, filter.cursor, filter.order)
+                            .with_count(filter.count.unwrap_or(false))
+                            .natural_page()?;
                     service.page(&tenant, filter.group.as_deref(), &page).await
                 }
             },

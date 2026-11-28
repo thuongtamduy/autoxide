@@ -928,9 +928,11 @@ async fn list_settings(
 
 /// Set one of this tenant's settings.
 ///
-/// Requires `kernel.settings.manage`. Creates or replaces the value; sending it again is safe.
-/// A secret value is stored encrypted and the answer does not contain it. The former name of a
-/// renamed setting is still accepted; the answer carries the current name.
+/// Requires `kernel.settings.manage` held at the tenant's root unit (a role of a branch, or an
+/// API key bound to a branch, is refused: settings apply to the whole tenant). Creates or replaces
+/// the value; sending it again is safe. A secret value is stored encrypted and the answer does
+/// not contain it. The former name of a renamed setting is still accepted; the answer carries the
+/// current name.
 #[utoipa::path(
     put,
     path = "/settings/{name}",
@@ -942,7 +944,7 @@ async fn list_settings(
     responses(
         (status = 200, description = "The setting as stored (without a secret value).", body = Data<SettingState>),
         (status = 401, description = "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.settings.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.settings.manage` (code `permission_denied`), or it is held only below the tenant's root unit (code `org_out_of_scope`).", body = Problem),
         (status = 422, description = "No module takes this setting (code `tenant_setting_unknown`) or the value is empty or too long; see `errors`.", body = Problem),
     )
 )]
@@ -953,14 +955,15 @@ async fn set_setting(
     Path(name): Path<String>,
     crate::http::ValidJson(input): crate::http::ValidJson<SettingInput>,
 ) -> Result<Data<SettingState>, Error> {
-    principal.require(&SETTINGS_MANAGE)?;
+    principal.require_at_root(&SETTINGS_MANAGE)?;
     Ok(Data { data: service.put(&tenant, &principal, &name, &input.value).await? })
 }
 
 /// Remove one of this tenant's settings.
 ///
-/// Requires `kernel.settings.manage`. The server-wide configuration applies again. Removing a
-/// setting this tenant never set changes nothing.
+/// Requires `kernel.settings.manage` held at the tenant's root unit, like setting one. The
+/// server-wide configuration applies again. Removing a setting this tenant never set changes
+/// nothing.
 #[utoipa::path(
     delete,
     path = "/settings/{name}",
@@ -971,7 +974,7 @@ async fn set_setting(
     responses(
         (status = 204, description = "The setting is unset (or never was)."),
         (status = 401, description = "Not signed in (code `unauthorized` or the code of the authentication module), or a setting of the `connection` group needs a recent sign-in: code `step_up_required`, confirm with `POST /api/v1/auth/me/reauth` and retry.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.settings.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.settings.manage` (code `permission_denied`), or it is held only below the tenant's root unit (code `org_out_of_scope`).", body = Problem),
         (status = 422, description = "No module takes this setting; code `tenant_setting_unknown`.", body = Problem),
     )
 )]
@@ -981,7 +984,7 @@ async fn delete_setting(
     principal: Principal,
     Path(name): Path<String>,
 ) -> Result<StatusCode, Error> {
-    principal.require(&SETTINGS_MANAGE)?;
+    principal.require_at_root(&SETTINGS_MANAGE)?;
     service.delete(&tenant, &principal, &name).await?;
     Ok(StatusCode::NO_CONTENT)
 }
