@@ -59,7 +59,7 @@ pub fn check(workspace: &Workspace) -> Result<Vec<Violation>, String> {
 
 /// Mỗi lần một tên cũ xuất hiện trong dòng code (bỏ dòng chú thích `//`).
 fn violations_in(path: &str, text: &str) -> Vec<Violation> {
-    let zone_imported = imports_zone(text);
+    let imports = zone_imports(text);
     let mut violations = Vec::new();
     let mut push = |line: usize, name: &str, instead: &str| {
         violations.push(Violation {
@@ -80,12 +80,24 @@ fn violations_in(path: &str, text: &str) -> Vec<Violation> {
                 push(index + 1, name, instead);
             }
         }
-        let zones = if zone_imported {
-            word_occurrences(line, "zone")
-        } else {
-            line.match_indices("time::zone")
-                .filter(|(at, _)| ends_word(line, at + "time::zone".len()))
-                .count()
+        // Trong câu `use`: mỗi lần nhập `zone` tính một lần, ở dòng đầu câu. Ngoài câu `use`: `time::zone` (đường đầy
+        // đủ, kể cả làm giá trị) + mỗi lần gọi tên đã nhập (`zone`, hay bí danh).
+        let in_use =
+            imports.statements.iter().find(|(first, last, _)| (*first..=*last).contains(&index));
+        let zones = match in_use {
+            Some((first, _, count)) => {
+                if *first == index {
+                    *count
+                } else {
+                    0
+                }
+            }
+            None => {
+                line.match_indices("time::zone")
+                    .filter(|(at, _)| ends_word(line, at + "time::zone".len()))
+                    .count()
+                    + imports.names.iter().map(|name| bare_occurrences(line, name)).sum::<usize>()
+            }
         };
         for _ in 0..zones {
             push(index + 1, "zone", ZONE_INSTEAD);
@@ -102,25 +114,157 @@ fn violations_in(path: &str, text: &str) -> Vec<Violation> {
     violations
 }
 
-/// File nhập `zone` từ `autoxide_kernel::time` (`use autoxide_kernel::time::zone;` hay trong ngoặc nhọn).
-fn imports_zone(text: &str) -> bool {
-    let mut rest = text;
-    while let Some(at) = rest.find("autoxide_kernel::time::") {
-        let tail = &rest[at + "autoxide_kernel::time::".len()..];
-        let item = match tail.strip_prefix('{') {
-            Some(inner) => &inner[..inner.find('}').unwrap_or(inner.len())],
-            None => {
-                &tail[..tail
-                    .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
-                    .unwrap_or(tail.len())]
+/// Tên tại chỗ của hàm `zone` mà file nhập từ `autoxide_kernel::time` bằng câu `use` / `pub use` (kể cả nhiều dòng,
+/// import lồng `autoxide_kernel::{time::{self, zone}}`, `time::*`, bí danh `zone as tz`). Chỉ xét câu `use`: file gọi
+/// đầy đủ `autoxide_kernel::time::zone(…)` không làm biến hay trường tên `zone` khác bị đếm.
+fn zone_imports(text: &str) -> ZoneImports {
+    let mut imports = ZoneImports::default();
+    for (first, last, statement) in use_statements(text) {
+        let mut count = 0;
+        for (path, alias) in flatten_use(&statement) {
+            let local = match path.as_str() {
+                "autoxide_kernel::time::zone" => alias.unwrap_or_else(|| "zone".to_owned()),
+                "autoxide_kernel::time::*" => "zone".to_owned(),
+                _ => continue,
+            };
+            // `time::*` không nêu tên `zone`: chỉ tính khi file thật sự gọi nó (ở dòng gọi).
+            if path.ends_with("::zone") {
+                count += 1;
             }
-        };
-        if item.split(',').any(|part| part.trim() == "zone") {
-            return true;
+            if !imports.names.contains(&local) {
+                imports.names.push(local);
+            }
         }
-        rest = tail;
+        imports.statements.push((first, last, count));
     }
-    false
+    imports
+}
+
+/// Những gì file nhập: tên tại chỗ của `zone`, và mọi câu `use` (dòng đầu, dòng cuối, số lần nhập `zone`).
+#[derive(Default)]
+struct ZoneImports {
+    names: Vec<String>,
+    statements: Vec<(usize, usize, usize)>,
+}
+
+/// Các câu `use`: (dòng đầu, dòng cuối, phần sau chữ `use` tới trước `;`), dòng tính từ 0.
+fn use_statements(text: &str) -> Vec<(usize, usize, String)> {
+    let mut statements = Vec::new();
+    let mut offset = 0;
+    let mut rest = text;
+    while let Some(at) = rest.find("use ") {
+        let before = &rest[..at];
+        let trimmed = before.trim_end_matches([' ', '\t']);
+        // `use` đứng đầu dòng (có thể sau `pub` / `pub(crate)`), không phải chữ `use` giữa câu hay trong chú thích.
+        let line_start = trimmed.rsplit('\n').next().unwrap_or(trimmed).trim_start();
+        let starts = line_start.is_empty()
+            || line_start == "pub"
+            || line_start.starts_with("pub(") && line_start.ends_with(')');
+        let tail = &rest[at + "use ".len()..];
+        let absolute = offset + at;
+        if starts {
+            let end = tail.find(';').unwrap_or(tail.len());
+            let first = text[..absolute].matches('\n').count();
+            let last = first + tail[..end].matches('\n').count();
+            statements.push((first, last, tail[..end].to_owned()));
+            offset = absolute + "use ".len() + end;
+            rest = &tail[end..];
+        } else {
+            offset = absolute + "use ".len();
+            rest = tail;
+        }
+    }
+    statements
+}
+
+/// Các đường của một cây `use` (`a::{b, c::{d as e}}`) thành (đường đầy đủ, bí danh).
+fn flatten_use(tree: &str) -> Vec<(String, Option<String>)> {
+    // Gom khoảng trắng: `a :: { b , c as d }` → `a::{b,c as d}`.
+    let compact: String = tree.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut compact = compact;
+    for token in ["::", "{", "}", ","] {
+        compact = compact.replace(&format!(" {token}"), token).replace(&format!("{token} "), token);
+    }
+    let mut out = Vec::new();
+    flatten_into(&compact, "", &mut out);
+    out
+}
+
+fn flatten_into(tree: &str, prefix: &str, out: &mut Vec<(String, Option<String>)>) {
+    let tree = tree.trim();
+    if tree.is_empty() {
+        return;
+    }
+    if let Some(inner) = tree.strip_prefix('{').and_then(|t| t.strip_suffix('}')) {
+        for part in split_top(inner) {
+            flatten_into(part, prefix, out);
+        }
+        return;
+    }
+    // `head::rest`: tách ở `::` đầu tiên ngoài ngoặc.
+    if let Some(at) = top_level_find(tree, "::") {
+        let (head, rest) = (&tree[..at], &tree[at + 2..]);
+        flatten_into(rest, &join(prefix, head), out);
+        return;
+    }
+    let (name, alias) = match tree.split_once(" as ") {
+        Some((name, alias)) => (name.trim(), Some(alias.trim().to_owned())),
+        None => (tree, None),
+    };
+    // `self` trong ngoặc là chính đường phía trước (`time::{self}` nhập `time`).
+    let path = if name == "self" { prefix.to_owned() } else { join(prefix, name) };
+    out.push((path, alias));
+}
+
+fn join(prefix: &str, name: &str) -> String {
+    if prefix.is_empty() { name.to_owned() } else { format!("{prefix}::{name}") }
+}
+
+/// Các phần của danh sách `a,b::{c,d},e` tách ở dấu phẩy ngoài ngoặc.
+fn split_top(list: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let (mut depth, mut start) = (0usize, 0);
+    for (index, c) in list.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                parts.push(&list[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(&list[start..]);
+    parts
+}
+
+fn top_level_find(text: &str, needle: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (index, c) in text.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            _ if depth == 0 && text[index..].starts_with(needle) => return Some(index),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Số lần `name` đứng riêng thành tên mà không phải đuôi của một đường (`a::zone`), một trường (`row.zone`) hay tên
+/// mới sau `as` — tức là gọi đến hàm đã nhập.
+fn bare_occurrences(line: &str, name: &str) -> usize {
+    line.match_indices(name)
+        .filter(|(at, _)| {
+            let before = &line[..*at];
+            before.chars().next_back().is_none_or(|c| !is_ident(c))
+                && ends_word(line, at + name.len())
+                && !before.ends_with("::")
+                && !before.ends_with('.')
+                && !before.trim_end().ends_with(" as")
+        })
+        .count()
 }
 
 fn is_ident(c: char) -> bool {
@@ -187,6 +331,17 @@ mod tests {
                     let y = names.filter_map(zone);\n\
                     let time_zone = 1;\n";
         assert_eq!(lines_of(text), [1, 2, 3]);
+        // Gọi đầy đủ không phải nhập: biến `zone` khác trong file không bị đếm.
+        assert_eq!(lines_of("let z = autoxide_kernel::time::zone(\"UTC\");\nlet zone = 1;\n"), [1]);
+        // Import nhiều dòng, lồng, bí danh, `*`.
+        let nested = "use autoxide_kernel::{\n    db::Queries,\n    time::{self, zone as tz},\n};\n\
+                      let z = tz(\"UTC\");\nlet zone = 1;\n";
+        assert_eq!(lines_of(nested), [1, 5]);
+        assert_eq!(
+            lines_of("use autoxide_kernel::time::*;\nlet z = zone(\"UTC\");\nlet r = row.zone;\n"),
+            [2]
+        );
+        assert_eq!(lines_of("pub use autoxide_kernel::time::zone;\n"), [1]);
         // Không nhập `zone` thì `zone` trần là tên khác (trường, biến).
         assert!(lines_of("let zone = row.zone;\nlet z = zone(1);\n").is_empty());
         assert_eq!(lines_of("use autoxide_kernel::time::zone;\nlet z = zone(\"UTC\");\n"), [1, 2]);
