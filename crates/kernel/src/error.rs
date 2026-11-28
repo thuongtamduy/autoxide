@@ -203,6 +203,20 @@ struct Extra {
     /// Value of the 401 `WWW-Authenticate` header in place of a bare `Bearer` (e.g. the re-authentication
     /// challenge of RFC 9470).
     challenge: Option<String>,
+    /// The rate limit policy that refused the request (429): the `RateLimit-Policy` and `RateLimit` headers.
+    rate_limit: Option<RateLimitPolicy>,
+}
+
+/// A rate limit policy as advertised by the `RateLimit-Policy` header (draft-ietf-httpapi-ratelimit-headers-12):
+/// `quota` requests in `window` seconds, under the name `name`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RateLimitPolicy {
+    /// The policy's name (`address`, `api-key`, `tenant`).
+    pub(crate) name: &'static str,
+    /// The quota (`q`): requests allowed in one window.
+    pub(crate) quota: u32,
+    /// The window (`w`) in seconds; at least 1.
+    pub(crate) window: u64,
 }
 
 /// Code and message of an internal error. The client sees exactly these two things.
@@ -227,6 +241,7 @@ impl Error {
                     reason: extra.reason,
                     current: extra.current.clone(),
                     challenge: extra.challenge.clone(),
+                    rate_limit: extra.rate_limit,
                 })
             }),
         }
@@ -343,6 +358,19 @@ impl Error {
         let seconds = u32::try_from(seconds).unwrap_or(u32::MAX).max(1);
         self.extra.get_or_insert_default().retry_after = NonZeroU32::new(seconds);
         self
+    }
+
+    /// Names the rate limit policy that refused the request: the response carries `RateLimit-Policy` and
+    /// `RateLimit` (available quota `0`, window = the `Retry-After` seconds).
+    #[must_use]
+    pub(crate) fn with_rate_limit(mut self, policy: RateLimitPolicy) -> Self {
+        self.extra.get_or_insert_default().rate_limit = Some(policy);
+        self
+    }
+
+    /// The rate limit policy attached with [`with_rate_limit`](Self::with_rate_limit), if any.
+    pub(crate) fn rate_limit(&self) -> Option<RateLimitPolicy> {
+        self.extra.as_ref().and_then(|extra| extra.rate_limit)
     }
 
     /// Attaches a stable machine-readable reason (the Problem's `reason` field), e.g. `expired`.

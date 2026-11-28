@@ -203,6 +203,12 @@ impl IntoResponse for Error {
         if let Some(seconds) = self.retry_after() {
             response.headers_mut().insert(header::RETRY_AFTER, HeaderValue::from(seconds));
         }
+        // Lỗi 429 của một tầng giới hạn: nói rõ chính sách nào từ chối, hết hạn mức, chờ bao lâu (bản nháp
+        // IETF RateLimit header, `Retry-After` không sớm hơn cuối cửa sổ).
+        if let Some(policy) = self.rate_limit() {
+            let wait = self.retry_after().unwrap_or(policy.window);
+            crate::http::rate_limit_headers::append(response.headers_mut(), policy, 0, wait);
+        }
         // Gửi kèm chính lỗi (có nguyên nhân gốc) trong "extensions" của response:
         // phần này không ra tới client, nhưng middleware ghi log đọc được.
         response.extensions_mut().insert(Arc::new(self));

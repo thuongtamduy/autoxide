@@ -34407,6 +34407,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_Home;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34418,6 +34419,7 @@ export interface paths {
       responses: {
         200: Record<string, unknown>;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34429,6 +34431,7 @@ export interface paths {
       responses: {
         200: Record<string, unknown>;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34440,6 +34443,7 @@ export interface paths {
       responses: {
         200: Record<string, unknown>;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34451,6 +34455,7 @@ export interface paths {
       responses: {
         200: Record<string, unknown>;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34463,6 +34468,7 @@ export interface paths {
         200: Page_AdministrativeUnit;
         304: void;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34476,6 +34482,7 @@ export interface paths {
         304: void;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34487,6 +34494,7 @@ export interface paths {
       responses: {
         200: Page_AdministrativeUnit;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34499,6 +34507,7 @@ export interface paths {
         200: Data_AdministrativeUnitDetail;
         304: void;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34511,6 +34520,7 @@ export interface paths {
       responses: {
         200: Data_Address;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34523,6 +34533,7 @@ export interface paths {
         200: Data_AiStatus;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34537,6 +34548,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34549,6 +34561,7 @@ export interface paths {
         200: Page_EventTypeInfo;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34562,6 +34575,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34576,6 +34590,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34590,6 +34605,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34604,6 +34620,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34618,6 +34635,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34634,6 +34652,7 @@ export interface paths {
         404: Problem;
         415: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34648,6 +34667,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34662,6 +34682,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34673,6 +34694,7 @@ export interface paths {
       responses: {
         200: Data_FormTokenResponse;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34686,6 +34708,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34698,6 +34721,7 @@ export interface paths {
         200: Page_ActivityResponse;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34711,6 +34735,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34724,6 +34749,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34737,6 +34763,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34751,6 +34778,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34763,6 +34791,7 @@ export interface paths {
         200: Page_ApiKeyResponse;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34790,6 +34819,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34820,6 +34850,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34833,6 +34864,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34847,6 +34879,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34860,6 +34893,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34872,6 +34906,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34885,6 +34920,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34898,6 +34934,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34911,6 +34948,7 @@ export interface paths {
         204: void;
         400: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34925,6 +34963,7 @@ export interface paths {
         400: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34938,6 +34977,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34950,6 +34990,7 @@ export interface paths {
         200: Data_AppliedGuardrailsResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34964,6 +35005,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34975,6 +35017,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -34988,6 +35031,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35000,6 +35044,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35015,6 +35060,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35029,6 +35075,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35043,6 +35090,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35072,6 +35120,7 @@ export interface paths {
         202: Data_LoginLinkResponse;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35088,6 +35137,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35118,6 +35168,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35129,6 +35180,7 @@ export interface paths {
       responses: {
         200: Data_CeremonyResponse;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35141,6 +35193,7 @@ export interface paths {
       responses: {
         204: void;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35153,6 +35206,7 @@ export interface paths {
         200: Data_MeResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35164,6 +35218,7 @@ export interface paths {
         200: Data_MeResponse;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35206,6 +35261,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35218,6 +35274,7 @@ export interface paths {
         202: void;
         401: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35230,6 +35287,7 @@ export interface paths {
         200: Data_PersonalDataResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35242,6 +35300,7 @@ export interface paths {
         200: Page_IdentityResponse;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35256,6 +35315,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35273,6 +35333,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -35304,6 +35365,7 @@ export interface paths {
         200: Page_MembershipResponse;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35315,6 +35377,7 @@ export interface paths {
       responses: {
         200: Data_MfaStatusResponse;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35330,6 +35393,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35345,6 +35409,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35360,6 +35425,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35375,6 +35441,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35388,6 +35455,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35401,6 +35469,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35414,6 +35483,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35428,6 +35498,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35443,6 +35514,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35456,6 +35528,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35502,6 +35575,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35513,6 +35587,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35526,6 +35601,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35538,6 +35614,7 @@ export interface paths {
         200: Page_MyTenantResponse;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35551,6 +35628,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35564,6 +35642,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35578,6 +35657,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35591,6 +35671,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35631,6 +35712,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35646,6 +35728,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35659,6 +35742,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35671,6 +35755,7 @@ export interface paths {
       responses: {
         200: void;
         400: OAuthErrorResponse;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35684,6 +35769,7 @@ export interface paths {
         200: OAuthTokenResponse;
         400: OAuthErrorResponse;
         404: OAuthErrorResponse;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35697,6 +35783,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35710,6 +35797,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35723,6 +35811,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35736,6 +35825,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35747,6 +35837,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35759,6 +35850,7 @@ export interface paths {
         200: Page_PublicProviderResponse;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35777,6 +35869,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -35791,6 +35884,7 @@ export interface paths {
         200: Data_StartResponse;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -35804,6 +35898,7 @@ export interface paths {
       responses: {
         202: void;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35817,6 +35912,7 @@ export interface paths {
         204: void;
         400: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35830,6 +35926,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35893,6 +35990,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35907,6 +36005,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35920,6 +36019,7 @@ export interface paths {
         202: Data_RegistrationResponse;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35933,6 +36033,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35946,6 +36047,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35959,6 +36061,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35972,6 +36075,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35987,6 +36091,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -35999,6 +36104,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36012,6 +36118,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36026,6 +36133,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36040,6 +36148,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36053,6 +36162,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36066,6 +36176,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36079,6 +36190,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36092,6 +36204,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36105,6 +36218,7 @@ export interface paths {
         400: ScimErrorBody;
         401: ScimErrorBody;
         403: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36118,6 +36232,7 @@ export interface paths {
         401: ScimErrorBody;
         403: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36131,6 +36246,7 @@ export interface paths {
         401: ScimErrorBody;
         403: ScimErrorBody;
         404: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36145,6 +36261,7 @@ export interface paths {
         403: ScimErrorBody;
         404: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36159,6 +36276,7 @@ export interface paths {
         403: ScimErrorBody;
         404: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36171,6 +36289,7 @@ export interface paths {
         403: ScimErrorBody;
         404: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36181,6 +36300,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: ScimListResponse;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36191,6 +36311,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: ScimListResponse;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36201,6 +36322,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Record<string, unknown>;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36214,6 +36336,7 @@ export interface paths {
         400: ScimErrorBody;
         401: ScimErrorBody;
         403: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36227,6 +36350,7 @@ export interface paths {
         401: ScimErrorBody;
         403: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36240,6 +36364,7 @@ export interface paths {
         401: ScimErrorBody;
         403: ScimErrorBody;
         404: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36254,6 +36379,7 @@ export interface paths {
         403: ScimErrorBody;
         404: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36268,6 +36394,7 @@ export interface paths {
         403: ScimErrorBody;
         404: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36280,6 +36407,7 @@ export interface paths {
         403: ScimErrorBody;
         404: ScimErrorBody;
         409: ScimErrorBody;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36293,6 +36421,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36306,6 +36435,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36319,6 +36449,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36331,6 +36462,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36344,6 +36476,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36357,6 +36490,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36370,6 +36504,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36383,6 +36518,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36396,6 +36532,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36411,6 +36548,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36423,6 +36561,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36437,6 +36576,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36451,6 +36591,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36465,6 +36606,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36478,6 +36620,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36492,6 +36635,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36503,6 +36647,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36516,6 +36661,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36532,6 +36678,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36546,6 +36693,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36560,6 +36708,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36573,6 +36722,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36585,6 +36735,7 @@ export interface paths {
         200: Data_Catalog;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36598,6 +36749,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36610,6 +36762,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36623,6 +36776,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36638,6 +36792,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36650,6 +36805,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         412: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36664,6 +36820,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         412: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36679,6 +36836,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36694,6 +36852,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36708,6 +36867,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36721,6 +36881,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36734,6 +36895,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36748,6 +36910,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36762,6 +36925,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36776,6 +36940,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36789,6 +36954,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36802,6 +36968,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36816,6 +36983,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36829,6 +36997,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36842,6 +37011,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36858,6 +37028,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36872,6 +37043,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36886,6 +37058,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36900,6 +37073,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36914,6 +37088,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36930,6 +37105,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36944,6 +37120,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36957,6 +37134,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36970,6 +37148,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36983,6 +37162,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -36996,6 +37176,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37009,6 +37190,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37024,6 +37206,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -37040,6 +37223,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37067,6 +37251,7 @@ export interface paths {
         200: Page_PublicBookingService;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37080,6 +37265,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37092,6 +37278,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37105,6 +37292,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37118,6 +37306,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37131,6 +37320,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37144,6 +37334,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37157,6 +37348,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37169,6 +37361,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37182,6 +37375,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37195,6 +37389,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37208,6 +37403,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37221,6 +37417,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37236,6 +37433,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37252,6 +37450,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37265,6 +37464,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37279,6 +37479,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37295,6 +37496,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37307,6 +37509,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37320,6 +37523,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37333,6 +37537,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37349,6 +37554,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37361,6 +37567,7 @@ export interface paths {
         200: Data_CatalogCategoryRestrictions;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37373,6 +37580,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37386,6 +37594,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37399,6 +37608,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37412,6 +37622,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37428,6 +37639,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37439,6 +37651,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37452,6 +37665,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37467,6 +37681,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37481,6 +37696,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37494,6 +37710,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37508,6 +37725,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37523,6 +37741,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -37537,6 +37756,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37550,6 +37770,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37566,6 +37787,7 @@ export interface paths {
         404: Problem;
         413: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -37580,6 +37802,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37594,6 +37817,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37607,6 +37831,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37620,6 +37845,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37633,6 +37859,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37646,6 +37873,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37659,6 +37887,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37672,6 +37901,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37685,6 +37915,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37701,6 +37932,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37716,6 +37948,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37729,6 +37962,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37743,6 +37977,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37758,6 +37993,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37772,6 +38008,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37785,6 +38022,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37798,6 +38036,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37812,6 +38051,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37825,6 +38065,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37839,6 +38080,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -37853,6 +38095,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37866,6 +38109,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37880,6 +38124,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37892,6 +38137,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37906,6 +38152,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37919,6 +38166,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37934,6 +38182,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37948,6 +38197,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37961,6 +38211,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37974,6 +38225,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -37989,6 +38241,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38005,6 +38258,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38018,6 +38272,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38034,6 +38289,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38051,6 +38307,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38066,6 +38323,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -38083,6 +38341,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38095,6 +38354,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38111,6 +38371,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38123,6 +38384,7 @@ export interface paths {
         200: Page_CatalogPublicCategory;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38136,6 +38398,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38149,6 +38412,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38163,6 +38427,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         416: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38176,6 +38441,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38189,6 +38455,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38202,6 +38469,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38214,6 +38482,7 @@ export interface paths {
         200: Data_CatalogFacets;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38227,6 +38496,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38240,6 +38510,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38252,6 +38523,7 @@ export interface paths {
         200: Page_CatalogSuggestion;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38264,6 +38536,7 @@ export interface paths {
         200: Page_CatalogSitemapItem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38277,6 +38550,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38290,6 +38564,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38302,6 +38577,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38317,6 +38593,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38332,6 +38609,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38346,6 +38624,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38358,6 +38637,7 @@ export interface paths {
         200: Data_CatalogSynonyms;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38370,6 +38650,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38383,6 +38664,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38400,6 +38682,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38412,6 +38695,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38426,6 +38710,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38439,6 +38724,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38454,6 +38740,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38468,6 +38755,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38481,6 +38769,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -38495,6 +38784,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38508,6 +38798,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38521,6 +38812,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38533,6 +38825,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38546,6 +38839,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38559,6 +38853,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38570,6 +38865,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38582,6 +38878,7 @@ export interface paths {
         200: Data_CommentProfile;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38595,6 +38892,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38626,6 +38924,7 @@ export interface paths {
         200: Data_PublicComment;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38640,6 +38939,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38653,6 +38953,7 @@ export interface paths {
         200: Data_CommentDeleted;
         403: Problem;
         412: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38666,6 +38967,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38680,6 +38982,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38693,6 +38996,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38705,6 +39009,7 @@ export interface paths {
         200: Data_CommentSettings;
         400: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38718,6 +39023,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38731,6 +39037,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38743,6 +39050,7 @@ export interface paths {
       responses: {
         200: Data_CommentsUnsubscribed;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38756,6 +39064,7 @@ export interface paths {
         200: Data_VerifiedResponse;
         400: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38769,6 +39078,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38783,6 +39093,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38797,6 +39108,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38810,6 +39122,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38826,6 +39139,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38837,6 +39151,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38851,6 +39166,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38864,6 +39180,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38876,6 +39193,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38889,6 +39207,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38906,6 +39225,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38923,6 +39243,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38939,6 +39260,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38955,6 +39277,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38972,6 +39295,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -38989,6 +39313,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39002,6 +39327,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39015,6 +39341,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39028,6 +39355,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39041,6 +39369,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39054,6 +39383,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39067,6 +39397,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39080,6 +39411,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39093,6 +39425,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39107,6 +39440,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39121,6 +39455,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39137,6 +39472,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39150,6 +39486,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39162,6 +39499,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39175,6 +39513,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39189,6 +39528,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39203,6 +39543,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39218,6 +39559,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39230,6 +39572,7 @@ export interface paths {
       responses: {
         204: void;
         401: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -39244,6 +39587,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39256,6 +39600,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39269,6 +39614,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39283,6 +39629,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39299,6 +39646,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39315,6 +39663,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39331,6 +39680,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39347,6 +39697,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39363,6 +39714,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39379,6 +39731,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -39393,6 +39746,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39407,6 +39761,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39420,6 +39775,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39434,6 +39790,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39447,6 +39804,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39461,6 +39819,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39473,6 +39832,7 @@ export interface paths {
         200: Page_ComplianceConsent;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39484,6 +39844,7 @@ export interface paths {
         200: Data_ComplianceConsent;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39495,6 +39856,7 @@ export interface paths {
       responses: {
         200: Data_ComplianceMyKyc;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39506,6 +39868,7 @@ export interface paths {
         200: Data_ComplianceKycProfile;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39521,6 +39884,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39536,6 +39900,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -39549,6 +39914,7 @@ export interface paths {
         200: Page_CompliancePendingAcceptance;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39560,6 +39926,7 @@ export interface paths {
       responses: {
         204: void;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39588,6 +39955,7 @@ export interface paths {
         200: Data_CompliancePhoneVerification;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39615,6 +39983,7 @@ export interface paths {
       responses: {
         200: Data_ComplianceAccountVerification;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39626,6 +39995,7 @@ export interface paths {
       responses: {
         200: Data_ComplianceOverview;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39640,6 +40010,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39653,6 +40024,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39668,6 +40040,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39680,6 +40053,7 @@ export interface paths {
         200: Data_ComplianceProcessingRegister;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39691,6 +40065,7 @@ export interface paths {
       responses: {
         200: Data_ComplianceBadge;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39702,6 +40077,7 @@ export interface paths {
       responses: {
         200: Data_ComplianceTrackedCase;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39712,6 +40088,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_ComplianceComplaintChannel;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39734,6 +40111,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { granted?: string; locale?: string; site?: string }; };
       responses: {
         200: Data_ComplianceConsentConfig;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39759,6 +40137,7 @@ export interface paths {
       responses: {
         200: Data_ComplianceDocumentVersion;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39769,6 +40148,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { surface?: string }; };
       responses: {
         200: Data_ComplianceModerationReasons;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39780,6 +40160,7 @@ export interface paths {
       responses: {
         200: Data_CompliancePublicOwner;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39791,6 +40172,7 @@ export interface paths {
       responses: {
         200: Page_CompliancePurpose;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39818,6 +40200,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39831,6 +40214,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39846,6 +40230,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39858,6 +40243,7 @@ export interface paths {
         200: Data_ComplianceResidency;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39872,6 +40258,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39884,6 +40271,7 @@ export interface paths {
         200: Page_ComplianceRespondentCase;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39897,6 +40285,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39910,6 +40299,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39922,6 +40312,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39935,6 +40326,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39947,6 +40339,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39960,6 +40353,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39975,6 +40369,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -39992,6 +40387,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40005,6 +40401,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40018,6 +40415,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40032,6 +40430,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40045,6 +40444,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40059,6 +40459,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40070,6 +40471,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40083,6 +40485,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40097,6 +40500,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40110,6 +40514,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40125,6 +40530,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40138,6 +40544,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40151,6 +40558,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40166,6 +40574,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40177,6 +40586,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40193,6 +40603,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40206,6 +40617,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40219,6 +40631,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40232,6 +40645,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40248,6 +40662,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40259,6 +40674,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40273,6 +40689,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40287,6 +40704,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40300,6 +40718,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40316,6 +40735,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40327,6 +40747,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40357,6 +40778,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40370,6 +40792,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40383,6 +40806,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40399,6 +40823,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40412,6 +40837,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40428,6 +40854,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40443,6 +40870,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40458,6 +40886,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -40474,6 +40903,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -40489,6 +40919,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40505,6 +40936,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40520,6 +40952,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40533,6 +40966,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40545,6 +40979,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40557,6 +40992,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40574,6 +41010,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40590,6 +41027,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40608,6 +41046,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40621,6 +41060,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -40640,6 +41080,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40655,6 +41096,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40668,6 +41110,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40681,6 +41124,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40694,6 +41138,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40711,6 +41156,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40725,6 +41171,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40741,6 +41188,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40754,6 +41202,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40785,6 +41234,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40801,6 +41251,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -40815,6 +41266,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40831,6 +41283,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40847,6 +41300,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40863,6 +41317,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40876,6 +41331,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40889,6 +41345,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40903,6 +41360,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40916,6 +41374,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40929,6 +41388,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40941,6 +41401,7 @@ export interface paths {
         200: Data_Vec_PageTemplateResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40954,6 +41415,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40967,6 +41429,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40980,6 +41443,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -40992,6 +41456,7 @@ export interface paths {
         200: Data_Vec_PlacementResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41005,6 +41470,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41020,6 +41486,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41032,6 +41499,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41049,6 +41517,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41061,6 +41530,7 @@ export interface paths {
         200: Data_PublicAuthorPage;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41073,6 +41543,7 @@ export interface paths {
         200: Page_PublicEntryResponse;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41086,6 +41557,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41099,6 +41571,7 @@ export interface paths {
         304: void;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41113,6 +41586,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41139,6 +41613,7 @@ export interface paths {
         200: Data_PreviewEntryResponse;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -41153,6 +41628,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         451: Problem;
         default: Problem;
       };
@@ -41182,6 +41658,7 @@ export interface paths {
         304: void;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41194,6 +41671,7 @@ export interface paths {
         200: Page_SitemapItem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41206,6 +41684,7 @@ export interface paths {
         200: Page_PublicTermCount;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41219,6 +41698,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41232,6 +41712,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41245,6 +41726,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41258,6 +41740,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41271,6 +41754,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41287,6 +41771,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41298,6 +41783,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41311,6 +41797,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41325,6 +41812,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41338,6 +41826,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41351,6 +41840,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41363,6 +41853,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41376,6 +41867,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41391,6 +41883,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41405,6 +41898,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41418,6 +41912,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41446,6 +41941,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41461,6 +41957,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41477,6 +41974,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41490,6 +41988,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41503,6 +42002,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41519,6 +42019,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41532,6 +42033,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41545,6 +42047,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41558,6 +42061,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41574,6 +42078,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41586,6 +42091,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41599,6 +42105,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41613,6 +42120,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41627,6 +42135,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41640,6 +42149,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41655,6 +42165,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41669,6 +42180,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41684,6 +42196,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41700,6 +42213,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41715,6 +42229,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41728,6 +42243,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41743,6 +42259,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41756,6 +42273,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41769,6 +42287,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41782,6 +42301,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41796,6 +42316,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -41810,6 +42331,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41826,6 +42348,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41838,6 +42361,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41851,6 +42375,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41865,6 +42390,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -41880,6 +42406,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41893,6 +42420,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41904,6 +42432,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -41918,6 +42447,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41945,6 +42475,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -41977,6 +42508,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42008,6 +42540,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42022,6 +42555,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42036,6 +42570,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42066,6 +42601,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42081,6 +42617,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42096,6 +42633,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42110,6 +42648,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42123,6 +42662,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42136,6 +42676,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42149,6 +42690,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42162,6 +42704,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42175,6 +42718,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42190,6 +42734,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42205,6 +42750,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42216,6 +42762,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42230,6 +42777,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42243,6 +42791,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42257,6 +42806,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -42272,6 +42822,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42302,6 +42853,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42317,6 +42869,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42332,6 +42885,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42345,6 +42899,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -42360,6 +42915,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42373,6 +42929,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -42387,6 +42944,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42399,6 +42957,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42414,6 +42973,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         413: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42427,6 +42987,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42440,6 +43001,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42454,6 +43016,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42482,6 +43045,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42496,6 +43060,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42509,6 +43074,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42522,6 +43088,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42535,6 +43102,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42549,6 +43117,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42560,6 +43129,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42574,6 +43144,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42586,6 +43157,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42599,6 +43171,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42612,6 +43185,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42624,6 +43198,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42637,6 +43212,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42650,6 +43226,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42663,6 +43240,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42675,6 +43253,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42689,6 +43268,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42701,6 +43281,7 @@ export interface paths {
         200: Data_MyCustomerProfile;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42713,6 +43294,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42726,6 +43308,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42754,6 +43337,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42766,6 +43350,7 @@ export interface paths {
         200: Data_CustomerPoints;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42779,6 +43364,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42794,6 +43380,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -42808,6 +43395,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42819,6 +43407,7 @@ export interface paths {
         204: void;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42831,6 +43420,7 @@ export interface paths {
         200: Data_MyReferral;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42846,6 +43436,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42858,6 +43449,7 @@ export interface paths {
         200: Data_Option_StoreCredit;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42871,6 +43463,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42883,6 +43476,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42895,6 +43489,7 @@ export interface paths {
         200: Data_WishlistAlerts;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42907,6 +43502,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42921,6 +43517,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42933,6 +43530,7 @@ export interface paths {
         204: void;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42946,6 +43544,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42958,6 +43557,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42971,6 +43571,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42983,6 +43584,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -42996,6 +43598,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43010,6 +43613,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43023,6 +43627,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43037,6 +43642,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43050,6 +43656,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43066,6 +43673,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43080,6 +43688,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43096,6 +43705,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43109,6 +43719,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43124,6 +43735,7 @@ export interface paths {
         413: Problem;
         415: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43139,6 +43751,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43155,6 +43768,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43168,6 +43782,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43179,6 +43794,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43192,6 +43808,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43205,6 +43822,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43218,6 +43836,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43231,6 +43850,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43242,6 +43862,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43255,6 +43876,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43268,6 +43890,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43281,6 +43904,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43313,6 +43937,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43328,6 +43953,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43339,6 +43965,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43352,6 +43979,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43368,6 +43996,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43381,6 +44010,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43397,6 +44027,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43411,6 +44042,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43425,6 +44057,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43441,6 +44074,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43458,6 +44092,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43471,6 +44106,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43484,6 +44120,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43496,6 +44133,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43509,6 +44147,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43523,6 +44162,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43537,6 +44177,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43553,6 +44194,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43569,6 +44211,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43582,6 +44225,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43595,6 +44239,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43608,6 +44253,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43621,6 +44267,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43634,6 +44281,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43647,6 +44295,7 @@ export interface paths {
         304: void;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43678,6 +44327,7 @@ export interface paths {
         400: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43692,6 +44342,7 @@ export interface paths {
         400: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43705,6 +44356,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43718,6 +44370,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43731,6 +44384,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43745,6 +44399,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43759,6 +44414,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43773,6 +44429,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43787,6 +44444,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43800,6 +44458,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43815,6 +44474,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43828,6 +44488,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43842,6 +44503,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43855,6 +44517,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43868,6 +44531,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43881,6 +44545,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43893,6 +44558,7 @@ export interface paths {
         200: Data_InventoryStoreSettings;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43904,6 +44570,7 @@ export interface paths {
         200: Data_InventoryStoreSettings;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43916,6 +44583,7 @@ export interface paths {
         200: Data_InventorySources;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43928,6 +44596,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43941,6 +44610,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43956,6 +44626,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43969,6 +44640,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43982,6 +44654,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -43995,6 +44668,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44008,6 +44682,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44022,6 +44697,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44035,6 +44711,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44048,6 +44725,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44061,6 +44739,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44075,6 +44754,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44089,6 +44769,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44105,6 +44786,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44119,6 +44801,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44132,6 +44815,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44142,6 +44826,7 @@ export interface paths {
         201: Data_InvoicesArchive;
         401: Problem;
         403: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -44156,6 +44841,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44169,6 +44855,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44182,6 +44869,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44196,6 +44884,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44208,6 +44897,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44225,6 +44915,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44240,6 +44931,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -44256,6 +44948,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -44272,6 +44965,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44285,6 +44979,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -44300,6 +44995,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44317,6 +45013,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44330,6 +45027,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44343,6 +45041,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44355,6 +45054,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -44369,6 +45069,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44383,6 +45084,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44397,6 +45099,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -44411,6 +45114,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44423,6 +45127,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44436,6 +45141,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44449,6 +45155,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44462,6 +45169,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44477,6 +45185,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44489,6 +45198,7 @@ export interface paths {
         200: Data_InvoicesTemplateDefaults;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44502,6 +45212,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44516,6 +45227,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44531,6 +45243,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44544,6 +45257,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44557,6 +45271,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44568,6 +45283,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44581,6 +45297,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44593,6 +45310,7 @@ export interface paths {
         200: Page_ApprovalRequest;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44605,6 +45323,7 @@ export interface paths {
         200: Data_ApprovalRequest;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44619,6 +45338,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44635,6 +45355,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44647,6 +45368,7 @@ export interface paths {
         200: Page_BlockTypeView;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44664,6 +45386,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44675,6 +45398,7 @@ export interface paths {
       responses: {
         200: Data_ClientConfigResponse;
         403: Problem;
+        429: Problem;
         500: Problem;
         503: Problem;
         default: Problem;
@@ -44690,6 +45414,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44703,6 +45428,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44716,6 +45442,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44729,6 +45456,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44743,6 +45471,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44754,6 +45483,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44767,6 +45497,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44780,6 +45511,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44793,6 +45525,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44806,6 +45539,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44835,6 +45569,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44846,6 +45581,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44859,6 +45595,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44906,6 +45643,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -44919,6 +45657,7 @@ export interface paths {
         200: string;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44946,6 +45685,7 @@ export interface paths {
         200: Data_FindView;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44958,6 +45698,7 @@ export interface paths {
         200: Page_JobRunView;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44970,6 +45711,7 @@ export interface paths {
         200: Data_JobRunView;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44982,6 +45724,7 @@ export interface paths {
         200: string;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -44996,6 +45739,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45009,6 +45753,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45022,6 +45767,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45035,6 +45781,7 @@ export interface paths {
         304: void;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45047,6 +45794,7 @@ export interface paths {
         200: Data_AlertsResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45059,6 +45807,7 @@ export interface paths {
         200: Data_OpsBacklog;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45072,6 +45821,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45085,6 +45835,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45099,6 +45850,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45112,6 +45864,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45124,6 +45877,7 @@ export interface paths {
         200: Data_BTreeMap_String_String;
         304: void;
         400: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45137,6 +45891,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45153,6 +45908,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45165,6 +45921,7 @@ export interface paths {
         200: Page_RecordType;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45178,6 +45935,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45191,6 +45949,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45203,6 +45962,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45215,6 +45975,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45231,6 +45992,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45244,6 +46006,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45261,6 +46024,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -45275,6 +46039,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45288,6 +46053,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45302,6 +46068,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45315,6 +46082,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45328,6 +46096,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45341,6 +46110,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45356,6 +46126,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45369,6 +46140,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45383,6 +46155,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45394,6 +46167,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45407,6 +46181,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45418,6 +46193,7 @@ export interface paths {
       responses: {
         200: Data_SetupView;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45429,6 +46205,7 @@ export interface paths {
       responses: {
         200: Data_SummaryView;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45442,6 +46219,7 @@ export interface paths {
         200: Data_Vec_BatchResult;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45454,6 +46232,7 @@ export interface paths {
         200: Page_SyncResourceView;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45467,6 +46246,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45480,6 +46260,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45496,6 +46277,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45507,6 +46289,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45522,6 +46305,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45537,6 +46321,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45548,6 +46333,7 @@ export interface paths {
       responses: {
         200: Data_CurrentTenant;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45562,6 +46348,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45575,6 +46362,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45588,6 +46376,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45602,6 +46391,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45615,6 +46405,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45629,6 +46420,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45645,6 +46437,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45659,6 +46452,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45670,6 +46464,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45683,6 +46478,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45697,6 +46493,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45711,6 +46508,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45728,6 +46526,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -45742,6 +46541,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45756,6 +46556,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45769,6 +46570,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45783,6 +46585,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45799,6 +46602,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45812,6 +46616,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45825,6 +46630,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45840,6 +46646,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45850,6 +46657,7 @@ export interface paths {
         204: void;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45861,6 +46669,7 @@ export interface paths {
       responses: {
         200: Page_Release;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45873,6 +46682,7 @@ export interface paths {
         200: Data_WorkView;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45884,6 +46694,7 @@ export interface paths {
       responses: {
         200: Data_WorkCounts;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45898,6 +46709,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45911,6 +46723,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45924,6 +46737,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45937,6 +46751,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45951,6 +46766,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45965,6 +46781,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45978,6 +46795,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -45991,6 +46809,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46006,6 +46825,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46021,6 +46841,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46035,6 +46856,7 @@ export interface paths {
         401: Problem;
         413: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46051,6 +46873,7 @@ export interface paths {
         404: Problem;
         413: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46064,6 +46887,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46077,6 +46901,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46090,6 +46915,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46103,6 +46929,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46116,6 +46943,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46129,6 +46957,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46144,6 +46973,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46157,6 +46987,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46174,6 +47005,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46187,6 +47019,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46203,6 +47036,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46216,6 +47050,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46230,6 +47065,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46244,6 +47080,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46258,6 +47095,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -46271,6 +47109,7 @@ export interface paths {
         200: Data_LedgerFlowSettings;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46283,6 +47122,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46296,6 +47136,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46310,6 +47151,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46323,6 +47165,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46336,6 +47179,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -46353,6 +47197,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46366,6 +47211,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46383,6 +47229,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -46400,6 +47247,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46413,6 +47261,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46427,6 +47276,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -46441,6 +47291,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46455,6 +47306,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46469,6 +47321,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46482,6 +47335,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46494,6 +47348,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -46509,6 +47364,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46523,6 +47379,7 @@ export interface paths {
         401: Problem;
         413: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46539,6 +47396,7 @@ export interface paths {
         404: Problem;
         413: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46552,6 +47410,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46564,6 +47423,7 @@ export interface paths {
         200: Data_BounceStatsResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46577,6 +47437,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46588,6 +47449,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46601,6 +47463,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46614,6 +47477,7 @@ export interface paths {
         200: Data_Vec_CanAnswer;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46626,6 +47490,7 @@ export interface paths {
         200: Page_UserFlag;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46640,6 +47505,7 @@ export interface paths {
         401: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46650,6 +47516,7 @@ export interface paths {
         204: void;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46662,6 +47529,7 @@ export interface paths {
         200: Page_MyPermission;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46674,6 +47542,7 @@ export interface paths {
         200: Page_Pin;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46687,6 +47556,7 @@ export interface paths {
         401: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46700,6 +47570,7 @@ export interface paths {
         200: Data_Vec_Pin;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46712,6 +47583,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46724,6 +47596,7 @@ export interface paths {
         200: Page_SavedView;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46737,6 +47610,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46752,6 +47626,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46763,6 +47638,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46777,6 +47653,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46791,6 +47668,7 @@ export interface paths {
         401: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46801,6 +47679,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46814,6 +47693,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46829,6 +47709,7 @@ export interface paths {
         413: Problem;
         415: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46842,6 +47723,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46855,6 +47737,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46868,6 +47751,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46884,6 +47768,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46896,6 +47781,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46908,6 +47794,7 @@ export interface paths {
         200: Data_LibrarySummaryResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46921,6 +47808,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46934,6 +47822,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46950,6 +47839,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46961,6 +47851,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46976,6 +47867,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -46994,6 +47886,7 @@ export interface paths {
         413: Problem;
         415: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47007,6 +47900,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47023,6 +47917,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47035,6 +47930,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47071,6 +47967,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47086,6 +47983,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47103,6 +48001,7 @@ export interface paths {
         404: Problem;
         416: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47122,6 +48021,7 @@ export interface paths {
         415: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47136,6 +48036,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47150,6 +48051,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47163,6 +48065,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47176,6 +48079,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47190,6 +48094,7 @@ export interface paths {
         400: Problem;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47204,6 +48109,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47217,6 +48123,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47232,6 +48139,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47243,6 +48151,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47257,6 +48166,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47270,6 +48180,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47282,6 +48193,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47295,6 +48207,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47311,6 +48224,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47325,6 +48239,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47340,6 +48255,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         412: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47355,6 +48271,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         412: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47368,6 +48285,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -47384,6 +48302,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         412: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -47403,6 +48322,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -47420,6 +48340,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -47436,6 +48357,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -47450,6 +48372,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47461,6 +48384,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47474,6 +48398,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47487,6 +48412,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47500,6 +48426,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47516,6 +48443,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47530,6 +48458,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47543,6 +48472,7 @@ export interface paths {
         200: Data_ConfirmResponse;
         400: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47555,6 +48485,7 @@ export interface paths {
         200: Data_PublicListsResponse;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47568,6 +48499,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47580,6 +48512,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47608,6 +48541,7 @@ export interface paths {
       responses: {
         200: Data_UnsubscribeResponse;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47620,6 +48554,7 @@ export interface paths {
         200: Data_NewsletterSettingsResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47633,6 +48568,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47647,6 +48583,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47660,6 +48597,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47675,6 +48613,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47686,6 +48625,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47699,6 +48639,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47711,6 +48652,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47724,6 +48666,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47736,6 +48679,7 @@ export interface paths {
         200: Data_NotificationBranding;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47748,6 +48692,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47760,6 +48705,7 @@ export interface paths {
         200: Page_NotificationKindInfo;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47772,6 +48718,7 @@ export interface paths {
         200: Data_NotificationKindSchema;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47784,6 +48731,7 @@ export interface paths {
         200: Page_NotificationDeviceToken;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47795,6 +48743,7 @@ export interface paths {
         201: Data_NotificationDeviceToken;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47807,6 +48756,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47819,6 +48769,7 @@ export interface paths {
         200: Page_NotificationInboxItem;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47830,6 +48781,7 @@ export interface paths {
       responses: {
         200: Data_NotificationReadAll;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47841,6 +48793,7 @@ export interface paths {
       responses: {
         200: Data_NotificationUnreadCount;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47853,6 +48806,7 @@ export interface paths {
         200: Data_NotificationInboxItem;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47865,6 +48819,7 @@ export interface paths {
         200: Page_NotificationKindPreference;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47876,6 +48831,7 @@ export interface paths {
         200: Data_Vec_NotificationKindPreference;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47889,6 +48845,7 @@ export interface paths {
         201: Data_NotificationPushSubscription;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47901,6 +48858,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47914,6 +48872,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47926,6 +48885,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47939,6 +48899,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47953,6 +48914,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47965,6 +48927,7 @@ export interface paths {
       responses: {
         204: void;
         400: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -47975,6 +48938,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: Data_NotificationWebPushKey;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -47989,6 +48953,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48003,6 +48968,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48015,6 +48981,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48029,6 +48996,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48041,6 +49009,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48053,6 +49022,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48068,6 +49038,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48082,6 +49053,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48096,6 +49068,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48111,6 +49084,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48140,6 +49114,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48151,6 +49126,7 @@ export interface paths {
       responses: {
         200: Record<string, unknown>;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48164,6 +49140,7 @@ export interface paths {
         400: Problem;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48178,6 +49155,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48191,6 +49169,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48204,6 +49183,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48220,6 +49200,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48236,6 +49217,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48252,6 +49234,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48268,6 +49251,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48281,6 +49265,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48297,6 +49282,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48310,6 +49296,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48325,6 +49312,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48343,6 +49331,7 @@ export interface paths {
         409: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48356,6 +49345,7 @@ export interface paths {
         400: Problem;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48370,6 +49360,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48383,6 +49374,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48398,6 +49390,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48412,6 +49405,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48425,6 +49419,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48441,6 +49436,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48457,6 +49453,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48471,6 +49468,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48502,6 +49500,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48518,6 +49517,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48534,6 +49534,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48549,6 +49550,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48562,6 +49564,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48575,6 +49578,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48590,6 +49594,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48606,6 +49611,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48623,6 +49629,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48638,6 +49645,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48652,6 +49660,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48668,6 +49677,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48682,6 +49692,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -48712,6 +49723,7 @@ export interface paths {
         200: Data_OrdersAccessToken;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48725,6 +49737,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48741,6 +49754,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48773,6 +49787,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48787,6 +49802,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48800,6 +49816,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48832,6 +49849,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48844,6 +49862,7 @@ export interface paths {
         200: Data_OrdersPublicPayment;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48857,6 +49876,7 @@ export interface paths {
         400: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48868,6 +49888,7 @@ export interface paths {
       responses: {
         200: Data_OrdersReviewStats;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48894,6 +49915,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48907,6 +49929,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48920,6 +49943,7 @@ export interface paths {
         400: Problem;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48933,6 +49957,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48964,6 +49989,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48978,6 +50004,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -48991,6 +50018,7 @@ export interface paths {
         400: Problem;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49003,6 +50031,7 @@ export interface paths {
         200: Data_OrdersReviewCount;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49018,6 +50047,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49033,6 +50063,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49046,6 +50077,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49059,6 +50091,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49071,6 +50104,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49084,6 +50118,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49097,6 +50132,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49109,6 +50145,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49122,6 +50159,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49135,6 +50173,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49151,6 +50190,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49167,6 +50207,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49180,6 +50221,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49196,6 +50238,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49211,6 +50254,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49225,6 +50269,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49241,6 +50286,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49255,6 +50301,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49269,6 +50316,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49301,6 +50349,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49319,6 +50368,7 @@ export interface paths {
         412: Problem;
         422: Problem;
         428: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49332,6 +50382,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49345,6 +50396,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49358,6 +50410,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49373,6 +50426,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49384,6 +50438,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49398,6 +50453,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49411,6 +50467,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49424,6 +50481,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49436,6 +50494,7 @@ export interface paths {
         200: Data_PublicProfileResponse;
         400: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49448,6 +50507,7 @@ export interface paths {
         200: Data_StorefrontResponse;
         400: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49460,6 +50520,7 @@ export interface paths {
         200: Page_PublicProfileResponse;
         304: void;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49472,6 +50533,7 @@ export interface paths {
         200: Page_SettingResponse;
         401: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49485,6 +50547,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49498,6 +50561,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49513,6 +50577,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49525,6 +50590,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49538,6 +50604,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49552,6 +50619,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49565,6 +50633,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49580,6 +50649,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49594,6 +50664,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49610,6 +50681,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49623,6 +50695,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49636,6 +50709,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49650,6 +50724,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49665,6 +50740,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49676,6 +50752,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49692,6 +50769,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49705,6 +50783,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49718,6 +50797,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49733,6 +50813,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49749,6 +50830,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -49764,6 +50846,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49777,6 +50860,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49789,6 +50873,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49800,6 +50885,7 @@ export interface paths {
       responses: {
         200: Page_PlanResponse;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49811,6 +50897,7 @@ export interface paths {
       responses: {
         200: Data_EntitlementsResponse;
         401: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49823,6 +50910,7 @@ export interface paths {
         200: Page_OverrideResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49835,6 +50923,7 @@ export interface paths {
         200: Page_PlanResponse;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49848,6 +50937,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49861,6 +50951,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49876,6 +50967,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49891,6 +50983,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49904,6 +50997,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49917,6 +51011,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49930,6 +51025,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49944,6 +51040,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49957,6 +51054,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49971,6 +51069,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49984,6 +51083,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -49996,6 +51096,7 @@ export interface paths {
         400: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -50010,6 +51111,7 @@ export interface paths {
         200: Data_SignupResponse;
         400: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -50022,6 +51124,7 @@ export interface paths {
       responses: {
         200: Data_SignupResponse;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50035,6 +51138,7 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -50049,6 +51153,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50064,6 +51169,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50075,6 +51181,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50088,6 +51195,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50102,6 +51210,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -50116,6 +51225,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50131,6 +51241,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50147,6 +51258,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50161,6 +51273,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50173,6 +51286,7 @@ export interface paths {
         200: Page_PlanSubscription;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50186,6 +51300,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50199,6 +51314,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50212,6 +51328,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50225,6 +51342,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50238,6 +51356,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50251,6 +51370,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50264,6 +51384,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50278,6 +51399,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50292,6 +51414,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50307,6 +51430,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50320,6 +51444,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50333,6 +51458,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50347,6 +51473,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50360,6 +51487,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50373,6 +51501,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50403,6 +51532,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50416,6 +51546,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50428,6 +51559,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50441,6 +51573,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50454,6 +51587,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50468,6 +51602,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50480,6 +51615,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50495,6 +51631,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50508,6 +51645,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50522,6 +51660,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50535,6 +51674,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50549,6 +51689,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50562,6 +51703,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50576,6 +51718,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50590,6 +51733,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50606,6 +51750,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50619,6 +51764,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50634,6 +51780,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50648,6 +51795,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50663,6 +51811,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50677,6 +51826,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50691,6 +51841,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50705,6 +51856,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50719,6 +51871,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50734,6 +51887,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50748,6 +51902,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50764,6 +51919,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50780,6 +51936,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50794,6 +51951,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50811,6 +51969,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50824,6 +51983,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50837,6 +51997,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50850,6 +52011,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50865,6 +52027,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50880,6 +52043,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50890,6 +52054,7 @@ export interface paths {
         204: void;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50903,6 +52068,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50916,6 +52082,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50930,6 +52097,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -50944,6 +52112,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50957,6 +52126,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50972,6 +52142,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -50986,6 +52157,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -51000,6 +52172,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51013,6 +52186,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51025,6 +52199,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51038,6 +52213,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51051,6 +52227,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51066,6 +52243,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51077,6 +52255,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51090,6 +52269,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51102,6 +52282,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51117,6 +52298,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51131,6 +52313,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51144,6 +52327,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51157,6 +52341,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -51174,6 +52359,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51187,6 +52373,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51202,6 +52389,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -51216,6 +52404,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51229,6 +52418,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51242,6 +52432,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51255,6 +52446,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51268,6 +52460,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51279,6 +52472,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51292,6 +52486,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51305,6 +52500,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51318,6 +52514,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51331,6 +52528,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51344,6 +52542,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51355,6 +52554,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51371,6 +52571,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51386,6 +52587,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51399,6 +52601,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51413,6 +52616,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51426,6 +52630,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51441,6 +52646,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51454,6 +52660,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51469,6 +52676,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -51484,6 +52692,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -51499,6 +52708,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -51516,6 +52726,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51532,6 +52743,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51547,6 +52759,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51562,6 +52775,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         413: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51577,6 +52791,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         413: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51590,6 +52805,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51602,6 +52818,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51615,6 +52832,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51628,6 +52846,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51639,6 +52858,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51654,6 +52874,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51667,6 +52888,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51680,6 +52902,7 @@ export interface paths {
         200: Data_SupportAutoReplyDecision;
         401: Problem;
         403: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -51694,6 +52917,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51706,6 +52930,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51721,6 +52946,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51732,6 +52958,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51747,6 +52974,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51761,6 +52989,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51774,6 +53003,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51787,6 +53017,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51801,6 +53032,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51816,6 +53048,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51832,6 +53065,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51848,6 +53082,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51860,6 +53095,7 @@ export interface paths {
         200: Data_SupportPolicyInForce;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51872,6 +53108,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51882,6 +53119,7 @@ export interface paths {
         200: Data_SupportPolicyInForce;
         401: Problem;
         403: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51909,6 +53147,7 @@ export interface paths {
         200: Data_SupportTicketDetail;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51922,6 +53161,7 @@ export interface paths {
         200: Data_SupportAutoReply;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51936,6 +53176,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51951,6 +53192,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51966,6 +53208,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -51995,6 +53238,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52008,6 +53252,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52020,6 +53265,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52033,6 +53279,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52046,6 +53293,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52059,6 +53307,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52072,6 +53321,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52083,6 +53333,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52098,6 +53349,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52109,6 +53361,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52122,6 +53375,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52134,6 +53388,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52147,6 +53402,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52162,6 +53418,7 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52178,6 +53435,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -52194,6 +53452,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52207,6 +53466,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52220,6 +53480,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52236,6 +53497,7 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52251,6 +53513,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52265,6 +53528,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52278,6 +53542,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         502: Problem;
         503: Problem;
         default: Problem;
@@ -52293,6 +53558,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52306,6 +53572,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52319,6 +53586,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52332,6 +53600,7 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52345,6 +53614,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52358,6 +53628,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52371,6 +53642,7 @@ export interface paths {
         403: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52385,6 +53657,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52398,6 +53671,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52411,6 +53685,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52425,6 +53700,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52438,6 +53714,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52451,6 +53728,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52463,6 +53741,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52476,6 +53755,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52490,6 +53770,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52503,6 +53784,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52516,6 +53798,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52530,6 +53813,7 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52541,6 +53825,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52555,6 +53840,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52568,6 +53854,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -52599,6 +53886,7 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; };
       responses: {
         200: string;
+        429: Problem;
         default: Problem;
       };
     };

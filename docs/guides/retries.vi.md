@@ -46,6 +46,15 @@ Lưu ý:
 - Kết quả chứa secret chỉ hiện một lần (API key mới) không được giữ: gửi lại trả `409 idempotency_result_not_kept`. Xem danh sách key để biết nó đã được tạo chưa.
 - Lệnh nghiệp vụ chuyển hàng hay tiền còn nhận mã tham chiếu của riêng bạn (`reference`), duy nhất cho mỗi thao tác, để cả lần gọi lại sau 24 giờ cũng không chạy hai lần.
 
+## Giới hạn request (rate limit)
+
+Request bị giới hạn theo địa chỉ client, theo API key và theo khách (theo gói). Khi giới hạn đang bật, response mang hai header theo bản nháp IETF `draft-ietf-httpapi-ratelimit-headers-12`:
+
+- `RateLimit-Policy: "address";q=60;w=6` — chính sách: `q` request trong mỗi cửa sổ `w` giây.
+- `RateLimit: "address";a=59;w=1` — còn lại bao nhiêu: `a` request dùng được ngay, đầy lại hạn mức sau `w` giây.
+
+Gửi chậm lại khi `a` xuống thấp. Quá giới hạn thì trả `429` (code `rate_limited` hay `tenant_rate_limited`) kèm `Retry-After`: chờ chừng ấy giây rồi gọi lại; lúc đó `RateLimit` nêu chính sách đã từ chối (`address`, `api-key` hay `tenant`) với `a=0`. Health check (`/health/…`) không bao giờ bị đếm.
+
 ## Với SDK
 
 ```ts

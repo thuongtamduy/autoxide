@@ -15,7 +15,8 @@
 //!   operating in a tenant and support access are not counted either, so support can help a tenant that is
 //!   at its limit.
 //! - A write batch (`/kernel/sync/batch`) counts once, not once per command.
-//! - Over the limit: 429 `tenant_rate_limited` with `Retry-After`.
+//! - Over the limit: 429 `tenant_rate_limited` with `Retry-After` and the `RateLimit-Policy` / `RateLimit` headers
+//!   of policy `tenant`.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,7 +36,7 @@ use super::rate_limit_store::SharedCounter;
 use crate::access::{Authenticator, Principal};
 use crate::config::RateLimit;
 use crate::entitlement::{EntitlementsHandle, Limit};
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, RateLimitPolicy};
 use crate::tenancy::{DatabaseRegistry, SignedInTenant, TenantId};
 
 /// The plan's request rate of a tenant (declared by the kernel).
@@ -94,23 +95,32 @@ impl TenantLimiter {
         Ok((self.default.per_minute > 0).then_some(self.default))
     }
 
-    /// Counts one request of tenant `tenant`.
-    pub(super) async fn check(&self, tenant: SignedInTenant) -> Result<Decision, Error> {
+    /// Counts one request of tenant `tenant`: over the limit, the 429 `tenant_rate_limited` error (with the
+    /// `tenant` rate limit policy).
+    pub(super) async fn admit(&self, tenant: SignedInTenant) -> Result<(), Error> {
         let tenant = tenant.id();
-        let Some(level) = self.level(tenant).await? else { return Ok(Decision::Allow) };
+        let Some(level) = self.level(tenant).await? else { return Ok(()) };
         if level.per_minute == 0 {
             // Gói đặt 0: không request nào qua.
-            return Ok(Decision::Deny(Duration::from_secs(60)));
+            let policy = RateLimitPolicy { name: "tenant", quota: 0, window: 60 };
+            return Err(tenant_rate_limited(Duration::from_secs(60)).with_rate_limit(policy));
         }
-        match &self.store {
+        let (decision, policy) = match &self.store {
             Some(registry) => {
-                let counter = self.counter(level, registry);
-                Ok(match counter {
+                let decision = match self.counter(level, registry) {
                     Some(counter) => counter.check(tenant, Uuid::nil()).await,
                     None => Decision::Allow,
-                })
+                };
+                (decision, super::rate_limit_headers::window_policy("tenant", level))
             }
-            None => Ok(self.check_memory(tenant, level, Instant::now())),
+            None => (
+                self.check_memory(tenant, level, Instant::now()),
+                super::rate_limit_headers::gcra_policy("tenant", level),
+            ),
+        };
+        match decision {
+            Decision::Allow => Ok(()),
+            Decision::Deny(wait) => Err(tenant_rate_limited(wait).with_rate_limit(policy)),
         }
     }
 
@@ -201,10 +211,8 @@ pub(crate) async fn limit(limiter: Arc<TenantLimiter>, request: Request, next: N
             Err(error) => return error.into_response(),
         };
         if let Some(tenant) = tenant {
-            match limiter.check(tenant).await {
-                Ok(Decision::Allow) => {}
-                Ok(Decision::Deny(wait)) => return tenant_rate_limited(wait).into_response(),
-                Err(error) => return error.into_response(),
+            if let Err(error) = limiter.admit(tenant).await {
+                return error.into_response();
             }
             parts.extensions.insert(Counted);
         }

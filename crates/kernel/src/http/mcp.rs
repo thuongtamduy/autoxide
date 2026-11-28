@@ -426,13 +426,7 @@ impl McpServer {
         let budget = super::tenant_rate_limit::budget_tenant(&caller.principal);
         let started = std::time::Instant::now();
         let limited = match (&self.tenant_limiter, budget) {
-            (Some(limiter), Some(tenant)) => match limiter.check(tenant).await {
-                Ok(super::rate_limit::Decision::Deny(wait)) => {
-                    Some(super::tenant_rate_limit::tenant_rate_limited(wait))
-                }
-                Ok(super::rate_limit::Decision::Allow) => None,
-                Err(error) => Some(error),
-            },
+            (Some(limiter), Some(tenant)) => limiter.admit(tenant).await.err(),
             _ => None,
         };
         // Hạn mức `kernel.api_requests` kiểm và đếm trong `call_tool`, sau các chốt của gói: lời gọi bị từ chối

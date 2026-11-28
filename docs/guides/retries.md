@@ -46,6 +46,15 @@ Notes:
 - A result that holds a secret shown once (a new API key) is not kept: a repeat answers `409 idempotency_result_not_kept`. Read the key list to see whether it was created.
 - Business commands that move goods or money also take a reference of your own (`reference`), unique per operation, so even a retry after 24 hours is not done twice.
 
+## Rate limits
+
+Requests are limited per client address, per API key and per tenant (from its plan). While limits are on, responses carry two headers from the IETF draft `draft-ietf-httpapi-ratelimit-headers-12`:
+
+- `RateLimit-Policy: "address";q=60;w=6` — the policy: `q` requests per window of `w` seconds.
+- `RateLimit: "address";a=59;w=1` — what is left: `a` requests available now, the whole quota back in `w` seconds.
+
+Slow down when `a` gets low. Past the limit the answer is `429` (code `rate_limited` or `tenant_rate_limited`) with `Retry-After`: wait that many seconds before retrying; `RateLimit` then names the policy that refused you (`address`, `api-key` or `tenant`) with `a=0`. Health checks (`/health/…`) are never counted.
+
 ## With the SDK
 
 ```ts
