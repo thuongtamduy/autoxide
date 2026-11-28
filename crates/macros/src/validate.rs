@@ -129,7 +129,7 @@ fn check(rule: &str, bounds: &Bounds, call: TokenStream, field_name: &str) -> To
         Some(message) => quote!(::std::option::Option::Some(#message)),
         None => quote!(::std::option::Option::None),
     };
-    let params = bounds.values.iter().map(|(name, value)| quote!((#name, check::json!(#value))));
+    let params = bounds.values.iter().map(|(name, value)| quote!((#name, check::param(&(#value)))));
     quote! {
         if !#call {
             errors.fail(#field_name, #code, #message, &[#(#params),*]);
@@ -158,13 +158,19 @@ fn is_vec(ty: &syn::Type) -> bool {
     }
 }
 
-fn cast_u64(value: TokenStream) -> TokenStream {
-    // `Some(1)` / `None` -> `Some((1) as u64)`; hằng kiểu `usize` của module cũng dùng được.
-    let text = value.to_string();
-    if text.contains("None") {
-        return value;
+// Cận của `length`: số nguyên viết thẳng thành `u64`; hằng hay biểu thức qua `check::length_bound` (chỉ nhận kiểu
+// số nguyên không dấu — cận âm hay số lẻ là lỗi biên dịch, như với `validator`).
+fn length_bound(bounds: &Bounds, name: &str) -> TokenStream {
+    match bounds.values.iter().find(|(key, _)| key == name) {
+        None => quote!(::std::option::Option::None),
+        Some((_, Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(int), .. }))) => {
+            match int.base10_parse::<u64>() {
+                Ok(value) => quote!(::std::option::Option::Some(#value)),
+                Err(error) => error.to_compile_error(),
+            }
+        }
+        Some((_, value)) => quote!(::std::option::Option::Some(check::length_bound(#value))),
     }
-    quote!(#value.map(|bound| bound as u64))
 }
 
 fn some_or_none(bounds: &Bounds, name: &str) -> TokenStream {
@@ -222,9 +228,9 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         let reference = if depth > 0 { quote!(#ident) } else { quote!(&self.#ident) };
         if let Some(bounds) = &rules.length {
             let (min, max, equal) = (
-                cast_u64(some_or_none(bounds, "min")),
-                cast_u64(some_or_none(bounds, "max")),
-                cast_u64(some_or_none(bounds, "equal")),
+                length_bound(bounds, "min"),
+                length_bound(bounds, "max"),
+                length_bound(bounds, "equal"),
             );
             let call = quote!(check::length(#reference, #min, #max, #equal));
             field_checks.push(check("length", bounds, call, &field_name));

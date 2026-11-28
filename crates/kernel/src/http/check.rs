@@ -1,6 +1,25 @@
 //! What `#[derive(Validate)]` calls: the five rules (`length`, `range`, `email`, `url`, `nested`) and the error
 //! collector. Hidden (`__private::check`): only generated code uses it, so the rules and their errors live in the
 //! kernel and not in a library a module would have to declare (D-20261128-library-layer-plan, item 2).
+//!
+//! A `length` bound is an unsigned integer; a negative one does not compile:
+//!
+//! ```compile_fail
+//! # use autoxide_kernel::http::Validate;
+//! #[derive(Validate)]
+//! struct New { #[validate(length(min = -1))] title: String }
+//! ```
+//!
+//! Control (a literal, a `usize` constant, a block):
+//!
+//! ```
+//! # use autoxide_kernel::http::Validate;
+//! const MAX: usize = 20;
+//! #[derive(Validate)]
+//! struct New { #[validate(length(min = 1, max = MAX))] title: String, #[validate(length(max = { MAX }))] body: String }
+//! assert!(New { title: "a".into(), body: String::new() }.check().is_ok());
+//! assert!(New { title: String::new(), body: String::new() }.check().is_err());
+//! ```
 
 // Ghi chú cho chủ dự án: trước đây derive của kernel sinh mã của thư viện `validator`. Giờ nó gọi các hàm ở đây;
 // lỗi trả về giữ nguyên (mã, tham số, câu, đường dẫn trường) vì cùng đi qua `error::describe_field`. Bên trong,
@@ -14,12 +33,12 @@ use serde_json::Value;
 
 use crate::error::{Error, FieldError, describe_field};
 
-pub use serde_json::json;
-
 /// The errors of one input, collected field by field.
 #[derive(Debug, Default)]
 pub struct Errors {
     fields: Vec<FieldError>,
+    // Lỗi không phải lỗi đầu vào từ một `Validate` viết tay lồng bên trong: trả nguyên, không đổi thành lỗi trường.
+    other: Option<Error>,
 }
 
 impl Errors {
@@ -63,8 +82,9 @@ impl Errors {
         let Err(error) = result else { return };
         let fields = error.fields();
         if fields.is_empty() {
-            // Không phải lỗi đầu vào (không nên xảy ra với derive): giữ lại dưới tên trường thay vì bỏ lặng lẽ.
-            self.fields.push(FieldError::new(prefix.to_owned(), "invalid", "is not valid"));
+            if self.other.is_none() {
+                self.other = Some(error);
+            }
             return;
         }
         for inner in fields {
@@ -76,6 +96,9 @@ impl Errors {
 
     /// `Ok` when nothing failed, otherwise `validation_failed` with every field (sorted, as before).
     pub fn finish(mut self) -> Result<(), Error> {
+        if let Some(other) = self.other {
+            return Err(other);
+        }
         if self.fields.is_empty() {
             return Ok(());
         }
@@ -153,10 +176,39 @@ pub fn range<T: PartialOrd>(
     exclusive_min: Option<T>,
     exclusive_max: Option<T>,
 ) -> bool {
-    min.is_none_or(|min| value >= min)
-        && max.is_none_or(|max| value <= max)
+    // Như `validator` (`!(v < min)`): không so được (NaN) thì qua cận đóng, như trước.
+    use std::cmp::Ordering;
+    min.is_none_or(|min| value.partial_cmp(&min) != Some(Ordering::Less))
+        && max.is_none_or(|max| value.partial_cmp(&max) != Some(Ordering::Greater))
         && exclusive_min.is_none_or(|min| value > min)
         && exclusive_max.is_none_or(|max| value < max)
+}
+
+/// A rule's bound as an error parameter (JSON).
+pub fn param<T: serde::Serialize + ?Sized>(value: &T) -> Value {
+    serde_json::to_value(value).unwrap_or(Value::Null)
+}
+
+/// Bounds `length(…)` accepts: unsigned integers (a negative or fractional bound does not compile).
+pub trait LengthBound {
+    fn to_u64(self) -> u64;
+}
+
+macro_rules! length_bounds {
+    ($($ty:ty),*) => {$(
+        impl LengthBound for $ty {
+            fn to_u64(self) -> u64 {
+                u64::try_from(self).unwrap_or(u64::MAX)
+            }
+        }
+    )*};
+}
+
+length_bounds!(u8, u16, u32, u64, usize);
+
+/// A `length(…)` bound written as a constant or an expression.
+pub fn length_bound(bound: impl LengthBound) -> u64 {
+    bound.to_u64()
 }
 
 /// `email`: the HTML5 rule (an address `<input type="email">` accepts), as before.
@@ -182,6 +234,12 @@ mod tests {
     }
 
     #[test]
+    fn nan_qua_can_dong_nhu_validator() {
+        assert!(range(f64::NAN, Some(-0.5), Some(0.5), None, None));
+        assert!(!range(f64::NAN, None, None, Some(0.0), None));
+    }
+
+    #[test]
     fn range_bien_mo_va_dong() {
         assert!(range(5, Some(1), Some(5), None, None));
         assert!(!range(5, None, None, None, Some(5)));
@@ -191,7 +249,7 @@ mod tests {
     #[test]
     fn loi_long_nhau_co_tien_to_va_sap_xep() {
         let mut errors = Errors::new();
-        errors.fail("title", "length", None, &[("max", json!(5)), ("value", json!("toolong"))]);
+        errors.fail("title", "length", None, &[("max", param(&5))]);
         assert!(errors.has("title"));
         let Err(error) = errors.finish() else { panic!("expected an error") };
         let field = &error.fields()[0];
