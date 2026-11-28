@@ -648,9 +648,16 @@ impl IdentityVerifier for GuardedIdentity {
         if !provider_reference.starts_with(IDENTITY_PREFIX) {
             return self.inner.fetch(provider_reference).await;
         }
+        // Đủ mục người bán của NĐ 248/2026 Điều 18 (quy tắc `kyc.required_activities` từ 01/01/2027): luồng thử
+        // ở sandbox không hỏng từ ngày đó.
         let mut outcome = VerificationOutcome::new(provider_reference, OutcomeStatus::Verified)
             .verified_name("Sandbox")
-            .assurance("sandbox");
+            .assurance("sandbox")
+            .address("Sandbox address")
+            .representative("Sandbox");
+        if let (Some(birth), Some(until)) = (Date::new(1990, 1, 1), Date::new(2099, 12, 31)) {
+            outcome = outcome.birth_date(birth).document_validity("VN", until);
+        }
         outcome.expires_at = Some(Timestamp::now() + SignedDuration::from_hours(24 * 30));
         Ok(outcome)
     }

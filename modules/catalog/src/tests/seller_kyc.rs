@@ -127,3 +127,91 @@ async fn khong_phai_san_khong_co_compliance_mo_ban_duoc() {
     .await
     .unwrap();
 }
+
+/// `KycGate` giả bật / tắt được: tắt thì mọi người bán bị từ chối như `compliance` thật.
+#[derive(Default)]
+struct Switch(std::sync::atomic::AtomicBool);
+
+#[async_trait::async_trait]
+impl KycGate for Switch {
+    async fn require_verified(
+        &self,
+        _tenant: TenantId,
+        _subject: Subject,
+        activity: Activity,
+    ) -> Result<(), Error> {
+        if self.0.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(autoxide_compliance::api::testing::kyc_required(activity));
+        }
+        Ok(())
+    }
+
+    async fn status(&self, _tenant: TenantId, _subject: Subject) -> Result<KycStatus, Error> {
+        Err(Error::internal("not used in this test"))
+    }
+
+    async fn start(
+        &self,
+        _tenant: TenantId,
+        _subject: Subject,
+        _party: PartyType,
+        _return_url: Option<String>,
+    ) -> Result<KycSession, Error> {
+        Err(Error::internal("not used in this test"))
+    }
+}
+
+async fn status_of(app: &TestApp, id: &str) -> Value {
+    let (_, read) = call(app, "GET", &format!("/products/{id}"), "boss", None).await;
+    read["data"]["status"].clone()
+}
+
+/// Người bán không còn định danh (hết hạn, bị thu hồi, quy tắc mới bắt đầu áp dụng): job hằng ngày
+/// `catalog.seller_kyc_sweep` chuyển hàng đang bán của họ sang `inactive`, phát `catalog.product_status_changed`;
+/// hàng của chính sàn không bị đụng; chạy lại không đổi gì thêm (LG-3b). Khách không phải sàn không bị quét.
+#[tokio::test]
+async fn san_dung_hang_cua_nguoi_ban_khong_con_dinh_danh() {
+    for model in ["marketplace", "multi_store"] {
+        TestDatabase::run(async |test| {
+            let switch = Arc::new(Switch::default());
+            let gate: Arc<dyn KycGate> = switch.clone();
+            let (app, tree) = app_with(test, |builder| builder.provide(gate)).await;
+            business_model(&app, model).await;
+            let (seller, _) = create_product(&app, "boss", tree.a, "K-1", "Hàng người bán").await;
+            // Thêm hàng của người bán để việc đọc đi qua nhiều trang (trang 2 sản phẩm khi test).
+            let (second, _) = create_product(&app, "boss", tree.a, "K-3", "Hàng người bán 2").await;
+            let (other, _) =
+                create_product(&app, "boss", tree.b, "K-4", "Hàng người bán khác").await;
+            let root = autoxide_kernel::tenancy::root_of(DEFAULT_TENANT);
+            let (own, _) = create_product(&app, "boss", root, "K-2", "Hàng của sàn").await;
+            for id in [&seller, &second, &other, &own] {
+                let (status, sold) = publish(&app, id).await;
+                assert_eq!(status, StatusCode::OK, "{sold}");
+            }
+            switch.0.store(true, std::sync::atomic::Ordering::SeqCst);
+            let worker = app.modules().worker(16).unwrap().blocked_delay(std::time::Duration::ZERO);
+            worker.run_once().await.unwrap();
+            let expected = if model == "marketplace" { "inactive" } else { "active" };
+            for id in [&seller, &second, &other] {
+                assert_eq!(status_of(&app, id).await, expected, "{model}");
+            }
+            assert_eq!(status_of(&app, &own).await, "active", "{model}");
+            let changes = || async {
+                use sea_orm::ConnectionTrait as _;
+                let read = app.database().read();
+                let sql =
+                    "SELECT id FROM catalog_events WHERE name = 'catalog.product_status_changed'";
+                let statement = sea_orm::Statement::from_string(read.get_database_backend(), sql);
+                read.query_all_raw(statement).await.unwrap().len()
+            };
+            // Mở bán bốn lần, cộng ba lần dừng trên sàn.
+            let before = changes().await;
+            assert_eq!(before, if model == "marketplace" { 7 } else { 4 }, "{model}");
+            // Lượt quét sau (như event đến lại): không còn gì để đổi.
+            worker.run_once().await.unwrap();
+            assert_eq!(changes().await, before, "{model}");
+        })
+        .await
+        .unwrap();
+    }
+}

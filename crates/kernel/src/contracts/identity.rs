@@ -3,10 +3,11 @@
 //! any specific provider. A provider's adapter is its own module that publishes
 //! `context.provide::<dyn IdentityVerifier>(...)`. Tests use `FakeIdentityVerifier` from the testkit.
 //!
-//! Minimal storage (Personal Data Protection Law 91/2025): `compliance` stores only the result, the reference
-//! code, the verified name, and a hash plus the last 4 digits of the document number; it stores no face images
-//! or biometric data.
-use crate::time::Timestamp;
+//! Minimal storage (Personal Data Protection Law 91/2025): `compliance` stores the result, the reference code,
+//! the verified name, a hash plus the last 4 digits of the document number, and the seller items a marketplace must
+//! verify (Vietnam's Decree 248/2026 Article 18: date of birth, address, legal representative, issuing country and
+//! end date of the document); it stores no face images or biometric data.
+use crate::time::{Date, Timestamp};
 use uuid::Uuid;
 
 use crate::error::{Error, ErrorKind};
@@ -160,6 +161,16 @@ pub struct VerificationOutcome {
     /// Assurance level, e.g. `vneid_level_2`.
     pub assurance: Option<String>,
     pub expires_at: Option<Timestamp>,
+    /// Date of birth of a verified individual.
+    pub birth_date: Option<Date>,
+    /// Address (an individual's) or head office (an organization's, a household business's).
+    pub address: Option<String>,
+    /// Legal representative of an organization or a household business.
+    pub representative_name: Option<String>,
+    /// Country that issued the document, ISO 3166-1 alpha-2 (`VN`, `US`, ...).
+    pub document_country: Option<String>,
+    /// Last day the document is valid (a passport must stay valid long enough; see the `compliance` rule).
+    pub document_expires_on: Option<Date>,
 }
 
 impl VerificationOutcome {
@@ -172,6 +183,11 @@ impl VerificationOutcome {
             document_number: None,
             assurance: None,
             expires_at: None,
+            birth_date: None,
+            address: None,
+            representative_name: None,
+            document_country: None,
+            document_expires_on: None,
         }
     }
 
@@ -191,6 +207,35 @@ impl VerificationOutcome {
     #[must_use]
     pub fn assurance(mut self, assurance: impl Into<String>) -> Self {
         self.assurance = Some(assurance.into());
+        self
+    }
+
+    /// Date of birth of a verified individual.
+    #[must_use]
+    pub fn birth_date(mut self, date: Date) -> Self {
+        self.birth_date = Some(date);
+        self
+    }
+
+    /// Address of an individual, head office of an organization or a household business.
+    #[must_use]
+    pub fn address(mut self, address: impl Into<String>) -> Self {
+        self.address = Some(address.into());
+        self
+    }
+
+    /// Legal representative of an organization or a household business.
+    #[must_use]
+    pub fn representative(mut self, name: impl Into<String>) -> Self {
+        self.representative_name = Some(name.into());
+        self
+    }
+
+    /// Issuing country (ISO 3166-1 alpha-2) and last valid day of the document.
+    #[must_use]
+    pub fn document_validity(mut self, country: impl Into<String>, expires_on: Date) -> Self {
+        self.document_country = Some(country.into());
+        self.document_expires_on = Some(expires_on);
         self
     }
 }

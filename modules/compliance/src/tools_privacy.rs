@@ -230,7 +230,7 @@ pub(crate) fn all(service: &Arc<ComplianceService>) -> Vec<Tool> {
         Tool::new(
             "subject_requests",
             "List the requests of data subjects received by email, post, phone or from an \
-             authority, with their due date (`overdue` for those late).",
+             authority, with their deadlines to answer (`due_at`) and to carry out (`fulfil_due_at`); `overdue` for those late.",
             move |tenant: TenantContext, principal: Principal, input: DeadlineInput| {
                 let service = requests.clone();
                 async move {

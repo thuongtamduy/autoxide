@@ -3826,6 +3826,23 @@ export type ComplianceIncidentRequest = {
   title: string;
 };
 
+/**
+ * Seller details checked against the documents (Vietnam's Decree 248/2026 Article 18). An omitted field keeps
+ * its value.
+ */
+export type ComplianceKycDetailsRequest = {
+  /** Address, or head office of an organization or a household business; 1 to 500 characters. */
+  address?: string | null;
+  /** Date of birth of an individual, `YYYY-MM-DD`, not in the future. */
+  birth_date?: string | null;
+  /** Country that issued the document, ISO 3166-1 alpha-2 (`VN`, `US`…). */
+  document_country?: string | null;
+  /** Last day the document is valid, `YYYY-MM-DD`. */
+  document_expires_on?: string | null;
+  /** Legal representative of an organization or a household business; 1 to 200 characters. */
+  representative_name?: string | null;
+};
+
 /** Files for a manual review. */
 export type ComplianceKycDocumentsRequest = {
   /** Ids of files uploaded with `POST /api/v1/files` (ID card, business registration), 1 to 10. */
@@ -3842,8 +3859,16 @@ export type ComplianceKycInfoRequest = {
 
 /** An identity verification (KYC) profile. */
 export type ComplianceKycProfile = {
+  /** Address, or head office of an organization or a household business. */
+  address?: string | null;
   assurance?: string | null;
+  /** Date of birth of an individual (`YYYY-MM-DD`). Seller detail of Vietnam's Decree 248/2026 Article 18. */
+  birth_date?: string | null;
   created_at: string;
+  /** Country that issued the document (ISO 3166-1 alpha-2). */
+  document_country?: string | null;
+  /** Last day the document is valid (`YYYY-MM-DD`); the profile never stays verified past it. */
+  document_expires_on?: string | null;
   /** Files sent for a manual review. */
   document_file_ids: string[];
   document_kind?: string | null;
@@ -3863,6 +3888,8 @@ export type ComplianceKycProfile = {
   party_type: string;
   provider?: string | null;
   reason_code?: string | null;
+  /** Legal representative of an organization or a household business. */
+  representative_name?: string | null;
   /** What the reviewer wrote to the person when refusing or revoking. */
   review_note?: string | null;
   /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
@@ -4364,14 +4391,23 @@ export type ComplianceSubjectRequest = {
   channel: string;
   closed_at?: string | null;
   created_at: string;
-  /** Answer before this time (legal rule `privacy.subject_requests`). */
+  /** Answer (acknowledge) before this time (legal rule `privacy.subject_requests`, `respond_within_hours`). */
   due_at: string;
+  /**
+   * Carry the request out before this time (legal rule `privacy.subject_requests`, `fulfil_within_days` of the
+   * kind, in calendar days unless the rule says `working_days`); `null` for a request recorded before deadlines
+   * to fulfil were kept, or when the rule sets none for the kind.
+   */
+  fulfil_due_at?: string | null;
   handled_by?: string | null;
   id: string;
   /** `access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`. */
   kind: string;
   notes?: string | null;
-  /** `true` while not done and past `due_at`. */
+  /**
+   * `true` while still `received` past `due_at`, or not done (`received`, `in_progress`) past
+   * `fulfil_due_at`.
+   */
   overdue: boolean;
   reason?: string | null;
   received_at: string;
@@ -7701,8 +7737,16 @@ export type Data_ComplianceIncidentEntry = {
 export type Data_ComplianceKycProfile = {
   /** An identity verification (KYC) profile. */
   data: {
+    /** Address, or head office of an organization or a household business. */
+    address?: string | null;
     assurance?: string | null;
+    /** Date of birth of an individual (`YYYY-MM-DD`). Seller detail of Vietnam's Decree 248/2026 Article 18. */
+    birth_date?: string | null;
     created_at: string;
+    /** Country that issued the document (ISO 3166-1 alpha-2). */
+    document_country?: string | null;
+    /** Last day the document is valid (`YYYY-MM-DD`); the profile never stays verified past it. */
+    document_expires_on?: string | null;
     /** Files sent for a manual review. */
     document_file_ids: string[];
     document_kind?: string | null;
@@ -7722,6 +7766,8 @@ export type Data_ComplianceKycProfile = {
     party_type: string;
     provider?: string | null;
     reason_code?: string | null;
+    /** Legal representative of an organization or a household business. */
+    representative_name?: string | null;
     /** What the reviewer wrote to the person when refusing or revoking. */
     review_note?: string | null;
     /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
@@ -7956,14 +8002,23 @@ export type Data_ComplianceSubjectRequest = {
     channel: string;
     closed_at?: string | null;
     created_at: string;
-    /** Answer before this time (legal rule `privacy.subject_requests`). */
+    /** Answer (acknowledge) before this time (legal rule `privacy.subject_requests`, `respond_within_hours`). */
     due_at: string;
+    /**
+     * Carry the request out before this time (legal rule `privacy.subject_requests`, `fulfil_within_days` of the
+     * kind, in calendar days unless the rule says `working_days`); `null` for a request recorded before deadlines
+     * to fulfil were kept, or when the rule sets none for the kind.
+     */
+    fulfil_due_at?: string | null;
     handled_by?: string | null;
     id: string;
     /** `access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`. */
     kind: string;
     notes?: string | null;
-    /** `true` while not done and past `due_at`. */
+    /**
+     * `true` while still `received` past `due_at`, or not done (`received`, `in_progress`) past
+     * `fulfil_due_at`.
+     */
     overdue: boolean;
     reason?: string | null;
     received_at: string;
@@ -21962,8 +22017,16 @@ export type Page_ComplianceIncident = {
 export type Page_ComplianceKycProfile = {
   /** The items of this page, in the requested order. */
   data: {
+    /** Address, or head office of an organization or a household business. */
+    address?: string | null;
     assurance?: string | null;
+    /** Date of birth of an individual (`YYYY-MM-DD`). Seller detail of Vietnam's Decree 248/2026 Article 18. */
+    birth_date?: string | null;
     created_at: string;
+    /** Country that issued the document (ISO 3166-1 alpha-2). */
+    document_country?: string | null;
+    /** Last day the document is valid (`YYYY-MM-DD`); the profile never stays verified past it. */
+    document_expires_on?: string | null;
     /** Files sent for a manual review. */
     document_file_ids: string[];
     document_kind?: string | null;
@@ -21983,6 +22046,8 @@ export type Page_ComplianceKycProfile = {
     party_type: string;
     provider?: string | null;
     reason_code?: string | null;
+    /** Legal representative of an organization or a household business. */
+    representative_name?: string | null;
     /** What the reviewer wrote to the person when refusing or revoking. */
     review_note?: string | null;
     /** `draft`, `pending`, `needs_info`, `verified`, `rejected`, `expired` or `revoked`. */
@@ -22178,14 +22243,23 @@ export type Page_ComplianceSubjectRequest = {
     channel: string;
     closed_at?: string | null;
     created_at: string;
-    /** Answer before this time (legal rule `privacy.subject_requests`). */
+    /** Answer (acknowledge) before this time (legal rule `privacy.subject_requests`, `respond_within_hours`). */
     due_at: string;
+    /**
+     * Carry the request out before this time (legal rule `privacy.subject_requests`, `fulfil_within_days` of the
+     * kind, in calendar days unless the rule says `working_days`); `null` for a request recorded before deadlines
+     * to fulfil were kept, or when the rule sets none for the kind.
+     */
+    fulfil_due_at?: string | null;
     handled_by?: string | null;
     id: string;
     /** `access`, `erasure`, `rectification`, `objection`, `restriction` or `withdrawal`. */
     kind: string;
     notes?: string | null;
-    /** `true` while not done and past `due_at`. */
+    /**
+     * `true` while still `received` past `due_at`, or not done (`received`, `in_progress`) past
+     * `fulfil_due_at`.
+     */
     overdue: boolean;
     reason?: string | null;
     received_at: string;
@@ -39209,6 +39283,22 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/compliance/kyc/profiles/{id}/details": {
+    /** Record seller details of a profile. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ComplianceKycDetailsRequest;
+      responses: {
+        200: Data_ComplianceKycProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

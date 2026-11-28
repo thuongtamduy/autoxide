@@ -251,3 +251,15 @@ impl ConsentLedger for FakeConsentLedger {
             .map(|record| record.consent.clone()))
     }
 }
+
+/// The error the real gate returns when `activity` needs a verified identity the subject does not have
+/// (`compliance.kyc_required`, 403), for a fake `KycGate` in another module's tests.
+pub fn kyc_required(activity: super::Activity) -> Error {
+    Error::new(
+        autoxide_kernel::error::ErrorKind::Forbidden,
+        "compliance.kyc_required",
+        "A verified identity is required to {activity}; the verification profile is `{profile_status}`.",
+    )
+    .with_param("activity", activity.as_str())
+    .with_param("profile_status", "none")
+}

@@ -584,10 +584,13 @@ impl OrdersService {
     async fn create_order(&self, tenant: &TenantContext, draft: &Draft<'_>) -> Result<(), Error> {
         let database = tenant.database();
         let outbox = &self.outbox;
+        // Năm của số đơn theo ngày của người bán (#575 N4): tính trước transaction ghi, cùng thời điểm.
+        let placed = crate::service::now();
+        let year = self.local_year(tenant, draft.org, placed).await?;
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
-                let now = crate::service::now();
+                let now = placed;
                 // Đóng giỏ TRƯỚC, có điều kiện giỏ còn mở (D-181): hai lần đặt khác
                 // `Idempotency-Key` trên cùng giỏ từng cùng qua bước kiểm (ngoài transaction) và ra
                 // hai đơn (cả hai DB). Bên sau không đổi được dòng giỏ → huỷ cả transaction.
@@ -603,7 +606,6 @@ impl OrdersService {
                 if closed.rows_affected == 0 {
                     return Err(errors::cart_closed());
                 }
-                let year = now.date_utc().year();
                 let sequence =
                     numbering::next(&transaction, tenant.id(), &format!("orders.order:{year}"))
                         .await?;
