@@ -4,7 +4,7 @@ Tiếng Anh: [`authentication.md`](authentication.md). Ví dụ dùng `curl` v�
 
 ## Đăng nhập
 
-Gửi email và mật khẩu. Câu trả lời có **access token** sống ngắn (gửi kèm mọi request) và **refresh token** (để lấy cặp kế tiếp). Tài khoản bật xác thực hai bước thì trả `202` kèm `challenge_id`; hoàn tất bằng `POST /api/v1/auth/login/mfa` với mã.
+Gửi email và mật khẩu. Câu trả lời có **access token** sống ngắn (gửi kèm mọi request) và **refresh token** (để lấy cặp kế tiếp). Tài khoản bật xác thực hai bước thì trả `202` kèm `mfa_token` (cùng `methods`, `expires_in`); hoàn tất bằng `POST /api/v1/auth/login/mfa` với `{"mfa_token": …, "code": …}`, trong đó `code` là mã 6 số của ứng dụng xác thực hoặc một recovery code chưa dùng. `mfa_token` cho thử vài lần trong `expires_in` giây và hết hiệu lực khi một mã được nhận; sau đó nó trả `401 auth.invalid_mfa_token` (đăng nhập lại). Mã sai trả `401 auth.invalid_mfa_code`. Mã đã được nhận một lần thì không dùng lại được trong cửa sổ 30 giây của nó, mã cũ hơn cũng vậy — đăng nhập hai lần liền nhau thì chờ mã kế tiếp. (`challenge_id` là của đăng nhập bằng số điện thoại, bên dưới.)
 
 Trên máy chủ phục vụ nhiều khách, đăng nhập trên tên miền của khách hoặc kèm header `Autoxide-Tenant`. Token nhận được ghi sẵn khách của nó, nên các request sau — bằng access token, `/refresh`, `/logout`, `/login/mfa`, và link trong mail đặt lại mật khẩu hay xác minh email — không cần header hay tên miền nữa. Gửi token kèm header (hay tên miền) của khách khác thì bị từ chối.
 
@@ -146,4 +146,26 @@ console.log(me.email, me.permissions);
 
 const next = await api.post("/api/v1/auth/refresh", { body: { refresh_token: tokens.refresh } });
 tokens = { access: next.access_token, refresh: next.refresh_token };
+```
+
+Hoặc để client tự refresh: có hàm `refresh`, request gặp `401 auth.token_expired` sẽ chờ một lần refresh — dùng
+chung cho mọi request lỗi cùng lúc, vì refresh token chỉ dùng được một lần — rồi được gửi lại.
+[Dựng ứng dụng web](web-app.vi.md) có cách làm đầy đủ, gồm cả lưu token và nhiều tab.
+
+```ts
+import { createClient } from "@autoxide/sdk";
+
+let tokens = { access: "", refresh: "" };
+const signIn = createClient({ baseUrl: "https://api.example.com" });
+const api = createClient({
+  baseUrl: "https://api.example.com",
+  token: () => tokens.access,
+  refresh: async () => {
+    const next = await signIn.post("/api/v1/auth/refresh", { body: { refresh_token: tokens.refresh } });
+    tokens = { access: next.access_token, refresh: next.refresh_token };
+  },
+});
+
+const me = await api.get("/api/v1/auth/me");
+console.log(me.all_permissions || me.permissions.includes("content.write"));
 ```
