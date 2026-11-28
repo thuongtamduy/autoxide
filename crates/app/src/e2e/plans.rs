@@ -162,7 +162,7 @@ async fn dem_request_api_va_het_quota_tra_429() {
         // Ghi gộp: 3 > 2 → hết quota; request sau của module bị gói chi phối trả 429.
         let entitlements = app.modules().entitlements();
         entitlements.flush_usage("test-node", 1).await;
-        assert!(entitlements.request_quota_wait(acme).is_some());
+        assert!(entitlements.request_quota_wait(signed_in(acme)).is_some());
         let (status, body) = call(&app, Method::GET, "/api/v1/forms", "owner", None).await;
         assert_eq!(
             (status, body["code"].as_str()),
@@ -199,7 +199,7 @@ async fn tool_bi_goi_tu_choi_khong_tieu_quota() {
         }
         let entitlements = app.modules().entitlements();
         entitlements.flush_usage("test-node", 1).await;
-        assert!(entitlements.request_quota_wait(acme).is_none());
+        assert!(entitlements.request_quota_wait(signed_in(acme)).is_none());
     })
     .await
     .unwrap();
@@ -223,7 +223,7 @@ async fn request_bi_429_khong_tieu_quota() {
         // Chỉ một request được đếm (1 ≤ 2): chưa hết lượng.
         let entitlements = app.modules().entitlements();
         entitlements.flush_usage("test-node", 1).await;
-        assert!(entitlements.request_quota_wait(acme).is_none());
+        assert!(entitlements.request_quota_wait(signed_in(acme)).is_none());
     })
     .await
     .unwrap();
@@ -529,4 +529,12 @@ async fn cap_phat_khach_moi_voi_module_that() {
     })
     .await
     .unwrap();
+}
+
+// Khách chịu hạn mức của một người gọi đã đăng nhập vào `tenant` (hạn mức chỉ nhận khách của người đã xác thực).
+fn signed_in(tenant: TenantId) -> autoxide_kernel::tenancy::SignedInTenant {
+    let principal =
+        autoxide_kernel::access::Principal::new(uuid::Uuid::nil(), Vec::<String>::new())
+            .in_tenant(tenant);
+    autoxide_kernel::tenancy::SignedInTenant::of(&principal).expect("a member counts")
 }

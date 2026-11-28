@@ -929,6 +929,7 @@ impl Module for KernelModule {
             key.clone(),
             self.seeds.clone(),
             self.request_timeout,
+            self.settings.clone(),
         )?;
         let exports = Arc::new(crate::tenancy::TenantExports::new(
             context.tenancy().clone(),
@@ -954,6 +955,10 @@ impl Module for KernelModule {
         self.migration_runs = Some(runs.clone());
         context.provide::<crate::tenancy::PlacementMigrationQueue>(Arc::new(
             crate::tenancy::PlacementMigrationQueue::new(runs),
+        ))?;
+        // Một hệ cài đặt (D-20261128-settings-one-system): cùng dịch vụ, thêm phạm vi theo cây, cache và luật chéo.
+        context.provide::<crate::tenancy::SettingSystem>(Arc::new(
+            crate::tenancy::SettingSystem::new(settings.clone(), context.org_settings()),
         ))?;
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;

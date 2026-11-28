@@ -84,6 +84,9 @@ pub(crate) struct OrgService {
     pub(crate) units: Option<std::sync::Arc<dyn autoxide_address::api::AdministrativeUnits>>,
     /// Hạn mức số nút theo gói (bước 35).
     pub(crate) entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    /// Hệ cài đặt của kernel (D-20261128-settings-one-system): đọc giá trị hiệu lực qua cache, kiểm luật chéo lúc
+    /// lưu. `None` chỉ khi app không có module `kernel` (không xảy ra ở app thật).
+    pub(crate) settings: Option<autoxide_kernel::tenancy::SettingSystem>,
 }
 
 impl OrgService {
@@ -92,7 +95,14 @@ impl OrgService {
         config: OrganizationsConfig,
         catalog: autoxide_kernel::tenancy::OrgSettingCatalog,
     ) -> Self {
-        OrgService { outbox, config, catalog, units: None, entitlements: Default::default() }
+        OrgService {
+            outbox,
+            config,
+            catalog,
+            units: None,
+            entitlements: Default::default(),
+            settings: None,
+        }
     }
 
     pub(crate) fn with_units(
@@ -451,6 +461,10 @@ impl OrgService {
             )
             .await?;
         transaction.commit().await?;
+        // Chuỗi tổ tiên đã đổi: bỏ cache cài đặt theo cây của khách.
+        if let Some(settings) = &self.settings {
+            settings.changed(tenant.id());
+        }
         Ok(after)
     }
 

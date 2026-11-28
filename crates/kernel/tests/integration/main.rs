@@ -68,6 +68,7 @@ mod seal;
 mod search_index;
 mod secret;
 mod security_headers;
+mod setting_system;
 mod stack;
 mod summary;
 mod tags_access;

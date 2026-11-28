@@ -140,7 +140,7 @@ impl<A: Access> Handle for Read<'_, A> {
         &self.access
     }
     fn connection(&self) -> Connection<'_> {
-        Connection(Inner::Read(self.connection))
+        Connection(Inner::Read(self.connection), self.access.tenant())
     }
 }
 
@@ -150,7 +150,7 @@ impl<A: Access> Handle for Tx<A> {
         &self.access
     }
     fn connection(&self) -> Connection<'_> {
-        Connection(Inner::Write(&self.transaction))
+        Connection(Inner::Write(&self.transaction), self.access.tenant())
     }
 }
 
@@ -180,7 +180,9 @@ impl<A: Access> Tx<A> {
 
 /// The connection behind a handle. Opaque: nothing in it is reachable outside the kernel.
 #[doc(hidden)]
-pub struct Connection<'a>(Inner<'a>);
+// Trường thứ hai: khách của handle (`None` cho control-plane, mọi khách và kết nối cũ) — mọi câu chạy qua đây được
+// chốt chặn lúc chạy kiểm trước (`super::guard`, D-20261128-tenant-runtime-guard).
+pub struct Connection<'a>(Inner<'a>, Option<Uuid>);
 
 #[derive(Clone, Copy)]
 enum Inner<'a> {
@@ -199,7 +201,8 @@ impl Connection<'_> {
         }
     }
 
-    pub(crate) async fn all(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr> {
+    pub(crate) async fn all(&self, statement: Statement) -> Result<Vec<QueryResult>, Error> {
+        super::guard::check(self.1, &statement)?;
         match self.0 {
             Inner::Read(connection) => ConnectionTrait::query_all_raw(connection, statement).await,
             Inner::Write(transaction) => {
@@ -207,6 +210,7 @@ impl Connection<'_> {
             }
             Inner::Legacy(connection) => connection.raw_query_all(statement).await,
         }
+        .map_err(super::write::write_error)
     }
 
     // Như `all`, database dừng câu sau `limit` (`super::bounded`). Chỉ trên handle đọc: transaction
@@ -216,6 +220,7 @@ impl Connection<'_> {
         statement: Statement,
         limit: std::time::Duration,
     ) -> Result<Vec<QueryResult>, Error> {
+        super::guard::check(self.1, &statement)?;
         match self.0 {
             Inner::Read(connection) => {
                 super::bounded::all_within(connection, statement, limit).await
@@ -226,14 +231,14 @@ impl Connection<'_> {
         }
     }
 
-    pub(crate) async fn execute(&self, statement: Statement) -> Result<u64, DbErr> {
+    pub(crate) async fn execute(&self, statement: Statement) -> Result<u64, Error> {
+        super::guard::check(self.1, &statement)?;
         Ok(match self.0 {
-            Inner::Read(connection) => ConnectionTrait::execute_raw(connection, statement).await?,
-            Inner::Write(transaction) => {
-                ConnectionTrait::execute_raw(transaction, statement).await?
-            }
-            Inner::Legacy(connection) => connection.raw_execute(statement).await?,
+            Inner::Read(connection) => ConnectionTrait::execute_raw(connection, statement).await,
+            Inner::Write(transaction) => ConnectionTrait::execute_raw(transaction, statement).await,
+            Inner::Legacy(connection) => connection.raw_execute(statement).await,
         }
+        .map_err(super::write::write_error)?
         .rows_affected())
     }
 
@@ -372,7 +377,7 @@ mod sealed_executor {
 // `Inner::Write`) — còn cầu thì hai impl đó xung đột với impl chung. Impl chung ở lại tới khi module cuối đã chuyển.
 impl<C: ConnectionTrait> Executor for C {
     fn executor(&self) -> Connection<'_> {
-        Connection(Inner::Legacy(self))
+        Connection(Inner::Legacy(self), None)
     }
 }
 
@@ -466,15 +471,19 @@ impl<A: Access> ConnectionTrait for Read<'_, A> {
         self.connection.get_database_backend()
     }
     async fn execute_raw(&self, statement: Statement) -> Result<ExecResult, DbErr> {
+        guarded(self.access.tenant(), &statement)?;
         self.connection.execute_raw(statement).await
     }
     async fn execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr> {
+        unprepared_allowed(self.access.tenant())?;
         self.connection.execute_unprepared(sql).await
     }
     async fn query_one_raw(&self, statement: Statement) -> Result<Option<QueryResult>, DbErr> {
+        guarded(self.access.tenant(), &statement)?;
         self.connection.query_one_raw(statement).await
     }
     async fn query_all_raw(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr> {
+        guarded(self.access.tenant(), &statement)?;
         self.connection.query_all_raw(statement).await
     }
 }
@@ -485,15 +494,38 @@ impl<A: Access> ConnectionTrait for Tx<A> {
         self.transaction.get_database_backend()
     }
     async fn execute_raw(&self, statement: Statement) -> Result<ExecResult, DbErr> {
+        guarded(self.access.tenant(), &statement)?;
         self.transaction.execute_raw(statement).await
     }
     async fn execute_unprepared(&self, sql: &str) -> Result<ExecResult, DbErr> {
+        unprepared_allowed(self.access.tenant())?;
         self.transaction.execute_unprepared(sql).await
     }
     async fn query_one_raw(&self, statement: Statement) -> Result<Option<QueryResult>, DbErr> {
+        guarded(self.access.tenant(), &statement)?;
         self.transaction.query_one_raw(statement).await
     }
     async fn query_all_raw(&self, statement: Statement) -> Result<Vec<QueryResult>, DbErr> {
+        guarded(self.access.tenant(), &statement)?;
         self.transaction.query_all_raw(statement).await
+    }
+}
+
+// Chốt chặn lúc chạy trên cầu `ConnectionTrait` (câu SeaORM module tự dựng chạy trên handle của khách): câu chạm bảng
+// cấp khách mà không lọc theo khách bị từ chối như trên đường của `db` (D-20261128-tenant-runtime-guard). Lỗi trả về
+// dạng `DbErr` vì cầu phải theo chữ ký của SeaORM; nguyên nhân đã ghi log ở `guard::check`.
+fn guarded(tenant: Option<Uuid>, statement: &Statement) -> Result<(), DbErr> {
+    super::guard::check(tenant, statement)
+        .map_err(|error| DbErr::Custom(format!("statement refused by the tenant guard: {error}")))
+}
+
+// Câu không tham số (`execute_unprepared`) không gắn được khách nên không lọc được: handle của khách từ chối luôn.
+fn unprepared_allowed(tenant: Option<Uuid>) -> Result<(), DbErr> {
+    match tenant {
+        Some(_) => Err(DbErr::Custom(
+            "a statement without parameters cannot filter by tenant; it is refused on a tenant handle"
+                .to_owned(),
+        )),
+        None => Ok(()),
     }
 }

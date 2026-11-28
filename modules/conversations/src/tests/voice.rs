@@ -711,7 +711,7 @@ async fn xoa_tai_khoan_khi_bo_noi_tat_van_an_danh_va_de_job_don() {
         assert_eq!(row.provider_recording_id.as_deref(), Some(provider_id.as_str()));
         assert!(row.recording_expires_at.is_some_and(|at| at <= Timestamp::now()));
         assert_eq!(row.caller_user_id, None);
-        let rows = callback::Entity::find().all(&tenant.db().read()).await.unwrap();
+        let rows = callback::Entity::find().scoped(&tenant).all(&tenant.db().read()).await.unwrap();
         assert!(
             rows.iter().all(|row| row.phone_sealed.is_none() && row.requester_user_id.is_none())
         );
