@@ -118,6 +118,9 @@ enum Token {
     Equals,
     // Chỉ số (từ 0) của giá trị được gắn.
     Placeholder(usize),
+    Open,
+    Close,
+    Comma,
     Other,
 }
 
@@ -178,7 +181,9 @@ fn tokens(sql: &str, backend: DbBackend) -> Vec<Token> {
                     index += 1;
                 }
                 index += 1;
-                tokens.push(Token::Name(name));
+                // Chữ thường cả tên trong ngoặc kép: SQLite so tên bảng không phân biệt hoa thường, nên
+                // `"KERNEL_T_LINE"` vẫn là bảng `kernel_t_line`.
+                tokens.push(Token::Name(name.to_lowercase()));
             }
             ':' if next == Some(':') => {
                 // Ép kiểu của Postgres (`$1::uuid`): không đổi giá trị, bỏ cả tên kiểu.
@@ -223,6 +228,18 @@ fn tokens(sql: &str, backend: DbBackend) -> Vec<Token> {
                 tokens.push(Token::Name(name));
             }
             c if c.is_whitespace() => index += 1,
+            '(' => {
+                tokens.push(Token::Open);
+                index += 1;
+            }
+            ')' => {
+                tokens.push(Token::Close);
+                index += 1;
+            }
+            ',' => {
+                tokens.push(Token::Comma);
+                index += 1;
+            }
             _ => {
                 // Số và dấu khác: một token (`<>`, `>=`… không phải `=` đứng riêng, nên `a >= b` không thành lọc).
                 let starts_number = character.is_ascii_digit();
@@ -356,8 +373,10 @@ fn problem(
     let column_at = |index: usize| name_at(index) == Some("tenant_id");
     let bound_at =
         |index: usize| matches!(tokens.get(index), Some(Token::Placeholder(i)) if is_tenant(*i));
+    let assignments = assignments(&tokens);
     for (index, token) in tokens.iter().enumerate() {
-        if *token != Token::Equals || index == 0 {
+        // `SET tenant_id = ?` của UPDATE / `DO UPDATE` là gán giá trị, không phải lọc.
+        if *token != Token::Equals || index == 0 || assignments[index] {
             continue;
         }
         let column = if column_at(index - 1) && bound_at(index + 1) {
@@ -385,8 +404,16 @@ fn problem(
         .any(|pair| matches!(pair, [Token::Name(a), Token::Name(b)] if a == "do" && b == "update"));
     for reference in &references {
         if reference.into {
-            // Bảng đích của `INSERT`: ghi cột `tenant_id` với giá trị của khách.
-            if !(names_column && tenant_bound) {
+            // Bảng đích của `INSERT`: ghi cột `tenant_id` với giá trị của khách — với `VALUES`, đúng ở vị trí của
+            // cột đó trong MỌI dòng.
+            let rows_fit = match insert_tenant_values(&tokens) {
+                Some(values) => {
+                    !values.is_empty()
+                        && values.iter().all(|value| value.is_some_and(|i| is_tenant(i)))
+                }
+                None => names_column && tenant_bound,
+            };
+            if !rows_fit {
                 return Some(reference.table.clone());
             }
             if !do_update {
@@ -403,6 +430,98 @@ fn problem(
         }
     }
     None
+}
+
+// Với mỗi token: có phải dấu `=` của một phép gán trong `SET` (cùng độ sâu ngoặc với `SET`, tới WHERE / FROM /
+// RETURNING / hết câu hay đóng ngoặc ra ngoài) không. Subquery trong `SET` sâu hơn nên lọc trong nó vẫn được tính.
+fn assignments(tokens: &[Token]) -> Vec<bool> {
+    let mut marks = vec![false; tokens.len()];
+    let mut depth = 0_usize;
+    let mut set_at: Option<usize> = None;
+    for (index, token) in tokens.iter().enumerate() {
+        match token {
+            Token::Open => depth += 1,
+            Token::Close => {
+                if set_at == Some(depth) {
+                    set_at = None;
+                }
+                depth = depth.saturating_sub(1);
+            }
+            Token::Name(name) if name == "set" => set_at = Some(depth),
+            Token::Name(name)
+                if set_at == Some(depth)
+                    && ["where", "from", "returning"].contains(&name.as_str()) =>
+            {
+                set_at = None;
+            }
+            Token::Equals if set_at == Some(depth) => marks[index] = true,
+            _ => {}
+        }
+    }
+    marks
+}
+
+// `INSERT INTO t (…, tenant_id, …) VALUES (…), (…)`: chỉ số tham số ở vị trí cột `tenant_id` của từng dòng (`None`
+// khi chỗ đó không phải một tham số). `None` cả hàm khi câu không có dạng đó (`INSERT … SELECT`, thiếu danh sách cột).
+fn insert_tenant_values(tokens: &[Token]) -> Option<Vec<Option<usize>>> {
+    let into =
+        tokens.iter().position(|token| matches!(token, Token::Name(name) if name == "into"))?;
+    // Tên bảng rồi danh sách cột trong ngoặc.
+    let mut index = into + 2;
+    if tokens.get(index) != Some(&Token::Open) {
+        return None;
+    }
+    let mut column = None;
+    let mut position = 0;
+    index += 1;
+    loop {
+        match tokens.get(index)? {
+            Token::Close => break,
+            Token::Comma => position += 1,
+            Token::Name(name) if name == "tenant_id" => column = Some(position),
+            _ => {}
+        }
+        index += 1;
+    }
+    let column = column?;
+    index += 1;
+    if !matches!(tokens.get(index), Some(Token::Name(name)) if name == "values") {
+        return None;
+    }
+    index += 1;
+    let mut rows = Vec::new();
+    while tokens.get(index) == Some(&Token::Open) {
+        // Một dòng: các phần tách bằng dấu phẩy ở độ sâu 1.
+        let (mut depth, mut position, mut parts) = (1_usize, 0_usize, Vec::<Vec<&Token>>::new());
+        parts.push(Vec::new());
+        index += 1;
+        while depth > 0 {
+            let token = tokens.get(index)?;
+            match token {
+                Token::Open => depth += 1,
+                Token::Close => depth -= 1,
+                Token::Comma if depth == 1 => {
+                    position += 1;
+                    parts.push(Vec::new());
+                }
+                _ => {}
+            }
+            if depth > 0 && !(depth == 1 && *token == Token::Comma) {
+                if let Some(part) = parts.get_mut(position) {
+                    part.push(token);
+                }
+            }
+            index += 1;
+        }
+        rows.push(match parts.get(column).map(Vec::as_slice) {
+            Some([Token::Placeholder(value)]) => Some(*value),
+            _ => None,
+        });
+        if tokens.get(index) == Some(&Token::Comma) {
+            index += 1;
+        }
+    }
+    Some(rows)
 }
 
 #[cfg(test)]
@@ -579,5 +698,40 @@ mod tests {
             }
             assert!(postgres(&numbered, &values).is_some(), "Postgres let through: {numbered}");
         }
+    }
+
+    // Kiểm độc lập lần 3 (PR #624): gán `tenant_id` trong SET không phải lọc; tên viết hoa; vị trí giá trị của INSERT.
+    #[test]
+    fn gan_trong_set_va_vi_tri_insert_khong_lua_duoc() {
+        let t = || uuid(TENANT);
+        // `ActiveModel::update` đủ trường: gán `tenant_id` = khách A cho dòng chọn theo id (của khách B).
+        let pull =
+            r#"UPDATE "notes_note" SET "tenant_id" = ?, "title" = ? WHERE "notes_note"."id" = ?"#;
+        assert_eq!(sqlite(pull, &[t(), "x".into(), uuid(OTHER)]).as_deref(), Some("notes_note"));
+        let pull_pg = r#"UPDATE "notes_note" SET "tenant_id" = $1, "title" = $2 WHERE "notes_note"."id" = $3"#;
+        assert_eq!(
+            postgres(pull_pg, &[t(), "x".into(), uuid(OTHER)]).as_deref(),
+            Some("notes_note")
+        );
+        let upsert = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "tenant_id" = ?"#;
+        assert_eq!(sqlite(upsert, &[uuid(OTHER), t(), t()]).as_deref(), Some("notes_note"));
+        // Có lọc thật sau SET: đạt; lọc trong subquery của SET vẫn tính cho subquery.
+        let scoped = r#"UPDATE "notes_note" SET "tenant_id" = ?, "title" = ? WHERE "notes_note"."id" = ? AND "notes_note"."tenant_id" = ?"#;
+        assert_eq!(sqlite(scoped, &[t(), "x".into(), uuid(OTHER), t()]), None);
+        let sub = "UPDATE notes_note SET position = (SELECT max(position) FROM notes_note WHERE tenant_id = ?) WHERE tenant_id = ?";
+        assert_eq!(sqlite(sub, &[t(), t()]), None);
+        // Tên bảng trong ngoặc kép viết hoa vẫn là bảng của khách.
+        assert_eq!(sqlite(r#"SELECT 1 FROM "NOTES_NOTE""#, &[]).as_deref(), Some("notes_note"));
+        // INSERT: giá trị của khách phải ở đúng cột `tenant_id`, ở mọi dòng.
+        let swapped = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES (?, ?)"#;
+        assert_eq!(sqlite(swapped, &[t(), uuid(OTHER)]).as_deref(), Some("notes_note"));
+        let rows = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES (?, ?), (?, ?)"#;
+        assert_eq!(
+            sqlite(rows, &[uuid(OTHER), t(), uuid(OTHER), uuid(OTHER)]).as_deref(),
+            Some("notes_note")
+        );
+        assert_eq!(sqlite(rows, &[uuid(OTHER), t(), uuid(OTHER), t()]), None);
+        let rows_pg = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES ($1, $2), ($3, $4)"#;
+        assert_eq!(postgres(rows_pg, &[uuid(OTHER), t(), uuid(OTHER), t()]), None);
     }
 }

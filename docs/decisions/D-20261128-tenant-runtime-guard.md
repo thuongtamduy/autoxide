@@ -36,7 +36,14 @@ chỉ nằm trong comment — có test). Giới hạn đã biết, ghi để kh�
 và chuỗi `$$…$$` lừa được bộ tách token (chỉ đáng lo với câu cố tình phá, không phải câu quên lọc); một số dạng lọc đúng
 nghĩa bị chặn nhầm vì chốt không đọc chúng — `tenant_id IN (:tenant)`, `IS NOT DISTINCT FROM`, lọc nằm trong `WITH … INSERT`
 — nên tài liệu của `sql` bảo viết đúng dạng `tenant_id = :tenant`. `SignedInTenant::of` nhận mọi `Principal`, kể cả tự dựng
-(test cần): kiểu này chống truyền nhầm, không chống code cố ý.
+(test cần): kiểu này chống truyền nhầm, không chống code cố ý. Lọc lặp trên cùng một tên gắn
+(cùng alias, hay cùng tên bảng khi bảng dùng nhiều lần không alias) đếm thành nhiều vế, nên có thể bù cho một lần dùng
+không lọc mang cùng tên gắn — chỉ xảy ra khi người viết cố tình lặp vế lọc. Phép gán `tenant_id = …` trong `SET` (UPDATE,
+`DO UPDATE`) không được tính là lọc (kiểm độc lập lần 3: `ActiveModel::update` đủ trường của SeaORM gán `tenant_id` rồi
+chọn dòng theo id, kéo dòng khách khác về); `INSERT … VALUES` phải có giá trị của khách đúng ở cột `tenant_id` của mọi
+dòng. Tên bảng so không phân biệt hoa thường (SQLite coi `"NOTES_NOTE"` là `notes_note`). Lệnh chạy với
+`Migrations::Ignore` (sinh `openapi`, `mcp_manifest`, một nhánh `backup`) không gọi `check_records`, nên sổ chỉ có bảng từ
+record — các lệnh đó không phục vụ request của khách.
 
 Phạm vi lúc này và đường nâng cấp: chốt chỉ chạy trên câu đi qua **handle** của khách. Module còn đi đường cũ
 (`TenantContext::database()`, đếm ở baseline `raw-database` — đa số truy vấn của 38 module hôm nay) không qua handle nên chưa
@@ -71,7 +78,7 @@ từ quy ước thành thứ trình biên dịch kiểm.
 Đã cân nhắc: chặn ở tầng kết nối cho cả đường cũ (bọc `DatabaseConnection` của SeaORM hay dùng backend proxy của nó) —
 phải đổi kiểu trả về của `Database::read()` cho 38 module đang được chuyển theo cụm, đụng mọi file, và chuyển kết quả qua
 proxy làm mất kiểu dữ liệu; cụm chuyển module làm việc đó đúng chỗ. Callback đo của SeaORM — chạy sau khi câu đã chạy, chỉ
-phát hiện được, không chặn. Thư viện phân tích SQL đầy đủ — thêm phụ thuộc lớn cho việc vài chục dòng làm đủ. Dò bảng cấp
-khách từ schema sống (cột `tenant_id`) — bắt cả bảng của kernel và bảng chưa có record, nhưng câu kernel tự dựng trên bảng
-dùng chung (sổ tên miền, sổ thuê bao có `tenant_id` mà tra theo tên miền) sẽ bị chặn nhầm; sổ từ record khớp đúng phần đã
-chuyển sang `db`.
+phát hiện được, không chặn. Thư viện phân tích SQL đầy đủ — thêm phụ thuộc lớn cho việc vài chục dòng làm đủ. Sổ bảng chỉ từ
+record (bản đầu) — kiểm độc lập chỉ ra nó chỉ phủ 7 bảng và để lọt mọi bảng chưa có record; đổi sang dò schema sống (cột
+`tenant_id`, trừ bảng control-plane), lo ngại chặn nhầm câu của kernel trên bảng dùng chung không xảy ra vì câu đó chạy trên
+kết nối control-plane, không qua handle của khách (test của 9 module xanh với sổ mới).

@@ -791,6 +791,8 @@ async fn chot_chan_luc_chay_tu_choi_cau_thieu_khach() {
             "SELECT id FROM kernel_t_line l WHERE l.tenant_id = :tenant AND EXISTS (SELECT 1 FROM kernel_t_line m WHERE m.id = l.id)",
             "INSERT INTO kernel_t_line (id, tenant_id, account_id, side, amount_minor, effective_date) \
              SELECT id, :tenant, account_id, side, amount_minor, effective_date FROM kernel_t_line",
+            // Gán `tenant_id` trong SET không phải lọc: câu này kéo dòng của khách khác về khách A.
+            "UPDATE kernel_t_line SET tenant_id = :tenant WHERE amount_minor > 0",
         ];
         for probe in probes {
             assert!(tx.sql(probe).execute().await.is_err(), "let through: {probe}");
