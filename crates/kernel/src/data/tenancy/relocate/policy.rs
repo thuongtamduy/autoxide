@@ -87,7 +87,9 @@ impl Policies {
         if problems.is_empty() { Ok(policies) } else { Err(problems) }
     }
 
-    /// Adds the switch-step hooks modules contributed in `start` (`contribute::<dyn SwitchHook>`).
+    /// Adds the switch-step hooks modules contributed in `start` (`contribute::<dyn SwitchHook>`). They run
+    /// after every hook declared with `Relocation::on_switch`, in module registration order; a dormant module
+    /// does not start, so it contributes none.
     pub(crate) fn add_switch_hooks(&mut self, hooks: Vec<std::sync::Arc<dyn super::SwitchHook>>) {
         self.switch_hooks.extend(hooks);
     }
