@@ -11,17 +11,14 @@
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::rows;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::{Date, Timestamp};
-use sea_orm::{EntityTrait, Set};
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::entity::kyc_profile;
-use crate::kyc::kyc_not_found;
 use crate::permissions::KYC_REVIEW;
-use crate::service::{ComplianceService, now, require_session};
+use crate::service::{ComplianceService, require_session};
 
 /// Mục Điều 18 người duyệt ghi sau khi đối chiếu giấy tờ. Trường trống: giữ giá trị đang có.
 #[derive(Debug, Clone, Default)]
@@ -174,8 +171,8 @@ fn checked(input: SellerDetails) -> Result<SellerDetails, Error> {
 }
 
 impl ComplianceService {
-    /// Người duyệt ghi mục Điều 18 đã đối chiếu với giấy tờ (hồ sơ chưa bị thu hồi). Hồ sơ đã xác thực mà hạn giấy
-    /// tờ ngắn hơn hạn hồ sơ thì hạn hồ sơ rút theo.
+    /// Người duyệt ghi mục Điều 18 đã đối chiếu với giấy tờ (hồ sơ chưa bị thu hồi); ghi ở `kyc.rs`
+    /// ([`ComplianceService::save_details`]).
     pub(crate) async fn record_details(
         &self,
         tenant: &TenantContext,
@@ -186,39 +183,7 @@ impl ComplianceService {
         principal.require(&KYC_REVIEW)?;
         require_session(principal)?;
         let input = checked(input)?;
-        let database = tenant.database();
-        let input = &input;
-        let saved = database
-            .write_with_retry(move || async move {
-                let transaction = database.begin_write().await?;
-                let row = rows::lock_one(
-                    &transaction,
-                    kyc_profile::Entity::find_by_id(id).scoped(tenant),
-                )
-                .await?
-                .ok_or_else(kyc_not_found)?;
-                if row.status == "revoked" {
-                    return Err(crate::kyc::kyc_state_invalid(&row.status));
-                }
-                let mut active: kyc_profile::ActiveModel = row.clone().into();
-                let keep = |new: &Option<String>, old: &Option<String>| new.clone().or(old.clone());
-                let expires_on = keep(&input.document_expires_on, &row.document_expires_on);
-                active.birth_date = Set(keep(&input.birth_date, &row.birth_date));
-                active.address = Set(keep(&input.address, &row.address));
-                active.representative_name =
-                    Set(keep(&input.representative_name, &row.representative_name));
-                active.document_country = Set(keep(&input.document_country, &row.document_country));
-                if row.status == "verified" {
-                    active.expires_at = Set(capped_expiry(row.expires_at, expires_on.as_deref()));
-                }
-                active.document_expires_on = Set(expires_on);
-                active.reviewed_by = Set(Some(principal.user_id()));
-                active.updated_at = Set(now());
-                let saved = kyc_profile::Entity::update(active).exec(&transaction).await?;
-                transaction.commit().await?;
-                Ok(saved)
-            })
-            .await?;
+        let saved = self.save_details(tenant, principal.user_id(), id, &input).await?;
         // Không ghi giá trị (dữ liệu cá nhân) vào log.
         tracing::info!(profile_id = %id, "seller identity details recorded by a reviewer");
         Ok(saved)

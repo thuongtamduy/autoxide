@@ -177,10 +177,10 @@ raw-database 4 modules/compliance/src/consents.rs
 raw-database 4 modules/compliance/src/disclosures.rs
 raw-database 14 modules/compliance/src/documents.rs
 raw-database 9 modules/compliance/src/incidents.rs
-raw-database 17 modules/compliance/src/kyc.rs
+raw-database 16 modules/compliance/src/kyc.rs
 raw-database 10 modules/compliance/src/legal.rs
 raw-database 1 modules/compliance/src/overview.rs
-raw-database 10 modules/compliance/src/privacy.rs
+raw-database 9 modules/compliance/src/privacy.rs
 raw-database 3 modules/compliance/src/service.rs
 raw-database 4 modules/compliance/src/sign_in_codes.rs
 raw-database 5 modules/compliance/src/subject_requests.rs

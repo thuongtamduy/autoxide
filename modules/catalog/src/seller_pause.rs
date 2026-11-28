@@ -9,32 +9,45 @@
 //! - mỗi ngày (job `catalog.seller_kyc_sweep`): khách vừa chuyển thành sàn (`kernel.business_model`), quy tắc
 //!   `kyc.required_activities` bắt đầu áp dụng, khách gộp vào sàn.
 //!
-//! Người bán không qua được cổng (`compliance.kyc_required`, hay sàn thiếu `compliance`) thì mọi sản phẩm
-//! `active` của nút đó chuyển `inactive`, mỗi sản phẩm phát `catalog.product_status_changed` với tác nhân hệ
-//! thống. Gọi lại vô hại (D-054): chỉ dòng còn `active` bị đổi, lần sau không còn gì để đổi. Định danh lại xong
+//! Người bán không qua được cổng (`compliance.kyc_required`, sàn thiếu `compliance`, nút không còn trong cây) thì
+//! mọi sản phẩm `active` của nút đó chuyển `inactive` qua đường đổi trạng thái của `products.rs`, phát
+//! `catalog.product_status_changed` với tác nhân hệ thống. Gọi lại vô hại (D-054): chỉ dòng còn `active` bị đổi. Định danh lại xong
 //! thì người bán tự mở bán lại — không tự bật lại hàng (người bán có thể đã muốn tắt).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
+use autoxide_kernel::db::{Queries as _, Record, TenantKey};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
-use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, TenantId, root_of};
+use autoxide_kernel::tenancy::{OrgId, Site, TenantContext, TenantId, root_of};
 use sea_orm::sea_query::{Expr, ExprTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
 use crate::entity::product;
-use crate::events::{self, Change};
-use crate::products::snapshot;
-use crate::service::{CatalogService, now};
+use crate::service::CatalogService;
 
 /// Job hằng ngày kiểm lại người bán của mọi sàn (mọi database).
 pub(crate) const SELLER_KYC_SWEEP: &str = "catalog.seller_kyc_sweep";
 
-/// Mã lỗi của cổng nghĩa là "người bán này không được bán" (khác lỗi tạm thời như database).
+/// Sản phẩm và nút bán của nó — chỉ các cột việc kiểm lại cần, đọc qua lớp `db` của kernel (lọc theo khách).
+#[derive(Record, Clone, Debug)]
+#[record(table = "catalog_products", scope = tenant)]
+pub(crate) struct OnSale {
+    #[record(primary_key)]
+    id: Uuid,
+    tenant_id: TenantKey,
+    org_id: Uuid,
+    status: String,
+}
+
+/// Mã lỗi nghĩa là "người bán này không được bán" (khác lỗi tạm thời như database). `site_not_found`: nút không
+/// còn trong cây — không xác định được người bán nên không coi là đã định danh.
 fn refused(error: &Error) -> bool {
-    matches!(error.code(), "compliance.kyc_required" | "catalog.seller_verification_unavailable")
+    matches!(
+        error.code(),
+        "compliance.kyc_required" | "catalog.seller_verification_unavailable" | "site_not_found"
+    )
 }
 
 impl CatalogService {
@@ -48,93 +61,52 @@ impl CatalogService {
         if !self.is_marketplace(tenant).await? {
             return Ok(0);
         }
-        let root = root_of(tenant.id());
-        let mut select = product::Entity::find()
-            .select_only()
-            .column(product::Column::OrgId)
-            .distinct()
-            .filter(product::Column::Status.eq("active"))
-            .filter(product::Column::OrgId.ne(root.as_uuid()))
-            .scoped(tenant);
-        if let Some(node) = within {
-            select = select.filter(OrgTree::subtree_condition(
-                tenant.id(),
-                &[node],
-                product::Column::OrgId,
-            ));
+        let root = root_of(tenant.id()).as_uuid();
+        let rows = tenant
+            .db()
+            .read()
+            .find::<OnSale>()
+            .filter(OnSale::STATUS.eq("active".to_owned()))
+            .filter(OnSale::ORG_ID.ne(root))
+            .all()
+            .await?;
+        let mut by_seller: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::new();
+        for row in rows {
+            by_seller.entry(row.org_id).or_default().push(row.id);
         }
-        let sellers: Vec<Uuid> = select.into_tuple().all(tenant.database().read()).await?;
         let mut paused = 0;
-        for seller in sellers {
+        for (seller, products) in by_seller {
             let org = OrgId::from_uuid(seller);
+            if let Some(node) = within {
+                // Chỉ người bán trong nhánh của nút vừa đổi định danh.
+                let inside = match Site::of(tenant, org).await {
+                    Ok(site) => site.lineage().contains(&node),
+                    Err(error) if refused(&error) => true,
+                    Err(error) => return Err(error),
+                };
+                if !inside {
+                    continue;
+                }
+            }
             match self.check_seller_identity(tenant, org).await {
                 Ok(()) => {}
                 Err(error) if refused(&error) => {
-                    paused += self.pause_products_of(tenant, org, error.code()).await?;
+                    let mut count = 0;
+                    for id in products {
+                        count += u64::from(self.pause_as_system(tenant, id).await?);
+                    }
+                    if count > 0 {
+                        tracing::warn!(
+                            org_id = %seller,
+                            paused = count,
+                            reason = error.code(),
+                            "catalog paused the goods of a marketplace seller without a valid identity verification"
+                        );
+                    }
+                    paused += count;
                 }
                 Err(error) => return Err(error),
             }
-        }
-        Ok(paused)
-    }
-
-    /// Chuyển mọi sản phẩm `active` của đúng nút `org` sang `inactive` (một transaction ghi ngắn mỗi sản phẩm).
-    async fn pause_products_of(
-        &self,
-        tenant: &TenantContext,
-        org: OrgId,
-        reason: &str,
-    ) -> Result<u64, Error> {
-        let ids: Vec<Uuid> = product::Entity::find()
-            .select_only()
-            .column(product::Column::Id)
-            .filter(product::Column::OrgId.eq(org.as_uuid()))
-            .filter(product::Column::Status.eq("active"))
-            .scoped(tenant)
-            .into_tuple()
-            .all(tenant.database().read())
-            .await?;
-        let mut paused = 0;
-        for id in ids {
-            let transaction = tenant.database().begin_write().await?;
-            let Some(before) =
-                product::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
-            else {
-                transaction.rollback().await?;
-                continue;
-            };
-            let at = now();
-            // Đổi có điều kiện `status = 'active'`: người khác vừa đổi (hay event đến lại) thì không đổi gì.
-            let changed = product::Entity::update_many()
-                .col_expr(product::Column::Status, Expr::value("inactive"))
-                .col_expr(product::Column::UpdatedAt, Expr::value(at))
-                .filter(product::Column::Id.eq(id))
-                .filter(product::Column::Status.eq("active"))
-                .scoped(tenant)
-                .exec(&transaction)
-                .await?
-                .rows_affected;
-            if changed == 0 {
-                transaction.rollback().await?;
-                continue;
-            }
-            let after =
-                product::Model { status: "inactive".to_owned(), updated_at: at, ..before.clone() };
-            let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
-            let event = events::ProductStatusChanged(change);
-            let subject = events::product_subject(id);
-            self.outbox.record(&transaction, tenant, Actor::system(), subject, &event).await?;
-            self.queue_products(&transaction, tenant, vec![id]).await?;
-            transaction.commit().await?;
-            paused += 1;
-        }
-        if paused > 0 {
-            tracing::warn!(
-                org_id = %org.as_uuid(),
-                paused,
-                reason,
-                "catalog paused the goods of a marketplace seller without a valid identity verification"
-            );
         }
         Ok(paused)
     }
@@ -159,10 +131,19 @@ impl JobHandler for SellerKycSweep {
             .all(job.database.read())
             .await?;
         let tenants: BTreeSet<Uuid> = rows.into_iter().map(|(tenant, _)| tenant).collect();
+        // Lỗi của một khách không chặn việc kiểm các khách khác; job vẫn báo lỗi để chạy lại.
+        let mut failed = None;
         for tenant in tenants {
-            let context = self.0.databases.tenant(TenantId::from_uuid(tenant)).await?;
-            self.0.pause_unverified_sellers(&context, None).await?;
+            let result = async {
+                let context = self.0.databases.tenant(TenantId::from_uuid(tenant)).await?;
+                self.0.pause_unverified_sellers(&context, None).await
+            }
+            .await;
+            if let Err(error) = result {
+                tracing::error!(tenant_id = %tenant, code = error.code(), "seller identity sweep failed for a tenant");
+                failed.get_or_insert(error);
+            }
         }
-        Ok(())
+        failed.map_or(Ok(()), Err)
     }
 }

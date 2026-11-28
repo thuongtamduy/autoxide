@@ -42,6 +42,8 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Lỗi `compliance.kyc_required` như cổng thật, cho `KycGate` giả (`autoxide_compliance::api::testing`).
+autoxide-compliance = { workspace = true, features = ["testing"] }
 # Thư viện media giả dùng chung (`autoxide_media::api::testing`).
 autoxide-media = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true

@@ -147,6 +147,15 @@ pub(crate) fn parse_status(raw: &str) -> ProductStatus {
 
 /// Chuyển trạng thái được phép: nháp → đang bán / lưu trữ; đang bán ↔ ngừng bán; mọi trạng
 /// thái → lưu trữ; lưu trữ → nháp (mở lại để sửa rồi bán lại).
+/// Ai đổi trạng thái sản phẩm.
+#[derive(Clone, Copy)]
+enum StatusBy<'a> {
+    /// Người (hay API key) có `catalog.products.publish` trên nút của sản phẩm.
+    Person(&'a Principal),
+    /// Việc nền của chính `catalog` (dừng hàng của người bán không còn định danh).
+    System,
+}
+
 fn transition_allowed(from: ProductStatus, to: ProductStatus) -> bool {
     use ProductStatus::{Active, Archived, Draft, Inactive};
     matches!(
@@ -863,19 +872,60 @@ impl CatalogService {
         to: ProductStatus,
         expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
-        let actor = Actor::from(principal);
         if to == ProductStatus::Active {
             // Điều kiện mở bán của module khác (bước 46) — có thể đọc database của nó, nên hỏi
             // TRƯỚC transaction ghi. Đọc qua kiểm quyền đọc để người ngoài phạm vi không biết lý do.
             self.check_listing_gate(tenant, principal, id).await?;
         }
+        let (row, _) =
+            self.write_status(tenant, StatusBy::Person(principal), id, to, expected).await?;
+        self.detail(tenant, row).await
+    }
+
+    /// Hệ thống dừng bán sản phẩm `id` (người bán trên sàn không còn định danh, LG-3b): chỉ khi nó còn `active`;
+    /// `true` khi đã đổi. Gọi lại vô hại.
+    pub(crate) async fn pause_as_system(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<bool, Error> {
+        let (_, changed) =
+            self.write_status(tenant, StatusBy::System, id, ProductStatus::Inactive, None).await?;
+        Ok(changed)
+    }
+
+    /// Đổi trạng thái trong một transaction ghi, kèm event; trả (dòng sau, có đổi không).
+    async fn write_status(
+        &self,
+        tenant: &TenantContext,
+        by: StatusBy<'_>,
+        id: Uuid,
+        to: ProductStatus,
+        expected: Option<Timestamp>,
+    ) -> Result<(product::Model, bool), Error> {
+        let actor = match by {
+            StatusBy::Person(principal) => Actor::from(principal),
+            StatusBy::System => Actor::system(),
+        };
         let transaction = tenant.database().begin_write().await?;
-        let before =
-            self.product_for_write(&transaction, tenant, principal, id, &PRODUCTS_PUBLISH).await?;
+        let before = match by {
+            StatusBy::Person(principal) => {
+                self.product_for_write(&transaction, tenant, principal, id, &PRODUCTS_PUBLISH)
+                    .await?
+            }
+            StatusBy::System => autoxide_kernel::rows::lock_one(
+                &transaction,
+                product::Entity::find_by_id(id).scoped(tenant),
+            )
+            .await?
+            .ok_or_else(|| errors::product_not_found(id))?,
+        };
         let from = parse_status(&before.status);
-        if from == to {
+        // Hệ thống chỉ dừng hàng đang bán; người khác vừa đổi (hay event đến lại) thì thôi.
+        let system_skips = matches!(by, StatusBy::System) && from != ProductStatus::Active;
+        if from == to || system_skips {
             transaction.rollback().await?;
-            return self.detail(tenant, before).await;
+            return Ok((before, false));
         }
         if !transition_allowed(from, to) {
             return Err(errors::invalid_status_transition(status_str(from), status_str(to)));
@@ -911,7 +961,7 @@ impl CatalogService {
         self.queue_products(&transaction, tenant, vec![id]).await?;
         transaction.commit().await?;
         tracing::info!(product_id = %id, status = status_str(to), "catalog product status changed");
-        self.detail(tenant, after).await
+        Ok((after, true))
     }
 
     /// Điều kiện mở bán; lỗi đầu tiên gặp được trả về.

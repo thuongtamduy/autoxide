@@ -141,12 +141,7 @@ impl KycGate for Switch {
         activity: Activity,
     ) -> Result<(), Error> {
         if self.0.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(Error::new(
-                autoxide_kernel::error::ErrorKind::Forbidden,
-                "compliance.kyc_required",
-                "A verified identity is required to {activity}.",
-            )
-            .with_param("activity", activity.as_str()));
+            return Err(autoxide_compliance::api::testing::kyc_required(activity));
         }
         Ok(())
     }

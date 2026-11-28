@@ -105,6 +105,11 @@ impl Module for CatalogModule {
         events::all()
     }
 
+    fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
+        // Hàng đang bán đọc qua lớp `db` khi kiểm lại người bán trên sàn (LG-3b).
+        vec![autoxide_kernel::db::RecordInfo::of::<seller_pause::OnSale>()]
+    }
+
     fn resource_events(&self) -> Vec<autoxide_kernel::resource::ResourceEvent> {
         resources::resource_events()
     }
