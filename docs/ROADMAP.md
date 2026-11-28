@@ -142,7 +142,10 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             `#[derive(Schema/Params/Validate)]`, `Path`/`Query`/`State`, `NoContent`, `Download`, `async_trait`;
             `notes` không còn khai thư viện bọc ở `[dependencies]` (D-20261126-kernel-web-layer)
       - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
-            `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng
+            `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng. Đã có: `autoxide_testkit::http`
+            (`StatusCode`, `Method`, `Client` cho bench), `status_code()`; `notes`, `esms`, `einvoice_sepay` bỏ `axum`
+            khỏi `[dev-dependencies]`. Còn: `idempotency` (test tự dựng endpoint trả mã và header tuỳ ý — cần response
+            thô của lớp HTTP, làm ở cụm 1); `status()` trả kiểu testkit ở PR gỡ đường cũ
       - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
             của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
             (D-20261127-http-layer-choices). Đã quyết: bỏ — derive sinh mã kiểm của kernel, impl chung gỡ khi module cuối

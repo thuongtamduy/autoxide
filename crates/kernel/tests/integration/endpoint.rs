@@ -168,7 +168,10 @@ async fn nest_len_path_da_co_giu_ca_hai_operation() {
         assert!(item.get("get").is_some() && item.get("post").is_some(), "{item}");
         for method in ["GET", "POST"] {
             let request = |token: Option<&str>| {
-                let mut request = app.request(method.parse().unwrap(), "/api/v1/probe/things");
+                let mut request = app.request(
+                    autoxide_testkit::http::Method::from_name(method).unwrap(),
+                    "/api/v1/probe/things",
+                );
                 if let Some(token) = token {
                     request = request.token(token);
                 }

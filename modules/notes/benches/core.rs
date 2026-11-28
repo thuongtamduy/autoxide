@@ -22,10 +22,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::module::Modules;
 use autoxide_testkit::TestDatabase;
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode, header};
-use tower::ServiceExt as _;
+use autoxide_testkit::http::{Client, Method, StatusCode};
 use uuid::Uuid;
 
 /// Số lần đo mỗi việc (sau khi chạy nóng).
@@ -47,7 +44,7 @@ impl Authenticator for Writer {
     }
 }
 
-async fn app(test: &TestDatabase) -> (Router, Modules, Database) {
+async fn app(test: &TestDatabase) -> (Client, Modules, Database) {
     let source = ConfigSource::from_pairs([
         ("DATABASE_URL", test.url()),
         // Đo database và code, không đo bộ giới hạn request.
@@ -66,20 +63,14 @@ async fn app(test: &TestDatabase) -> (Router, Modules, Database) {
     let routes = modules.routes();
     let router =
         autoxide_kernel::http::build(&config.http, Default::default(), routes, extras).router;
-    (router, modules, database)
+    (Client::new(router), modules, database)
 }
 
-async fn send(router: &Router, method: &str, uri: &str, body: Option<String>) -> serde_json::Value {
-    let request = Request::builder()
-        .method(method)
-        .uri(uri)
-        .header(header::AUTHORIZATION, "Bearer bench")
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(body.map_or_else(Body::empty, Body::from))
-        .unwrap();
-    let response = router.clone().oneshot(request).await.unwrap();
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+async fn send(router: &Client, method: &str, uri: &str, body: Option<String>) -> serde_json::Value {
+    let method = Method::from_name(method).unwrap();
+    let headers = [("authorization", "Bearer bench"), ("content-type", "application/json")];
+    let (status, bytes) =
+        router.send(&method, uri, &headers, body.map(String::into_bytes)).await.unwrap();
     assert!(status == StatusCode::OK || status == StatusCode::CREATED, "{status}: {bytes:?}");
     serde_json::from_slice(&bytes).unwrap()
 }

@@ -6,8 +6,8 @@ use std::sync::Arc;
 use autoxide_kernel::error::ErrorKind;
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, SmsSender};
 use autoxide_kernel::tenancy::TenantId;
+use autoxide_testkit::http::StatusCode;
 use autoxide_testkit::{FakeProviderServer, TestApp, TestDatabase};
-use axum::http::StatusCode;
 use serde_json::{Value, json};
 
 const SEND: &str = "/MainService.svc/json/SendMultipleMessage_V4_post_json/";
@@ -47,7 +47,7 @@ impl Fixture {
             .send()
             .await
             .unwrap();
-        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+        assert_eq!(answer.status_code(), StatusCode::OK, "{}", answer.json());
         assert!(
             !answer.text().contains(value) || !name.ends_with("_key"),
             "secret is never answered"
@@ -210,7 +210,7 @@ async fn khach_chua_cau_hinh_bao_loi_ro_va_khong_dung_tai_khoan_khach_khac() {
                 .send()
                 .await
                 .unwrap();
-            assert_eq!(answer.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", answer.json());
+            assert_eq!(answer.status_code(), StatusCode::UNPROCESSABLE_ENTITY, "{}", answer.json());
         }
     })
     .await
@@ -378,7 +378,7 @@ async fn thu_ket_noi_bang_ham_lay_so_du() {
 
         // Chưa cấu hình: kết quả nói rõ thiếu gì, không gọi eSMS.
         let answer = fx.app.post(test_url).token("one-admin").send().await.unwrap();
-        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+        assert_eq!(answer.status_code(), StatusCode::OK, "{}", answer.json());
         let body = answer.json();
         assert_eq!(body["data"]["connection"], "esms.connection.sms");
         assert_eq!(body["data"]["ok"], false);
