@@ -325,8 +325,10 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       `listing_denied` trong `errors.rs` lệch chỗ
 - [ ] `compliance` `kyc.rs`: thân quy tắc không parse được JSON đang coi là "không bắt buộc" (fail-open) — phải báo lỗi; hồ
       sơ quá `expires_at` vẫn tính là đã định danh tới khi job hằng ngày chạy — phải kiểm hạn ngay lúc hỏi
-- [ ] Bảo mật kernel: `set_setting` cho cài đặt cấp khách (vd `kernel.business_model`) ở mọi nhánh chỉ đòi
-      `kernel.settings.manage`; cần quyền phạm vi gốc + ghi audit; chạm bảo mật nên qua kiểm độc lập
+- [x] Bảo mật kernel: `set_setting` cho cài đặt cấp khách (vd `kernel.business_model`) ở mọi nhánh chỉ đòi
+      `kernel.settings.manage`; cần quyền phạm vi gốc + ghi audit; chạm bảo mật nên qua kiểm độc lập — đặt / bỏ cần
+      permission ở nút gốc (`require_at_root`), audit qua event `kernel.setting_changed` sẵn có
+      (D-20261128-tenant-settings-root)
 - [ ] Số đơn / POS / trả hàng / bảo hành lấy năm theo UTC (#575 N4): lấy theo múi giờ người bán như LG-2
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
@@ -344,8 +346,9 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
     - [ ] UT-1 tiếp: xuất kho lỗi 4xx hiện chỉ `warn` — thêm cảnh báo / đối soát cho người vận hành; đối soát các đơn giao
           trước bản sửa; `inventory`: chỗ giữ do nhân viên trả tay (`release_reason=manual`) rồi hàng vẫn giao hiện chỉ log
           `debug` — đổi thành `warn` + metric
-  - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
-        chạm bảo mật nên qua kiểm độc lập
+  - [x] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
+        chạm bảo mật nên qua kiểm độc lập — xong ở #572 (kiểm ở service, REST và MCP cùng luật, test hai database;
+        D-20261126-api-key-self-scope)
   - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
         `.env`, `migrate up` trước `serve`, `AUTOXIDE_HTTP_ADDRESS`, mục "binary + PostgreSQL từ đầu", một ví dụ GET có
         dữ liệu; `config` cảnh báo biến `AUTOXIDE_*` lạ; lỗi đọc `.env` nêu tên biến
@@ -623,23 +626,28 @@ thật (P7).
         `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được
   - [x] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
         — chặn (PT-9, D-20261126-no-self-grant): gán role và sửa role theo "chỉ cấp cái mình có", kể cả cho chính mình
-  - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi
-        email / nhận về tài khoản) so theo tên permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi;
+  - [x] Luật cấp quyền (i): `require_covers` (xoá / khoá / đổi email / nhận về tài khoản) so cả phạm vi như
+        `require_grantable` (D-20261128-ban-lift-scope)
+  - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi):
         (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403; (iv) hạ quyền người khác bằng cách
         thu hẹp permission của role họ giữ không qua luật "gỡ được" như gỡ role (sửa role chỉ chặn thêm / nới / bỏ cấm)
   - [ ] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
         luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked)
   - [ ] `automations`: event `auth.access_revoked` vào dead-letter thì luật không tạm dừng và không có đường dự phòng
         (runner chỉ dừng lần chạy khi luật đã `paused`)
-  - [ ] Gỡ role có lệnh cấm đòi người gỡ `allows(p)` theo TÊN permission, bỏ qua phạm vi; khách có guardrail: role cấm
-        một permission ngoài rào thì có thể không ai trong khách gỡ được role đó (cần kiểm chứng)
+  - [x] Gỡ role có lệnh cấm đòi người gỡ `allows(p)` theo TÊN permission, bỏ qua phạm vi — nay đòi permission ở độ sâu
+        `tenant`, không rào (D-20261128-ban-lift-scope)
+  - [ ] Khách có guardrail: role cấm một permission ngoài rào thì không ai trong khách gỡ được role đó (đã kiểm chứng
+        bằng đọc code, D-20261128-ban-lift-scope) — cần kernel cho biết lý do cấm (`outside_guardrail`) hay đưa rào vào
+        `grantable`
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
         thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
-  - [ ] Hạn mức số nhân sự: hai lần đổi role thật cho cùng một người chạy đồng thời có thể làm lệch chỗ (dùng chung
+  - [x] Hạn mức số nhân sự: hai lần đổi role thật cho cùng một người chạy đồng thời có thể làm lệch chỗ (dùng chung
         mã giữ chỗ `auth.member:<id>`; có từ trước) — khoá dòng người dùng quanh giữ chỗ → đổi → xác nhận, hay job
-        đối soát số nhân sự với `auth_user_role` (D-20261125-scim-sync-report)
+        đối soát số nhân sự với `auth_user_role` (D-20261125-scim-sync-report) — đối chiếu với role thật tới khi ổn
+        định, test đồng thời hai database (D-20261128-member-slot-settle)
   - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
         tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
         ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)

@@ -387,3 +387,60 @@ async fn nguoi_cho_thu_101_tro_di_khong_bi_doi() {
     .await
     .unwrap();
 }
+
+/// P16 (D-20261128-member-slot-settle): hai lần đổi role THẬT cho cùng một người chạy đồng thời (một gỡ hết, một
+/// gán) — sau cả hai, chỗ trong hạn mức khớp với việc người đó còn giữ role hay không. Trước đây lượt gỡ đọc
+/// "không còn role" trước khi lượt gán commit rồi trả chỗ, còn lượt gán thấy người đó vốn có role nên không giữ lại.
+#[tokio::test]
+async fn hai_lan_doi_role_dong_thoi_khong_lech_cho() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let roles = crate::role::RoleService::new(
+            setup.services.roles.catalog().clone(),
+            autoxide_kernel::event::Outbox::standalone("auth"),
+        )
+        .with_entitlements(setup.app.modules().entitlements());
+        let tenant = &setup.tenant;
+        let input = |name: &str| crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: name.to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.users.read".to_owned()],
+            grants: Vec::new(),
+        };
+        let first = roles.create(tenant, Actor::system(), input("first")).await.unwrap().id;
+        let second = roles.create(tenant, Actor::system(), input("second")).await.unwrap().id;
+        let who = NewUser {
+            email: "race@alpha.example".to_owned(),
+            name: "Race".to_owned(),
+            password: None,
+        };
+        let who = setup.services.users.create(tenant, Actor::system(), who).await.unwrap().id;
+        let slot = crate::role::member_reference(who);
+        for round in 0..12 {
+            // Mỗi vòng bắt đầu từ "đang giữ một role"; một lượt gỡ hết, lượt kia gán thêm (đổi thứ tự xen kẽ).
+            roles.set_user_roles(tenant, Actor::system(), who, vec![first]).await.unwrap();
+            assert!(setup.plan.used().contains(&slot));
+            let clear = roles.set_user_roles(tenant, Actor::system(), who, vec![]);
+            let grant = roles.set_user_roles(tenant, Actor::system(), who, vec![first, second]);
+            if round % 2 == 0 {
+                let (cleared, granted) = tokio::join!(clear, grant);
+                cleared.unwrap();
+                granted.unwrap();
+            } else {
+                let (granted, cleared) = tokio::join!(grant, clear);
+                cleared.unwrap();
+                granted.unwrap();
+            }
+            let holds = crate::role::has_membership(tenant, who).await.unwrap();
+            assert_eq!(
+                setup.plan.used().contains(&slot),
+                holds,
+                "vòng {round}: chỗ lệch với role thật"
+            );
+        }
+    })
+    .await
+    .unwrap();
+}

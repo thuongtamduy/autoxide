@@ -134,6 +134,9 @@ pub(crate) const MEMBERS_LIMIT: autoxide_kernel::entitlement::Limit =
         "People who hold at least one role in the tenant (staff accounts with access).",
     );
 
+/// Số lượt tối đa [`RoleService::settle_member`] đọc lại trạng thái thật trước khi để job đối soát làm tiếp.
+const SETTLE_ROUNDS: usize = 4;
+
 /// Mã giữ chỗ hạn mức của người dùng `user_id`.
 pub(crate) fn member_reference(user_id: Uuid) -> String {
     format!("auth.member:{user_id}")
@@ -217,7 +220,7 @@ impl RoleService {
     /// "có đổi gì không". Có đổi: đối chiếu với trạng thái THẬT sau khi đổi (người đó còn giữ role
     /// nào không, đọc qua kết nối ghi — xem `has_membership`), không với ý định: lần đồng bộ SCIM chỉ
     /// áp phần mình được phép (D-20261125-scim-grant-cover), nên "muốn giữ" và "đang giữ" có thể khác
-    /// — giữ role thì xác nhận chỗ, không giữ thì trả chỗ. Không đổi gì: không đụng tới chỗ — mã giữ
+    /// — giữ role thì xác nhận chỗ, không giữ thì trả chỗ ([`settle_member`](Self::settle_member)). Không đổi gì: không đụng tới chỗ — mã giữ
     /// chỗ (`auth.member:<id>`) dùng chung cho mọi lần đổi role của người đó, một lần chạy đồng thời
     /// khác có thể đang dựa vào nó; chỗ giữ mà không ai xác nhận tự hết hạn (D-20261125-scim-sync-report).
     async fn with_member_limit<T, F>(
@@ -248,20 +251,52 @@ impl RoleService {
         if !changed {
             return Ok(value);
         }
-        let holds = has_membership(tenant, user_id).await?;
-        match (joining, holds) {
-            (true, true) => {
-                self.entitlements.confirm(tenant.id(), &MEMBERS_LIMIT, &reference).await?
-            }
-            (true, false) => {
-                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?
-            }
-            (false, false) if held => {
-                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?
-            }
-            _ => {}
-        }
+        self.settle_member(tenant, user_id).await?;
         Ok(value)
+    }
+
+    /// Đưa chỗ của `user_id` trong hạn mức về đúng trạng thái THẬT sau một lần đổi: giữ role thì có chỗ đã xác
+    /// nhận, không giữ thì trả chỗ; rồi đọc lại — trạng thái đổi giữa chừng (lần đổi role đồng thời khác của cùng
+    /// người đã commit) thì làm lại theo trạng thái mới. Hành động cuối cùng của mọi lượt luôn đi sau mọi commit và
+    /// được một lần đọc sau nó xác nhận, nên hai lần đổi đồng thời (một gỡ hết, một gán) không còn để chỗ lệch với
+    /// role thật (P16, D-20261128-member-slot-settle). Còn lệch sau [`SETTLE_ROUNDS`] lượt (đổi liên tục) thì job
+    /// đối soát của `plans` (`MemberCounter`) sửa số đếm.
+    async fn settle_member(&self, tenant: &TenantContext, user_id: Uuid) -> Result<(), Error> {
+        let reference = member_reference(user_id);
+        let mut holds = has_membership(tenant, user_id).await?;
+        for _ in 0..SETTLE_ROUNDS {
+            if holds {
+                self.keep_member_slot(tenant, user_id, &reference).await?;
+            } else {
+                self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?;
+            }
+            let now = has_membership(tenant, user_id).await?;
+            if now == holds {
+                return Ok(());
+            }
+            holds = now;
+        }
+        tracing::warn!(%user_id, tenant_id = %tenant.id(), "member slot kept changing; reconciliation settles it");
+        Ok(())
+    }
+
+    /// Chỗ của người đang giữ role: giữ (không giữ thêm nếu đã có — cùng mã) rồi xác nhận. Hết chỗ ở bước này nghĩa
+    /// là role đã ghi rồi (người giữ role từ trước khi khách vào gói chưa có dòng trong sổ, hay chỗ vừa bị lượt đồng
+    /// thời trả): không làm hỏng lệnh đã commit, ghi `warn`; job đối soát đếm theo role thật.
+    async fn keep_member_slot(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        reference: &str,
+    ) -> Result<(), Error> {
+        match self.entitlements.reserve(tenant.id(), &MEMBERS_LIMIT, 1, reference).await {
+            Ok(()) => self.entitlements.confirm(tenant.id(), &MEMBERS_LIMIT, reference).await,
+            Err(error) if error.code() == "limit_exceeded" => {
+                tracing::warn!(%user_id, tenant_id = %tenant.id(), "member holds a role beyond the members limit");
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
     }
 
     /// Dịch mô tả permission bằng `translations`.
@@ -860,6 +895,8 @@ pub(crate) async fn role_by_name(
         .map(|row| row.id))
 }
 
+#[cfg(test)]
+mod scope_rule_tests;
 #[cfg(test)]
 mod self_grant_tests;
 #[cfg(test)]

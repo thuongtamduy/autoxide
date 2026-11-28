@@ -358,9 +358,9 @@ impl ScimService {
         let creator = self.authority(caller).await?;
         let tenant = &caller.tenant;
         self.roles.require_covers(tenant, &creator, target).await?;
-        // `require_covers` so theo TÊN permission, bỏ qua phạm vi: người tạo có quyền ở một nhánh vẫn qua với tài khoản
-        // ở nhánh khác (PT-19). Thêm luật "giữ được" của membership: người tạo phải cấp được từng (nút, role) tài khoản
-        // đang giữ — cùng luật với nhóm SCIM và luật ánh xạ (D-20261125-scim-grant-cover).
+        // `require_covers` so từng grant (nút, độ sâu) của tài khoản (D-20261128-ban-lift-scope). Thêm luật "giữ được"
+        // của membership (PT-19): người tạo phải cấp được từng (nút, role) tài khoản đang giữ — cùng luật với nhóm SCIM
+        // và luật ánh xạ (D-20261125-scim-grant-cover); nó còn kiểm role `admin` và lệnh cấm của role.
         use crate::role::entity::user_role;
         let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
         let held: Vec<(Uuid, Uuid)> = user_role::Entity::find()

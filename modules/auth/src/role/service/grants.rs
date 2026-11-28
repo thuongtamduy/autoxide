@@ -133,7 +133,49 @@ pub(crate) async fn grantable<C: ConnectionTrait>(
     }
     let mut rules = permissions_of(connection, tenant, [role_id]).await?;
     let denies = rules.remove(&role_id).unwrap_or_default().denies;
-    Ok(denies.iter().all(|permission| authority.allows(permission)))
+    let root = root_of(tenant.id());
+    Ok(denies.iter().all(|permission| lifts_ban(authority, root, permission)))
+}
+
+/// `actor` bao được mọi quyền của `target` không — tên permission LẪN phạm vi (nút, độ sâu) của từng grant,
+/// cùng luật với khi gán role ([`grant_problems`]); dùng cho việc tác động lên tài khoản người khác (xoá, khoá,
+/// đổi email, nhận về tài khoản, thu hồi API key — `require_covers`). Trước đây chỉ so tên (P16 (i)).
+pub(crate) async fn covers_all<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    actor: &Principal,
+    target: &Principal,
+) -> Result<bool, Error> {
+    if target.has_all_permissions() {
+        // Như gán role `admin`: chỉ người toàn quyền, không bị rào.
+        return Ok(actor.has_all_permissions() && actor.fence().is_none());
+    }
+    let Some(map) = target.grant_map() else { return Ok(true) };
+    let root = root_of(tenant.id());
+    let mut chains: HashMap<OrgId, Vec<OrgId>> = HashMap::new();
+    for (permission, grants) in map {
+        for grant in grants {
+            let chain = match chains.get(&grant.org) {
+                Some(chain) => chain,
+                None => {
+                    let mut chain = OrgTree::ancestors(connection, tenant.id(), grant.org).await?;
+                    chain.extend([grant.org, root]);
+                    chains.entry(grant.org).or_insert(chain)
+                }
+            };
+            if !actor_covers(actor, grant.org, chain, permission, grant.scope) {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
+/// `actor` bỏ được lệnh cấm `permission` không. Cấm có hiệu lực ở cả khách (thắng mọi role, mọi nút), nên
+/// bỏ cấm mở lại `permission` ở mọi nút người giữ có grant: người bỏ phải có nó ở độ sâu `tenant`, không bị
+/// rào — không chỉ có TÊN permission ở một nhánh (P16, D-20261128-ban-lift-scope).
+fn lifts_ban(actor: &Principal, root: OrgId, permission: &str) -> bool {
+    actor_covers(actor, root, &[root], permission, Scope::Tenant)
 }
 
 pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {
@@ -174,7 +216,9 @@ pub(crate) fn rules_beyond(
     before
         .denies
         .iter()
-        .find(|permission| !after.denies.contains(permission) && !actor.allows(permission))
+        .find(|permission| {
+            !after.denies.contains(permission) && !lifts_ban(actor, root, permission)
+        })
         .cloned()
 }
 
