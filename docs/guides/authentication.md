@@ -4,7 +4,7 @@ Vietnamese: [`authentication.vi.md`](authentication.vi.md). Examples use `curl` 
 
 ## Sign in
 
-Send the email and password. The answer holds a short-lived **access token** (send it with every request) and a **refresh token** (to get the next pair). An account with two-step sign-in answers `202` with a `challenge_id` instead; finish with `POST /api/v1/auth/login/mfa` and the code.
+Send the email and password. The answer holds a short-lived **access token** (send it with every request) and a **refresh token** (to get the next pair). An account with two-step sign-in answers `202` with an `mfa_token` instead (and `methods`, `expires_in`); finish with `POST /api/v1/auth/login/mfa` and `{"mfa_token": …, "code": …}`, where `code` is the 6-digit code of the authenticator app or an unused recovery code. The `mfa_token` allows a few tries within `expires_in` seconds and ends when a code is accepted; afterwards it answers `401 auth.invalid_mfa_token` (sign in again). A wrong code answers `401 auth.invalid_mfa_code`. A code that was accepted once cannot be used again within its 30-second window, nor an older one — signing in twice in a row, wait for the next code. (`challenge_id` belongs to signing in with a phone number, below.)
 
 On a server that hosts several tenants, sign in on the tenant's domain or with the `Autoxide-Tenant` header. The tokens you get name their tenant, so the requests that follow — with the access token, `/refresh`, `/logout`, `/login/mfa`, and the links in password-reset and verification mails — need neither the header nor the domain. Sending a token together with a header (or domain) of another tenant is refused.
 
@@ -148,4 +148,26 @@ console.log(me.email, me.permissions);
 
 const next = await api.post("/api/v1/auth/refresh", { body: { refresh_token: tokens.refresh } });
 tokens = { access: next.access_token, refresh: next.refresh_token };
+```
+
+Or let the client refresh by itself: with a `refresh` function, a request that gets `401 auth.token_expired`
+waits for one refresh — shared by every request that failed at the same time, since a refresh token works
+once — and is sent again. [Building a web app](web-app.md) has the whole setup, with storage and several tabs.
+
+```ts
+import { createClient } from "@autoxide/sdk";
+
+let tokens = { access: "", refresh: "" };
+const signIn = createClient({ baseUrl: "https://api.example.com" });
+const api = createClient({
+  baseUrl: "https://api.example.com",
+  token: () => tokens.access,
+  refresh: async () => {
+    const next = await signIn.post("/api/v1/auth/refresh", { body: { refresh_token: tokens.refresh } });
+    tokens = { access: next.access_token, refresh: next.refresh_token };
+  },
+});
+
+const me = await api.get("/api/v1/auth/me");
+console.log(me.all_permissions || me.permissions.includes("content.write"));
 ```

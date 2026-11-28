@@ -72,7 +72,7 @@ curl -sS "$API/api/v1/notifications/me/device-tokens" -H "Authorization: Bearer 
 
 ## 5. Tải ảnh thẳng lên nơi lưu
 
-Đừng gửi ảnh lớn qua máy chủ API. Xin link tải lên đã ký, gửi dữ liệu từ điện thoại thẳng lên S3, rồi hoàn tất — xem [Tải file lớn thẳng lên nơi lưu](direct-uploads.vi.md). Tính `size` và `sha256` của đúng dữ liệu sẽ gửi (sau khi thu nhỏ trên điện thoại). Máy chủ này lưu file trên đĩa của nó nên trả `409 media.direct_upload_unavailable`: khi đó app tải lên qua `POST /api/v1/media` (multipart).
+Đừng gửi ảnh lớn qua máy chủ API. Xin link tải lên đã ký, gửi dữ liệu từ điện thoại thẳng lên S3, rồi hoàn tất — xem [Tải file lớn thẳng lên nơi lưu](direct-uploads.vi.md). Tính `size` và `sha256` của đúng dữ liệu sẽ gửi (sau khi thu nhỏ trên điện thoại). Máy chủ này lưu file trên đĩa của nó nên trả `409 media.direct_upload_unavailable`: khi đó app tải lên qua `POST /api/v1/media?name=…`, với chính file làm thân request và loại của nó trong `Content-Type` (không phải form multipart — bị từ chối với `415`).
 
 <!-- example: start-upload -->
 ```bash

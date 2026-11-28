@@ -96,6 +96,29 @@ curl -sS "$API/api/v1/content/public/resolve?locale=en&path=/blog/hello-world" -
 # expect: 304
 ```
 
+## Cache, and seeing a post you just published
+
+Anonymous public reads (posts, pages, categories, the site frame, sitemap, feed) answer
+`Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300`:
+
+- **browsers** keep a copy but ask the server again every time (`max-age=0`), cheaply with `ETag` / `304`;
+- **shared caches** — a CDN, a reverse proxy, your framework's server cache — may serve their copy for
+  60 seconds (`s-maxage`, set with `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS`), and an older copy for 5 more
+  minutes while they fetch a fresh one in the background (`stale-while-revalidate`).
+
+So behind a cache, the first reload after you publish or change a post can still show the old version; the
+next one shows the new one. Requests with an `Authorization` header are never kept by shared caches.
+
+To see a change at once — a "preview" button in your admin, right after publishing:
+
+- call from the browser with `fetch(url, { cache: "no-cache" })`: the browser asks the server again and
+  sends its `ETag` itself;
+- or send the request with your access token: signed-in answers are `private` and skip shared caches;
+- or, with the SDK, keep the `ETag` you got and send it as `ifNoneMatch`: `304` means your copy is current.
+
+Drafts are not public at all: show a draft with the signed-in endpoints (`GET /api/v1/content/entries/{id}`)
+or a preview link (`POST /api/v1/content/entries/{id}/preview-token`, read with `GET /api/v1/content/public/preview`).
+
 ## With the SDK
 
 ```ts
