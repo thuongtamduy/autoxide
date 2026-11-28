@@ -111,6 +111,10 @@ trait and registers it where the older one-function-per-concept call did:
 | `ops::summary::SummaryMetric`, `ops::list_exports::ExportSource`, `ops::bulk::BulkAction` | `summary_metric`, `export_source`, `bulk_action` |
 | `ops::resolve::CodeResolver`, `ops::setup::SetupStep`, `ops::connections::ConnectionProbe`, `ops::usages::ReferenceSource` | `code_resolver`, `setup_step`, `connection_probe`, `reference_source` |
 
+Name the trait every time: `contribute(Arc::new(x))` without `::<dyn Trait>` contributes the concrete type, which nobody
+reads, and fails at start. Contributed switch hooks run after the hooks declared with `Relocation::on_switch`; a dormant
+module does not start, so it contributes no hook (D-20261128-contributed-switch-hooks).
+
 Registrations that bind a key to an implementation keep their own call: `resource_type`, `badge_source`, `block_data`,
 `taggable`, `usage_counter`, `search_documents`, `search_backend`. The old getters (`outbox()`, `sync_log()`,
 `entitlements()`…) and the old registrations above keep working during the transition; new code uses
@@ -590,8 +594,8 @@ Modules such as `comments` attach data to records of other modules without depen
 - `context.badge_source(kind, &["seller"], resolver)` computes badges of an author on a record of
   any kind, e.g. `seller` for someone who manages a product. Each badge of a kind comes from one
   module; badges are stable codes, never sentences.
-- `context.posting_verifier(…)` (one module in the whole program) answers whether an account is
-  verified to post content (phone or identity); `context.posting_verification()` asks it. With no
+- `context.contribute::<dyn PostingVerifier>(…)` (one module in the whole program) answers whether an account is
+  verified to post content (phone or identity); `context.kernel::<PostingVerification>()` asks it. With no
   verifier registered every signed-in account counts as verified.
 
 ### Personal data
@@ -793,11 +797,11 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
 
 - **Menu**: `Module::navigation` — groups and items with permissions, plan features and a
   work counter. Labels are English, translated through the module's `text:` keys.
-- **Work inbox**: `context.work_source(…)` — a `WorkSource` computes the work from data (no "done"
+- **Work inbox**: `context.contribute::<dyn WorkSource>(…)` — a `WorkSource` computes the work from data (no "done"
   flag), with a count for the menu. Items have a stable key `<source>:<record id>`, so people
   snooze and assign them.
-- **Search and codes**: `context.finder_source(…)` (a `FinderSource`; `fields` and `scoped` when
-  it understands `field:value` and `scope=`) and `context.code_resolver(…)` (order numbers, page
+- **Search and codes**: `context.contribute::<dyn FinderSource>(…)` (a `FinderSource`; `fields` and `scoped` when
+  it understands `field:value` and `scope=`) and `context.contribute::<dyn CodeResolver>(…)` (order numbers, page
   addresses… for `GET /api/v1/kernel/resolve`).
 - **Search index** (large tables, step 40 P7): `context.search_documents(kind, source)` declares a
   searchable kind (`SearchKind`: fields with weights, equality filters, read permission) and a
@@ -808,13 +812,13 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
   units inside the engine. The engine is the database by default; a module adds another with
   `context.search_backend(name, …)`, chosen by `AUTOXIDE_SEARCH_BACKEND`, without changes to other
   modules. `autoxide task kernel.reindex` rebuilds the index.
-- **Figures and setup**: `context.summary_metric(…)` (a `MetricInfo` always carries its
-  definition) and `context.setup_step(…)` (done is computed from data).
+- **Figures and setup**: `context.contribute::<dyn SummaryMetric>(…)` (a `MetricInfo` always carries its
+  definition) and `context.contribute::<dyn SetupStep>(…)` (done is computed from data).
 - **Activity**: `EventInfo::activity(…)` gives an event a readable sentence; notes and history of
   any record of the resource directory come from the kernel.
 - **Lists**: every list endpoint (a `GET` with `cursor`) gets `x-autoxide-filters` from its own
-  query parameters — keep them in one `IntoParams` struct. Exports: `context.export_source(…)` with
-  the list's id. Bulk actions: `context.bulk_action(…)`; the action must be safe to repeat.
+  query parameters — keep them in one `IntoParams` struct. Exports: `context.contribute::<dyn ExportSource>(…)` with
+  the list's id. Bulk actions: `context.contribute::<dyn BulkAction>(…)`; the action must be safe to repeat.
 - **Risky commands**: add `("x-approval" = json!("agent"))` to the route's `extensions`; an MCP
   tool doing the same calls `.requires_approval_for_agent()`.
 - **Tenant choices**: `Module::reason_lists` (codes with English labels; legal ones stay on),
@@ -825,7 +829,7 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
   `custom_fields::index_migration` and writes the index with `CustomFields::write_index` in the
   same transaction as the record.
 - **Connections to partners**: settings named `<module>.connection.<kind>.<field>`;
-  `context.connection_probe(…)` to test one, `ConnectionStatus::record` after each use.
+  `context.contribute::<dyn ConnectionProbe>(…)` to test one, `ConnectionStatus::record` after each use.
 - **Page blocks** (step 67): `Module::blocks` declares the blocks the module offers to pages built
   from blocks — `BlockType::new("<module>.<block>", category, label, ai_hint, props_schema)`, with
   `.with_data()`, `.with_children()`, `.requires(feature)`. The props schema is the JSON Schema

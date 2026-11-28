@@ -637,8 +637,20 @@ impl Modules {
         )
         .map_err(|problems| ModuleError(problems.join("; ")))?;
         // Hook của bước chuyển cần service nên đóng góp trong `start` (D-20261128-contribute); `Relocation::on_switch`
-        // là đường cũ.
-        policies.add_switch_hooks(self.apis.contributions::<dyn crate::tenancy::SwitchHook>());
+        // là đường cũ. Hook đóng góp chạy SAU mọi hook cũ; module đang nghỉ không `start` nên không có hook đóng góp
+        // (D-20261128-contributed-switch-hooks).
+        let hooks = self.apis.contributions_named::<dyn crate::tenancy::SwitchHook>();
+        for (module, _) in &hooks {
+            if self.modules.iter().any(|known| {
+                known.name() == *module && !known.relocation().switch_hooks().is_empty()
+            }) {
+                return Err(ModuleError(format!(
+                    "module `{module}` adds a switch hook with `Relocation::on_switch` and also contributes \
+                     `dyn SwitchHook` in `start`: keep the contribution and remove `on_switch`"
+                )));
+            }
+        }
+        policies.add_switch_hooks(hooks.into_iter().map(|(_, hook)| hook).collect());
         let dormant = super::dormant::migrators(&self.dormant, &self.keys, registry)?;
         self.moves.fill(crate::tenancy::moves::Setup {
             modules: self.names(),
