@@ -598,10 +598,7 @@ impl OrdersService {
             return Err(Error::validation(problems));
         }
         // Tiền khác tiền của ca (vd JPY ở ca VND) không được ghi như tiền của ca (PT-6).
-        if let Some(index) = paid
-            .iter()
-            .position(|payment| !payment.in_currency(&shift.currency))
-        {
+        if let Some(index) = paid.iter().position(|payment| !payment.in_currency(&shift.currency)) {
             return Err(errors::payment_currency_mismatch(index, &shift.currency));
         }
         let print = fingerprint(&json!({"lines": cart.lines, "codes": cart.codes,

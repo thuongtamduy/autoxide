@@ -124,7 +124,8 @@ pub(crate) fn load_of(
             longest = longest.max(side);
         }
     }
-    let chargeable = crate::limits::within_load(actual.max(volumetric)).map_err(LoadError::TooLarge)?;
+    let chargeable =
+        crate::limits::within_load(actual.max(volumetric)).map_err(LoadError::TooLarge)?;
     Ok(Load { chargeable_grams: chargeable, longest_side_mm: longest })
 }
 

@@ -434,7 +434,11 @@ pub(crate) fn payment_currency_mismatch(index: usize, currency: &str) -> Error {
 
 /// `orders.payment_received_currency_mismatch` (422): `ledger` báo đã thu khoản `payment` bằng tiền khác
 /// tiền của khoản (và của đơn). Chỉ thấy trong log / dead-letter của event, không qua REST.
-pub(crate) fn received_currency_mismatch(payment: uuid::Uuid, received: &str, currency: &str) -> Error {
+pub(crate) fn received_currency_mismatch(
+    payment: uuid::Uuid,
+    received: &str,
+    currency: &str,
+) -> Error {
     Error::new(
         ErrorKind::Validation,
         "orders.payment_received_currency_mismatch",

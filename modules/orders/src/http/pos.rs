@@ -346,12 +346,7 @@ pub(crate) async fn sell(
         .payments
         .into_iter()
         .map(|payment| {
-            PosPayment::new(
-                payment.method,
-                payment.amount,
-                payment.tendered,
-                payment.approval_code,
-            )
+            PosPayment::new(payment.method, payment.amount, payment.tendered, payment.approval_code)
         })
         .collect();
     let sold = service

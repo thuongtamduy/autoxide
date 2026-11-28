@@ -416,7 +416,8 @@ async fn khoan_nhan_khac_tien_te_cua_don_khong_cong_vao_don() {
         let database = shop.database();
         let backend = database.read().get_database_backend();
         let sql = "SELECT last_error FROM ledger_events WHERE delivered_at IS NULL";
-        let row = database.read().query_one_raw(statement(backend, sql, [])).await.unwrap().unwrap();
+        let row =
+            database.read().query_one_raw(statement(backend, sql, [])).await.unwrap().unwrap();
         let error: String = row.try_get("", "last_error").unwrap();
         assert!(error.contains("orders.payment_received_currency_mismatch"), "{error}");
 

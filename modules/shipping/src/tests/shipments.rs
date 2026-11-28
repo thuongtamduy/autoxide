@@ -514,8 +514,12 @@ async fn chia_kien_vuot_tran_bao_loi() {
         ]});
         let (status, problem) = call(&app, "PUT", &uri, "boss", Some(wild)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
-        let fields: Vec<&str> =
-            problem["errors"].as_array().unwrap().iter().filter_map(|e| e["field"].as_str()).collect();
+        let fields: Vec<&str> = problem["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|e| e["field"].as_str())
+            .collect();
         assert_eq!(fields, ["parcels[0].weight_grams", "parcels[0].length_mm"], "{problem}");
         // Mỗi kiện đúng trần, hai kiện cộng lại vượt trần.
         let heavy = json!({"parcels": [
