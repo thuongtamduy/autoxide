@@ -91,6 +91,7 @@ impl IdempotencyStore for Store {
                 .one()
                 .await?
             else {
+                transaction.rollback().await?;
                 continue; // vừa bị dọn giữa hai câu lệnh
             };
             let now = now();
@@ -99,7 +100,9 @@ impl IdempotencyStore for Store {
                 transaction.commit().await?;
                 continue;
             }
+            // Các nhánh chỉ đọc trả lời ngay và `rollback` rõ ràng: nhả khoá ghi của SQLite liền, không đợi kết nối về pool.
             if row.fingerprint != fingerprint {
+                transaction.rollback().await?;
                 return Ok(Begin::Mismatch);
             }
             if let Some(status) = row.status {
@@ -112,9 +115,11 @@ impl IdempotencyStore for Store {
                     .unwrap_or_default();
                 let status = u16::try_from(status).map_err(Error::internal)?;
                 let body = row.body.unwrap_or_default();
+                transaction.rollback().await?;
                 return Ok(Begin::Replay(StoredResponse::new(status, headers, body)));
             }
             if row.locked_until > now {
+                transaction.rollback().await?;
                 return Ok(Begin::InProgress);
             }
             // Lần đầu đã quá hạn mà chưa xong (tiến trình chết): nhận lại quyền chạy, có

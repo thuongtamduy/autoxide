@@ -353,9 +353,15 @@ async fn key_het_han_va_lan_dau_chet_giua_chung() {
 
         // Hết hạn giữ key: dọn đi, key dùng lại được như mới.
         set_all(&database, Row::EXPIRES_AT).await;
+        // Key còn hạn (vừa tạo sau khi các key kia hết hạn): job dọn giữ nguyên.
+        let fresh = store.begin(&tenant, "s", "fresh", "f", soon).await.unwrap();
+        assert!(matches!(fresh, Begin::Started { .. }), "{fresh:?}");
         let context =
             JobContext::for_database(database.clone(), CLEANUP, serde_json::Value::Null, 1);
         Cleanup.run(&context).await.unwrap();
+        let rows = all_tenants(&database).read().find::<Row>().all().await.unwrap();
+        assert_eq!(rows.iter().map(|row| row.key.as_str()).collect::<Vec<_>>(), ["fresh"]);
+        assert_eq!(store.begin(&tenant, "s", "fresh", "f", soon).await.unwrap(), Begin::InProgress);
         assert!(matches!(
             store.begin(&tenant, "s", "k", "different", soon).await.unwrap(),
             Begin::Started { .. }
