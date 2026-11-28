@@ -146,7 +146,7 @@ impl SepayEInvoice {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EInvoiceProvider for SepayEInvoice {
     fn provider(&self) -> &'static str {
         PROVIDER
@@ -252,7 +252,7 @@ impl EInvoiceProvider for SepayEInvoice {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl ConnectionProbe for SepayEInvoice {
     fn connection(&self) -> &'static str {
         crate::CONNECTION

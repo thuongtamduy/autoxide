@@ -562,9 +562,9 @@ impl Principal {
     }
 
     /// The user `user_id` with exactly the permissions `permissions`, at depth `tenant`. The grants sit at the
-    /// default tenant's root node and [`in_tenant`](Self::in_tenant) does not move them; they still count as held at
-    /// the root of whichever tenant the caller is in (for example by
-    /// [`require_at_root`](Self::require_at_root)), so `TestApp::user_in` builds a tenant administrator.
+    /// default tenant's root node; [`in_tenant`](Self::in_tenant) moves them to the root of the tenant the caller
+    /// enters, so they count as held at that root (for example by [`require_at_root`](Self::require_at_root)) and
+    /// `TestApp::user_in` builds a tenant administrator.
     pub fn new(user_id: Uuid, permissions: impl IntoIterator<Item = String>) -> Self {
         let root = root_of(DEFAULT_TENANT);
         Principal::with_grants(
@@ -761,6 +761,12 @@ impl Principal {
         self.denied.contains_key(name)
     }
 
+    /// The permission `name` lies outside the tenant's guardrail (and no role of the caller bans it): nobody
+    /// in this tenant can hold it, so lifting a ban on it opens nothing.
+    pub fn outside_guardrail(&self, name: &str) -> bool {
+        self.denied.get(name) == Some(&OUTSIDE_GUARDRAIL)
+    }
+
     /// Error 403 `permission_denied` for `permission`, with the `reason` `denied_by_role`,
     /// `outside_guardrail` hay `missing`.
     fn refuse(&self, permission: &Permission) -> Error {
@@ -828,7 +834,12 @@ impl Principal {
     }
 
     /// The caller belongs to tenant `tenant` (the authenticator sets it from the tenant in the credential).
+    ///
+    /// Grants (and a fence) at the root node of the previous tenant move to the root node of `tenant`: a grant
+    /// at a tenant's root means "the whole tenant", never a branch of another tenant. Not for platform staff
+    /// entering a tenant ([`operating`](Self::operating)): their grants stay at their own tenant's root.
     pub fn in_tenant(mut self, tenant: TenantId) -> Self {
+        self.move_root_grants(tenant);
         self.tenant = tenant;
         self
     }

@@ -35,11 +35,11 @@ mod tests;
 use std::sync::Arc;
 
 use autoxide_kernel::config::{ConfigReader, Invalid};
+use autoxide_kernel::connections::ConnectionProbe;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::module::{Module, Stability, StartContext};
+use autoxide_kernel::module::{Manifest, Module, Stability, StartContext};
 use autoxide_kernel::provider::ProviderAccounts;
 use autoxide_kernel::sms::SmsSender;
-use autoxide_kernel::tenancy::TenantSetting;
 
 use crate::config::EsmsConfig;
 
@@ -55,32 +55,28 @@ struct EsmsModule {
     config: Option<EsmsConfig>,
 }
 
+// Hợp đồng module (D-20261126-module-manifest): khai tĩnh trong `manifest`, đăng ký thứ cần service trong `start`.
 impl Module for EsmsModule {
-    fn name(&self) -> &'static str {
-        "esms"
-    }
-
-    fn description(&self) -> &'static str {
-        "SMS through eSMS (Vietnam): one-time codes and customer-care messages under each \
-         tenant's own eSMS account and brandname. Written from the provider's public \
-         documentation; not yet verified against the live service."
-    }
-
-    fn stability(&self) -> Stability {
-        Stability::Experimental
-    }
-
-    fn tenant_settings(&self) -> Vec<TenantSetting> {
-        vec![account::API_KEY, account::SECRET_KEY, account::BRANDNAME, account::ENVIRONMENT]
+    fn manifest(&self) -> Manifest {
+        Manifest::new(
+            "esms",
+            "SMS through eSMS (Vietnam): one-time codes and customer-care messages under each \
+             tenant's own eSMS account and brandname. Written from the provider's public \
+             documentation; not yet verified against the live service.",
+        )
+        .stability(Stability::Experimental)
+        .tenant_settings([
+            account::API_KEY,
+            account::SECRET_KEY,
+            account::BRANDNAME,
+            account::ENVIRONMENT,
+        ])
+        .translation("vi", include_str!("../locales/vi.json"))
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(EsmsConfig::read(reader)?);
         Ok(())
-    }
-
-    fn translations(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("vi", include_str!("../locales/vi.json"))]
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -92,7 +88,7 @@ impl Module for EsmsModule {
         // `require` trả `Arc<ProviderAccounts>`; bản thân nó clone rẻ nên lấy một bản riêng.
         let accounts = (*context.require::<ProviderAccounts>()?).clone();
         let esms = Arc::new(client::Esms::new(accounts, config.api_url)?);
-        context.connection_probe(esms.clone())?;
+        context.contribute::<dyn ConnectionProbe>(esms.clone())?;
         context.provide::<dyn SmsSender>(esms)
     }
 }

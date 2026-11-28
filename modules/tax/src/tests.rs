@@ -436,6 +436,10 @@ async fn loi_khuyen_hoa_don_theo_nghi_dinh_68() {
         let company = advice(tree.south, day(2026, 6, 1), false).await.unwrap();
         assert!(company.einvoice_required);
         assert_eq!(company.kind, None);
+        // Người bán không chịu thuế: hoá đơn bán hàng, không để `orders` rơi về hoá đơn GTGT mặc định.
+        put(tree.south, profile("exempt", 300_000_000)).await;
+        let exempt = advice(tree.south, day(2026, 6, 1), false).await.unwrap();
+        assert_eq!(exempt.kind.as_deref(), Some("sales_invoice"), "{exempt:?}");
         // Ngưỡng không chịu thuế là dữ liệu có ngày hiệu lực, đọc được qua `/rules`.
         let (_, rules) = call(&app, "GET", "/rules", "ops", None).await;
         assert!(rules.to_string().contains("household.tax_free_revenue"), "{rules}");

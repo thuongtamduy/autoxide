@@ -265,6 +265,7 @@
   "kernel.work_not_found": "Không có việc `{key}` nào cho bạn.",
   "length_required": "Request cần header `content-length`.",
   "limit_exceeded": "Đã dùng hết hạn mức `{limit}` ({used}/{max}). Nâng gói hoặc giải phóng bớt.",
+  "limit_hold_missing": "Không có chỗ giữ của hạn mức `{limit}` cho `{reference}` (đã hết hạn hay đã được trả); hãy giữ lại.",
   "method_not_allowed": "Endpoint này không hỗ trợ HTTP method này. Xem header `allow`.",
   "mobile_push_disabled": "Máy chủ chưa cấu hình thông báo đẩy tới ứng dụng di động.",
   "module_not_enabled": "Gói hiện tại của bạn chưa có module `{module}`. Nâng gói để dùng.",

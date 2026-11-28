@@ -221,3 +221,96 @@ async fn role_chi_co_lenh_cam() {
     .await
     .unwrap();
 }
+
+/// P16 (iv) (D-20261128-role-narrow-rule): sửa role mà BỎ, THU HẸP hay CẤM thêm một permission là gỡ nó khỏi mọi người
+/// giữ role — người sửa phải có permission đó đủ rộng, như khi gỡ role. Permission mình có thì bỏ được.
+#[tokio::test]
+async fn thu_hep_role_nguoi_khac_doi_co_permission_do() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let (roles, tenant) = (services.roles.clone(), services.tenant.clone());
+        let manager = roles
+            .create(
+                &tenant,
+                Actor::system(),
+                input("manager", &["auth.roles.manage", "auth.users.read"]),
+            )
+            .await
+            .unwrap();
+        let deleter = roles
+            .create(
+                &tenant,
+                Actor::system(),
+                input("deleter", &["auth.users.read", "auth.users.manage"]),
+            )
+            .await
+            .unwrap();
+        let ann = user(&services, "ann@example.com").await;
+        roles.set_user_roles(&tenant, Actor::system(), ann, vec![manager.id]).await.unwrap();
+        let ann_p = principal_of(&services, ann).await;
+
+        // Bỏ `auth.users.manage` (ann không có) khỏi role người khác giữ: 403, role giữ nguyên.
+        let error = roles
+            .update_as(&tenant, &ann_p, deleter.id, input("deleter", &["auth.users.read"]), None)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "auth.permission_beyond_you", "{error:?}");
+        // Cấm thêm `auth.scim.manage` (ann không có): cũng là gỡ nó ở cả khách khỏi người giữ role.
+        let mut banned = input("deleter", &["auth.users.read", "auth.users.manage"]);
+        banned.denies = vec!["auth.scim.manage".to_owned()];
+        let error = roles.update_as(&tenant, &ann_p, deleter.id, banned, None).await.unwrap_err();
+        assert_eq!(error.code(), "auth.permission_beyond_you");
+        let kept = roles.get(&tenant, deleter.id).await.unwrap();
+        assert!(kept.permissions.contains(&"auth.users.manage".to_owned()), "{kept:?}");
+        assert!(kept.denies.is_empty(), "{kept:?}");
+        // Bỏ permission mình có (`auth.users.read`) thì được.
+        roles
+            .update_as(&tenant, &ann_p, deleter.id, input("deleter", &["auth.users.manage"]), None)
+            .await
+            .unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Khách có guardrail (D-20261128-ban-lift-guardrail): role cấm một permission nằm ngoài rào — không ai trong khách có
+/// được permission đó, kể cả quản trị viên. Bỏ cấm ấy không mở thêm gì, nên quản trị viên trong rào gỡ được role (trước
+/// đây không ai gỡ được). Permission trong rào mà người gỡ không có thì vẫn bị chặn.
+#[tokio::test]
+async fn go_role_cam_permission_ngoai_rao() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let (roles, tenant) = (services.roles.clone(), services.tenant.clone());
+        let catalog = roles.catalog().clone();
+        let first = PageRequest::first(200, autoxide_kernel::pagination::Order::Asc);
+        let admin = roles.list(&tenant, &first).await.unwrap().data.into_iter();
+        let admin = admin.into_iter().find(|role| role.all_permissions).unwrap();
+        let mut banner = input("banner", &["auth.users.read"]);
+        banner.denies = vec!["auth.users.manage".to_owned()];
+        let banner = roles.create(&tenant, Actor::system(), banner).await.unwrap();
+        let (boss, bob) =
+            (user(&services, "boss@example.com").await, user(&services, "bob@example.com").await);
+        roles.set_user_roles(&tenant, Actor::system(), boss, vec![admin.id]).await.unwrap();
+        roles.set_user_roles(&tenant, Actor::system(), bob, vec![banner.id]).await.unwrap();
+        let everything: std::collections::BTreeSet<String> =
+            catalog.iter().map(|permission| permission.name().to_owned()).collect();
+
+        // Rào bỏ `auth.users.manage`: quản trị viên không có nó, nhưng gỡ được role cấm nó.
+        let mut fenced = everything.clone();
+        fenced.remove("auth.users.manage");
+        let boss_p = principal_of(&services, boss).await.within(Some(&fenced), &catalog);
+        assert!(boss_p.outside_guardrail("auth.users.manage"));
+        roles.set_user_roles_as(&tenant, &boss_p, bob, vec![]).await.unwrap();
+
+        // Rào bỏ permission khác: `auth.users.manage` trong rào mà người gỡ không có (role cấm của chính họ) → 403.
+        roles.set_user_roles(&tenant, Actor::system(), bob, vec![banner.id]).await.unwrap();
+        let boss_p = principal_of(&services, boss)
+            .await
+            .without(["auth.users.manage".to_owned()], &catalog)
+            .within(Some(&everything), &catalog);
+        let error = roles.set_user_roles_as(&tenant, &boss_p, bob, vec![]).await.unwrap_err();
+        assert_eq!(error.code(), "auth.role_beyond_you", "{error:?}");
+    })
+    .await
+    .unwrap();
+}
