@@ -134,7 +134,10 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       utoipa (gate kiểm)
       - [ ] Chặn 1.0: gỡ cầu tạm `ConnectionTrait` trên handle của `db` (các hàm kernel nhận handle thay connection) và
             `TenantContext::database()` thô; baseline `raw-database` của `xtask/library-baseline.txt` về rỗng
-            (D-20261126-kernel-data-layer)
+            (D-20261126-kernel-data-layer). Đã có: hàm kernel tự dựng câu nhận `db::Executor` thay `ConnectionTrait`.
+            Còn: cầu chỉ còn giữ cho chỗ module chạy câu SeaORM trên handle (OAuth của `auth`, `ledger`, `compliance`
+            `phone_locks`, `conversations` `voice/recordings`, `orders` `payment_attempts`) — chuyển các chỗ đó sang
+            `Record` rồi gỡ cầu; `raw-database` về rỗng theo cụm (D-20261128-library-layer-plan mục 5, 6)
       - [x] Lớp HTTP: `#[endpoint]` (khai rõ ai được gọi, 401/403 chuẩn tự sinh), `routes!`, `Routes`,
             `#[derive(Schema/Params/Validate)]`, `Path`/`Query`/`State`, `NoContent`, `Download`, `async_trait`;
             `notes` không còn khai thư viện bọc ở `[dependencies]` (D-20261126-kernel-web-layer)

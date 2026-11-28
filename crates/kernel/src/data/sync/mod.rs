@@ -256,7 +256,7 @@ impl SyncLog {
 
     /// Record `id` (kind `resource`, at node / owner `target`) has just been created or edited. Call it
     /// with the transaction that is writing the change.
-    pub async fn changed<C: ConnectionTrait>(
+    pub async fn changed<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
@@ -264,12 +264,13 @@ impl SyncLog {
         id: Uuid,
         target: OrgTarget,
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         self.insert(connection, tenant, resource, id, target, false).await
     }
 
     /// Record `id` has just been deleted: the client receives a deletion mark. `target` is the node / owner
     /// at deletion time.
-    pub async fn deleted<C: ConnectionTrait>(
+    pub async fn deleted<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
@@ -277,6 +278,7 @@ impl SyncLog {
         id: Uuid,
         target: OrgTarget,
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         self.insert(connection, tenant, resource, id, target, true).await
     }
 
