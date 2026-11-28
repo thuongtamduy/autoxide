@@ -324,9 +324,25 @@ async fn hoan_luot_cu_gap_409_thi_thu_lai() {
         assert_eq!(status, StatusCode::OK, "{opened}");
         shop.ledger.conflict_next_refunds(1);
         paid(shop, &old).await;
-        drain(shop).await;
+        // Đúng MỘT lượt giao, không `drain`: lần thử lại tới hạn sau 2 giây (backoff của dispatcher), mà `drain`
+        // lặp tiếp khi còn việc — trên máy CI chậm vòng sau bắt đầu quá 2 giây thì event đã được thử lại và hoàn
+        // xong trước khi kiểm, bài đỏ dù code đúng (run 46086567838).
+        shop.modules().dispatcher().unwrap().run_once().await.unwrap();
         assert!(shop.ledger.refunds().is_empty());
         assert_eq!(undelivered(shop).await, 1, "409 is retried, not dropped");
+        assert_eq!(superseded_events(shop).await, 1);
+        // Lần thử lại (cho tới hạn ngay thay vì chờ backoff) hoàn lượt cũ đúng một lần.
+        let database = shop.database();
+        let backend = database.write().get_database_backend();
+        let due =
+            "UPDATE ledger_events SET next_attempt_at = occurred_at WHERE delivered_at IS NULL";
+        database.write().execute_raw(statement(backend, due, [])).await.unwrap();
+        drain(shop).await;
+        assert_eq!(
+            super::refund_rows(&shop.ledger),
+            vec![(old.id, old.amount.minor(), "superseded_payment".to_owned())]
+        );
+        assert_eq!(undelivered(shop).await, 0);
         assert_eq!(superseded_events(shop).await, 1);
     })
     .await
