@@ -36,6 +36,14 @@ pub struct McpClientError {
     pub body: String,
 }
 
+impl McpClientError {
+    /// The HTTP status of the response, as the test kit's type (the field `status` is the `http` crate's type, old
+    /// path).
+    pub fn status_code(&self) -> crate::http::StatusCode {
+        crate::http::StatusCode::from(self.status)
+    }
+}
+
 impl fmt::Display for McpClientError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.error {

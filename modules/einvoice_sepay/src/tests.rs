@@ -10,8 +10,8 @@ use autoxide_kernel::einvoice::{
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::provider::ProviderAccounts;
 use autoxide_kernel::time::Date;
+use autoxide_testkit::http::{Method, StatusCode};
 use autoxide_testkit::{FakeProviderServer, TestApp, TestDatabase};
-use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -37,7 +37,7 @@ async fn app(test: &TestDatabase, server: &FakeProviderServer) -> TestApp {
 async fn set(app: &TestApp, token: &str, field: &str, value: &str) {
     let uri = format!("/api/v1/kernel/settings/einvoice_sepay.connection.api.{field}");
     let answer = app.put(&uri).token(token).json(json!({"value": value})).send().await.unwrap();
-    assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+    assert_eq!(answer.status_code(), StatusCode::OK, "{}", answer.text());
 }
 
 fn provider(app: &TestApp, server: &FakeProviderServer) -> SepayEInvoice {
@@ -167,7 +167,7 @@ async fn xuat_hoa_don_dung_tai_lieu_bang_tai_khoan_cua_tung_khach() {
         // Giá trị lạ bị từ chối lúc đặt.
         let uri = "/api/v1/kernel/settings/einvoice_sepay.connection.api.environment";
         let refused = app.put(uri).token("two").json(json!({"value": "test"})).send().await.unwrap();
-        assert_eq!(refused.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(refused.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
     })
     .await
     .unwrap();

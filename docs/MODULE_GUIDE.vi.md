@@ -752,7 +752,8 @@ let app = TestApp::builder(test)
     .unwrap();
 
 let answer = app.post("/api/v1/notes").token("ada").json(json!({"title": "Hi"})).send().await.unwrap();
-assert_eq!(answer.status(), StatusCode::CREATED);
+// `StatusCode` và `Method` lấy từ `autoxide_testkit::http`, nên test không cần khai `axum` / `http`
+assert_eq!(answer.status_code(), StatusCode::CREATED);
 
 let client = app.mcp("ada").await.unwrap();             // một client MCP thật
 let result = client.call_tool(tool("notes.list_notes", json!({}))).await.unwrap();

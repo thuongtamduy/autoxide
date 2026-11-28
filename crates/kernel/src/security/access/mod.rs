@@ -22,7 +22,6 @@ use std::sync::Arc;
 use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::header;
 use axum::http::request::Parts;
-use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -793,7 +792,8 @@ impl Principal {
     /// Whether the caller works at node `org`: any grant (any permission) at depth
     /// `tenant`, or `unit` / `subtree` covering that node. Used when the caller names a node for something not
     /// tied to one particular permission (e.g. a node-bound API key).
-    pub async fn reaches<D: ConnectionTrait>(&self, db: &D, org: OrgId) -> Result<bool, Error> {
+    pub async fn reaches<D: crate::db::Executor>(&self, db: &D, org: OrgId) -> Result<bool, Error> {
+        let db = &crate::db::Via::of(db);
         let Grants::Only(map) = &self.grants else { return Ok(true) };
         let mut subtrees = Vec::new();
         for grant in map.values().flatten() {

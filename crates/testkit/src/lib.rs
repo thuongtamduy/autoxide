@@ -39,6 +39,7 @@ mod contract;
 mod coverage;
 mod dns;
 mod einvoice;
+pub mod http;
 mod identity;
 mod leak;
 mod mail;

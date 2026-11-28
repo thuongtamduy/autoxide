@@ -4,8 +4,8 @@
 
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, root_of};
+use autoxide_testkit::http::{Method, StatusCode};
 use autoxide_testkit::{TestApp, TestDatabase, branch_leak_check};
-use axum::http::StatusCode;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -55,13 +55,13 @@ async fn call(
     who: &str,
     body: Option<Value>,
 ) -> (StatusCode, Value) {
-    let method = axum::http::Method::from_bytes(method.as_bytes()).unwrap();
+    let method = Method::from_name(method).unwrap();
     let mut request = app.request(method, &format!("/api/v1/notes{uri}")).token(who);
     if let Some(body) = body {
         request = request.json(body);
     }
     let answer = request.send().await.unwrap();
-    let status = answer.status();
+    let status = answer.status_code();
     (status, if answer.body().is_empty() { Value::Null } else { answer.json() })
 }
 
