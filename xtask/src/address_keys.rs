@@ -186,7 +186,8 @@ fn variables(code: &str) -> impl Iterator<Item = &str> {
     let mut rest = code;
     while let Some(start) = rest.find(|c: char| c.is_ascii_alphanumeric() || c == '_') {
         let tail = &rest[start..];
-        let end = tail.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).unwrap_or(tail.len());
+        let end =
+            tail.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).unwrap_or(tail.len());
         if !tail[end..].starts_with('(') {
             found.push(&tail[..end]);
         }
