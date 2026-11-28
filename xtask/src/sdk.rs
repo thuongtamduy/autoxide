@@ -59,13 +59,7 @@ fn operation_type(document: &Value, operation: &Value, level: usize) -> String {
     let end = "  ".repeat(level);
     let mut groups: BTreeMap<&str, Vec<String>> = BTreeMap::new();
     for parameter in operation.get("parameters").and_then(Value::as_array).into_iter().flatten() {
-        let parameter = match parameter.get("$ref").and_then(Value::as_str) {
-            Some(reference) => reference
-                .strip_prefix('#')
-                .and_then(|pointer| document.pointer(pointer))
-                .unwrap_or(parameter),
-            None => parameter,
-        };
+        let parameter = resolve(document, parameter);
         let place = parameter.get("in").and_then(Value::as_str).unwrap_or("query");
         let name = parameter.get("name").and_then(Value::as_str).unwrap_or_default();
         let required = parameter.get("required").and_then(Value::as_bool) == Some(true);
@@ -102,6 +96,7 @@ fn operation_type(document: &Value, operation: &Value, level: usize) -> String {
     for (status, response) in
         operation.get("responses").and_then(Value::as_object).into_iter().flatten()
     {
+        let response = resolve(document, response);
         let kind = match response.get("content").and_then(Value::as_object) {
             Some(content) if !content.is_empty() => {
                 let kinds: Vec<String> = content
@@ -118,6 +113,18 @@ fn operation_type(document: &Value, operation: &Value, level: usize) -> String {
     let _ = write!(responses, "{pad}}}");
     parts.push(format!("responses: {responses}"));
     format!("{{\n{pad}{};\n{end}}}", parts.join(&format!(";\n{pad}")))
+}
+
+/// Phần tử dùng chung (`components.parameters`, `components.responses`) mà `$ref` trỏ tới; không trỏ
+/// được thì giữ nguyên.
+fn resolve<'a>(document: &'a Value, node: &'a Value) -> &'a Value {
+    match node.get("$ref").and_then(Value::as_str) {
+        Some(reference) => reference
+            .strip_prefix('#')
+            .and_then(|pointer| document.pointer(pointer))
+            .unwrap_or(node),
+        None => node,
+    }
 }
 
 /// Kiểu của thân theo media type: JSON theo schema, còn lại là dữ liệu thô.
@@ -473,10 +480,14 @@ mod tests {
                 "responses": {
                     "200": {"description": "ok", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/X"}}}},
                     "204": {"description": "none"},
+                    "429": {"$ref": "#/components/responses/TooMany"},
                     "default": {"description": "error", "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}}}
                 }
             }}},
-            "components": {"schemas": {"X": {"type": "object", "properties": {}}, "Problem": {"type": "object", "properties": {}}}}
+            "components": {
+                "schemas": {"X": {"type": "object", "properties": {}}, "Problem": {"type": "object", "properties": {}}},
+                "responses": {"TooMany": {"description": "slow", "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}}}}
+            }
         });
         let generated = generate(&document);
         assert!(generated.starts_with(HEADER));
@@ -494,6 +505,7 @@ mod tests {
         assert!(generated.contains("requestBody: X;"), "{generated}");
         assert!(generated.contains("200: X;"), "{generated}");
         assert!(generated.contains("204: void;"), "{generated}");
+        assert!(generated.contains("429: Problem;"), "{generated}");
         assert!(generated.contains("default: Problem;"), "{generated}");
         assert_eq!(generate(&document), generated, "stable");
     }

@@ -283,8 +283,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 
 ### G7 — Chuẩn giao thức còn thiếu
 
-- [ ] Header `RateLimit` / `RateLimit-Policy` (bản nháp IETF mới nhất) và 429 kèm `Retry-After` khai trong OpenAPI cho mọi
-      thao tác
+- [x] Header `RateLimit` / `RateLimit-Policy` (bản nháp IETF mới nhất) và 429 kèm `Retry-After` khai trong OpenAPI cho mọi
+      thao tác — bản nháp -12; chính sách `address` trên mọi response được đếm, `api-key` / `tenant` trên 429 của nó;
+      `components.responses.TooManyRequests`
 - [ ] ETag: khác nhau khi nén khác nhau (hay dùng ETag yếu); `If-Match` nhận danh sách
 - [ ] OpenAPI: bản mới nhất mà bộ sinh hỗ trợ (3.2), `info.license`, `webhooks` cho payload gửi đi, `components.responses`,
       cách xác thực API key riêng

@@ -468,7 +468,8 @@ async fn cors_chi_cho_origin_da_cau_hinh() {
         .unwrap();
     let response = send(api_with(&config).router, request).await;
     let exposed = response.headers()[header::ACCESS_CONTROL_EXPOSE_HEADERS].to_str().unwrap();
-    for name in ["etag", "location", "retry-after", "x-request-id"] {
+    for name in ["etag", "location", "retry-after", "ratelimit", "ratelimit-policy", "x-request-id"]
+    {
         assert!(exposed.contains(name), "{name} not in {exposed}");
     }
 }
@@ -892,14 +893,21 @@ async fn qua_gioi_han_thi_429_kem_retry_after() {
     config.rate_limit.burst = 2;
     let app = api_with(&config).router;
 
-    for _ in 0..2 {
-        let response = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await;
-        assert_eq!(response.unwrap().status(), StatusCode::OK);
+    // Header RateLimit (bản nháp IETF -12): chính sách `address` 2 request / 2 giây, còn lại giảm dần.
+    for available in [1, 0] {
+        let response =
+            app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["ratelimit-policy"], "\"address\";q=2;w=2");
+        let left = response.headers()["ratelimit"].to_str().unwrap().to_owned();
+        assert!(left.starts_with(&format!("\"address\";a={available};w=")), "{left}");
     }
     let limited = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await.unwrap();
 
     assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(limited.headers()[header::RETRY_AFTER], "1");
+    assert_eq!(limited.headers()["ratelimit"], "\"address\";a=0;w=1");
+    assert_eq!(limited.headers()["ratelimit-policy"], "\"address\";q=2;w=2");
     assert!(limited.headers().contains_key("x-request-id"));
     // Header bảo mật có cả trên 429 (lớp đặt ngoài rate limiting, D-320).
     assert_eq!(limited.headers()[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
@@ -985,8 +993,10 @@ async fn tat_rate_limiting_thi_khong_gioi_han() {
     let app = api_with(&config).router;
 
     for _ in 0..5 {
-        let response = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await;
-        assert_eq!(response.unwrap().status(), StatusCode::OK);
+        let response =
+            app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(!response.headers().contains_key("ratelimit"));
     }
 }
 

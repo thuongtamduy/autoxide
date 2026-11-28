@@ -65,6 +65,7 @@ mod output;
 mod permission_gate;
 mod problem;
 mod rate_limit;
+pub(crate) mod rate_limit_headers;
 mod rate_limit_store;
 mod request_id;
 mod security_headers;

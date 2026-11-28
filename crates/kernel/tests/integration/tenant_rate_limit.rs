@@ -34,6 +34,10 @@ async fn moi_khach_mot_muc_rieng() {
             assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS, "{store}");
             assert_eq!(limited.json()["code"], "tenant_rate_limited", "{store}");
             assert!(!limited.header("retry-after").is_empty(), "{store}");
+            // Chính sách từ chối là `tenant`; đếm qua database thì cửa sổ cố định 60 giây.
+            let policy = limited.header("ratelimit-policy");
+            assert!(policy.starts_with("\"tenant\";q=2;w="), "{store}: {policy}");
+            assert!(limited.header("ratelimit").starts_with("\"tenant\";a=0;w="), "{store}");
             // Khách B vẫn chạy.
             assert_eq!(get("owner-b").await.unwrap().status(), StatusCode::OK, "{store}");
         })

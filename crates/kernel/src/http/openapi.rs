@@ -71,8 +71,11 @@ rel=\"successor-version\"` headers. Move to the successor before the sunset date
 - **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that \
 language; English (`en`) by default and for unsupported languages. Responses carry \
 `Content-Language`. Codes never change with the language.
-- **Rate limits**: too many requests from one address are answered with `429` (code \
-`rate_limited`) and a `Retry-After` header giving the seconds to wait.
+- **Rate limits**: requests are limited per client address, per API key and per tenant. When \
+limits are on, responses carry `RateLimit-Policy` and `RateLimit` (draft-ietf-httpapi-ratelimit-headers-12): \
+how many requests are left now (`a`) and when the quota is back (`w` seconds), so a client can \
+slow down before it is refused. Too many requests are answered with `429` (code `rate_limited` \
+or `tenant_rate_limited`) and a `Retry-After` header giving the seconds to wait.
 - **Which tenant**: on a server with many tenants, a request is served for the tenant of its \
 credential (the token or API key); without one, for the tenant named in the header \
 `Autoxide-Tenant: <slug or id>`, else for the tenant whose verified domain is in `Host` (behind \
@@ -188,6 +191,8 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
         ))
     });
 
+    rate_limit_components(components);
+
     let problem = ResponseBuilder::new()
         .description(
             "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
@@ -199,13 +204,18 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
                 .build(),
         )
         .build();
-    for item in openapi.paths.paths.values_mut() {
+    for (path, item) in openapi.paths.paths.iter_mut() {
+        // Health check không bị đếm (`rate_limit::limit`): không hứa 429 ở đó.
+        let counted = !path.starts_with("/health/");
         for (_, operation) in operations_mut(item) {
             operation
                 .responses
                 .responses
                 .entry("default".to_owned())
                 .or_insert_with(|| RefOr::T(problem.clone()));
+            if counted {
+                document_rate_limit(operation);
+            }
         }
     }
     for item in openapi.paths.paths.values_mut() {
@@ -243,6 +253,86 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
                 push_header(parameters, idempotency_key());
             }
         }
+    }
+}
+
+/// The name of the shared 429 response in `components.responses`.
+const TOO_MANY_REQUESTS: &str = "TooManyRequests";
+
+/// The rate limit headers (`components.headers`) and the shared 429 response (`components.responses`).
+fn rate_limit_components(components: &mut utoipa::openapi::Components) {
+    let integer = || ObjectBuilder::new().schema_type(Type::Integer).minimum(Some(0));
+    let string = || ObjectBuilder::new().schema_type(Type::String);
+    let headers = [
+        (
+            "Retry-After",
+            HeaderBuilder::new()
+                .schema(Some(integer()))
+                .description(Some("Seconds to wait before sending the request again (RFC 9110)."))
+                .build(),
+        ),
+        (
+            "RateLimit-Policy",
+            HeaderBuilder::new()
+                .schema(Some(string().examples([json!("\"address\";q=60;w=6")])))
+                .description(Some(
+                    "The limits that apply (draft-ietf-httpapi-ratelimit-headers-12), one list \
+                     member each: `q` requests per window of `w` seconds. Policies: `address` (per \
+                     client address, on every response), `api-key` (per API key) and `tenant` (per \
+                     tenant, from its plan).",
+                ))
+                .build(),
+        ),
+        (
+            "RateLimit",
+            HeaderBuilder::new()
+                .schema(Some(string().examples([json!("\"address\";a=59;w=1")])))
+                .description(Some(
+                    "What is left under each policy (draft-ietf-httpapi-ratelimit-headers-12): `a` \
+                     requests are available now, and the whole quota is back in `w` seconds. With \
+                     `a=0`, `w` is the seconds to wait.",
+                ))
+                .build(),
+        ),
+    ];
+    let mut too_many = ResponseBuilder::new().description(
+        "Too many requests: wait `Retry-After` seconds, then retry. `code` is `rate_limited` (too \
+         many from this address or API key) or `tenant_rate_limited` (the tenant reached its plan's \
+         rate); `RateLimit` names the policy that refused the request.",
+    );
+    for (name, header) in headers {
+        components.headers.entry(name.to_owned()).or_insert(RefOr::T(header));
+        too_many = too_many.header_ref(name, header_ref(name));
+    }
+    let too_many = too_many
+        .content(
+            PROBLEM_CONTENT_TYPE,
+            ContentBuilder::new()
+                .schema(Some(RefOr::Ref(Ref::from_schema_name(Problem::name()))))
+                .build(),
+        )
+        .build();
+    components.responses.entry(TOO_MANY_REQUESTS.to_owned()).or_insert(RefOr::T(too_many));
+}
+
+fn header_ref(name: &str) -> Ref {
+    Ref::new(format!("#/components/headers/{name}"))
+}
+
+/// Every counted operation may answer 429: the shared response, or - when the operation declares its own 429
+/// (a quota of its own) - that one with the `Retry-After` and rate limit headers added.
+fn document_rate_limit(operation: &mut Operation) {
+    match operation.responses.responses.get_mut("429") {
+        None => {
+            let shared = Ref::new(format!("#/components/responses/{TOO_MANY_REQUESTS}"));
+            operation.responses.responses.insert("429".to_owned(), RefOr::Ref(shared));
+        }
+        Some(RefOr::T(own)) => {
+            for name in ["Retry-After", "RateLimit-Policy", "RateLimit"] {
+                own.headers.entry(name.to_owned()).or_insert_with(|| RefOr::Ref(header_ref(name)));
+            }
+        }
+        Some(RefOr::Ref(_)) => {}
     }
 }
 

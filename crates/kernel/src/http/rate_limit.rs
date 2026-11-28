@@ -27,13 +27,14 @@ use uuid::Uuid;
 use super::client::ClientIp;
 use crate::access::{Authenticator, Principal};
 use crate::config::RateLimit;
-use crate::error::Error;
+use crate::error::{Error, RateLimitPolicy};
 
 /// Cleans up clients that have gone "cold" after this many requests.
 const PRUNE_EVERY: u64 = 1024;
 
 pub(super) struct RateLimiter {
     cells: Gcra<IpAddr>,
+    policy: RateLimitPolicy,
 }
 
 /// The GCRA counter for any kind of key (`K`: client address, API key ID...).
@@ -64,10 +65,17 @@ impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
     }
 
     fn check(&self, client: K, now: Instant) -> Decision {
+        self.check_state(client, now).0
+    }
+
+    /// Evaluates one request and also says what is left: the number of further requests accepted right now,
+    /// and how long until the whole burst is back (for the `RateLimit` header).
+    fn check_state(&self, client: K, now: Instant) -> (Decision, Option<(u32, Duration)>) {
         let Ok(mut clients) = self.clients.lock() else {
             // Khoá chỉ "hỏng" khi một thread panic lúc đang giữ nó; không chặn ai cả
-            // còn hơn chặn tất cả.
-            return Decision::Allow;
+            // còn hơn chặn tất cả. Không biết còn bao nhiêu: `None`, không gửi header RateLimit
+            // (gửi `a=0` thì client làm đúng chuẩn tưởng đã hết hạn mức).
+            return (Decision::Allow, None);
         };
         if self.requests.fetch_add(1, Ordering::Relaxed).is_multiple_of(PRUNE_EVERY) {
             // Mốc đã lùi về quá khứ thì client như mới: bỏ đi cho bảng không phình.
@@ -76,10 +84,22 @@ impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
         let tat = clients.get(&client).copied().unwrap_or(now).max(now);
         let ahead = tat - now;
         if ahead > self.tolerance {
-            return Decision::Deny(ahead - self.tolerance);
+            let wait = ahead - self.tolerance;
+            return (Decision::Deny(wait), Some((0, wait)));
         }
-        clients.insert(client, tat + self.interval);
-        Decision::Allow
+        let next = tat + self.interval;
+        clients.insert(client, next);
+        let ahead = next - now;
+        // Request kế được nhận khi `ahead ≤ tolerance`, mỗi request đẩy `ahead` thêm một `interval`: còn
+        // `(tolerance − ahead) / interval + 1` lượt.
+        let available = match self.tolerance.checked_sub(ahead) {
+            Some(room) => {
+                let more = room.as_nanos() / self.interval.as_nanos().max(1);
+                u32::try_from(more + 1).unwrap_or(u32::MAX)
+            }
+            None => 0,
+        };
+        (Decision::Allow, Some((available, ahead)))
     }
 }
 
@@ -94,12 +114,21 @@ pub(super) enum Decision {
 impl RateLimiter {
     /// `None` when rate limiting is disabled (`per_minute = 0`).
     pub(super) fn new(limit: RateLimit) -> Option<Self> {
-        Gcra::new(limit).map(|cells| RateLimiter { cells })
+        Gcra::new(limit).map(|cells| RateLimiter {
+            cells,
+            policy: super::rate_limit_headers::gcra_policy("address", limit),
+        })
     }
 
     /// Evaluates one request from `client` at time `now`.
-    pub(super) fn check(&self, client: IpAddr, now: Instant) -> Decision {
+    #[cfg(test)]
+    fn check(&self, client: IpAddr, now: Instant) -> Decision {
         self.cells.check(client, now)
+    }
+
+    /// Evaluates one request from `client` at time `now`, with what is left (see `Gcra::check_state`).
+    fn check_state(&self, client: IpAddr, now: Instant) -> (Decision, Option<(u32, Duration)>) {
+        self.cells.check_state(client, now)
     }
 }
 
@@ -132,6 +161,7 @@ fn group(address: IpAddr) -> IpAddr {
 pub(super) struct ApiKeyLimited {
     inner: Arc<dyn Authenticator>,
     counter: KeyCounter,
+    policy: RateLimitPolicy,
 }
 
 /// Where the per-API-key limit is counted.
@@ -158,13 +188,19 @@ impl ApiKeyLimited {
         limit: RateLimit,
         registry: Option<crate::tenancy::DatabaseRegistry>,
     ) -> Arc<dyn Authenticator> {
-        let counter = match registry {
-            Some(registry) => super::rate_limit_store::SharedCounter::new(limit, registry)
-                .map(KeyCounter::Database),
-            None => Gcra::new(limit).map(KeyCounter::Memory),
+        let (counter, policy) = match registry {
+            Some(registry) => (
+                super::rate_limit_store::SharedCounter::new(limit, registry)
+                    .map(KeyCounter::Database),
+                super::rate_limit_headers::window_policy("api-key", limit),
+            ),
+            None => (
+                Gcra::new(limit).map(KeyCounter::Memory),
+                super::rate_limit_headers::gcra_policy("api-key", limit),
+            ),
         };
         match counter {
-            Some(counter) => Arc::new(ApiKeyLimited { inner, counter }),
+            Some(counter) => Arc::new(ApiKeyLimited { inner, counter, policy }),
             None => inner,
         }
     }
@@ -192,7 +228,8 @@ impl Authenticator for ApiKeyLimited {
                  requests more slowly to avoid this.",
             )
             .with_param("seconds", seconds)
-            .with_retry_after(seconds));
+            .with_retry_after(seconds)
+            .with_rate_limit(self.policy));
         }
         Ok(principal)
     }
@@ -218,7 +255,8 @@ impl Authenticator for ApiKeyLimited {
     }
 }
 
-/// The HTTP layer: rejects with 429 `rate_limited` and `Retry-After`.
+/// The HTTP layer: rejects with 429 `rate_limited` and `Retry-After`; every counted response carries the
+/// `RateLimit-Policy` / `RateLimit` headers of policy `address`.
 pub(super) async fn limit(
     limiter: Option<Arc<RateLimiter>>,
     request: Request,
@@ -236,9 +274,24 @@ pub(super) async fn limit(
     let Some(client) = request.extensions().get::<ClientIp>().and_then(|ip| ip.0).map(group) else {
         return next.run(request).await;
     };
-    match limiter.check(client, Instant::now()) {
-        Decision::Allow => next.run(request).await,
-        Decision::Deny(wait) => {
+    match limiter.check_state(client, Instant::now()) {
+        (Decision::Allow, state) => {
+            let mut response = next.run(request).await;
+            // Bản nháp: tránh gửi ở 3xx (client có thể chần chừ không theo chuyển hướng).
+            if let Some((available, full)) = state
+                && !response.status().is_redirection()
+            {
+                let seconds = full.as_secs() + u64::from(full.subsec_nanos() > 0);
+                super::rate_limit_headers::append(
+                    response.headers_mut(),
+                    limiter.policy,
+                    available,
+                    seconds,
+                );
+            }
+            response
+        }
+        (Decision::Deny(wait), ..) => {
             metrics::counter!("http_rate_limited_total").increment(1);
             // Làm tròn lên: chờ đúng số giây báo thì chắc chắn được nhận.
             let seconds = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
@@ -249,6 +302,7 @@ pub(super) async fn limit(
             )
             .with_param("seconds", seconds)
             .with_retry_after(seconds)
+            .with_rate_limit(limiter.policy)
             .into_response()
         }
     }
@@ -294,6 +348,8 @@ mod tests {
         let error =
             limited.authenticate(Some(&a), &crate::tenancy::TenantHint::none()).await.unwrap_err();
         assert_eq!((error.code(), error.retry_after()), ("rate_limited", Some(1)));
+        let policy = RateLimitPolicy { name: "api-key", quota: 2, window: 2 };
+        assert_eq!(error.rate_limit(), Some(policy));
         // Key khác vẫn chạy; phiên đăng nhập không bị đếm.
         limited.authenticate(Some(&b), &crate::tenancy::TenantHint::none()).await.unwrap();
         for _ in 0..5 {
@@ -331,6 +387,29 @@ mod tests {
         assert!(matches!(limiter.check(client, later), Decision::Deny(_)));
         // Client khác không bị ảnh hưởng.
         assert_eq!(limiter.check(ip("203.0.113.8"), start), Decision::Allow);
+    }
+
+    #[test]
+    fn con_lai_bao_nhieu_va_bao_lau_thi_day_lai() {
+        // 60 request/phút, dồn 3: sau request đầu còn 2, đầy lại sau 1 giây.
+        let limiter = limiter(60, 3);
+        let start = Instant::now();
+        let client = ip("203.0.113.9");
+        assert_eq!(
+            limiter.check_state(client, start),
+            (Decision::Allow, Some((2, Duration::from_secs(1))))
+        );
+        assert_eq!(
+            limiter.check_state(client, start),
+            (Decision::Allow, Some((1, Duration::from_secs(2))))
+        );
+        assert_eq!(
+            limiter.check_state(client, start),
+            (Decision::Allow, Some((0, Duration::from_secs(3))))
+        );
+        let wait = Duration::from_secs(1);
+        assert_eq!(limiter.check_state(client, start), (Decision::Deny(wait), Some((0, wait))));
+        assert_eq!(limiter.policy, RateLimitPolicy { name: "address", quota: 3, window: 3 });
     }
 
     #[test]
