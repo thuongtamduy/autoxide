@@ -304,10 +304,12 @@ impl RoleService {
         }
         match self.entitlements.confirm(tenant.id(), &MEMBERS_LIMIT, reference).await {
             Ok(()) => Ok(true),
-            Err(error) => {
+            // Chỉ đúng mã "không có chỗ giữ"; lỗi khác (database…) không bị nuốt.
+            Err(error) if error.code() == "limit_hold_missing" => {
                 tracing::warn!(%user_id, tenant_id = %tenant.id(), %error, "member slot released before confirm; settling again");
                 Ok(false)
             }
+            Err(error) => Err(error),
         }
     }
 

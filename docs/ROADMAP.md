@@ -690,6 +690,8 @@ thật (P7).
   - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi):
         (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403; (iv) hạ quyền người khác bằng cách
         thu hẹp permission của role họ giữ không qua luật "gỡ được" như gỡ role (sửa role chỉ chặn thêm / nới / bỏ cấm)
+        — (iv) xong: sửa role mà bỏ, thu hẹp hay cấm thêm permission phải có permission đó đủ rộng
+        (D-20261128-role-narrow-rule); còn (iii)
   - [x] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
         luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked). Xong: `Principal::bounded_by`
         (D-20261128-bound-keeps-scope)
@@ -698,9 +700,10 @@ thật (P7).
         giờ như xoá tài khoản (D-20261128-access-revoked-retry)
   - [x] Gỡ role có lệnh cấm đòi người gỡ `allows(p)` theo TÊN permission, bỏ qua phạm vi — nay đòi permission ở độ sâu
         `tenant`, không rào (D-20261128-ban-lift-scope)
-  - [ ] Khách có guardrail: role cấm một permission ngoài rào thì không ai trong khách gỡ được role đó (đã kiểm chứng
+  - [x] Khách có guardrail: role cấm một permission ngoài rào thì không ai trong khách gỡ được role đó (đã kiểm chứng
         bằng đọc code, D-20261128-ban-lift-scope) — cần kernel cho biết lý do cấm (`outside_guardrail`) hay đưa rào vào
-        `grantable`
+        `grantable`. Xong: `Principal::outside_guardrail` của kernel, `lifts_ban` coi
+        permission ngoài rào là bỏ cấm không mở thêm gì (D-20261128-ban-lift-guardrail)
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
