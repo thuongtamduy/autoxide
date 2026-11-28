@@ -6,7 +6,8 @@ Quyết định: `PUT` / `DELETE /api/v1/kernel/settings/{name}` và tool `kerne
 `Principal::require_at_root(&SETTINGS_MANAGE)` (kernel, `security/access/decision.rs`): người gọi phải có
 `kernel.settings.manage` qua một grant ở **nút gốc** của khách (hay toàn quyền), và không bị rào dưới gốc (API key gắn
 nhánh). Có permission mà chỉ qua membership ở nhánh, hay API key gắn nhánh → 403 `org_out_of_scope`. Nhân sự nền tảng
-vào khách bằng `kernel.tenants.operate` giữ grant ở gốc của khách nền tảng: được coi như ở gốc. Đường của nhân sự nền
+vào khách bằng `kernel.tenants.operate` giữ grant ở gốc của khách nền tảng: được coi như ở gốc. Grant ở gốc của khách mặc định cũng được coi là ở gốc: `Principal::new` (độ sâu `tenant`,
+dùng ở testkit và code cũ) đặt grant ở đó rồi `in_tenant` đổi khách mà không dời grant. Đường của nhân sự nền
 tảng (`/kernel/tenants/{id}/settings…`, `kernel.tenants.manage`) không đổi. Đọc danh sách cấu hình giữ nguyên.
 
 Audit: không thêm gì — mỗi lần đặt / bỏ đã ghi event `kernel.setting_changed` (người làm, tên cấu hình) cùng
