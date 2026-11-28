@@ -466,17 +466,6 @@ impl TenantContext {
         )
     }
 
-    /// Transition path (step 33 A4): code that has not yet received a tenant context (modules not yet
-    /// converted in part B) uses the default tenant on the database it holds. Marked `#[deprecated]` once
-    /// part B is done (nobody left calling it), removed at the start of step 34 (D-253 item 7).
-    #[doc(hidden)]
-    #[deprecated(
-        note = "dùng `TenantContext` của request, job hay event; cần khách mặc định thì `default_on`"
-    )]
-    pub fn legacy_default(database: &Database) -> Self {
-        Self::default_on(database.clone())
-    }
-
     pub fn id(&self) -> TenantId {
         self.0.id
     }

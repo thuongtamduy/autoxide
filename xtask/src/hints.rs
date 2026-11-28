@@ -108,6 +108,14 @@ const FIXES: &[(&str, &str)] = &[
     ),
     ("metric-labels", "Use labels from a small fixed set (an enum), never ids or raw paths."),
     (
+        "module-contract-legacy",
+        "Move the module to the manifest: implement `Module::manifest` (static declarations) and register routes, tools, subscriptions and jobs on `StartContext` in `start` (docs/MODULE_GUIDE.md, `notes` is the example); then lower or remove its line in xtask/module-contract-legacy.txt.",
+    ),
+    (
+        "module-contract-mixed",
+        "A module that implements `Module::manifest` declares everything there or on `StartContext`: move this old `Module` function into the manifest (or into `start`) and delete it.",
+    ),
+    (
         "permission-first",
         "Call `principal.require(&PERMISSION)?` (or the same check the service runs first) before parsing the page request, so a caller without the permission gets 403, not 422; if the order is intended, add `// permission-first: <reason>` above the `fn`.",
     ),

@@ -26,6 +26,51 @@ Business features live in modules, not in the core. A module is one crate under
 
 `./gate.sh` checks all of this; a module is done when the gate is green.
 
+## Declaring a module
+
+A module tells the core about itself in two places, one way for each concept (D-20261126-module-manifest):
+
+- **`Module::manifest`** returns a `Manifest`: everything known before the module starts — name, description,
+  migrations, records, permissions, events, settings, translations, quotas, dependencies, tier. It is plain data,
+  so the core can read it without starting anything (migrations, `.env.example`, module selection, docs).
+- **`Module::start`** builds the module's services and registers on `StartContext` what needs them: routes, MCP
+  tools, event subscriptions, jobs, tasks, doctor checks, traits for other modules. Kernel handles come from
+  `context.kernel::<Handle>()` (`Outbox`, `SyncLog`, `EntitlementsHandle`, `JobQueue`…).
+
+```rust
+impl Module for NotesModule {
+    fn manifest(&self) -> Manifest {
+        Manifest::new("notes", "Sample module: personal notes.")
+            .migrations(migration::all)
+            .records([RecordInfo::of::<entity::Note>()])
+            .permissions(permissions::all())
+            .events(events::all())
+            .translation("vi", include_str!("../locales/vi.json"))
+            .limits([service::NOTES_LIMIT])
+            .unstable(|unstable| unstable.sync_resources([service::NOTES_SYNC]))
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let service = Arc::new(NoteService::new(context.kernel()?, context.kernel()?, context.kernel()?));
+        context.subscribe(Subscription::new(USER_DELETED, service.clone()))?;
+        context.routes(http::routes(service.clone()))?;
+        context.tools(tools::all(&service))?;
+        context.provide::<dyn api::Notes>(service)
+    }
+}
+```
+
+`configure` (read the module's settings) and `dormant` (personal-data duties of a turned-off module) stay as
+they are. Concepts of the experimental tier ([compatibility](COMPATIBILITY.md#contract-tiers-of-the-rust-api))
+go through `Manifest::unstable`.
+
+The other functions of the `Module` trait (`name`, `permissions`, `routes`, `tools`, `subscriptions`…) are the
+old way, kept until every module in this repository has moved; each maps to the manifest or `StartContext`
+function of the same name. A module that implements `manifest` implements none of them (`cargo xtask check`,
+rule `module-contract-mixed`), and a module on the old way cannot register on `StartContext`. Modules still on
+the old way are listed in `xtask/module-contract-legacy.txt`; the steps below still name some old functions —
+read them as the manifest function of the same name.
+
 ## Step by step
 
 ### 1. Create the crate

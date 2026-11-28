@@ -11,9 +11,17 @@
 //! module name: it works only through the [`Module`] trait, so adding a module does not require changing
 //! the core.
 //!
-//! The contract grows along the roadmap: each part of the core (routes, permissions, events, jobs, MCP
-//! tools) adds a function to [`Module`], always with a default implementation of "nothing" - existing
-//! modules need no changes when the contract gains a new function.
+//! A module declares itself in two places, one way for each concept (D-20261126-module-manifest):
+//!
+//! - [`Module::manifest`] returns a [`Manifest`]: everything known before the module starts (name,
+//!   migrations, permissions, events, settings, translations, quotas, dependencies, tier…);
+//! - [`Module::start`] builds the module's services and registers on [`StartContext`] what needs them: routes,
+//!   MCP tools, subscriptions, jobs, traits for other modules.
+//!
+//! The contract grows by adding builder functions to [`Manifest`] and registration functions to
+//! [`StartContext`], so existing modules keep compiling. The other functions of [`Module`] are the old way of
+//! declaring a module, kept until every module has moved to the manifest; a module that implements
+//! [`Module::manifest`] implements none of them.
 
 pub use crate::ops::client_config::{ClientSection, TenantClientSection};
 use jiff::SignedDuration;
@@ -35,14 +43,18 @@ use crate::privacy::{PersonalData, PersonalDataExport};
 
 mod dormant;
 mod later;
+mod manifest;
 pub mod navigation;
 mod registry;
+mod started;
 
 mod selection;
 
 pub use dormant::DormantContext;
 pub(crate) use dormant::installed;
 pub use later::Later;
+pub use manifest::{Manifest, MigrationsFn, UnstableManifest, UpgradesFn};
+pub use started::KernelHandle;
 pub use registry::{ModuleError, Modules};
 pub use selection::{DormantModule, InactiveModule, MODULES, Selection, SelectionError, Stability};
 
@@ -50,7 +62,7 @@ pub use selection::{DormantModule, InactiveModule, MODULES, Selection, Selection
 ///
 /// ```
 /// use autoxide_kernel::config::{ConfigReader, Invalid, Setting};
-/// use autoxide_kernel::module::Module;
+/// use autoxide_kernel::module::{Manifest, Module};
 ///
 /// const PAGE_SIZE: Setting =
 ///     Setting::new("AUTOXIDE_NOTES_PAGE_SIZE", "Notes returned per page.").with_default("50");
@@ -61,8 +73,8 @@ pub use selection::{DormantModule, InactiveModule, MODULES, Selection, Selection
 /// }
 ///
 /// impl Module for NotesModule {
-///     fn name(&self) -> &'static str {
-///         "notes"
+///     fn manifest(&self) -> Manifest {
+///         Manifest::new("notes", "Personal notes.")
 ///     }
 ///
 ///     fn configure(&mut self, reader: &mut ConfigReader) -> Result<(), Invalid> {
@@ -80,20 +92,29 @@ pub use selection::{DormantModule, InactiveModule, MODULES, Selection, Selection
 // `Send + Sync`: module được dùng từ nhiều thread của máy chủ. Trình biên dịch
 // từ chối module chứa thứ không an toàn khi chia sẻ giữa các thread.
 pub trait Module: Send + Sync {
+    /// Everything the module declares before it starts (see [`Manifest`]). The default is the old way: the
+    /// module answers through the other functions of this trait instead.
+    fn manifest(&self) -> Manifest {
+        Manifest::legacy()
+    }
+
     /// The module name: lowercase letters, digits and `_`, starting with a letter. It is also the prefix of
     /// every table (`<name>_…`) and every configuration variable (`AUTOXIDE_<NAME>_…`) of the module.
-    fn name(&self) -> &'static str;
+    /// Old way of [`Manifest::new`]; by default the manifest's name.
+    fn name(&self) -> &'static str {
+        self.manifest().name
+    }
 
     /// The module's migrations, in the order they are applied. Once committed they are never edited - add a
     /// new migration at the end.
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        Vec::new()
+        self.manifest().migrations.map(|build| build()).unwrap_or_default()
     }
 
     /// A module's data upgrades (D-257): data upgrades that need the program's configuration (e.g.
     /// re-encrypting old secrets). Empty by default. See `autoxide_kernel::migration::DataUpgrade`.
     fn upgrades(&self) -> Vec<Box<dyn crate::migration::DataUpgrade>> {
-        Vec::new()
+        self.manifest().upgrades.map(|build| build()).unwrap_or_default()
     }
 
     /// Configuration the module accepts per tenant (D-258): named `<module>.<key>`, read with
@@ -102,14 +123,14 @@ pub trait Module: Send + Sync {
     /// gateway...) declare `.group(CONNECTION_GROUP)` and are named `<module>.connection.<kind>.<field>`;
     /// when renaming a setting, declare the old name with `.formerly(…)`. Empty by default.
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
-        Vec::new()
+        self.manifest().tenant_settings
     }
 
     /// The module's settings inherited down the organization tree (step 34): named `<module>.<name>`, with
     /// defaults and a validator. The `organizations` module stores and serves the value per node; a node
     /// that sets none uses the value of the nearest ancestor. Empty by default.
     fn org_settings(&self) -> Vec<crate::tenancy::OrgSetting> {
-        Vec::new()
+        self.manifest().org_settings
     }
 
     /// Seeds the module's initial data for a new tenant (e.g. the `admin` role, lock rows) - called after
@@ -130,7 +151,7 @@ pub trait Module: Send + Sync {
     /// vouchers, accounting books, invoices kept for at least 10 years (Accounting Law 88/2015, Article 41;
     /// D-190). Empty by default: the module's data is deleted along with the tenant.
     fn retained_tables(&self) -> Vec<&'static str> {
-        Vec::new()
+        self.manifest().retained_tables
     }
 
     /// The kinds of personal data the module holds and the retention period of each kind (step 37, D-360).
@@ -138,7 +159,7 @@ pub trait Module: Send + Sync {
     /// collects them into a [`RetentionCatalog`](crate::privacy::RetentionCatalog), which `compliance`
     /// publishes in the processing activity register. Empty by default.
     fn retention(&self) -> Vec<crate::privacy::RetentionPolicy> {
-        Vec::new()
+        self.manifest().retention
     }
 
     /// The module's control-plane tables (step 33, D-253): tables shared across the whole platform that live
@@ -149,34 +170,34 @@ pub trait Module: Send + Sync {
     /// `tenant_id` - the testkit and `cargo xtask check` verify this. Empty by default: business modules
     /// have almost no tables of this kind.
     fn control_plane_tables(&self) -> Vec<&'static str> {
-        Vec::new()
+        self.manifest().control_plane_tables
     }
 
     /// The module's plan-based on / off features (`<module>.<name>`, step 35). The module asks with
     /// [`EntitlementsHandle::require_feature`](crate::entitlement::EntitlementsHandle) before work that
     /// needs the feature. Empty by default.
     fn features(&self) -> Vec<crate::entitlement::Feature> {
-        Vec::new()
+        self.manifest().features
     }
 
     /// The module's plan-based quotas (`<module>.<name>`, step 35): the module reserves / releases through
     /// [`EntitlementsHandle`](crate::entitlement::EntitlementsHandle). Empty by default.
     fn limits(&self) -> Vec<crate::entitlement::Limit> {
-        Vec::new()
+        self.manifest().limits
     }
 
     /// A foundation module that a plan never blocks (login, files, audit...). Default `false`: the module
     /// is governed by plans - if not yet enabled for a tenant, its routes, MCP tools, jobs and events are
     /// blocked.
     fn always_enabled(&self) -> bool {
-        false
+        self.manifest().always_enabled
     }
 
     /// The module's tier (step 70 P3): `Official` (default) runs when the installer chooses nothing;
     /// `Experimental` - API and tables may still change - runs only when explicitly enabled in
     /// `AUTOXIDE_MODULES`. An official module may depend only on official modules.
     fn stability(&self) -> Stability {
-        Stability::Official
+        self.manifest().stability
     }
 
     /// The core cannot run without this module (login, idempotency...): always enabled, `-name` in
@@ -184,14 +205,14 @@ pub trait Module: Send + Sync {
     /// `false`. Different from [`always_enabled`](Self::always_enabled) - that one is about each tenant's
     /// PLAN, this one is about the whole installation.
     fn essential(&self) -> bool {
-        false
+        self.manifest().essential
     }
 
     /// The records (`#[derive(Record)]`) of the module, as `RecordInfo::of::<Note>()`: at startup the kernel
     /// checks each against the live schema (table, columns, `tenant_id` for a tenant record) and refuses to
     /// start on a mismatch.
     fn records(&self) -> Vec<crate::db::RecordInfo> {
-        Vec::new()
+        self.manifest().records
     }
 
     /// The names of modules that this module MUST have: every `context.require::<…>()?` to a trait of
@@ -199,7 +220,7 @@ pub trait Module: Send + Sync {
     /// module enables those modules with it. Things used "if present" (`.require::<…>().ok()`) are NOT
     /// declared here. Empty by default.
     fn depends_on(&self) -> Vec<&'static str> {
-        Vec::new()
+        self.manifest().depends_on
     }
 
     /// Reads the module's own configuration and keeps it inside itself. Called once at startup, before
@@ -226,14 +247,14 @@ pub trait Module: Send + Sync {
     /// startup. A released permission is a contract: renaming it makes roles that hold the old permission
     /// lose access.
     fn permissions(&self) -> Vec<Permission> {
-        Vec::new()
+        self.manifest().permissions
     }
 
     /// The events the module emits. With events the module must have a `<name>_events` table (add
     /// `autoxide_kernel::event::outbox_migration` to its migrations) and record events with
     /// [`StartContext::outbox`].
     fn events(&self) -> Vec<EventInfo> {
-        Vec::new()
+        self.manifest().events
     }
 
     /// Lifecycle events of the object kinds the module owns (D-202): which event means an object no longer
@@ -242,7 +263,7 @@ pub trait Module: Send + Sync {
     /// own [`events`](Self::events), the kind must be `<module name>.<kind>`, and the event's subject is
     /// `<kind>:<id>`. The kernel checks this at startup.
     fn resource_events(&self) -> Vec<crate::resource::ResourceEvent> {
-        Vec::new()
+        self.manifest().resource_events
     }
 
     /// The events the module wants to receive (of every module, including itself). Called after `start`.
@@ -270,13 +291,13 @@ pub trait Module: Send + Sync {
     /// The module's periodic schedules: each schedule puts a job (of a kind the module itself runs) on the
     /// queue after every interval. Called after `start`.
     fn schedules(&self) -> Vec<Schedule> {
-        Vec::new()
+        self.manifest().schedules
     }
 
     /// The module's deprecated endpoints: the kernel marks them in OpenAPI and attaches the `Deprecation` /
     /// `Sunset` / `Link` headers to responses (D-059).
     fn deprecations(&self) -> Vec<crate::http::Deprecation> {
-        Vec::new()
+        self.manifest().deprecations
     }
 
     /// The module's MCP tools (D-068). Called after `start` (tools usually call into the service built
@@ -301,7 +322,7 @@ pub trait Module: Send + Sync {
     /// One English sentence saying what the module does, for `/llms.txt` and the module registry (step 40
     /// P2). Default: empty.
     fn description(&self) -> &'static str {
-        ""
+        self.manifest().description
     }
 
     /// Installation checks for `autoxide doctor` (D-166): whether storage is writable, whether an external
@@ -316,14 +337,14 @@ pub trait Module: Send + Sync {
     /// startup (duplicate groups must be declared identically) and filters by tenant, plan and permission
     /// at `GET /api/v1/kernel/navigation`. Default: none.
     fn navigation(&self) -> navigation::Navigation {
-        navigation::Navigation::default()
+        self.manifest().navigation
     }
 
     /// The module's reason lists (step 51 P18, D-223): named `<module>.<action>`, with default codes and
     /// English labels. A tenant can rename labels, enable / disable them, and add its own codes via
     /// `/api/v1/kernel/reasons`. Default: none.
     fn reason_lists(&self) -> Vec<crate::ops::reasons::ReasonList> {
-        Vec::new()
+        self.manifest().reason_lists
     }
 
     /// Tenant-customizable texts (step 51 P21, D-235): terminology and end-user-facing sentences, keyed
@@ -331,14 +352,14 @@ pub trait Module: Send + Sync {
     /// customized. A tenant customizes them via `/api/v1/kernel/texts`; modules read them with
     /// `TextOverrides::text`. Default: none.
     fn overridable_texts(&self) -> Vec<crate::ops::texts::OverridableText> {
-        Vec::new()
+        self.manifest().overridable_texts
     }
 
     /// The module's record kinds that accept custom fields (step 51 P19, D-235). The module stores the
     /// values on the record (the `custom_fields` column) and validates with `CustomFields::validate`.
     /// Default: none.
     fn custom_field_targets(&self) -> Vec<crate::ops::custom_fields::CustomFieldTarget> {
-        Vec::new()
+        self.manifest().unstable.custom_field_targets
     }
 
     /// The module's admin commands for `autoxide task` (D-169): work an operator runs by hand, e.g.
@@ -351,14 +372,14 @@ pub trait Module: Send + Sync {
     /// Routes that need a request body larger than the shared limit (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`),
     /// e.g. file uploads. Called after `configure` (the limit may come from the module's configuration).
     fn body_limits(&self) -> Vec<crate::http::BodyLimit> {
-        Vec::new()
+        self.manifest().body_limits
     }
 
     /// The module's error message translations: `(language, JSON content)`, usually
     /// `vec![("vi", include_str!("../locales/vi.json"))]`. Every error `code` of the module must have a
     /// translation (`cargo xtask check` verifies this).
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
-        Vec::new()
+        self.manifest().translations
     }
 
     /// Non-secret configuration values the UI needs (language, upload limits...), served at
@@ -388,7 +409,7 @@ pub trait Module: Send + Sync {
     /// those events and pours the figures into the aggregated report store of the tenant tree. The kernel
     /// checks the declarations at startup. Default: none.
     fn facts(&self) -> Vec<crate::report::FactSource> {
-        Vec::new()
+        self.manifest().unstable.facts
     }
 
     /// How each tenant-level table of the module travels when an organization branch is split off into its
@@ -398,26 +419,26 @@ pub trait Module: Send + Sync {
     /// Default: inferred from columns (has `org_id` -> by node; a queue -> must be empty; otherwise ->
     /// stays, with a warning in the plan) - the binary's test blocks undeclared tables.
     fn relocation(&self) -> crate::tenancy::Relocation {
-        crate::tenancy::Relocation::inferred()
+        self.manifest().relocation
     }
 
     /// The module's web analytics event kinds (step 57, D-220): the website sends kind `browser`, kind
     /// `server` is derived from the module's own events. The `analytics` module accepts only declared
     /// kinds. The kernel checks the declarations at startup. Default: none.
     fn analytics_events(&self) -> Vec<crate::analytics::AnalyticsEvent> {
-        Vec::new()
+        self.manifest().unstable.analytics_events
     }
 
     /// Funnels the module declares (step 57), e.g. `orders.checkout`: the steps are declared event kinds
     /// (of any module). Default: none.
     fn funnels(&self) -> Vec<crate::analytics::Funnel> {
-        Vec::new()
+        self.manifest().unstable.funnels
     }
 
     /// The module's built-in automation rule templates (step 58): id `<module>.<name>`, rule body in the
     /// format of the `automations` module. Called after `start`. Default: none.
     fn automation_templates(&self) -> Vec<crate::automation::AutomationTemplate> {
-        Vec::new()
+        self.manifest().unstable.automation_templates
     }
 
     /// Copies the module's configuration into a new sandbox (step 38, D-232): called by the
@@ -430,7 +451,7 @@ pub trait Module: Send + Sync {
     /// The module's record kinds that can be pushed from a sandbox to the real tenant as drafts (step 38,
     /// D-232): `kind` is `<module>.<kind>`. Called after `start`. Default: none.
     fn promotable(&self) -> Vec<crate::tenancy::sandbox::Promotable> {
-        Vec::new()
+        self.manifest().unstable.promotable
     }
 
     /// Record kinds an offline app can sync (step 69 P2, D-20261119-step69-sync): a module that has them
@@ -438,20 +459,24 @@ pub trait Module: Send + Sync {
     /// the write transaction, and serves `GET <path>/changes`. The kernel checks the declarations at
     /// startup. Default: none.
     fn sync_resources(&self) -> Vec<crate::sync::SyncResource> {
-        Vec::new()
+        self.manifest().unstable.sync_resources
     }
 
     /// Blocks the module provides to block-built pages (step 67, [`crate::blocks`]). A block that needs
     /// data attaches a [`BlockData`](crate::blocks::BlockData) at `start` with
     /// [`StartContext::block_data`]. Default: none.
     fn blocks(&self) -> Vec<crate::blocks::BlockType> {
-        Vec::new()
+        self.manifest().unstable.blocks
     }
 }
 
 /// What a module receives at startup.
 pub struct StartContext<'a> {
     module: &'static str,
+    /// The module implements [`Module::manifest`]: only then may it register in `start` (`started.rs`).
+    declared: bool,
+    /// What the module registered in `start` (routes, tools, subscriptions…), see `started.rs`.
+    registered: started::Registered,
     database: &'a Database,
     permissions: &'a PermissionCatalog,
     events: &'a EventCatalog,
@@ -1051,6 +1076,15 @@ pub(crate) fn module_name_problems(names: &[&str]) -> Vec<String> {
     let mut problems = Vec::new();
     let mut seen = BTreeSet::new();
     for name in names {
+        if name.is_empty() {
+            // Module không cài `manifest` (mặc định không tên) mà cũng không cài `name` cũ.
+            problems.push(
+                "module name `` must be lowercase letters, digits and `_`, starting with a letter: a module with \
+                 no name does not implement `Module::manifest` (build it with `Manifest::new(name, …)`)"
+                    .to_owned(),
+            );
+            continue;
+        }
         if !is_identifier(name) {
             problems.push(format!(
                 "module name `{name}` must be lowercase letters, digits and `_`, starting with a letter"

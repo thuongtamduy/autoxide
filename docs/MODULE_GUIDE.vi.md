@@ -26,6 +26,50 @@ Tính năng nghiệp vụ nằm trong module, không nằm trong core. Một mod
 
 `./gate.sh` kiểm tất cả; module xong khi gate xanh.
 
+## Khai báo module
+
+Module khai về mình cho core ở hai chỗ, mỗi khái niệm một đường (D-20261126-module-manifest):
+
+- **`Module::manifest`** trả một `Manifest`: mọi thứ biết được trước khi module khởi động — tên, mô tả, migration,
+  record, permission, event, cài đặt, bản dịch, hạn mức, phụ thuộc, hạng. Đó là dữ liệu thuần, nên core đọc được mà
+  không phải khởi động gì (migration, `.env.example`, chọn module, tài liệu).
+- **`Module::start`** dựng service của module và đăng ký trên `StartContext` những gì cần service: route, tool MCP,
+  đăng ký nhận event, job, task, phép kiểm của doctor, trait cho module khác. Handle của kernel lấy bằng
+  `context.kernel::<Handle>()` (`Outbox`, `SyncLog`, `EntitlementsHandle`, `JobQueue`…).
+
+```rust
+impl Module for NotesModule {
+    fn manifest(&self) -> Manifest {
+        Manifest::new("notes", "Sample module: personal notes.")
+            .migrations(migration::all)
+            .records([RecordInfo::of::<entity::Note>()])
+            .permissions(permissions::all())
+            .events(events::all())
+            .translation("vi", include_str!("../locales/vi.json"))
+            .limits([service::NOTES_LIMIT])
+            .unstable(|unstable| unstable.sync_resources([service::NOTES_SYNC]))
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let service = Arc::new(NoteService::new(context.kernel()?, context.kernel()?, context.kernel()?));
+        context.subscribe(Subscription::new(USER_DELETED, service.clone()))?;
+        context.routes(http::routes(service.clone()))?;
+        context.tools(tools::all(&service))?;
+        context.provide::<dyn api::Notes>(service)
+    }
+}
+```
+
+`configure` (đọc cấu hình của module) và `dormant` (nghĩa vụ dữ liệu cá nhân của module đang tắt) giữ nguyên. Khái
+niệm thuộc hạng thử nghiệm ([tương thích](COMPATIBILITY.vi.md#các-hạng-hợp-đồng-của-rust-api)) khai qua
+`Manifest::unstable`.
+
+Các hàm khác của trait `Module` (`name`, `permissions`, `routes`, `tools`, `subscriptions`…) là đường cũ, giữ tới khi
+mọi module trong repo đã chuyển; mỗi hàm ứng với hàm cùng tên của manifest hay `StartContext`. Module đã cài
+`manifest` thì không cài hàm cũ nào (`cargo xtask check`, luật `module-contract-mixed`), và module theo đường cũ không
+đăng ký được trên `StartContext`. Module còn theo đường cũ nằm trong `xtask/module-contract-legacy.txt`; các bước dưới
+đây còn nhắc vài hàm cũ — hiểu là hàm cùng tên của manifest.
+
 ## Từng bước
 
 ### 1. Tạo crate

@@ -34,6 +34,7 @@ mod http;
 mod job;
 mod job_lease;
 mod job_runs;
+mod manifest;
 mod mcp;
 mod mcp_resources;
 mod me_pages;

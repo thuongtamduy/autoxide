@@ -104,11 +104,26 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Hai hạng hợp đồng: kernel tách lõi ổn định khỏi phần thử nghiệm (hoá đơn điện tử, ZNS, thoại, khối trang, phân tích,
       `bench_seed`… sau feature hay mô-đun `unstable`); module gắn nhãn hạng; `docs/COMPATIBILITY.md` (EN + VI) nói rõ hạng
       nào được cam kết gì
+      - [x] `docs/COMPATIBILITY.md` (EN + VI): ba hạng của Rust API và cam kết của từng hạng; hạng module đã có từ bước 70
+            (`Stability`, `docs/MODULES.md`)
+      - [ ] Feature `unstable` + đường `autoxide_kernel::unstable::…`, `bench_seed` sang testkit, semver-checks chạy feature
+            mặc định, luật `stable-signatures` (PR 6 của `docs/research/kernel-contract-1-0.md`)
 - [ ] Hợp đồng `Module` một cách làm cho mỗi việc: gom 49 hàm của trait và ~50 hàm đăng ký của `StartContext` thành một
       cách khai báo (manifest hay trait con theo nhóm), mỗi khái niệm một đường đăng ký; giữ đường cũ `#[deprecated]` tới khi
       mọi module đã chuyển; gỡ `TenantContext::legacy_default`
+      - [x] `Manifest` (builder, khái niệm thử nghiệm sau `Manifest::unstable`), đăng ký trong `start` (`subscribe`,
+            `routes`, `tools`, `job`, `task`, `check`, `prompt`, `mcp_resource`, `client_config`, `seed_tenant`,
+            `sample_data`, `sandbox_copy`), `StartContext::kernel::<H>()`; `notes` chuyển làm mẫu; luật
+            `module-contract-legacy` (baseline 38 module) và `module-contract-mixed`; gỡ `legacy_default`
+            (D-20261128-manifest-defaults)
+      - [ ] `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng của `StartContext` (`work_source`, `personal_data`…), hook
+            của `relocation`; chuyển 38 module theo cụm (PR 7–12); baseline rỗng thì gắn `#[deprecated]` cho hàm cũ, bản
+            sau gỡ (D-20261127-transition-paths)
 - [ ] `#[non_exhaustive]` cho enum và struct công khai sẽ còn lớn thêm (kernel, testkit, `api` của module); mọi `#[deprecated]`
       viết tiếng Anh, nêu cái thay thế
+      - [x] Phần hợp đồng module: `Manifest`, `Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `#[deprecated]`
+            tiếng Việt duy nhất (`legacy_default`) đã gỡ
+      - [ ] Phần còn lại cùng luật `exhaustive` (danh sách ngoại lệ) và `deprecated-note` (PR 6)
 - [ ] Tách `autoxide-host` (phần chỉ binary dùng) khỏi kernel; file trên 880 dòng tách theo trách nhiệm (phần đa khách
       ~21.700 dòng). Tách phần còn lại của kernel theo lớp: **sau 1.0** — đo 26/11/2026 chỉ rút 6–9% thời gian build lại, dưới
       ngưỡng 20% (D-20261126-kernel-crates; mặt tiền giữ đường dẫn nên tách sau không phá vỡ)

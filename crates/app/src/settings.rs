@@ -74,6 +74,10 @@ fn read_selected(
         Ok(Err(SelectionError::Modules(error))) => {
             return Err(ConfigErrors::from(ConfigError::new("modules", error.message())));
         }
+        // `SelectionError` là `#[non_exhaustive]`: loại lỗi thêm sau này báo nguyên văn.
+        Ok(Err(other)) => {
+            return Err(ConfigErrors::from(ConfigError::new("modules", other.to_string())));
+        }
         Err(Invalid) => Err(Invalid),
     };
     let Ok(mut modules) = registered else {
