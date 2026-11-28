@@ -6,8 +6,8 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::time::Timestamp;
 use autoxide_shipping::api::{
     Address, CarrierAccount, CarrierCapabilities, CarrierParcel, CarrierQuoteRequest, CarrierRate,
-    CarrierShipment, CarrierShipmentRequest, CarrierUpdate, Direction, Label, ShipmentStatus,
-    ShippingCarrier, errors as carrier,
+    CarrierShipment, CarrierShipmentRequest, CarrierUpdate, Direction, Label,
+    MAX_PARCEL_WEIGHT_GRAMS, MAX_SIDE_MM, ShipmentStatus, ShippingCarrier, errors as carrier,
 };
 use serde_json::{Map, Value, json};
 
@@ -56,14 +56,30 @@ fn cm(mm: Option<i64>) -> i64 {
     mm.filter(|mm| *mm > 0).map_or(DEFAULT_SIDE_CM, |mm| mm / 10 + i64::from(mm % 10 != 0))
 }
 
+/// Tổng cân (gram) các kiện gửi GHN, mỗi kiện ít nhất 1 gram. Kiện nặng hơn trần của `shipping` hay
+/// cạnh dài hơn trần → `ghn.parcel_too_large` (422) thay vì gửi số bão hoà `i64::MAX` (P17). Tính bằng
+/// `i128` nên không tràn dù người gọi gửi gì.
+fn total_weight(parcels: &[CarrierParcel]) -> Result<i64, Error> {
+    let too_long = |side: Option<i64>| side.is_some_and(|mm| mm > MAX_SIDE_MM);
+    if parcels.iter().any(|parcel| {
+        too_long(parcel.length_mm) || too_long(parcel.width_mm) || too_long(parcel.height_mm)
+    }) {
+        return Err(errors::parcel_too_large(MAX_PARCEL_WEIGHT_GRAMS, MAX_SIDE_MM));
+    }
+    let grams: i128 = parcels.iter().map(|parcel| i128::from(parcel.weight_grams.max(1))).sum();
+    i64::try_from(grams)
+        .ok()
+        .filter(|grams| *grams <= MAX_PARCEL_WEIGHT_GRAMS)
+        .ok_or_else(|| errors::parcel_too_large(MAX_PARCEL_WEIGHT_GRAMS, MAX_SIDE_MM))
+}
+
 fn service_of(code: Option<&str>, parcels: &[CarrierParcel]) -> Result<i64, Error> {
     match code.map(str::trim) {
         Some("2") => Ok(LIGHT),
         Some("5") => Ok(HEAVY),
         Some(other) if !other.is_empty() => Err(errors::service_unknown(other)),
         _ => {
-            let total =
-                parcels.iter().map(|parcel| parcel.weight_grams).fold(0i64, i64::saturating_add);
+            let total = total_weight(parcels)?;
             Ok(if parcels.len() > 1 || total >= HEAVY_FROM_GRAMS { HEAVY } else { LIGHT })
         }
     }
@@ -97,8 +113,7 @@ fn put_parcels(
     declared: Money,
     cod: Option<Money>,
 ) -> Result<(), Error> {
-    let weight =
-        parcels.iter().map(|parcel| parcel.weight_grams.max(1)).fold(0i64, i64::saturating_add);
+    let weight = total_weight(parcels)?;
     let side = |pick: fn(&CarrierParcel) -> Option<i64>| {
         parcels.iter().map(|parcel| cm(pick(parcel))).max().unwrap_or(DEFAULT_SIDE_CM)
     };
@@ -410,6 +425,20 @@ mod tests {
         assert_eq!(service_of(Some("5"), &light).unwrap(), HEAVY);
         assert_eq!(service_of(Some(" 2 "), &heavy).unwrap(), LIGHT);
         assert_eq!(service_of(Some("express"), &light).unwrap_err().code(), "ghn.service_unknown");
+    }
+
+    #[test]
+    fn kien_qua_nang_hay_qua_dai_bao_loi_khong_bao_hoa() {
+        let max = [CarrierParcel::new(MAX_PARCEL_WEIGHT_GRAMS)];
+        assert_eq!(total_weight(&max).unwrap(), MAX_PARCEL_WEIGHT_GRAMS);
+        let over = [CarrierParcel::new(MAX_PARCEL_WEIGHT_GRAMS), CarrierParcel::new(1)];
+        assert_eq!(total_weight(&over).unwrap_err().code(), "ghn.parcel_too_large");
+        let huge = [CarrierParcel::new(i64::MAX), CarrierParcel::new(i64::MAX)];
+        assert_eq!(service_of(None, &huge).unwrap_err().code(), "ghn.parcel_too_large");
+        let long = [CarrierParcel::new(100).dimensions(Some(MAX_SIDE_MM + 1), None, None)];
+        assert_eq!(total_weight(&long).unwrap_err().code(), "ghn.parcel_too_large");
+        // Cân 0 hay âm tính 1 gram như trước.
+        assert_eq!(total_weight(&[CarrierParcel::new(0), CarrierParcel::new(-5)]).unwrap(), 2);
     }
 
     #[test]

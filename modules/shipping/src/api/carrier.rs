@@ -98,6 +98,15 @@ impl CarrierCapabilities {
     }
 }
 
+/// The heaviest load `shipping` hands to a carrier, in grams (1,000 tonnes): the chargeable weight of a
+/// quote, one parcel, and all parcels of a shipment together. Inputs over it are refused with
+/// `shipping.load_too_large` (422), so a connector adding up the parcels of one request never overflows
+/// `i64`; a connector still checks its own sums and the carrier's own limits.
+pub const MAX_PARCEL_WEIGHT_GRAMS: i64 = 1_000_000_000;
+
+/// The longest side of an item or parcel `shipping` accepts, in mm (as `catalog`: 10,000,000 mm).
+pub const MAX_SIDE_MM: i64 = 10_000_000;
+
 /// A package sent to the carrier.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]

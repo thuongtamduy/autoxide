@@ -93,15 +93,45 @@ Module `orders` holds stock through `autoxide_inventory::api::Inventory`:
    again, so later events for the order, such as serials recorded afterwards, do not take the stock a second
    time), then record the units sold with an adjustment (`POST /api/v1/inventory/adjustments`, negative
    quantity, reason `data_entry_fix`).
-   Upgrading from an earlier version: orders delivered before this version keep their reservation `confirmed`
-   (their units stay `reserved`). List them with `GET /api/v1/inventory/reservations?status=confirmed` and
-   reconcile each order already delivered the same way (release, then adjustment).
+   Upgrading from a version before 0.20.0: orders delivered before it keep their reservation `confirmed` (their
+   units stay `reserved`); see "Stock that did not leave with a delivery" below.
 4. `release` — give back what was not shipped (cancelled, payment failed…). Releasing twice adds back once.
 5. `restock` — returned goods come back in (`reference` such as `return:<id>`); unsellable lines are only recorded.
 
 Unconfirmed reservations past `expires_at` are released by the job `inventory.expire_reservations` (every minute).
 Each reservation takes stock with one conditional `UPDATE` per line, in a fixed order, so 100 buyers of the last
 unit get exactly one success.
+
+### Stock that did not leave with a delivery
+
+`inventory` applies order events after the order changed, so when one cannot be applied the order is not
+rolled back: the stock level is reconciled by a person. Three counters say it happened (no tenant label;
+the warning log line carries `order_id`, the event and the error `code`):
+
+| Counter | Means |
+| --- | --- |
+| `inventory_delivery_unissued_total{reason}` | delivered goods were not taken from stock (`no_reservation`, `rejected`) |
+| `inventory_order_event_unapplied_total{event}` | another order event (confirmation, cancellation, return, pre-order cancellation) was refused |
+| `inventory_delivery_after_manual_release_total` | goods were delivered after staff released the reservation: nothing was issued |
+
+The alert `AutoxideStockNotIssued` in
+[`deploy/prometheus/autoxide-alerts.yml`](../deploy/prometheus/autoxide-alerts.yml) fires on any of them. For
+each order named in the log:
+
+1. `GET /api/v1/inventory/reservations?order_id=<order_id>` and `GET /api/v1/orders/<order_id>` (what was
+   delivered, line by line).
+2. Reservation still `held` or `confirmed` while the goods are delivered: release it
+   (`POST /api/v1/inventory/reservations/{id}/release`), then record the delivered units with an adjustment
+   (`POST /api/v1/inventory/adjustments`, negative quantity, reason `data_entry_fix`) in the warehouse each line
+   was reserved in.
+3. Reservation already released by staff (the third counter): look for the adjustment
+   (`GET /api/v1/inventory/movements?variant_id=<id>&kind=adjustment`); record it if it is missing. A staff
+   release is final, so later events of the order never take the stock a second time.
+4. No reservation (`no_reservation`) for goods that track stock: record the adjustment only.
+
+Orders delivered before 0.20.0 kept their reservation `confirmed`. Find them with
+`GET /api/v1/orders?status=delivered` and `?status=completed`, look each one up as in step 1, and reconcile
+the ones whose reservation is still `confirmed` as in step 2.
 
 ### Pre-orders
 

@@ -320,7 +320,7 @@ What it cannot see lives in the database and is checked by your tests (step 5): 
 2. Change the tag in your workspace `Cargo.toml` (all three core crates) and build: cargo updates `Cargo.lock` for the core crates. Run your tests on both databases.
 3. On each server: `acme migrate up`, then start the new binary — as for the official server ([`docs/DEPLOY.md`](../DEPLOY.md)).
 
-What the core promises: while its version is `0.x`, a breaking change to the module contract comes only in a minor release (`0.17` → `0.18`), never in a patch release; an item that is going away is `#[deprecated]` for at least one minor release first; the `Module` trait only grows by functions with a default body. From `1.0` the contract follows Semantic Versioning. The full statement is in [`MODULE_GUIDE.md`](../MODULE_GUIDE.md), "Stability of the module contract".
+What the core promises: while its version is `0.x`, a breaking change to the module contract comes only in a minor release (`0.17` → `0.18`), never in a patch release; an item that is going away is `#[deprecated]` for at least one minor release first; the module contract only grows by new builder functions of `Manifest` and new registration functions of `StartContext`. From `1.0` the contract follows Semantic Versioning. The full statement is in [`MODULE_GUIDE.md`](../MODULE_GUIDE.md), "Stability of the module contract".
 
 The core crates are not on crates.io yet; until they are, the git tag is the way to depend on them.
 

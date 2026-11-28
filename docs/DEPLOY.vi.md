@@ -1184,7 +1184,7 @@ trình chạy việc nền (`AUTOXIDE_PROCESS_ROLE` là `all` hay `worker`) cậ
 | `jobs_pending` | Job chưa xong, kể cả job hẹn giờ |
 | `jobs_oldest_pending_seconds` | Job tới hạn chờ lâu nhất đã chờ bao lâu (0 khi không có) |
 | `jobs_dead` | Job trong dead-letter queue (`autoxide jobs failed`) |
-| `events_pending`, `events_oldest_pending_seconds`, `events_dead` | Như trên, cho event đang chờ giao tới bên nhận |
+| `events_pending`, `events_oldest_pending_seconds`, `events_dead` | Như trên, cho event đang chờ giao tới bên nhận, đếm cả từng module nhận còn chờ thử lại |
 | `database_connections{pool,state}`, `database_connections_max{pool}` | Kết nối của pool `read` và `write`, `in_use` hay `idle`, và số tối đa |
 
 Nhãn `database` là tên database (`main`, hay placement của khách có database riêng); quá

@@ -138,6 +138,13 @@ fn check_request(request: &ShipmentRequest) -> Result<(), Error> {
                 "must be more than 0",
             ));
         }
+        crate::limits::check_item(
+            &mut problems,
+            &format!("items[{index}]"),
+            item.quantity,
+            item.weight_grams,
+            [item.length_mm, item.width_mm, item.height_mm],
+        );
     }
     let currency = request.declared_value.currency();
     for (field, money) in [("cod_amount", request.cod_amount), ("quoted_fee", request.quoted_fee)] {
@@ -151,7 +158,20 @@ fn check_request(request: &ShipmentRequest) -> Result<(), Error> {
             ));
         }
     }
-    invalid(problems)
+    invalid(problems)?;
+    // Kiện đầu tiên gom mọi món: tổng cân không vượt trần một lần giao (P17).
+    total_weight(request).map(|_| ())
+}
+
+/// Tổng cân (gram) mọi món của yêu cầu — cân của kiện đầu tiên. Món đã kiểm trần nên tính `i128`
+/// không tràn; vượt trần một lần giao → `shipping.load_too_large`.
+fn total_weight(request: &ShipmentRequest) -> Result<i64, Error> {
+    let grams = request
+        .items
+        .iter()
+        .map(|item| i128::from(item.weight_grams.unwrap_or(0).max(0)) * i128::from(item.quantity))
+        .sum();
+    crate::limits::within_load(grams)
 }
 
 impl ShippingService {
@@ -278,12 +298,8 @@ impl ShippingService {
             Err(error) => return Err(error.into()),
         };
         // Một kiện chứa mọi món; nhân viên chia kiện lại bằng `PUT /shipments/{id}/parcels`.
-        let weight: i64 = request
-            .items
-            .iter()
-            .map(|item| item.weight_grams.unwrap_or(0).saturating_mul(item.quantity))
-            // Cộng bão hoà (PT-5): cân nặng do người gọi gửi, không có trần; `.sum()` tràn là panic.
-            .fold(0i64, i64::saturating_add);
+        // `check_request` đã kiểm trần (PT-5, P17): không tràn, không bão hoà.
+        let weight = total_weight(request)?;
         let parcel_id = Uuid::now_v7();
         parcel::ActiveModel {
             id: Set(parcel_id),

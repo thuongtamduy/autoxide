@@ -46,6 +46,7 @@ const KEYWORDS: [&str; 3] = [CORE, OFFICIAL, ALL];
 
 /// The tier of a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Stability {
     /// Official: runs by default; the API stays compatible under the versioning policy.
     Official,
@@ -141,6 +142,7 @@ impl Selection {
 
 /// A module that is in the binary but does not run in this installation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct InactiveModule {
     pub name: &'static str,
     pub description: &'static str,
@@ -149,6 +151,7 @@ pub struct InactiveModule {
 
 /// A disabled module whose tables still exist in the database.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct DormantModule {
     pub name: &'static str,
     pub stability: Stability,
@@ -163,6 +166,7 @@ pub struct DormantModule {
 /// The result of selection: running modules, dormant modules, and modules enabled along because another
 /// module needs them. Why modules could not be selected.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum SelectionError {
     /// `AUTOXIDE_MODULES` is written wrongly (the installer's error): the message says plainly what to fix.
     Setting(String),

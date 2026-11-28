@@ -58,7 +58,14 @@ Dấu hiệu: cảnh báo `AutoxideJobsStuck`, `AutoxideEventsBacklog`, `Autoxid
 3. Nhiều khách: database đang migrate trả `503 tenant_maintenance` và việc của nó chờ; để `autoxide migrate up --all` chạy xong.
 4. Job đã bỏ cuộc: `autoxide jobs failed [--module <module>] [--limit <n>]` liệt kê chúng kèm lỗi cuối. Sửa nguyên nhân (mật
    khẩu SMTP sai, đối tác sập) **trước** `autoxide jobs retry <module> <id>`; job retry quá sớm chỉ lại thất bại.
-5. Vẫn trễ dù worker khoẻ: tăng `AUTOXIDE_JOBS_CONCURRENCY` hay chạy thêm worker process.
+5. Event đã bỏ cuộc: module cứ lỗi với một event thì được thử lại riêng, nên các module khác đã nhận event đó. Mỗi
+   dòng của `kernel_event_deliveries` có `failed_at` là một module (`subscriber`) chưa bao giờ nhận một event (`module`,
+   `event_id`), kèm `last_error`. Sửa nguyên nhân, rồi chạy
+   `UPDATE kernel_event_deliveries SET failed_at = NULL, attempts = 0 WHERE id = '<id>';` để chỉ thử lại module đó.
+   Dòng của `<module>_events` có `failed_at` là dòng không đọc được (payload hỏng, khách không còn).
+   Trước khi `autoxide rollback` về bản cũ hơn bảng `kernel_event_deliveries`, chờ `events_pending` về 0: lùi bản xoá
+   bảng đó, nên các lần thử lại đang chờ của từng module mất, và bản cũ thấy các event đó đã giao nên không gửi lại.
+6. Vẫn trễ dù worker khoẻ: tăng `AUTOXIDE_JOBS_CONCURRENCY` hay chạy thêm worker process.
 
 ## Lộ key
 
@@ -186,6 +193,8 @@ thiết kế; tra một tenant trong log và trace).
 | `http_rate_limited_total`, `http_api_key_rate_limited_total`, `http_tenant_rate_limited_total` | gần 0 | `AutoxideRateLimitedClients` trên 1/s trong 15 phút | "Thu hồi hàng loạt" |
 | `webhooks_failed_total` so với `webhooks_delivered_total`  | dưới 5% lỗi                      | `AutoxideWebhooksFailing` trên 20% trong 30 phút  | chủ của các bên nhận         |
 | `mail_bounces_total{kind="hard"}`                         | ít                               | `AutoxideMailHardBounces` trên 20 mỗi giờ         | `DEPLOY.vi.md` "Thư bị dội" |
+| `inventory_delivery_unissued_total`, `inventory_order_event_unapplied_total`, `inventory_delivery_after_manual_release_total` | 0 | `AutoxideStockNotIssued` | `INVENTORY.vi.md` "Hàng đã giao mà tồn không giảm" |
+| `orders_payment_currency_mismatch_total`                  | 0                                | `AutoxidePaymentCurrencyMismatch`                 | `MONEY.vi.md` "Khoản thanh toán khác tiền tệ" |
 
 Các series khác đáng có một panel (mặc định không cảnh báo): `database_write_retries_total` (tranh chấp ghi),
 `kernel_request_log_dropped_total` (request log quá tải), `entitlement_denials_total` (chạm giới hạn gói),

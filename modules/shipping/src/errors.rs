@@ -217,6 +217,18 @@ pub(crate) fn estimate_unavailable() -> Error {
     )
 }
 
+/// `shipping.load_too_large` (422): hàng quá nặng cho một lần giao (cân tính phí, một kiện hay mọi kiện
+/// của vận đơn vượt `MAX_PARCEL_WEIGHT_GRAMS`).
+pub(crate) fn load_too_large(max_grams: i64) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "shipping.load_too_large",
+        "The goods weigh more than {max_grams} grams (actual or volumetric weight), the most one shipment \
+         carries. Check the weight and dimensions sent, or split the goods into several shipments.",
+    )
+    .with_param("max_grams", max_grams)
+}
+
 pub(crate) fn estimate_quantity() -> Error {
     Error::new(
         ErrorKind::Validation,

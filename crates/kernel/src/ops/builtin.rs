@@ -322,6 +322,8 @@ impl Module for KernelModule {
             Box::new(crate::ops::list_indexes::AddListIndexesKernel),
             // Loại lượt và phiên bản đi / đến trên `kernel_migration_runs` (bước 71 G3, D-20261126-upgrade-rollback).
             Box::new(crate::tenancy::migration_runs::kind::AddMigrationRunKind),
+            // Trạng thái giao event theo từng bên nhận: bên lỗi thử lại riêng (bước 71 G1, D-20261128-event-per-subscriber).
+            Box::new(crate::event::deliveries::CreateEventDeliveries),
         ]
     }
 
