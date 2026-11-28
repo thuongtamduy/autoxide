@@ -358,6 +358,25 @@ impl OrdersService {
                 if crate::payment_attempts::superseded(&stored) {
                     return Ok(Recorded::Superseded);
                 }
+                // Khoản nhận khác tiền của khoản thanh toán (vd đối soát `ledger` chấp nhận một khoản
+                // ngoại tệ, P17): không ghi số đơn vị nhỏ của tiền khác vào đơn. Lỗi có mã rõ, cảnh báo
+                // và số đo cho người vận hành; event thử lại rồi vào dead-letter (giao lại không đổi được
+                // tiền tệ). Người vận hành hoàn khoản qua `ledger` — xem docs/MONEY.md.
+                if amount.currency().code() != stored.currency {
+                    metrics::counter!("orders_payment_currency_mismatch_total").increment(1);
+                    tracing::error!(
+                        order_id = %current.id,
+                        payment_id = %stored.id,
+                        received = amount.currency().code(),
+                        currency = %stored.currency,
+                        "a payment was received in another currency than its order; refund it by hand"
+                    );
+                    return Err(errors::received_currency_mismatch(
+                        stored.id,
+                        amount.currency().code(),
+                        &stored.currency,
+                    ));
+                }
                 let now = crate::service::now();
                 let purpose = stored.purpose.clone();
                 let mut paid: payment::ActiveModel = stored.into();
@@ -366,9 +385,8 @@ impl OrdersService {
                 paid.updated_at = Set(now);
                 paid.update(&transaction).await?;
                 let late = current.status == OrderStatus::Cancelled.as_str();
-                // Cộng có kiểm (PT-5, PT-6): khoản nhận khác tiền của đơn (vd đối soát chấp nhận một
-                // khoản ngoại tệ) hay tràn `i64` là lỗi — event vào dead-letter để người xử lý, không ghi
-                // số đơn vị nhỏ của tiền khác vào đơn.
+                // Cộng có kiểm (PT-5, PT-6): tràn `i64` (hay tiền khác tiền của đơn, đã chặn ở trên) là
+                // lỗi — event vào dead-letter để người xử lý.
                 let paid_minor = autoxide_kernel::money::Money::from_columns(
                     current.paid_minor,
                     &current.currency,

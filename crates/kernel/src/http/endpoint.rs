@@ -177,6 +177,8 @@ pub trait Endpoint {
 
 /// The routes of a module with their OpenAPI description, built by [`routes!`](crate::routes). `S` is the state the
 /// handlers take with [`State`](super::State); [`with_state`](Self::with_state) gives it.
+// `Clone`: kernel giữ bản đăng ký trong `start` và trả lại mỗi lần được hỏi (`module/started.rs`).
+#[derive(Clone)]
 pub struct Routes<S = ()>(OpenApiRouter<S>);
 
 impl<S: Clone + Send + Sync + 'static> Default for Routes<S> {

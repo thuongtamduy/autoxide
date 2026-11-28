@@ -60,7 +60,15 @@ Signs: alerts `AutoxideJobsStuck`, `AutoxideEventsBacklog`, `AutoxideDeadLetterG
    `autoxide migrate up --all` finish.
 4. Jobs that gave up: `autoxide jobs failed [--module <module>] [--limit <n>]` lists them with the last error. Fix the cause
    (a wrong SMTP password, a partner down) **before** `autoxide jobs retry <module> <id>`; a job retried too early only fails again.
-5. Still behind with a healthy worker: raise `AUTOXIDE_JOBS_CONCURRENCY` or start more worker processes.
+5. Events that gave up: a module that kept failing on one event is retried alone, so the other modules already have
+   it. Each row of `kernel_event_deliveries` with `failed_at` set is one module (`subscriber`) that never received one
+   event (`module`, `event_id`), with `last_error`. Fix the cause, then run
+   `UPDATE kernel_event_deliveries SET failed_at = NULL, attempts = 0 WHERE id = '<id>';` to retry that module only.
+   A row of `<module>_events` with `failed_at` set could not be read at all (damaged payload, tenant gone).
+   Before `autoxide rollback` to a release older than the `kernel_event_deliveries` table, let `events_pending` reach 0:
+   the rollback drops that table, so waiting per-module retries are lost and the older release, which sees those
+   events as delivered, does not send them again.
+6. Still behind with a healthy worker: raise `AUTOXIDE_JOBS_CONCURRENCY` or start more worker processes.
 
 ## A key leaked
 
@@ -192,6 +200,8 @@ label by design; look a tenant up in logs and traces).
 | `http_rate_limited_total`, `http_api_key_rate_limited_total`, `http_tenant_rate_limited_total` | near 0 | `AutoxideRateLimitedClients` above 1/s for 15 min | "Mass revocation" |
 | `webhooks_failed_total` vs `webhooks_delivered_total`     | under 5% failing                 | `AutoxideWebhooksFailing` above 20% for 30 min    | the receivers' owners        |
 | `mail_bounces_total{kind="hard"}`                         | few                              | `AutoxideMailHardBounces` above 20 per hour       | `DEPLOY.md` "Mail that bounces" |
+| `inventory_delivery_unissued_total`, `inventory_order_event_unapplied_total`, `inventory_delivery_after_manual_release_total` | 0 | `AutoxideStockNotIssued` | `INVENTORY.md` "Stock that did not leave with a delivery" |
+| `orders_payment_currency_mismatch_total`                  | 0                                | `AutoxidePaymentCurrencyMismatch`                 | `MONEY.md` "A payment in another currency" |
 
 Other series worth a panel (no alert by default): `database_write_retries_total` (write contention),
 `kernel_request_log_dropped_total` (request log overloaded), `entitlement_denials_total` (plan limits hit),

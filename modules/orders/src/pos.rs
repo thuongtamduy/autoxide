@@ -66,19 +66,50 @@ pub(crate) struct PosLine {
     pub quantity: i64,
 }
 
-/// Một khoản thu ở quầy.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Một khoản thu ở quầy. Trường riêng tư: chỉ dựng được bằng [`PosPayment::new`], nhận `Money` (số
+/// tiền kèm tiền tệ) — mọi đường gọi (REST hôm nay, tool MCP bán ở quầy sau này) buộc nêu tiền tệ, nên
+/// kiểm `orders.payment_currency_mismatch` không bị bỏ qua vì danh sách tiền tệ rỗng (P17).
+// Chỉ `Serialize` (để tính dấu của lượt bán), không `Deserialize`: dựng lại từ JSON sẽ mất tiền tệ.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct PosPayment {
-    pub method: String,
-    pub amount: i64,
+    method: String,
+    amount: i64,
     /// Tiền mặt khách đưa (≥ `amount`); tiền thối = `tendered − amount`.
-    pub tendered: Option<i64>,
+    tendered: Option<i64>,
     /// Mã chuẩn chi của máy POS thẻ / mã giao dịch VietQR.
-    pub approval_code: Option<String>,
-    /// Mã tiền tệ người gọi gửi kèm `amount` và `tendered` (phải là tiền của ca). Không vào dấu của lượt
-    /// bán (`serde(skip)`): dấu cũ đã lưu vẫn khớp khi gửi lại.
+    approval_code: Option<String>,
+    /// Mã tiền tệ của `amount` và `tendered` (phải là tiền của ca). Không vào dấu của lượt bán
+    /// (`serde(skip)`): dấu cũ đã lưu vẫn khớp khi gửi lại.
     #[serde(skip)]
-    pub currencies: Vec<String>,
+    currencies: Vec<String>,
+}
+
+impl PosPayment {
+    /// Khoản thu `amount` theo cách `method`; `tendered` là tiền mặt khách đưa. Tiền tệ của cả hai được
+    /// giữ lại để `pos_sell` so với tiền của ca.
+    pub(crate) fn new(
+        method: String,
+        amount: Money,
+        tendered: Option<Money>,
+        approval_code: Option<String>,
+    ) -> Self {
+        let currencies = std::iter::once(amount)
+            .chain(tendered)
+            .map(|money| money.currency().code().to_owned())
+            .collect();
+        PosPayment {
+            method,
+            amount: amount.minor(),
+            tendered: tendered.map(Money::minor),
+            approval_code,
+            currencies,
+        }
+    }
+
+    /// Mọi tiền tệ của khoản thu đều là `currency`.
+    fn in_currency(&self, currency: &str) -> bool {
+        self.currencies.iter().all(|code| code == currency)
+    }
 }
 
 /// Giỏ ở quầy.
@@ -567,10 +598,7 @@ impl OrdersService {
             return Err(Error::validation(problems));
         }
         // Tiền khác tiền của ca (vd JPY ở ca VND) không được ghi như tiền của ca (PT-6).
-        if let Some(index) = paid
-            .iter()
-            .position(|payment| payment.currencies.iter().any(|code| *code != shift.currency))
-        {
+        if let Some(index) = paid.iter().position(|payment| !payment.in_currency(&shift.currency)) {
             return Err(errors::payment_currency_mismatch(index, &shift.currency));
         }
         let print = fingerprint(&json!({"lines": cart.lines, "codes": cart.codes,
@@ -905,5 +933,34 @@ impl OrdersService {
         };
         let input = self.pos_price_input(&shift, &cart)?;
         pricing::quote(&self.sources, tenant, &input, self.config.quote_ttl_minutes).await
+    }
+}
+
+#[cfg(test)]
+mod payment_tests {
+    use super::*;
+
+    #[test]
+    fn khoan_thu_luon_mang_tien_te() {
+        let vnd = |minor| Money::new(minor, Currency::VND);
+        let cash = PosPayment::new("cash".to_owned(), vnd(90_000), Some(vnd(100_000)), None);
+        assert!(cash.in_currency("VND"));
+        assert!(!cash.in_currency("USD"));
+        // Tiền khách đưa khác tiền của khoản thu: không khớp tiền của ca nào.
+        let mixed = PosPayment::new(
+            "cash".to_owned(),
+            vnd(90_000),
+            Some(Money::new(100, Currency::USD)),
+            None,
+        );
+        assert!(!mixed.in_currency("VND"));
+        assert!(!mixed.in_currency("USD"));
+        // Tiền tệ không vào dấu của lượt bán (dấu cũ vẫn khớp).
+        let json = serde_json::to_value(&cash).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"method": "cash", "amount": 90_000, "tendered": 100_000,
+                "approval_code": null})
+        );
     }
 }

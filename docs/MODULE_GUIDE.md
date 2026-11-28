@@ -26,6 +26,79 @@ Business features live in modules, not in the core. A module is one crate under
 
 `./gate.sh` checks all of this; a module is done when the gate is green.
 
+## Declaring a module
+
+A module tells the core about itself in two places, one way for each concept (D-20261126-module-manifest):
+
+- **`Module::manifest`** returns a `Manifest`: everything known before the module starts — name, description,
+  migrations, records, permissions, events, settings, translations, quotas, dependencies, tier. It is plain data,
+  so the core can read it without starting anything (migrations, `.env.example`, module selection, docs).
+- **`Module::start`** builds the module's services and registers on `StartContext` what needs them: routes, MCP
+  tools, event subscriptions, jobs, tasks, doctor checks, traits for other modules. Kernel handles come from
+  `context.kernel::<Handle>()` (`Outbox`, `SyncLog`, `EntitlementsHandle`, `JobQueue`…).
+
+```rust
+impl Module for NotesModule {
+    fn manifest(&self) -> Manifest {
+        Manifest::new("notes", "Sample module: personal notes.")
+            .migrations(migration::all)
+            .records([RecordInfo::of::<entity::Note>()])
+            .permissions(permissions::all())
+            .events(events::all())
+            .translation("vi", include_str!("../locales/vi.json"))
+            .limits([service::NOTES_LIMIT])
+            .unstable(|unstable| unstable.sync_resources([service::NOTES_SYNC]))
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let service = Arc::new(NoteService::new(context.kernel()?, context.kernel()?, context.kernel()?));
+        context.subscribe(Subscription::new(USER_DELETED, service.clone()))?;
+        context.routes(http::routes(service.clone()))?;
+        context.tools(tools::all(&service))?;
+        context.provide::<dyn api::Notes>(service)
+    }
+}
+```
+
+`configure` (read the module's settings) and `dormant` (personal-data duties of a turned-off module) stay as
+they are. Concepts of the experimental tier ([compatibility](COMPATIBILITY.md#contract-tiers-of-the-rust-api))
+go through `Manifest::unstable`.
+
+The other functions of the `Module` trait (`name`, `permissions`, `routes`, `tools`, `subscriptions`…) are the
+old way, kept until every module in this repository has moved. A module that implements `manifest` implements none of
+them: `cargo xtask check` (rule `module-contract-mixed`) and startup refuse it, and a module on the old way cannot
+register on `StartContext`. Modules still on the old way are listed in `xtask/module-contract-legacy.txt`. The steps
+below still name some old functions; this table gives the new way for each:
+
+| Old `Module` function | New way |
+| --- | --- |
+| `name`, `description` | `Manifest::new(name, description)` |
+| `stability`, `essential`, `always_enabled`, `depends_on`, `migrations`, `upgrades`, `records`, `tenant_settings`, `org_settings`, `retained_tables`, `retention`, `control_plane_tables`, `features`, `limits`, `permissions`, `events`, `resource_events`, `schedules`, `deprecations`, `body_limits`, `navigation`, `reason_lists`, `overridable_texts`, `relocation` | the `Manifest` function of the same name |
+| `translations` | `Manifest::translation` (one call per language) |
+| `custom_field_targets` | `UnstableManifest::custom_field_targets` (inside `Manifest::unstable`) |
+| `facts` | `UnstableManifest::facts` (inside `Manifest::unstable`) |
+| `analytics_events` | `UnstableManifest::analytics_events` (inside `Manifest::unstable`) |
+| `funnels` | `UnstableManifest::funnels` (inside `Manifest::unstable`) |
+| `automation_templates` | `UnstableManifest::automation_templates` (inside `Manifest::unstable`) |
+| `promotable` | `UnstableManifest::promotable` (inside `Manifest::unstable`) |
+| `sync_resources` | `UnstableManifest::sync_resources` (inside `Manifest::unstable`) |
+| `blocks` | `UnstableManifest::blocks` (inside `Manifest::unstable`) |
+| `subscriptions` | `StartContext::subscribe` (one call per subscription) |
+| `routes`, `endpoints` | `StartContext::routes` |
+| `tools` | `StartContext::tools` |
+| `jobs` | `StartContext::job` (one call each) |
+| `tasks` | `StartContext::task` (one call each) |
+| `checks` | `StartContext::check` (one call each) |
+| `prompts` | `StartContext::prompt` (one call each) |
+| `mcp_resources` | `StartContext::mcp_resource` (one call each) |
+| `client_config` | `StartContext::client_config` |
+| `seed_tenant` | `StartContext::seed_tenant` |
+| `sample_data` | `StartContext::sample_data` |
+| `sandbox_copy` | `StartContext::sandbox_copy` |
+
+`StartContext::outbox()`, `sync_log()` and the other getters keep working; `StartContext::kernel::<H>()` is the one
+way for new code.
+
 ## Step by step
 
 ### 1. Create the crate
@@ -398,6 +471,11 @@ Declare events in `src/events.rs` and return them from `Module::events`. The pay
 `{"before": …, "after": …}` (omit what does not apply) and never contains secrets. The
 `audit` module records every event; other modules subscribe through
 `Module::subscriptions` and must accept receiving the same event twice.
+Each subscribing module gets the event on its own: when your handler returns an error, panics or
+runs past 50 seconds, the modules after yours still receive the event, and only your module is
+retried (2, 4, 8… seconds, at most an hour apart; after 10 attempts its delivery goes to the
+dead-letter queue, except `privacy::USER_DELETED`, which is retried every hour until it succeeds).
+Several subscriptions of one module to the same event are retried together.
 An event about data of one organization unit carries that unit as `org_id` - at the top of the
 payload or inside `after` / `before` (a row snapshot with its `org_id` column is enough).
 Receivers read it with `Delivered::org_id()`: an automation rule of a branch only starts for
@@ -857,8 +935,8 @@ Rules the core follows:
   version of a vocabulary library waits for a major release of Autoxide; a newer minimum Rust
   version comes only in a minor release, never in a patch release. The whole policy, for the HTTP
   API too, is in [`docs/COMPATIBILITY.md`](COMPATIBILITY.md).
-- `Module` only grows by functions with a default body: a module written for an older
-  release keeps compiling.
+- The module contract only grows by new builder functions of `Manifest` and new registration functions
+  of `StartContext`: a module written for an older release keeps compiling.
 - Public types that will grow are `#[non_exhaustive]`: build them with their
   constructor, not a struct literal, and match their enums with a `_` arm.
 - A public item that is going away is `#[deprecated]` (with what to use instead) for at

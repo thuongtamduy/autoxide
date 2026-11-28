@@ -499,3 +499,44 @@ async fn webhook_tai_khoan_khac_khong_doi_van_don() {
     .await
     .unwrap();
 }
+
+/// P17: kiện nặng / dài quá trần, hay mọi kiện cộng lại quá trần một lần giao → 422 có mã; vận đơn giữ
+/// nguyên kiện cũ.
+#[tokio::test]
+async fn chia_kien_vuot_tran_bao_loi() {
+    TestDatabase::run(async |test| {
+        let (app, tree, _fake, method, _) = carrier_shop(test, false).await;
+        let created = create(&app, request(&tree, &method, Uuid::now_v7(), "k")).await;
+        let id = created["id"].as_str().unwrap();
+        let uri = format!("/shipments/{id}/parcels");
+        let wild = json!({"parcels": [
+            {"weight_grams": i64::MAX, "length_mm": i64::MAX, "items": ["l1", "l2"]},
+        ]});
+        let (status, problem) = call(&app, "PUT", &uri, "boss", Some(wild)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let fields: Vec<&str> = problem["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|e| e["field"].as_str())
+            .collect();
+        assert_eq!(fields, ["parcels[0].weight_grams", "parcels[0].length_mm"], "{problem}");
+        // Mỗi kiện đúng trần, hai kiện cộng lại vượt trần.
+        let heavy = json!({"parcels": [
+            {"weight_grams": 1_000_000_000_i64, "items": ["l1"]},
+            {"weight_grams": 1, "items": ["l2"]},
+        ]});
+        let (status, problem) = call(&app, "PUT", &uri, "boss", Some(heavy)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["code"], "shipping.load_too_large", "{problem}");
+        // Yêu cầu giao mà tổng cân các món quá trần: từ chối ngay lúc tạo.
+        let mut big = request(&tree, &method, Uuid::now_v7(), "big");
+        big["items"][0]["weight_grams"] = json!(10_000_000);
+        big["items"][0]["quantity"] = json!(101);
+        let (status, problem) = call(&app, "POST", "/shipments", "boss", Some(big)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["code"], "shipping.load_too_large", "{problem}");
+    })
+    .await
+    .unwrap();
+}
