@@ -180,8 +180,8 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
             `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng. Đã có: `autoxide_testkit::http`
             (`StatusCode`, `Method`, `Client` cho bench), `status_code()`; `notes`, `esms`, `einvoice_sepay` bỏ `axum`
-            khỏi `[dev-dependencies]`; `examples/external-module` dùng `autoxide_testkit::http`. Còn: `idempotency`
-            (test tự dựng endpoint trả mã và header tuỳ ý — cần response thô của lớp HTTP, làm ở cụm 1);
+            khỏi `[dev-dependencies]`; `examples/external-module` dùng `autoxide_testkit::http`; `idempotency` (cụm 1:
+            handler giả viết bằng `#[endpoint]`, lỗi của kernel và `http::NoStore`). Còn:
             `http::Client::new(axum::Router)` và `TestApp::router()` lộ `axum` — đổi khi `autoxide_kernel::http::build`
             thôi trả `axum::Router`; `TestResponse::status()` / `headers()` / `body(Body)` và trường
             `McpClientError::status` (kiểu `http`) gắn `#[deprecated]` khi không test nào trong repo còn gọi, gỡ bản minor
@@ -196,6 +196,15 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             cần chúng
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
+      - [ ] Cụm 1 (D-20261128-library-layer-plan mục 7). Kernel thêm `http::NoStore<T>`, `JobContext::all_tenants`.
+            Xong: `idempotency`, `esms`, `einvoice_sepay`. Còn, chờ phần kernel: `sepay`, `momo` (trait `BankFeed` /
+            `PaymentGateway::verify_webhook` nhận `axum::http::HeaderMap` — cần kiểu `http::Headers` của kernel);
+            `mail`, `webhooks` (cộng trên cột `i32`: `Expr`/`adjust` chỉ có `i64`; `webhooks` thêm response 202,
+            `UpgradeContext::all_tenants` cho data upgrade, đọc trên kết nối ghi ngoài transaction); `ai` (server giả
+            của test cần header `retry-after` và trễ: `FakeProviderServer` chưa có); `audit` (doctor đọc snapshot mọi
+            khách mọi database, trait `RelocateTable` nhận `sea_orm::DatabaseTransaction`, `write_with_retry`,
+            `Timestamp::truncate(jiff::Unit)`); `files` (upload dạng stream + `Content-Type`, tải về dạng stream với
+            304/`ETag`, `BodyLimit::new(axum::http::Method)`, response 200-hay-201)
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên
       bản trong `Cargo.lock`, theo dõi hai cảnh báo RUSTSEC đang bỏ qua của `webauthn_rp`
 

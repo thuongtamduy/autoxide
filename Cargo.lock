@@ -632,7 +632,6 @@ dependencies = [
 name = "autoxide-einvoice-sepay"
 version = "0.20.0"
 dependencies = [
- "async-trait",
  "autoxide-kernel",
  "autoxide-testkit",
  "base64 0.23.1",
@@ -647,7 +646,6 @@ dependencies = [
 name = "autoxide-esms"
 version = "0.20.0"
 dependencies = [
- "async-trait",
  "autoxide-kernel",
  "autoxide-testkit",
  "reqwest",
@@ -749,17 +747,12 @@ dependencies = [
 name = "autoxide-idempotency"
 version = "0.20.0"
 dependencies = [
- "async-trait",
  "autoxide-kernel",
  "autoxide-testkit",
- "axum",
- "jiff",
- "sea-orm",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",
- "utoipa",
- "utoipa-axum",
  "uuid",
 ]
 
