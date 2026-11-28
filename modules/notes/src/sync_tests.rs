@@ -13,8 +13,8 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::idempotency::{Begin, IdempotencyStore, StoredResponse};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
+use autoxide_testkit::http::StatusCode;
 use autoxide_testkit::{TestApp, TestDatabase};
-use axum::http::StatusCode;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -43,7 +43,7 @@ async fn create(app: &TestApp, who: &str, title: &str) -> (String, String) {
         .send()
         .await
         .unwrap();
-    assert_eq!(answer.status(), StatusCode::CREATED, "{}", answer.text());
+    assert_eq!(answer.status_code(), StatusCode::CREATED, "{}", answer.text());
     let id = answer.json()["data"]["id"].as_str().unwrap().to_owned();
     let version = app.get(&format!("/api/v1/notes/{id}")).token(who).send().await.unwrap();
     (id, version.header("etag").to_owned())
@@ -51,7 +51,7 @@ async fn create(app: &TestApp, who: &str, title: &str) -> (String, String) {
 
 async fn changes(app: &TestApp, who: &str, query: &str) -> (StatusCode, Value) {
     let answer = app.get(&format!("/api/v1/notes/changes{query}")).token(who).send().await.unwrap();
-    (answer.status(), answer.json())
+    (answer.status_code(), answer.json())
 }
 
 /// Đọc hết luồng như app: theo `next_cursor` tới trang cuối, áp từng mục vào bản sao trên máy;
@@ -107,9 +107,9 @@ async fn luong_thay_doi_dung_thu_tu_du_dau_xoa() {
             .send()
             .await
             .unwrap();
-        assert_eq!(patched.status(), StatusCode::OK);
+        assert_eq!(patched.status_code(), StatusCode::OK);
         let removed = app.delete(&format!("/api/v1/notes/{b}")).token("ada").send().await.unwrap();
-        assert_eq!(removed.status(), StatusCode::NO_CONTENT);
+        assert_eq!(removed.status_code(), StatusCode::NO_CONTENT);
         let (c, _) = create(&app, "ada", "C").await;
 
         // Một trang đủ lớn: mỗi ghi chú một mục, ở vị trí lần đổi cuối của nó.
@@ -134,7 +134,7 @@ async fn luong_thay_doi_dung_thu_tu_du_dau_xoa() {
         // Lần sau, từ con trỏ đã giữ: thấy dấu xoá của C; mục gần đây có thể đến lại (con trỏ lùi
         // vài giây để không bỏ sót transaction commit muộn) — áp lại không đổi kết quả.
         let removed = app.delete(&format!("/api/v1/notes/{c}")).token("ada").send().await.unwrap();
-        assert_eq!(removed.status(), StatusCode::NO_CONTENT);
+        assert_eq!(removed.status_code(), StatusCode::NO_CONTENT);
         let (_, seen) = pull(&app, "ada", cursor, 100, &mut device).await;
         assert!(seen.iter().any(|item| item["id"] == c.as_str() && item["deleted"] == true));
         assert_eq!(device.keys().cloned().collect::<Vec<_>>(), vec![a.clone()]);
@@ -212,7 +212,7 @@ async fn if_match_cu_tra_412_kem_ban_hien_tai() {
             .send()
             .await
             .unwrap();
-        assert_eq!(first.status(), StatusCode::OK);
+        assert_eq!(first.status_code(), StatusCode::OK);
         let now = first.header("etag").to_owned();
 
         let stale = app
@@ -223,7 +223,7 @@ async fn if_match_cu_tra_412_kem_ban_hien_tai() {
             .send()
             .await
             .unwrap();
-        assert_eq!(stale.status(), StatusCode::PRECONDITION_FAILED);
+        assert_eq!(stale.status_code(), StatusCode::PRECONDITION_FAILED);
         let problem = stale.json();
         assert_eq!(problem["code"], "precondition_failed");
         assert_eq!(problem["current"]["body"], "from phone");
@@ -248,7 +248,7 @@ async fn hai_may_cung_sua_mot_ben_thang() {
                 .send()
         };
         let (phone, laptop) = tokio::join!(send("phone"), send("laptop"));
-        let mut statuses = [phone.unwrap().status(), laptop.unwrap().status()];
+        let mut statuses = [phone.unwrap().status_code(), laptop.unwrap().status_code()];
         statuses.sort();
         assert_eq!(statuses, [StatusCode::OK, StatusCode::PRECONDITION_FAILED]);
     })
@@ -264,7 +264,7 @@ async fn batch(app: &TestApp, who: &str, operations: Value) -> (StatusCode, Valu
         .send()
         .await
         .unwrap();
-    (answer.status(), answer.json())
+    (answer.status_code(), answer.json())
 }
 
 #[tokio::test]
@@ -279,7 +279,7 @@ async fn lo_ghi_gui_lai_khong_ghi_trung() {
             .send()
             .await
             .unwrap();
-        assert_eq!(changed.status(), StatusCode::OK);
+        assert_eq!(changed.status_code(), StatusCode::OK);
         let missing = Uuid::now_v7();
         let operations = json!([
             {"id": "1", "method": "POST", "path": "/api/v1/notes", "idempotency_key": "k-1",
@@ -435,8 +435,8 @@ async fn lo_ghi_tinh_mot_luot_vao_khach() {
             assert_eq!(result["status"], 201, "{answer}");
         }
         let list = || app.get("/api/v1/notes").token("ada").send();
-        assert_eq!(list().await.unwrap().status(), StatusCode::OK);
-        assert_eq!(list().await.unwrap().status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(list().await.unwrap().status_code(), StatusCode::OK);
+        assert_eq!(list().await.unwrap().status_code(), StatusCode::TOO_MANY_REQUESTS);
     })
     .await
     .unwrap();

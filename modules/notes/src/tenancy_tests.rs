@@ -8,8 +8,8 @@ use autoxide_kernel::event::{Delivered, EventHandler, Outbox};
 use autoxide_kernel::migration::Migrator;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
 use autoxide_kernel::time::Timestamp;
+use autoxide_testkit::http::StatusCode;
 use autoxide_testkit::{TestApp, TestDatabase, leak_check};
-use axum::http::StatusCode;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -34,7 +34,7 @@ async fn app(test: &TestDatabase) -> TestApp {
 async fn create(app: &TestApp, token: &str, title: &str) -> (StatusCode, Value) {
     let body = json!({"title": title, "body": format!("body of {title}")});
     let answer = app.post("/api/v1/notes").token(token).json(body).send().await.unwrap();
-    (answer.status(), answer.json())
+    (answer.status_code(), answer.json())
 }
 
 /// Tên và ID của event trong bảng `notes_events` của `tenant` (database của khách).
@@ -59,9 +59,9 @@ async fn khong_ro_ri_giua_khach() {
             let uri = format!("/api/v1/notes/{id}");
             let changed =
                 app.patch(&uri).token(other).json(json!({"body": "x"})).send().await.unwrap();
-            assert_eq!(changed.status(), StatusCode::NOT_FOUND);
+            assert_eq!(changed.status_code(), StatusCode::NOT_FOUND);
             let removed = app.delete(&uri).token(other).send().await.unwrap();
-            assert_eq!(removed.status(), StatusCode::NOT_FOUND);
+            assert_eq!(removed.status_code(), StatusCode::NOT_FOUND);
             let mine = app.get(&uri).token(owner).send().await.unwrap();
             assert_eq!(mine.json()["data"]["body"], format!("body of {marker}"));
         }
@@ -101,7 +101,7 @@ async fn con_tro_cua_khach_khac_khong_lo_du_lieu() {
             let cursor = first.json()["pagination"]["next_cursor"].as_str().unwrap().to_owned();
             let uri = format!("/api/v1/notes?order=asc&cursor={cursor}");
             let theirs = app.get(&uri).token(other).send().await.unwrap();
-            assert_eq!(theirs.status(), StatusCode::OK);
+            assert_eq!(theirs.status_code(), StatusCode::OK);
             let rows = theirs.json()["data"].as_array().unwrap().clone();
             assert!(rows.iter().all(|row| !row["title"].as_str().unwrap().contains(&marker)));
         }
@@ -162,7 +162,7 @@ async fn nang_cap_gan_du_lieu_cu_cho_khach_mac_dinh() {
         migrator.up(app.database()).await.unwrap();
 
         let answer = app.get(&format!("/api/v1/notes/{id}")).token("ada").send().await.unwrap();
-        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        assert_eq!(answer.status_code(), StatusCode::OK, "{}", answer.text());
         assert_eq!(answer.json()["data"]["title"], "Old");
         // Bước 34: ghi chú cũ thuộc nút gốc (= ID của khách).
         assert_eq!(answer.json()["data"]["org_id"], DEFAULT_TENANT.as_uuid().to_string());
