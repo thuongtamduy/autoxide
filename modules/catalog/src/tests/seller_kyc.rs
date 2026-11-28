@@ -180,7 +180,8 @@ async fn san_dung_hang_cua_nguoi_ban_khong_con_dinh_danh() {
             let (seller, _) = create_product(&app, "boss", tree.a, "K-1", "Hàng người bán").await;
             // Thêm hàng của người bán để việc đọc đi qua nhiều trang (trang 2 sản phẩm khi test).
             let (second, _) = create_product(&app, "boss", tree.a, "K-3", "Hàng người bán 2").await;
-            let (other, _) = create_product(&app, "boss", tree.b, "K-4", "Hàng người bán khác").await;
+            let (other, _) =
+                create_product(&app, "boss", tree.b, "K-4", "Hàng người bán khác").await;
             let root = autoxide_kernel::tenancy::root_of(DEFAULT_TENANT);
             let (own, _) = create_product(&app, "boss", root, "K-2", "Hàng của sàn").await;
             for id in [&seller, &second, &other, &own] {
