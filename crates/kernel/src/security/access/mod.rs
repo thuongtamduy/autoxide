@@ -560,7 +560,10 @@ impl Principal {
         }
     }
 
-    /// The user `user_id` with exactly the permissions `permissions`, at depth `tenant`.
+    /// The user `user_id` with exactly the permissions `permissions`, at depth `tenant`. The grants sit at the
+    /// default tenant's root node and [`in_tenant`](Self::in_tenant) does not move them; they still count as held at
+    /// the root of whichever tenant the caller is in (for example by
+    /// [`require_at_root`](Self::require_at_root)), so `TestApp::user_in` builds a tenant administrator.
     pub fn new(user_id: Uuid, permissions: impl IntoIterator<Item = String>) -> Self {
         let root = root_of(DEFAULT_TENANT);
         Principal::with_grants(

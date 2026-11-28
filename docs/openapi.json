@@ -207463,7 +207463,7 @@
     },
     "/api/v1/kernel/settings/{name}": {
       "delete": {
-        "description": "Requires `kernel.settings.manage`. The server-wide configuration applies again. Removing a\nsetting this tenant never set changes nothing.",
+        "description": "Requires `kernel.settings.manage` held at the tenant's root unit, like setting one. The\nserver-wide configuration applies again. Removing a setting this tenant never set changes\nnothing.",
         "operationId": "kernel_delete_tenant_setting",
         "parameters": [
           {
@@ -207523,7 +207523,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.settings.manage`; code `permission_denied`."
+            "description": "Missing permission `kernel.settings.manage` (code `permission_denied`), or it is held only below the tenant's root unit (code `org_out_of_scope`)."
           },
           "422": {
             "content": {
@@ -207560,7 +207560,7 @@
         ]
       },
       "put": {
-        "description": "Requires `kernel.settings.manage`. Creates or replaces the value; sending it again is safe.\nA secret value is stored encrypted and the answer does not contain it. The former name of a\nrenamed setting is still accepted; the answer carries the current name.",
+        "description": "Requires `kernel.settings.manage` held at the tenant's root unit (a role of a branch, or an\nAPI key bound to a branch, is refused: settings apply to the whole tenant). Creates or replaces\nthe value; sending it again is safe. A secret value is stored encrypted and the answer does\nnot contain it. The former name of a renamed setting is still accepted; the answer carries the\ncurrent name.",
         "operationId": "kernel_set_tenant_setting",
         "parameters": [
           {
@@ -207637,7 +207637,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.settings.manage`; code `permission_denied`."
+            "description": "Missing permission `kernel.settings.manage` (code `permission_denied`), or it is held only below the tenant's root unit (code `org_out_of_scope`)."
           },
           "422": {
             "content": {

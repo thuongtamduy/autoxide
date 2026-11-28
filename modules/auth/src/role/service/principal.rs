@@ -133,7 +133,7 @@ impl RoleService {
         Ok(Some((user, principal, live)))
     }
 
-    /// `Ok` nếu `actor` có mọi permission người dùng `target` có. Dùng trước khi một
+    /// `Ok` nếu `actor` có mọi permission người dùng `target` có, đủ rộng (nút + độ sâu). Dùng trước khi một
     /// quản trị viên tác động lên tài khoản người khác (gỡ MFA, khoá, đặt mật khẩu đầu):
     /// người chỉ có `auth.users.manage` không được làm yếu tài khoản của người quyền cao
     /// hơn mình, rồi chiếm nó (D-079).
@@ -144,21 +144,17 @@ impl RoleService {
         target: Uuid,
     ) -> Result<(), Error> {
         // Người mua không quản lý qua đây (D-309): `GET /customers`, `PATCH /customers/{id}`.
+        let read = tenant.database().read();
         let staff = user::Entity::find_by_id(target)
             .filter(user::Column::Realm.eq("staff"))
             .scoped(tenant)
-            .one(tenant.database().read())
+            .one(read)
             .await?;
         if staff.is_none() {
             return Err(crate::user::user_not_found(target));
         }
         let target = self.principal(tenant, target).await?;
-        let covered = if target.has_all_permissions() {
-            actor.has_all_permissions()
-        } else {
-            target.permissions().iter().all(|permission| actor.allows(permission))
-        };
-        if covered {
+        if super::grants::covers_all(read, tenant, actor, &target).await? {
             return Ok(());
         }
         Err(Error::forbidden(
