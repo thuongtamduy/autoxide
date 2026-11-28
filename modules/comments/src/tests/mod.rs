@@ -154,9 +154,17 @@ pub(super) fn page(order: Order) -> PageRequest {
     PageRequest::first(50, order)
 }
 
-/// Ghi thẳng bình luận `row` đã sửa (test đặt trạng thái khó tạo qua API).
+/// Ghi thẳng bình luận `row` đã sửa (test đặt trạng thái khó tạo qua API), kể cả `created_at` (đường ghi của module
+/// không bao giờ đổi cột này).
 pub(super) async fn save(tenant: &autoxide_kernel::tenancy::TenantContext, row: &comment::Model) {
     let transaction = tenant.db().begin_write().await.unwrap();
     crate::posting::authoring::save_comment(&transaction, row).await.unwrap();
+    transaction
+        .update::<comment::Model>()
+        .set(comment::Model::CREATED_AT, row.created_at)
+        .filter(comment::Model::ID.eq(row.id))
+        .exec()
+        .await
+        .unwrap();
     transaction.commit().await.unwrap();
 }

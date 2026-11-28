@@ -122,7 +122,7 @@ impl CommentsService {
                 id: Uuid::now_v7(),
                 tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
                 comment_id: id,
-                reporter_key: reporter_key,
+                reporter_key,
                 reporter_user_id: principal.map(Principal::user_id),
                 reason: reason.as_str().to_owned(),
                 note: note.map(str::to_owned),

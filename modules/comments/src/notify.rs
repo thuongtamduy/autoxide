@@ -186,7 +186,7 @@ impl CommentsService {
             id: Uuid::now_v7(),
             tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
             comment_id: id,
-            email: email,
+            email,
             created_at: now(),
         };
         transaction

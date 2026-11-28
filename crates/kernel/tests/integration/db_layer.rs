@@ -881,7 +881,8 @@ async fn job_cua_mot_khach_khong_lay_duoc_handle_moi_khach() {
     TestDatabase::run(async |test| {
         let database = open(test).await;
         let a = tenant(&database, 0xA);
-        let sweep = JobContext::for_database(database.clone(), "kernel.sweep", serde_json::json!({}), 1);
+        let sweep =
+            JobContext::for_database(database.clone(), "kernel.sweep", serde_json::json!({}), 1);
         let all = sweep.all_tenants("test sweep").unwrap();
         assert_eq!(all.read().find::<Line>().count().await.unwrap(), 0);
         let own = JobContext::for_tenant(a, "kernel.own", serde_json::json!({}), 1);

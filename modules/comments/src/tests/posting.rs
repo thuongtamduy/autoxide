@@ -985,7 +985,8 @@ async fn ghi_ban_cu_khong_xoa_so_tra_loi_vua_cong() {
     TestDatabase::run(async |test| {
         let h = service(test, open_config()).await;
         let client = visitor("203.0.113.9");
-        let root = as_guest(&h.service, &client, guest("Ada", "Câu hỏi")).await.unwrap().comment.row;
+        let root =
+            as_guest(&h.service, &client, guest("Ada", "Câu hỏi")).await.unwrap().comment.row;
         let stale = h.service.find(&h.tenant, root.id).await.unwrap();
         assert_eq!(stale.reply_count, 0);
         // Trong lúc đó có một trả lời được hiện: `reply_count` của gốc thành 1.
@@ -996,8 +997,9 @@ async fn ghi_ban_cu_khong_xoa_so_tra_loi_vua_cong() {
         let mut edited = stale.clone();
         edited.email_verified = true;
         let transaction = h.tenant.db().begin_write().await.unwrap();
-        let after =
-            crate::posting::authoring::update_if_unchanged(&transaction, edited, &stale).await.unwrap();
+        let after = crate::posting::authoring::update_if_unchanged(&transaction, edited, &stale)
+            .await
+            .unwrap();
         transaction.commit().await.unwrap();
         assert!(after.email_verified);
         assert_eq!(after.reply_count, 1);

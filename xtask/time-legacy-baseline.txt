@@ -98,16 +98,6 @@ time-legacy 7 modules/catalog/src/tests/pricing.rs
 time-legacy 3 modules/catalog/src/tests/products.rs
 time-legacy 3 modules/catalog/src/tests/public.rs
 time-legacy 2 modules/catalog/src/transfers.rs
-time-legacy 3 modules/comments/src/bench_seed.rs
-time-legacy 2 modules/comments/src/http/views.rs
-time-legacy 2 modules/comments/src/notify.rs
-time-legacy 3 modules/comments/src/posting.rs
-time-legacy 2 modules/comments/src/posting/authoring.rs
-time-legacy 4 modules/comments/src/retention.rs
-time-legacy 2 modules/comments/src/service.rs
-time-legacy 13 modules/comments/src/tests/moderation.rs
-time-legacy 4 modules/comments/src/tests/posting.rs
-time-legacy 2 modules/comments/src/tests/tenancy.rs
 time-legacy 6 modules/compliance/src/cases.rs
 time-legacy 2 modules/compliance/src/disclosures.rs
 time-legacy 5 modules/compliance/src/incidents.rs

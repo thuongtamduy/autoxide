@@ -216,9 +216,9 @@ fn thread(
     let published = i32::try_from(rows.len()).map_err(Error::internal)?;
     let threads = i32::try_from(roots).map_err(Error::internal)?;
     batch.targets.push(target::Model {
-        tenant_id: tenant_id,
+        tenant_id,
         target_type: TARGET_TYPE.to_owned(),
-        target_id: target_id,
+        target_id,
         uid: Some(Uuid::now_v7()),
         state: "open".to_owned(),
         hidden: false,
