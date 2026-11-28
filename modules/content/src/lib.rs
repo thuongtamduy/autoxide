@@ -245,6 +245,14 @@ impl Module for ContentModule {
             embedder: context.require::<dyn autoxide_kernel::ai::Embedder>()?,
             settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
         };
+        // Luật chéo lúc lưu (D-20261128-settings-one-system): ngôn ngữ mặc định đã đặt phải thuộc danh sách ngôn ngữ.
+        let server_locales = config.locales.clone();
+        context.require::<autoxide_kernel::tenancy::SettingSystem>()?.rule(
+            autoxide_kernel::tenancy::SettingRule::new(
+                &[config::TENANT_LOCALES.name(), config::TENANT_DEFAULT_LOCALE.name()],
+                move |view| config::locales_fit(view, &server_locales),
+            ),
+        )?;
         let service = Arc::new(
             ContentService::new(
                 context.tenancy(),

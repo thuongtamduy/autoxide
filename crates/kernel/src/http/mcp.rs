@@ -255,7 +255,7 @@ impl McpServer {
         tenant: TenantContext,
         principal: Principal,
         arguments: Value,
-        budget: Option<crate::tenancy::TenantId>,
+        budget: Option<crate::tenancy::SignedInTenant>,
     ) -> Result<Value, Error> {
         call_tool(&self.entitlements, tool, tenant, principal, arguments, budget).await
     }
@@ -611,7 +611,7 @@ pub(crate) async fn call_tool(
     tenant: TenantContext,
     principal: Principal,
     arguments: Value,
-    budget: Option<crate::tenancy::TenantId>,
+    budget: Option<crate::tenancy::SignedInTenant>,
 ) -> Result<Value, Error> {
     // Như REST: permission nhạy cảm cần xác nhận lại gần đây (step-up), không chỉ "có permission".
     tool.authorize(&principal)?;

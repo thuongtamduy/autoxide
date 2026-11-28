@@ -141,6 +141,14 @@ impl Module for MenusModule {
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
         };
+        // Luật chéo lúc lưu (D-20261128-settings-one-system): ngôn ngữ mặc định đã đặt phải thuộc danh sách ngôn ngữ.
+        let server_locales = config.locales.clone();
+        context.require::<autoxide_kernel::tenancy::SettingSystem>()?.rule(
+            autoxide_kernel::tenancy::SettingRule::new(
+                &[config::TENANT_LOCALES.name(), config::TENANT_DEFAULT_LOCALE.name()],
+                move |view| config::locales_fit(view, &server_locales),
+            ),
+        )?;
         let service = Arc::new(MenuService::new(context.outbox()?, dependencies, config));
         context.reference_source(Arc::new(usages::Menus));
         // Khối `menus.menu` của trang dựng từ khối (bước 67).

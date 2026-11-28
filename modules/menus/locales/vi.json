@@ -1,4 +1,5 @@
 {
+  "field:`menus.default_locale` ({default}) must be one of the menu languages ({locales}); change or remove `menus.default_locale` first": "`menus.default_locale` ({default}) phải là một trong các ngôn ngữ của menu ({locales}); đổi hay bỏ `menus.default_locale` trước",
   "field:`{kind}` has no sub-items to take": "`{kind}` không có mục con để lấy",
   "field:at most {max_items} items": "tối đa {max_items} mục",
   "field:give at most one of `url` and `ref`": "chỉ ghi tối đa một trong `url` và `ref`",

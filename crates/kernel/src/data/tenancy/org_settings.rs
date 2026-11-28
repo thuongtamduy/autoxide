@@ -140,7 +140,7 @@ pub(crate) fn declaration_problems(
             ));
         }
         if seen.contains(&key) {
-            problems.push(format!("organization setting `{key}` is declared twice"));
+            problems.push(format!("organization setting `{key}` is declared twice (as a per-node setting, or as a per-tenant setting: a key lives in one scope only)"));
         }
         seen.push(key);
         if setting.description.trim().is_empty() {

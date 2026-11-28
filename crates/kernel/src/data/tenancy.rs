@@ -97,7 +97,7 @@ pub use relocate::{
     RelocationTable, RelocationWarning, SealedColumn, Split, SwitchHook, TENANTS_RELOCATE,
     TablePolicy, TableReport, TenantRelocation, TenantRelocations,
 };
-pub use request::{TENANT_HEADER, TenantHint};
+pub use request::{SignedInTenant, TENANT_HEADER, TenantHint};
 pub use residency::{Residency, parse_country};
 pub use return_url::{
     RETURN_URL_MAX_LEN, ReturnUrlProblem, check_return_url, invalid_return_origins,
@@ -110,9 +110,10 @@ pub use sandbox::{
 };
 pub use scope::{ScopeExt, TenantScoped};
 pub use settings::{
-    BUSINESS_MODEL, BUSINESS_MODELS, CONNECTION_GROUP, DOMAIN_GROUP, LINK_GROUP, PUBLIC_URL,
-    SETTINGS_MANAGE, SettingCheck, SettingValue, SiteLinks, TenantSetting, TenantSettings,
-    parsed_setting,
+    BUSINESS_MODEL, BUSINESS_MODELS, CONNECTION_GROUP, DOMAIN_GROUP, EffectiveOrgSetting,
+    LINK_GROUP, OrgSettingStore, PUBLIC_URL, SETTINGS_MANAGE, SettingCheck, SettingRule,
+    SettingSystem, SettingValue, SettingsView, SiteLinks, StoredOrgSetting, TenantSetting,
+    TenantSettings, parsed_setting,
 };
 pub use site::{SITE_PARAM, Site, SiteQuery, site_not_found};
 

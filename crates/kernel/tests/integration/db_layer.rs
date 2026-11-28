@@ -8,7 +8,8 @@ use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::db::{
     Bounds, Cond, Expr, Queries as _, Record, TenantKey, all_tenants_for_tests,
-    is_unique_violation, max, register_control_plane_for_tests, sum,
+    is_unique_violation, max, register_control_plane_for_tests, register_tenant_tables_for_tests,
+    sum,
 };
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};
@@ -125,6 +126,17 @@ async fn open(test: &TestDatabase) -> Database {
     let database = Database::connect(&reader.finish(config).unwrap().0).await.unwrap();
     // Bảng control-plane của file này (trong app thật: `Module::control_plane_tables`).
     register_control_plane_for_tests(&["kernel_t_plan"]);
+    // Bảng cấp khách cho chốt chặn lúc chạy (trong app thật: record `scope = tenant` của `Module::records`).
+    register_tenant_tables_for_tests(&[
+        "kernel_t_line",
+        "kernel_t_period",
+        "kernel_t_reservation_line",
+        "kernel_t_level",
+        "kernel_t_daily",
+        "kernel_t_entry",
+        "kernel_t_product_attribute",
+        "kernel_t_translation",
+    ]);
     let tx = all_tenants_for_tests(&database).begin_write().await.unwrap();
     for ddl in DDL {
         tx.sql(ddl).execute().await.unwrap();
@@ -800,6 +812,95 @@ async fn trang_theo_cot_tu_nhien() {
             .await
             .unwrap_err();
         assert_eq!(error.code(), "validation_failed");
+    })
+    .await
+    .unwrap();
+}
+
+// Chốt chặn lúc chạy (D-20261128-tenant-runtime-guard): câu chạy trên handle của khách mà chạm bảng cấp khách không lọc
+// theo khách bị từ chối trước khi tới database, dù câu dựng bằng đường nào — SQL viết tay mà `:tenant` chỉ nằm trong
+// comment, câu SeaORM chạy qua cầu chuyển tiếp, câu không tham số. Câu đúng vẫn chạy; dữ liệu không đổi.
+#[tokio::test]
+async fn chot_chan_luc_chay_tu_choi_cau_thieu_khach() {
+    use sea_orm::ConnectionTrait as _;
+
+    TestDatabase::run(async |test| {
+        let database = open(test).await;
+        let (a, b) = (tenant(&database, 0xA), tenant(&database, 0xB));
+        seed(&a, &b).await;
+        let read = a.db().read();
+        let backend = read.get_database_backend();
+
+        // SQL viết tay: rào chữ `:tenant` cũ cho qua vì thấy chữ đó; chốt mới thấy nó nằm trong comment.
+        let commented = read
+            .sql("SELECT id FROM kernel_t_line -- AND tenant_id = :tenant\n")
+            .all::<(Uuid,)>()
+            .await
+            .unwrap_err();
+        assert_eq!(commented.code(), "internal_error");
+
+        // Câu SeaORM tự dựng chạy trên handle của khách (cầu chuyển tiếp): thiếu lọc thì bị chặn, có lọc thì chạy.
+        let placeholder = |n: usize| match backend {
+            sea_orm::DbBackend::Postgres => format!("${n}"),
+            _ => "?".to_owned(),
+        };
+        let unscoped = autoxide_kernel::database::statement(
+            backend,
+            format!(
+                r#"SELECT "kernel_t_line"."id" FROM "kernel_t_line" WHERE "kernel_t_line"."account_id" = {}"#,
+                placeholder(1)
+            ),
+            [sea_orm::Value::from(id(0x2001))],
+        );
+        assert!(read.query_all_raw(unscoped).await.is_err());
+        let scoped = autoxide_kernel::database::statement(
+            backend,
+            format!(
+                r#"SELECT "kernel_t_line"."id" FROM "kernel_t_line" WHERE "kernel_t_line"."account_id" = {} AND "kernel_t_line"."tenant_id" = {}"#,
+                placeholder(1),
+                placeholder(2)
+            ),
+            [sea_orm::Value::from(id(0x1001)), sea_orm::Value::from(a.id().as_uuid())],
+        );
+        assert_eq!(read.query_all_raw(scoped).await.unwrap().len(), 3);
+
+        // Ghi qua cầu: xoá không lọc khách bị chặn, câu không tham số bị chặn; dòng của khách B còn nguyên.
+        let count_of_b = async || -> Vec<(i64,)> {
+            b.db().read().sql("SELECT COUNT(*) FROM kernel_t_line WHERE tenant_id = :tenant").all().await.unwrap()
+        };
+        let before = count_of_b().await;
+        let tx = a.db().begin_write().await.unwrap();
+        let delete_all = autoxide_kernel::database::statement(
+            backend,
+            r#"DELETE FROM "kernel_t_line""#,
+            Vec::<sea_orm::Value>::new(),
+        );
+        assert!(tx.execute_raw(delete_all).await.is_err());
+        assert!(tx.execute_unprepared("DELETE FROM kernel_t_line").await.is_err());
+        // Lọc theo khách khác cũng bị chặn: handle của A chỉ chạy câu gắn khách A.
+        let other = autoxide_kernel::database::statement(
+            backend,
+            format!(r#"DELETE FROM "kernel_t_line" WHERE "kernel_t_line"."tenant_id" = {}"#, placeholder(1)),
+            [sea_orm::Value::from(b.id().as_uuid())],
+        );
+        assert!(tx.execute_raw(other).await.is_err());
+        // Bộ câu dò của kiểm độc lập (mỗi lần dùng bảng cần vế lọc riêng): chạy thật trên handle, đều bị chặn.
+        let probes = [
+            "UPDATE kernel_t_line SET amount_minor = (SELECT MAX(amount_minor) FROM kernel_t_line) WHERE tenant_id = :tenant",
+            "SELECT a.id FROM kernel_t_line a JOIN kernel_t_line b ON b.account_id = a.account_id WHERE a.tenant_id = :tenant",
+            "SELECT id FROM kernel_t_line WHERE tenant_id = :tenant UNION SELECT id FROM kernel_t_line",
+            "SELECT id FROM kernel_t_line WHERE tenant_id = :tenant AND account_id IN (SELECT account_id FROM kernel_t_line)",
+            "SELECT id FROM kernel_t_line l WHERE l.tenant_id = :tenant AND EXISTS (SELECT 1 FROM kernel_t_line m WHERE m.id = l.id)",
+            "INSERT INTO kernel_t_line (id, tenant_id, account_id, side, amount_minor, effective_date) \
+             SELECT id, :tenant, account_id, side, amount_minor, effective_date FROM kernel_t_line",
+            // Gán `tenant_id` trong SET không phải lọc: câu này kéo dòng của khách khác về khách A.
+            "UPDATE kernel_t_line SET tenant_id = :tenant WHERE amount_minor > 0",
+        ];
+        for probe in probes {
+            assert!(tx.sql(probe).execute().await.is_err(), "let through: {probe}");
+        }
+        tx.rollback().await.unwrap();
+        assert_eq!(count_of_b().await, before);
     })
     .await
     .unwrap();

@@ -448,9 +448,16 @@ async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
         // Request không nêu khách: cấu hình của máy chủ.
         assert_eq!(client(None).await["locales"], json!(["en", "vi"]));
 
-        // Bỏ cấu hình: về biến môi trường.
-        let removed = app.delete(&format!("{base}/content.locales")).token("platform").send();
-        assert_eq!(removed.await.unwrap().status(), 204);
+        // Bỏ danh sách khi mặc định `fr` không thuộc danh sách của máy chủ: luật chéo chặn lúc lưu
+        // (D-20261128-settings-one-system). Bỏ mặc định trước, rồi bỏ danh sách: về biến môi trường.
+        let refused = app.delete(&format!("{base}/content.locales")).token("platform").send();
+        let refused = refused.await.unwrap();
+        assert_eq!(refused.status(), 422, "{}", refused.text());
+        assert_eq!(refused.json()["errors"][0]["code"], "locale_not_listed");
+        for name in ["content.default_locale", "content.locales"] {
+            let removed = app.delete(&format!("{base}/{name}")).token("platform").send();
+            assert_eq!(removed.await.unwrap().status(), 204);
+        }
         assert_eq!(
             content.create(&b, &ada.clone().in_tenant(b.id()), post("Hi")).await.unwrap().locale,
             "en"

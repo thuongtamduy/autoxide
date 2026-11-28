@@ -91,6 +91,8 @@ pub struct TenantRelocations {
     pub(super) translations: Translations,
     pub(super) key: SecretKey,
     pub(super) seeds: Seeds,
+    /// Settings of the tenants (cache cleared once a run ends: the run moved their setting rows).
+    pub(super) settings: Option<Arc<crate::tenancy::settings::SettingsService>>,
 }
 
 impl TenantRelocations {
@@ -264,6 +266,15 @@ impl TenantRelocations {
         loop {
             let relocation = self.step(id, runner).await?;
             if !store::UNFINISHED.contains(&relocation.state.as_str()) {
+                // Lượt đã chuyển dòng cài đặt (cấp khách và theo cây) giữa hai khách: bỏ cache của cả hai trên máy chủ
+                // này (D-20261128-settings-one-system); máy chủ khác thấy sau thời gian sống của cache.
+                if let Some(settings) = &self.settings {
+                    let tenants = std::iter::once(relocation.source_tenant_id)
+                        .chain(relocation.target_tenant_id);
+                    for tenant in tenants {
+                        settings.forget(crate::tenancy::TenantId::from_uuid(tenant));
+                    }
+                }
                 return Ok(relocation);
             }
         }
@@ -558,6 +569,7 @@ impl Wiring {
         key: SecretKey,
         seeds: Seeds,
         request_timeout: Duration,
+        settings: Option<Arc<crate::tenancy::settings::SettingsService>>,
     ) -> Result<(), Error> {
         let registry = context.tenancy().clone();
         let settle = Duration::from_secs(registry.config().cache_seconds) + request_timeout;
@@ -573,6 +585,7 @@ impl Wiring {
             translations: context.translations().clone(),
             key,
             seeds,
+            settings,
         });
         context.work_source(Arc::new(super::RelocationRequestsWork(service.clone())))?;
         context.provide::<TenantRelocations>(service.clone())?;

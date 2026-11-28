@@ -243,8 +243,14 @@ impl Modules {
             ));
             declared_settings.extend(declared);
         }
+        // Một khoá chỉ ở một phạm vi của hệ cài đặt (D-20261128-settings-one-system): tên cấu hình cấp khách (cả tên
+        // cũ) không trùng khoá cài đặt theo cây.
+        let tenant_names: Vec<&'static str> = declared_settings
+            .iter()
+            .flat_map(|setting| std::iter::once(setting.name()).chain(setting.former_name()))
+            .collect();
         settings.fill(declared_settings);
-        let mut seen = Vec::new();
+        let mut seen = tenant_names;
         let mut declared_org_settings = Vec::new();
         for module in &modules {
             let declared = module.org_settings();
@@ -301,6 +307,14 @@ impl Modules {
             crate::db::register_control_plane(
                 modules.iter().flat_map(|module| module.control_plane_tables()),
             );
+            // Sổ bảng cấp khách cho chốt chặn lúc chạy của handle theo khách (D-20261128-tenant-runtime-guard).
+            crate::db::register_tenant_tables(modules.iter().flat_map(|module| {
+                module
+                    .records()
+                    .into_iter()
+                    .filter(|record| record.tenant)
+                    .map(|record| record.table)
+            }));
             Ok(Modules {
                 modules,
                 permissions,
@@ -389,6 +403,8 @@ impl Modules {
     /// (migrations applied), and that the control-plane tables of turned-off modules are their own. Call it after the migrations and before serving; a mismatch is an error listing
     /// every problem.
     pub async fn check_records(&self, database: &Database) -> Result<(), ModuleError> {
+        // Sổ bảng cấp khách của chốt chặn lúc chạy, từ schema thật (D-20261128-tenant-runtime-guard).
+        crate::db::register_live_tenant_tables(database).await.map_err(ModuleError)?;
         let mut problems = Vec::new();
         // Module đang tắt không qua bước dựng `Modules`: kiểm tiền tố bảng control-plane của nó ở đây.
         for module in &self.dormant {
