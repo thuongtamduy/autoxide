@@ -75,9 +75,14 @@ committed migration is never edited — add a new one. Every migration has a `do
   `migrations.extend(autoxide_kernel::migration::helper_tables("<module>", &[HelperTable::Events, HelperTable::Jobs]))`,
   instead of listing each historical step as the existing modules do.
 
-Entities use SeaORM (`src/entity.rs`). Read with `Database::read()`, write with
-`Database::write()`, and group writes in `Database::begin_write()`. Keep write
-transactions short: no network calls, no password hashing inside.
+Records are declared with `#[derive(Record)]` and queried through `autoxide_kernel::db`
+(`src/entity.rs` and `src/service.rs` of `modules/notes`): `tenant.db().read()` for reads,
+`tenant.db().begin_write()` for writes that go together. The handle filters every tenant record by
+the tenant, so a forgotten filter cannot compile. Keep write transactions short: no network calls,
+no password hashing inside. Most existing modules still use SeaORM entities and
+`Database::read()` / `write()` / `begin_write()`; that path stays until they have moved, but a new
+module does not use it (it would depend on a library the kernel wraps; see
+[Stability of the module contract](#stability-of-the-module-contract)).
 
 ### Tenants: classify every table, filter every query
 
@@ -811,7 +816,7 @@ a running, tested module step by step; [`examples/external-module`](../examples/
 is that module and its server, built and tested by CI on both databases.
 
 Use the Rust version of that release (`rust-toolchain.toml`) or newer, and the same
-major versions of the public dependencies (table below), or the compiler reports two
+major versions of the vocabulary libraries (table below), or the compiler reports two
 copies of the same type.
 
 `cargo xtask check-module <dir>` (run from a checkout of this repository) applies the rules of
@@ -825,34 +830,37 @@ them, and run your tests on both databases.
 ## Stability of the module contract
 
 What a module builds on is the **module contract**: the public items of
-`autoxide-kernel` and `autoxide-testkit`, the entry point `autoxide::Autoxide`, the `api` of the
-official modules (`autoxide_<name>::api`), and the libraries whose types appear in them.
+`autoxide-kernel` and `autoxide-testkit`, the entry point `autoxide::Autoxide`, and the `api` of
+the official modules (`autoxide_<name>::api`). A module does not depend on the libraries the kernel
+uses underneath: a new major version of one of them changes the kernel, not your module, and does
+not make a major release of Autoxide.
 
-| Library | Version | Seen in |
+Two kinds of libraries:
+
+| Kind | Libraries | A module… |
 | --- | --- | --- |
-| `axum` | 0.8 | handlers, extractors |
-| `sea-orm`, `sea-orm-migration` | 2 | entities, `Database`, `Module::migrations` |
-| `utoipa` | 6 | `ToSchema`, `#[utoipa::path]` |
-| `utoipa-axum` | 0.3 | `Module::routes` (`OpenApiRouter`) |
-| `tokio` | 1 | async runtime |
-| `serde`, `serde_json` | 1 | bodies, events, tool arguments |
-| `uuid` | 1 (v7) | ids |
-| `jiff` | 1 | durations and time zones (times themselves are `autoxide_kernel::time::Timestamp`) |
-| `async-trait` | 0.1 | traits called through `dyn` |
-| `validator` | 0.21 | `ValidJson<T>` |
+| Vocabulary — part of the contract | `serde`, `serde_json` 1, `uuid` 1 (v7), `tokio` 1, `tracing` 0.1, `futures-core`, `bytes` 1 | declares them directly; they may appear in kernel signatures (no `tokio` type does) |
+| Behind a kernel layer — not part of the contract | `sea-orm`, `sea-query`, `sqlx` → `autoxide_kernel::db`, `migration`; `axum`, `axum-core`, `http`, `matchit`, `tower`, `utoipa`, `utoipa-axum`, `validator` → `autoxide_kernel::http` (`#[endpoint]`, `routes!`, `Schema`, `Params`, `Validate`, `Path`, `Query`, `State`); `jiff` → `autoxide_kernel::time`; `async-trait` → `autoxide_kernel::async_trait` | does **not** declare them (`cargo xtask check` / `check-module`: rule `wrapped-libraries`); `tower` is allowed in `[dev-dependencies]` |
+
+Any other library (`reqwest`, `image`, `argon2`…) is the module's own business: it declares and
+upgrades it, and keeps its types out of its `api`. The list of wrapped libraries lives in one file,
+`xtask/wrapped-libraries.txt`. Until 1.0 some kernel items still show a wrapped library's type
+(the old `Database::read()`, `Module::routes`, the `http` types of the test kit…) while modules move
+onto the layers; each of them has a replacement or a plan, and 1.0 is released only once they are
+gone from the stable API.
 
 Rules the core follows:
 
 - While the version is `0.x`, a breaking change to the contract comes only in a minor
   release (`0.7` → `0.8`) and is listed under **Changed** or **Removed** in
   `CHANGELOG.md`, with the Rust items under `### Breaking (Rust)`. A patch release (`0.8.0` →
-  `0.8.1`) never breaks the contract. A new major version of a library in the table, or a newer
-  minimum Rust version, is such a change.
+  `0.8.1`) never breaks the contract. A newer minimum Rust version is such a change; a new major
+  version of a wrapped library is not.
 - From `1.0` the contract follows Semantic Versioning: a breaking change comes only in a major
-  release, and `cargo semver-checks` stops a release that breaks it by accident. A new major
-  version of a library in the table then waits for a major release of Autoxide; a newer minimum
-  Rust version comes only in a minor release, never in a patch release. The whole policy, for the
-  HTTP API too, is in [`docs/COMPATIBILITY.md`](COMPATIBILITY.md).
+  release, and `cargo semver-checks` stops a release that breaks it by accident. Only a new major
+  version of a vocabulary library waits for a major release of Autoxide; a newer minimum Rust
+  version comes only in a minor release, never in a patch release. The whole policy, for the HTTP
+  API too, is in [`docs/COMPATIBILITY.md`](COMPATIBILITY.md).
 - `Module` only grows by functions with a default body: a module written for an older
   release keeps compiling.
 - Public types that will grow are `#[non_exhaustive]`: build them with their

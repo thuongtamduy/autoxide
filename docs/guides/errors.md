@@ -91,6 +91,41 @@ curl -sS -X PATCH "$API/api/v1/content/entries/$ENTRY" -H "Authorization: Bearer
 # expect: 412
 ```
 
+## What your app should do
+
+The codes a web or mobile app meets most, and what to do with each. Branch on `code`; show `detail` to the
+user (it is already in their language). Codes of a module start with its name (`content.not_found`,
+`auth.email_taken`): treat them by their status when you have no special case.
+
+| Status | `code` | What it means | What the app does |
+| ------ | ------ | ------------- | ----------------- |
+| 401 | `auth.token_expired` | The access token expired | Refresh once (`POST /api/v1/auth/refresh`) and send the request again; the SDK does it with the `refresh` option |
+| 401 | `auth.missing_token`, `auth.invalid_token`, `auth.session_ended` | No token, a broken one, or the session was signed out (logout, password change, revoked) | Forget the tokens, show the sign-in page |
+| 401 | `auth.invalid_refresh_token`, `auth.refresh_token_reused` | From `/auth/refresh`: the refresh token is unknown, expired, or was already used (the session is now ended) | Sign in again. Never refresh twice at the same time |
+| 401 | `auth.invalid_credentials` | From `/auth/login`: wrong email or password | Say so, without telling which one |
+| 401 | `auth.invalid_mfa_code`, `auth.invalid_mfa_token` | From `/auth/login/mfa`: wrong or already used code; the sign-in attempt expired or ran out of tries | Ask for the next code; for `auth.invalid_mfa_token` start again with the password |
+| 401 | `step_up_required` | A sensitive action needs a fresh proof that it is you | Ask for the password or code, call `POST /api/v1/auth/me/reauth`, retry |
+| 403 | `permission_denied` | The user lacks the permission (the `detail` names it) | Hide the action; offer to ask an administrator |
+| 403 | `auth.user_disabled` | The account is disabled | Tell the user; do not retry |
+| 404 | `not_found`, `<module>.…_not_found` | Gone, or never existed (or in another tenant) | Refresh the list or go back |
+| 409 | `idempotency_key_in_progress` | The first request with this key is still running | Wait `Retry-After` (1 s) and send the same request with the **same** key |
+| 409 | `<module>.…_taken`, `conflict` | A unique value is taken, or the state does not allow it | Show `detail` next to the field |
+| 412 | `precondition_failed` | Someone changed the record since you read it | Read it again, show the new version, apply the change again |
+| 413 | `payload_too_large` | The body or file is larger than the server accepts | Tell the user the limit; upload big files [straight to storage](direct-uploads.md) |
+| 422 | `validation_failed` | Invalid input; **every** invalid field is in `errors[]` | Show each `errors[].detail` next to its `errors[].field` |
+| 422 | `invalid_body` | Unknown or misspelt field, wrong JSON type | A bug in the app: fix the request |
+| 422 | `idempotency_key_reused` | The same key was sent with a different request | A bug in the app: one new key per user action |
+| 428 | `precondition_required` | The endpoint needs `If-Match` | Read the record, send its `ETag` in `If-Match` |
+| 429 | `rate_limited` | Too many requests from this client address (or with this API key) | Wait `Retry-After` seconds, then send fewer requests |
+| 429 | `tenant_rate_limited` | The whole tenant (every user and key together) is over its limit | Wait `Retry-After` seconds |
+| 429 | `auth.login_throttled` | Too many failed sign-ins for this email (from this address, or from everywhere) | **Do not retry by yourself.** Tell the user to wait `Retry-After` seconds (often several minutes); signing in with the right password is refused too until then |
+| 503 | `request_timeout`, `shutting_down` | The request took too long, or the server is restarting | Wait `Retry-After` (or a few seconds) and retry; send writes with an `Idempotency-Key` |
+
+The two common `429`s are counted apart: `rate_limited` counts **requests** per client address (every
+endpoint, `AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE`), while `auth.login_throttled` counts **failed sign-ins**
+per email (`AUTOXIDE_AUTH_LOGIN_MAX_FAILURES` within `AUTOXIDE_AUTH_LOGIN_LOCK_MINUTES`). A sign-in form
+must never retry by itself.
+
 ## With the SDK
 
 Errors throw an `AutoxideError`:
