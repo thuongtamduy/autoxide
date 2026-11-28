@@ -185,17 +185,6 @@ fn event_label(name: &str) -> &'static str {
     KNOWN.into_iter().find(|known| *known == name).unwrap_or("other")
 }
 
-#[cfg(test)]
-mod label_tests {
-    use super::*;
-
-    #[test]
-    fn nhan_so_do_chi_thuoc_tap_co_dinh() {
-        assert_eq!(event_label(ORDER_DELIVERED), ORDER_DELIVERED);
-        assert_eq!(event_label("orders.something_new"), "other");
-    }
-}
-
 #[async_trait::async_trait]
 impl EventHandler for OrderEvents {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
@@ -364,5 +353,16 @@ impl OrderEvents {
             Err(error) if error.kind().status() < 500 => Ok(true),
             Err(error) => Err(error),
         }
+    }
+}
+
+#[cfg(test)]
+mod label_tests {
+    use super::*;
+
+    #[test]
+    fn nhan_so_do_chi_thuoc_tap_co_dinh() {
+        assert_eq!(event_label(ORDER_DELIVERED), ORDER_DELIVERED);
+        assert_eq!(event_label("orders.something_new"), "other");
     }
 }
