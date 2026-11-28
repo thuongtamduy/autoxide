@@ -17,8 +17,8 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 
 use crate::api::{
-    InvoiceRequirements, InvoiceType, TaxComponent, TaxProfile, TaxQuote, TaxQuoteRequest,
-    WithholdingQuote, WithholdingRequest,
+    InvoiceAdvice, InvoiceRequirements, InvoiceType, TaxComponent, TaxProfile, TaxQuote,
+    TaxQuoteRequest, WithholdingQuote, WithholdingRequest,
 };
 use crate::engine::{Basis, ResolvedRate, compute};
 use crate::entity::{category, jurisdiction, profile, rate, rule, withholding};
@@ -81,6 +81,15 @@ pub(crate) struct TaxService {
 
 /// Mã quy tắc trong gói thuế khai múi giờ của vùng thuế: ngày thuế, ngày lập hoá đơn tính theo nó.
 pub(crate) const TIME_ZONE_RULE: &str = "tax_date.time_zone";
+
+/// Mã quy tắc trong gói thuế: dưới ngưỡng doanh thu năm này người bán thuộc chế độ đã nêu không bắt buộc dùng hoá
+/// đơn điện tử (`{"regimes": [...], "annual_revenue_minor": ..., "currency": "VND"}`; Việt Nam: NĐ 68/2026/NĐ-CP).
+pub(crate) const NOT_REQUIRED_RULE: &str = "einvoice.not_required_below";
+
+/// Quy tắc trong gói không đọc được: lỗi, không đoán (gói nhập hỏng).
+fn rule_invalid(code: &str, error: impl std::fmt::Display) -> Error {
+    Error::internal(format!("the tax pack rule {code} cannot be read: {error}"))
+}
 
 /// Mã quy tắc trong gói thuế: có được huỷ hoá đơn điện tử đã gửi cơ quan thuế không (`{"allowed": bool}`).
 pub(crate) const CANCEL_RULE: &str = "einvoice.cancel_after_submission";
@@ -450,6 +459,56 @@ impl TaxService {
             }
         }
         Ok(InvoiceRequirements { cash_register_required: false, legal_basis: None })
+    }
+
+    /// Lời khuyên về hoá đơn cho một lần bán của người bán `org` ngày `on` (LG-7, D-20261128-tax-pack-vn-decree-68):
+    /// có bắt buộc hoá đơn điện tử không (quy tắc [`NOT_REQUIRED_RULE`] — hộ kinh doanh dưới ngưỡng; doanh thu
+    /// chưa khai thì coi là bắt buộc), và loại hoá đơn luật đặt (bán tại quầy mà phải dùng máy tính tiền; người
+    /// bán không theo phương pháp khấu trừ thì hoá đơn bán hàng). `None`: không có hồ sơ thuế.
+    pub(crate) async fn invoice_advice(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        on: Date,
+        at_counter: bool,
+    ) -> Result<Option<InvoiceAdvice>, Error> {
+        let Some(found) = self.nearest_profile(tenant, org).await? else { return Ok(None) };
+        let requirements = self.invoice_requirements(tenant, org, on).await?;
+        let tables = self.tables().await?;
+        let day = on.format("%Y-%m-%d").to_string();
+        let revenue = describe_profile(&found).annual_revenue;
+        let mut legal_basis: Vec<String> = requirements.legal_basis.clone().into_iter().collect();
+        let mut einvoice_required = true;
+        for rule in tables.rules.iter().filter(|rule| {
+            rule.jurisdiction == found.jurisdiction
+                && rule.code == NOT_REQUIRED_RULE
+                && in_force(&rule.effective_from, rule.effective_to.as_deref(), &day)
+        }) {
+            let value: serde_json::Value = serde_json::from_str(&rule.value)
+                .map_err(|error| rule_invalid(&rule.code, error))?;
+            let regimes: Vec<String> = serde_json::from_value(value["regimes"].clone())
+                .map_err(|error| rule_invalid(&rule.code, error))?;
+            let threshold = value["annual_revenue_minor"].as_i64();
+            let currency = value["currency"].as_str().and_then(|code| Currency::parse(code).ok());
+            let under = match (revenue, threshold, currency) {
+                (Some(revenue), Some(threshold), Some(currency)) => {
+                    revenue.currency() == currency && revenue.minor() < threshold
+                }
+                _ => false,
+            };
+            if regimes.contains(&found.regime) && under {
+                einvoice_required = false;
+                legal_basis.push(rule.legal_basis.clone());
+            }
+        }
+        let kind = if at_counter && requirements.cash_register_required {
+            Some("cash_register_invoice".to_owned())
+        } else if !at_counter && found.regime != "vat_credit" {
+            Some("sales_invoice".to_owned())
+        } else {
+            None
+        };
+        Ok(Some(InvoiceAdvice { einvoice_required, kind, legal_basis }))
     }
 
     /// Căn cứ cấm huỷ hoá đơn điện tử đã gửi cơ quan thuế của vùng thuế người bán `org`, cho hoá đơn ngày

@@ -394,3 +394,52 @@ async fn huy_hoa_don_dien_tu_theo_vung_thue_va_ngay() {
     .await
     .unwrap();
 }
+
+/// Gói `vn` theo NĐ 68/2026 (LG-7): hộ kinh doanh doanh thu dưới 500 triệu đ / năm không bắt buộc hoá đơn điện tử
+/// (từ 05/3/2026); từ 1 tỷ, bán tại quầy dùng hoá đơn máy tính tiền; người bán không theo phương pháp khấu trừ lập
+/// hoá đơn bán hàng; người bán khấu trừ tự chọn; không hồ sơ thuế thì không có lời khuyên.
+#[tokio::test]
+async fn loi_khuyen_hoa_don_theo_nghi_dinh_68() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let profile = |regime: &str, revenue: i64| {
+            json!({"jurisdiction": "VN", "tax_code": "0101234567", "regime": regime, "business_lines": ["goods"],
+                   "annual_revenue": {"amount": revenue.to_string(), "currency": "VND"}})
+        };
+        let put = async |org: OrgId, body: Value| {
+            let uri = format!("/profiles/{}", org.as_uuid());
+            let (status, saved) = call(&app, "PUT", &uri, "ops", Some(body)).await;
+            assert_eq!(status, StatusCode::OK, "{saved}");
+        };
+        let engine = app.api::<dyn crate::api::TaxEngine>().unwrap();
+        let tenant = app.default_tenant();
+        let day = |y, m, d| Date::new(y, m, d).unwrap();
+        let advice = async |org: OrgId, on: Date, counter: bool| {
+            engine.invoice_advice(&tenant, org, on, counter).await.unwrap()
+        };
+        assert_eq!(advice(tree.south, day(2026, 6, 1), false).await, None);
+
+        put(tree.north, profile("household", 300_000_000)).await;
+        let small = advice(tree.store, day(2026, 6, 1), false).await.unwrap();
+        assert!(!small.einvoice_required, "{small:?}");
+        assert!(small.legal_basis.iter().any(|basis| basis.contains("68/2026")), "{small:?}");
+        assert_eq!(small.kind.as_deref(), Some("sales_invoice"));
+        // Trước ngày nghị định có hiệu lực: chưa có ngưỡng.
+        assert!(advice(tree.store, day(2026, 3, 4), false).await.unwrap().einvoice_required);
+
+        put(tree.north, profile("household", 1_500_000_000)).await;
+        let large = advice(tree.store, day(2026, 6, 1), true).await.unwrap();
+        assert!(large.einvoice_required);
+        assert_eq!(large.kind.as_deref(), Some("cash_register_invoice"));
+
+        put(tree.south, profile("vat_credit", 300_000_000)).await;
+        let company = advice(tree.south, day(2026, 6, 1), false).await.unwrap();
+        assert!(company.einvoice_required);
+        assert_eq!(company.kind, None);
+        // Ngưỡng không chịu thuế là dữ liệu có ngày hiệu lực, đọc được qua `/rules`.
+        let (_, rules) = call(&app, "GET", "/rules", "ops", None).await;
+        assert!(rules.to_string().contains("household.tax_free_revenue"), "{rules}");
+    })
+    .await
+    .unwrap();
+}

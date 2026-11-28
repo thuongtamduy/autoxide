@@ -6,9 +6,11 @@
 use autoxide_kernel::migration::prelude::*;
 
 mod kyc_document_key;
+mod kyc_seller_details;
 mod list_indexes;
 mod phone_challenge_block;
 mod phone_otp_state;
+mod subject_request_fulfil;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -50,6 +52,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(phone_challenge_block::PhoneChallengeBlock),
         Box::new(list_indexes::ListIndexes),
         Box::new(phone_otp_state::PhoneOtpState),
+        Box::new(kyc_seller_details::KycSellerDetails),
+        Box::new(subject_request_fulfil::SubjectRequestFulfil),
     ]
 }
 

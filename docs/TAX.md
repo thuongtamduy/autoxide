@@ -21,7 +21,8 @@ invoices, the ledger) compute taxes through `autoxide_tax::api::TaxEngine`.
 | `vat.exempt` | not subject | shown as "not subject to VAT", not as 0% |
 | `excise.beer` | 65% special consumption tax, then 10% VAT on the price including it | sample |
 
-Withholding by marketplaces with payment (Decree 117/2025/ND-CP) for household businesses: goods 1% VAT
+Withholding by marketplaces with payment (Decree 117/2025/ND-CP; Decree 68/2026/ND-CP Article 11 — the 2026
+rates differ between sources, check the originals) for household businesses: goods 1% VAT
 + 0.5% PIT, services 5% + 2%, production and transport 3% + 1.5%. Businesses declare themselves:
 nothing is withheld. What core does today: computes the amount (`POST /api/v1/tax/withholding`) and books it
 when a settlement asks for it (`ledger`, entry `TaxWithheld`). What it does **not** do yet (with the
@@ -87,7 +88,16 @@ address: `PUT /api/v1/tax/profiles/{org_id}` (`tax.profiles_manage` on the unit)
 profile uses the nearest one above it. The regime decides the invoice: `vat_credit` → VAT invoice;
 `vat_direct`, `household` → sales invoice without VAT per line; `exempt` → no tax. A household business
 with revenue from 1 billion VND a year must issue cash register invoices
-(`TaxEngine::invoice_requirements`, Decree 70/2025/ND-CP — check the latest schedule).
+(`TaxEngine::invoice_requirements`, Decree 70/2025/ND-CP and Decree 68/2026/ND-CP — check the originals).
+
+Household businesses under Decree 68/2026/ND-CP (pack `vn` version 4; check the originals): revenue up to
+500 million VND a year pays no VAT or personal income tax (rule `household.tax_free_revenue`, counted once per
+household), and under 500 million VND e-invoices are not mandatory (rule `einvoice.not_required_below`, from
+2026-03-05). `TaxEngine::invoice_advice` turns the profile and these rules into what to issue for a sale;
+`orders` follows it: no automatic e-invoice when not required (the seller may still issue one by hand), a sales
+invoice for a seller outside the VAT credit method, a cash register invoice at the counter when required, and
+otherwise its own default (cash register invoice at the counter, `orders.invoice_kind` elsewhere). Between 500
+million and 1 billion VND the sources differ, so e-invoices count as required; unknown revenue too.
 
 ## Read the data
 

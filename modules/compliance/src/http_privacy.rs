@@ -760,9 +760,14 @@ pub(crate) struct SubjectRequestResponse {
     /// The user id, email address or phone number (E.164) of the person.
     pub subject: String,
     pub received_at: Timestamp,
-    /// Answer before this time (legal rule `privacy.subject_requests`).
+    /// Answer (acknowledge) before this time (legal rule `privacy.subject_requests`, `respond_within_hours`).
     pub due_at: Timestamp,
-    /// `true` while not done and past `due_at`.
+    /// Carry the request out before this time (legal rule `privacy.subject_requests`, `fulfil_within_days` of the
+    /// kind, in calendar days unless the rule says `working_days`); `null` for a request recorded before deadlines
+    /// to fulfil were kept, or when the rule sets none for the kind.
+    pub fulfil_due_at: Option<Timestamp>,
+    /// `true` while still `received` past `due_at`, or not done (`received`, `in_progress`) past
+    /// `fulfil_due_at`.
     pub overdue: bool,
     /// `received`, `in_progress`, `fulfilled` or `rejected`.
     pub status: String,
@@ -775,8 +780,7 @@ pub(crate) struct SubjectRequestResponse {
 }
 
 pub(crate) fn describe_request(row: subject_request::Model) -> SubjectRequestResponse {
-    let overdue =
-        matches!(row.status.as_str(), "received" | "in_progress") && row.due_at < Timestamp::now();
+    let overdue = crate::subject_requests::is_overdue(&row, Timestamp::now());
     SubjectRequestResponse {
         id: row.id,
         kind: row.kind,
@@ -785,6 +789,7 @@ pub(crate) fn describe_request(row: subject_request::Model) -> SubjectRequestRes
         subject: row.subject,
         received_at: row.received_at,
         due_at: row.due_at,
+        fulfil_due_at: row.fulfil_due_at,
         overdue,
         status: row.status,
         reason: row.reason,

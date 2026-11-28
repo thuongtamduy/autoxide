@@ -30,7 +30,7 @@ const ALL: &[&str] = &[
     "compliance.rules.read",
 ];
 
-async fn app(test: &TestDatabase) -> (TestApp, Arc<FakeIdentityVerifier>) {
+pub(crate) async fn app(test: &TestDatabase) -> (TestApp, Arc<FakeIdentityVerifier>) {
     let verifier = Arc::new(FakeIdentityVerifier::new());
     let app = TestApp::builder(test)
         .user("admin", 1, ALL)
@@ -250,11 +250,22 @@ async fn quy_tac_ra_phap_ly_vong_1_theo_ngay_hieu_luc() {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(requests.version, 2);
+        assert_eq!(requests.version, 3);
         assert!(requests.legal_basis.contains("356/2025"));
-        // Hạn trả lời giữ 72 giờ (chặt hơn nghị định); hạn thực hiện để tham khảo.
+        // Hạn trả lời giữ 72 giờ (chặt hơn nghị định); hạn thực hiện tính theo ngày thường (LG-4b).
         assert_eq!(requests.body["respond_within_hours"]["erasure"], 72);
         assert_eq!(requests.body["fulfil_within_days"]["erasure"], 20);
+        assert_eq!(requests.body["fulfil_unit"], "days");
+        // Định danh người bán: mục NĐ 248/2026 Điều 18 từ 00:00 ngày 01/01/2027 giờ Việt Nam (LG-3c).
+        let kyc = |at| rules.effective(DEFAULT_TENANT, "kyc.required_activities", at);
+        let end_2026 = Timestamp::from_utc(2026, 12, 31, 16, 59, 0).unwrap();
+        let new_year = Timestamp::from_utc(2026, 12, 31, 17, 0, 0).unwrap();
+        assert_eq!(kyc(end_2026).await.unwrap().unwrap().version, 1);
+        let v2 = kyc(new_year).await.unwrap().unwrap();
+        assert_eq!(v2.version, 2);
+        assert!(v2.legal_basis.contains("248/2026"));
+        assert_eq!(v2.body["seller_details"]["individual"], json!(["birth_date"]));
+        assert_eq!(v2.body["passport_min_valid_months"], 6);
     })
     .await
     .unwrap();
@@ -285,7 +296,7 @@ async fn quy_tac_theo_ngay_hieu_luc_va_nhap_chi_them() {
 
         // Nhập cần `compliance.rules.manage` (nhân sự nền tảng); bản đã có giữ nguyên.
         let pack = json!({"pack": {"jurisdiction": "vn", "rules": [{
-            "key": "kyc.required_activities", "version": 2,
+            "key": "kyc.required_activities", "version": 3,
             "effective_from": "2030-01-01T00:00:00Z", "effective_to": null,
             "body": {"sell": false}, "legal_basis": "Ví dụ — cần đối chiếu văn bản gốc."
         }]}});
@@ -302,22 +313,22 @@ async fn quy_tac_theo_ngay_hieu_luc_va_nhap_chi_them() {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(rule.version, 2);
+        assert_eq!(rule.version, 3);
         // Từ 2030 bán hàng không cần định danh nữa (theo gói vừa nhập).
         assert_eq!(rule.body["sell"], false);
         let (status, listed) = call(&app, "GET", "/rules", "staff", None).await;
         assert_eq!(status, StatusCode::OK, "{listed}");
-        assert!(listed["data"].as_array().unwrap().iter().any(|rule| rule["version"] == 2));
+        assert!(listed["data"].as_array().unwrap().iter().any(|rule| rule["version"] == 3));
         // `as_of`: mỗi khoá chỉ còn bản có hiệu lực lúc đó.
         let uri = "/rules?key=kyc.required_activities&jurisdiction=vn&as_of=2030-01-02T00:00:00Z";
         let (status, at) = call(&app, "GET", uri, "staff", None).await;
         assert_eq!(status, StatusCode::OK, "{at}");
         let versions: Vec<i64> =
             at["data"].as_array().unwrap().iter().map(|r| r["version"].as_i64().unwrap()).collect();
-        assert_eq!(versions, [2]);
+        assert_eq!(versions, [3]);
         let uri = "/rules?key=kyc.required_activities&as_of=2029-12-31T00:00:00Z";
         let (_, before) = call(&app, "GET", uri, "staff", None).await;
-        assert!(before["data"].as_array().unwrap().iter().all(|rule| rule["version"] != 2));
+        assert!(before["data"].as_array().unwrap().iter().all(|rule| rule["version"] != 3));
         let (_, all) = call(&app, "GET", "/rules?as_of=2030-01-02T00:00:00Z", "staff", None).await;
         let mut keys: Vec<(String, String)> = all["data"]
             .as_array()

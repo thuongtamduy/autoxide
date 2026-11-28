@@ -225,14 +225,21 @@ chưa xử lý. Trong lúc chờ, người triển khai tự bù:
   đã định danh là đủ. Người bán chưa định danh nhận `compliance.kyc_required` (403); hàng của nút gốc và khách tự bán
   hàng của mình không bị hỏi. Module `compliance` bị tắt (vd `AUTOXIDE_MODULES=official,-compliance`) thì không kiểm
   được định danh, nên trên sàn hàng của người bán không mở bán được (`catalog.seller_verification_unavailable`, 403).
-  Chỉ bước chuyển sang `active` được kiểm: hàng đang bán vẫn bán khi khách chuyển thành sàn, quy tắc bắt đầu áp dụng
-  hay định danh của người bán hết hạn / bị thu hồi — tự dừng chúng (`POST /api/v1/catalog/products/{id}/status`).
-  Sàn cho mỗi người bán một khách con thay vì một nút thì không được kiểm theo cách này: mỗi khách con tự bán hàng của
-  mình. Còn mở: luồng livestream và tiếp thị liên kết (chưa có module), và hồ sơ chưa ghi đủ mọi mục Điều 18
-  nêu — cá nhân: họ tên, ngày sinh, số định danh cá nhân (một nguồn thêm địa chỉ cư trú); tổ chức, hộ kinh doanh:
-  tên, trụ sở, số định danh, người đại diện theo pháp luật; cá nhân nước ngoài: số hộ chiếu (hay giấy tờ tương
-  đương) và nước cấp, còn hiệu lực ít nhất 6 tháng lúc xét duyệt. Hồ sơ giữ tên đã xác thực, mã băm và 4 số cuối của
-  giấy tờ; các mục còn lại nằm ở nhà cung cấp eKYC. Cần đối chiếu văn bản gốc trước khi dựa vào.
+  Hàng đang bán được kiểm lại: khi định danh của người bán hết hạn hay bị thu hồi (`compliance.kyc_expired`,
+  `compliance.kyc_revoked`), khi một nút đổi chỗ trong cây, và mỗi ngày (job `catalog.seller_kyc_sweep`: khách vừa
+  thành sàn, quy tắc bắt đầu áp dụng). Hàng của người bán không còn qua được chuyển `inactive` (event
+  `catalog.product_status_changed`); định danh lại xong người bán tự mở bán lại. Sàn cho mỗi người bán một khách con
+  thay vì một nút thì không được kiểm theo cách này: mỗi khách con tự bán hàng của mình. Từ 01/01/2027 (quy tắc
+  `kyc.required_activities` phiên bản 2) người bán còn phải có trong hồ sơ các mục Điều 18 mới được bán — cá nhân:
+  ngày sinh (họ tên và số định danh đã có); tổ chức, hộ kinh doanh: trụ sở và người đại diện theo pháp luật; hộ chiếu
+  còn hạn ít nhất 6 tháng tính từ ngày xác thực, kèm nước cấp. Thiếu mục thì nhận `compliance.kyc_required` với
+  `profile_status` là `incomplete` và tên mục thiếu ở `missing`. Nhà cung cấp eKYC trả các mục này, hay người duyệt
+  ghi bằng `PUT /api/v1/compliance/kyc/profiles/{id}/details` (`compliance.kyc.review`); hồ sơ không còn hiệu lực
+  sau ngày hết hạn của giấy tờ. **Trước 01/01/2027**, trên sàn: chưa nhà cung cấp eKYC đi kèm nào trả các mục này,
+  nên người bán định danh từ trước thiếu mục và job quét hằng ngày sẽ dừng hàng của họ từ ngày đó — cho người duyệt
+  ghi mục trước (liệt kê hồ sơ đã định danh bằng `GET /api/v1/compliance/kyc/profiles?status=verified` và xem các
+  trường mới). Còn mở: luồng livestream và tiếp thị liên kết (chưa có module). Cần đối chiếu văn
+  bản gốc trước khi dựa vào.
 - **Dữ liệu cá nhân của trẻ em.** Luật 91/2025/QH15 có quy định riêng cho trẻ em và người được giám hộ (đồng ý của
   cha mẹ / người giám hộ; từ đủ 7 tuổi thêm đồng ý của trẻ — điều luật và độ tuổi cần đối chiếu). Core không có ngày
   sinh, kiểm tuổi hay đồng ý của người giám hộ: dịch vụ hướng tới trẻ em phải tự thu và lưu đồng ý của người giám hộ.
@@ -292,9 +299,11 @@ cơ quan được ghi sổ để không bị sót:
 - `POST /subject-requests` với `kind` (`access`, `erasure`, `rectification`, `objection`, `restriction`,
   `withdrawal`), `channel` (`email`, `post`, `phone`, `authority`, `other`), `subject` (ID người dùng, địa chỉ
   email hay số điện thoại) và `received_at`. `due_at` lấy từ quy tắc `privacy.subject_requests` hiệu lực lúc
-  nhận: 72 giờ, chặt hơn hạn trả lời 2 ngày làm việc của NĐ 356/2025/NĐ-CP Điều 5 (thay NĐ 13/2023/NĐ-CP). Phiên
-  bản 2 của quy tắc ghi thêm số ngày thực hiện theo loại (`fulfil_within_days`, theo nguồn thứ cấp) để tham khảo;
-  Autoxide chưa tính hạn thứ hai này — cần đối chiếu văn bản gốc.
+  nhận: 72 giờ, chặt hơn hạn trả lời 2 ngày làm việc của NĐ 356/2025/NĐ-CP Điều 5 (thay NĐ 13/2023/NĐ-CP).
+  `fulfil_due_at` là hạn thực hiện: `fulfil_within_days` của loại trong quy tắc (phiên bản 3: rút đồng ý, hạn chế,
+  phản đối 15 ngày; xem, sửa 10 ngày; xoá 20 ngày — theo nguồn thứ cấp), tính theo ngày thường (`fulfil_unit`) vì
+  nguồn chưa nói rõ ngày làm việc; hạn dài hơn khi có bên xử lý thứ ba chưa áp dụng. Yêu cầu quá hạn khi còn
+  `received` mà qua `due_at`, hay chưa xong mà qua `fulfil_due_at` — cần đối chiếu văn bản gốc.
 - `POST /subject-requests/{id}/fulfil`: `access` của người dùng trả dữ liệu cá nhân của mọi module (gửi cho
   người đó; không lưu lại); `erasure` / `withdrawal` của email hay số điện thoại xoá giá trị đó khỏi sổ đồng ý
   (khoá băm và bản ghi giữ làm bằng chứng, để không gửi lại). Xoá cả tài khoản là `DELETE

@@ -29,6 +29,7 @@ mod http;
 mod invoicing;
 mod jobs;
 mod lifecycle;
+mod local_year;
 mod migration;
 mod notices;
 mod orders_read;
