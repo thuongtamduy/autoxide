@@ -116,6 +116,7 @@
   "field:must be `https://`, `mailto:` or a path starting with a single `/`": "phải là `https://`, `mailto:` hay đường dẫn bắt đầu bằng một dấu `/`",
   "field:must be `root` or an entry id": "phải là `root` hay id của một bài",
   "field:must be `scheduled`, `succeeded`, `failed` or `canceled`": "phải là `scheduled`, `succeeded`, `failed` hay `canceled`",
+  "field:`content.default_locale` ({default}) must be one of the content languages ({locales}); change or remove `content.default_locale` first": "`content.default_locale` ({default}) phải là một trong các ngôn ngữ của nội dung ({locales}); đổi hay bỏ `content.default_locale` trước",
   "field:must be a language code like `en` or `pt-BR`": "phải là một mã ngôn ngữ như `en` hay `pt-BR`",
   "field:must be a list of widths in pixels, or null": "phải là danh sách độ rộng theo pixel, hoặc null",
   "field:must be a mark type": "phải là một loại định dạng chữ",

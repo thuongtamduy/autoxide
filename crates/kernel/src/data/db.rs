@@ -101,6 +101,7 @@
 
 mod bounded;
 mod check;
+mod guard;
 mod handle;
 mod query;
 mod record;
@@ -118,6 +119,10 @@ pub(crate) use check::register_control_plane;
 #[cfg(feature = "testing")]
 #[doc(hidden)]
 pub use check::register_control_plane_for_tests;
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub use guard::register_tenant_tables_for_tests;
+pub(crate) use guard::{register_live_tenant_tables, register_tenant_tables};
 #[doc(hidden)]
 pub use handle::Connection;
 pub(crate) use handle::Via;

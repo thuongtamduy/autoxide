@@ -176,7 +176,16 @@ async fn tran_muc_dich_dung_khi_tao_dong_thoi() {
         let rows = tenant
             .db()
             .read()
-            .query_all_raw(Statement::from_string(backend, "SELECT id FROM compliance_purposes"))
+            .query_all_raw(autoxide_kernel::database::statement(
+                backend,
+                match backend {
+                    sea_orm::DbBackend::Postgres => {
+                        "SELECT id FROM compliance_purposes WHERE tenant_id = $1"
+                    }
+                    _ => "SELECT id FROM compliance_purposes WHERE tenant_id = ?",
+                },
+                [sea_orm::Value::from(tenant.id().as_uuid())],
+            ))
             .await
             .unwrap();
         assert_eq!(rows.len(), 3);

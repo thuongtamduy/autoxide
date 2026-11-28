@@ -241,15 +241,17 @@ pub(crate) const TENANT_LOCALES: TenantSetting = TenantSetting::new(
     "content.locales",
     "Languages this tenant's content may be written in, comma-separated BCP 47 codes (e.g. \
      `en,vi`), instead of the server's AUTOXIDE_CONTENT_LOCALES. Entries already written in a \
-     language left out stay as they are.",
+     language left out stay as they are. Must keep `content.default_locale`, when set, in the \
+     list.",
 )
 .checked(|raw| tenant_locales(raw).map(|_| ()));
 
 pub(crate) const TENANT_DEFAULT_LOCALE: TenantSetting = TenantSetting::new(
     "content.default_locale",
     "Language used when a request names none, instead of the server's \
-     AUTOXIDE_CONTENT_DEFAULT_LOCALE. When it is not one of the tenant's languages, the server's \
-     default is used if it is one of them, otherwise the first of them.",
+     AUTOXIDE_CONTENT_DEFAULT_LOCALE. Must be one of the tenant's languages (`content.locales`, \
+     or the server's when unset), checked when saved; a value stored before that check which is \
+     not gives way to the server's default if it is one of them, otherwise the first.",
 )
 .checked(|raw| tenant_default_locale(raw).map(|_| ()));
 
@@ -315,6 +317,33 @@ pub(crate) fn tenant_locales(raw: &str) -> Result<Vec<String>, FieldError> {
         ));
     }
     Ok(locales)
+}
+
+/// Luật chéo lúc lưu: `content.default_locale` đã đặt phải thuộc `content.locales` (chưa đặt thì danh sách của máy
+/// chủ). Mặc định chưa đặt thì không kiểm — đổi bộ ngôn ngữ: bỏ mặc định, đổi danh sách, đặt lại mặc định.
+pub(crate) fn locales_fit(
+    view: &autoxide_kernel::tenancy::SettingsView<'_>,
+    server_locales: &[String],
+) -> Result<(), FieldError> {
+    let Some(Ok(default)) = view.text(TENANT_DEFAULT_LOCALE.name()).map(tenant_default_locale)
+    else {
+        return Ok(());
+    };
+    let locales = match view.text(TENANT_LOCALES.name()).map(tenant_locales) {
+        Some(Ok(locales)) => locales,
+        _ => server_locales.to_vec(),
+    };
+    if locales.contains(&default) {
+        return Ok(());
+    }
+    Err(FieldError::new(
+        "value",
+        "locale_not_listed",
+        "`content.default_locale` ({default}) must be one of the content languages ({locales}); \
+         change or remove `content.default_locale` first",
+    )
+    .with_param("default", default)
+    .with_param("locales", locales.join(", ")))
 }
 
 /// Ngôn ngữ mặc định (`content.default_locale`).

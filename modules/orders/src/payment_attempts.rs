@@ -168,7 +168,8 @@ impl OrdersService {
             let mut paid: payment::ActiveModel = stored.into();
             paid.succeeded_at = Set(Some(at));
             paid.updated_at = Set(at);
-            paid.update(&transaction).await?;
+            // Lọc khách cả khi cập nhật theo khoá chính (chốt chặn lúc chạy của handle, D-20261128-tenant-runtime-guard).
+            payment::Entity::update(paid).validate()?.scoped(tenant).exec(&transaction).await?;
             let event = PaymentRecorded(Change::after(json!({
                 "order_id": row.order_id, "payment_id": row.id, "amount": amount,
                 "late": true, "superseded": true,

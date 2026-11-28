@@ -134,6 +134,10 @@ impl Module for OrganizationsModule {
         let mut service =
             OrgService::new(context.outbox()?, config, context.org_settings()).with_units(units);
         service.entitlements = context.entitlements();
+        // Kho giá trị theo nút cắm vào hệ cài đặt của kernel: đọc có cache, lưu có kiểm chéo.
+        let settings = context.require::<autoxide_kernel::tenancy::SettingSystem>()?;
+        settings.use_org_store(Arc::new(settings::Store))?;
+        service.settings = Some(settings.as_ref().clone());
         context.usage_counter(&service::UNITS_LIMIT, Arc::new(service::UnitCounter))?;
         let service = Arc::new(service);
         context.resource_type(profile::STORE, Arc::new(profile::StoreResolver))?;

@@ -32,11 +32,11 @@ use uuid::Uuid;
 
 use super::rate_limit::Decision;
 use super::rate_limit_store::SharedCounter;
-use crate::access::{AccessPath, Authenticator, Principal};
+use crate::access::{Authenticator, Principal};
 use crate::config::RateLimit;
 use crate::entitlement::{EntitlementsHandle, Limit};
 use crate::error::{Error, ErrorKind};
-use crate::tenancy::{DatabaseRegistry, TenantId};
+use crate::tenancy::{DatabaseRegistry, SignedInTenant, TenantId};
 
 /// The plan's request rate of a tenant (declared by the kernel).
 pub const API_RATE: Limit = Limit::amount(
@@ -95,7 +95,8 @@ impl TenantLimiter {
     }
 
     /// Counts one request of tenant `tenant`.
-    pub(super) async fn check(&self, tenant: TenantId) -> Result<Decision, Error> {
+    pub(super) async fn check(&self, tenant: SignedInTenant) -> Result<Decision, Error> {
+        let tenant = tenant.id();
         let Some(level) = self.level(tenant).await? else { return Ok(Decision::Allow) };
         if level.per_minute == 0 {
             // Gói đặt 0: không request nào qua.
@@ -156,13 +157,9 @@ pub(crate) fn tenant_rate_limited(wait: Duration) -> Error {
     .with_retry_after(seconds)
 }
 
-/// The tenant whose budget a call by `principal` uses: the tenant it acts in (its own, or one that delegated
-/// work to it); `None` for platform staff operating in another tenant and for support access.
-pub(crate) fn budget_tenant(principal: &Principal) -> Option<TenantId> {
-    if principal.operator_from().is_some() || matches!(principal.access(), AccessPath::Support(_)) {
-        return None;
-    }
-    Some(principal.tenant_id())
+/// The tenant whose budget a call by `principal` uses: see [`SignedInTenant::of`].
+pub(crate) fn budget_tenant(principal: &Principal) -> Option<SignedInTenant> {
+    SignedInTenant::of(principal)
 }
 
 /// The caller of a request that carries a credential that authenticates (`Ok(None)` without one, or when it does
@@ -218,6 +215,7 @@ pub(crate) async fn limit(limiter: Arc<TenantLimiter>, request: Request, next: N
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::access::AccessPath;
 
     #[test]
     fn moi_khach_dem_rieng_theo_muc_cua_minh() {
@@ -245,7 +243,7 @@ mod tests {
         let (home, target) =
             (TenantId::from_uuid(Uuid::from_u128(1)), TenantId::from_uuid(Uuid::from_u128(2)));
         let user = Principal::new(Uuid::from_u128(9), Vec::<String>::new()).in_tenant(target);
-        assert_eq!(budget_tenant(&user), Some(target));
+        assert_eq!(budget_tenant(&user).map(SignedInTenant::id), Some(target));
         let staff = Principal::new(Uuid::from_u128(9), Vec::<String>::new())
             .in_tenant(home)
             .operating(target);
@@ -253,7 +251,7 @@ mod tests {
         let support = user.clone().with_access(AccessPath::Support(Uuid::from_u128(3)));
         assert_eq!(budget_tenant(&support), None);
         let delegated = user.with_access(AccessPath::Delegation(Uuid::from_u128(4)));
-        assert_eq!(budget_tenant(&delegated), Some(target));
+        assert_eq!(budget_tenant(&delegated).map(SignedInTenant::id), Some(target));
     }
 
     #[test]
