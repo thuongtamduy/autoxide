@@ -383,7 +383,9 @@ fn check() -> ExitCode {
         violations.extend(layer.violations);
         // Hợp đồng module một đường (D-20261126-module-manifest): module còn khai bằng hàm cũ ở
         // `module-contract-legacy.txt`, chỉ giảm.
-        let contract = module_contract::check(&workspace)?;
+        let mut contract = module_contract::check(&workspace)?;
+        // Getter và hàm đăng ký cũ của `StartContext` (D-20261128-contribute), cùng file danh sách.
+        contract.extend(module_contract::check_start_context(&workspace)?);
         let contract = baseline::apply_file(&workspace.root, module_contract::BASELINE, contract)?;
         for warning in &contract.warnings {
             eprintln!("{warning}");

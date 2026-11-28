@@ -116,6 +116,10 @@ const FIXES: &[(&str, &str)] = &[
         "A module that implements `Module::manifest` declares everything there or on `StartContext`: move this old `Module` function into the manifest (or into `start`) and delete it.",
     ),
     (
+        "start-context-legacy",
+        "Get kernel handles with `context.kernel::<Handle>()` and register extension points with `context.contribute::<dyn Trait>(…)` (table in docs/MODULE_GUIDE.md); then lower or remove the file's `start-context-legacy` line in xtask/module-contract-legacy.txt.",
+    ),
+    (
         "permission-first",
         "Call `principal.require(&PERMISSION)?` (or the same check the service runs first) before parsing the page request, so a caller without the permission gets 403, not 422; if the order is intended, add `// permission-first: <reason>` above the `fn`.",
     ),

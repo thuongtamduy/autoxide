@@ -40,6 +40,7 @@ pub mod relocate;
 pub(crate) mod request;
 pub(crate) mod residency;
 mod return_url;
+mod sample;
 pub mod sandbox;
 pub(crate) mod schema;
 mod scope;
@@ -98,6 +99,8 @@ pub use relocate::{
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use residency::{Residency, parse_country};
+pub use sample::SampleData;
+pub(crate) use sample::{SampleSeed, SeedAsSample};
 pub use return_url::{
     RETURN_URL_MAX_LEN, ReturnUrlProblem, check_return_url, invalid_return_origins,
 };

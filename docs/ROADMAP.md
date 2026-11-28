@@ -116,9 +116,10 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             `sample_data`, `sandbox_copy`), `StartContext::kernel::<H>()`; `notes` chuyển làm mẫu; luật
             `module-contract-legacy` (baseline 38 module) và `module-contract-mixed`; gỡ `legacy_default`
             (D-20261128-manifest-defaults)
-      - [ ] `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng của `StartContext` (`work_source`, `personal_data`…) và
+      - [x] `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng của `StartContext` (`work_source`, `personal_data`…) và
             `seed_tenant`/`sample_data`/`sandbox_copy`, hook của `relocation` — **làm trước khi chuyển cụm module đầu
-            tiên** (D-20261128-manifest-defaults)
+            tiên** (D-20261128-manifest-defaults); đăng ký có khoá (`resource_type`, `badge_source`…) giữ lệnh riêng,
+            getter và hàm đăng ký cũ đếm bằng luật `start-context-legacy` (D-20261128-contribute)
       - [ ] Chuyển 38 module theo cụm (PR 7–12); baseline rỗng thì gắn `#[deprecated]` cho hàm cũ và getter cũ của
             `StartContext`, bản sau gỡ (D-20261127-transition-paths)
 - [ ] `#[non_exhaustive]` cho enum và struct công khai sẽ còn lớn thêm (kernel, testkit, `api` của module); mọi `#[deprecated]`
