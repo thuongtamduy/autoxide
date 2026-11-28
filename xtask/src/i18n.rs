@@ -219,6 +219,23 @@ pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
             offset += open + end + 1;
             rest = &after[end + 1..];
         }
+        // Tên event là hằng công khai của `api` (`crate::api::KYC_VERIFIED, "mô tả"`): tên khai một lần ở `api`,
+        // mô tả vẫn phải có bản dịch.
+        for (position, description, _) in &literals {
+            let before = source[..*position].trim_end();
+            let Some(before) = before.strip_suffix(',') else { continue };
+            let name = before.trim_end();
+            let ident_start = name
+                .rfind(|c: char| !(c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'))
+                .map_or(0, |index| index + 1);
+            if ident_start < name.len()
+                && name[..ident_start].ends_with("crate::api::")
+                && let Some(description) = string_literal(description)
+            {
+                let line = source[..*position].matches('\n').count() + 1;
+                found.push((line, FieldMessage::Template(description)));
+            }
+        }
         for pair in literals.windows(2) {
             let (_, name, after) = &pair[0];
             let (position, description, _) = &pair[1];
@@ -596,5 +613,23 @@ fn after() -> Error { Error::not_found("notes.after", "x") }
         assert!(has("`notes.a` has no Vietnamese translation"), "{messages:#?}");
         assert!(has("[error-code-prefix]"), "{messages:#?}");
         assert!(has("`notes.unused` is not used"), "{messages:#?}");
+    }
+
+    #[test]
+    fn mo_ta_event_sau_ten_la_hang_cua_api() {
+        let source = r#"
+events! {
+    KYC_SUBMITTED, KycSubmitted, "compliance.kyc_submitted", "Started.";
+    KYC_VERIFIED, KycVerified, crate::api::KYC_VERIFIED, "Verified.";
+}
+"#;
+        let found: Vec<String> = descriptions(source)
+            .into_iter()
+            .filter_map(|(_, message)| match message {
+                FieldMessage::Template(text) => Some(text),
+                FieldMessage::Built(_) => None,
+            })
+            .collect();
+        assert_eq!(found, ["Verified.", "Started."], "{found:?}");
     }
 }

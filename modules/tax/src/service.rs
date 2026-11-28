@@ -501,6 +501,10 @@ impl TaxService {
                 legal_basis.push(rule.legal_basis.clone());
             }
         }
+        // `exempt` (người bán không chịu thuế) cũng nhận hoá đơn bán hàng: trả `None` thì `orders` rơi về mặc định
+        // `orders.invoice_kind` = `vat_invoice` — hoá đơn GTGT của người không khai GTGT, sai hơn. Loại hoá đơn đúng
+        // cho từng trường hợp không chịu thuế cần đối chiếu NĐ 123/2020 Điều 8 (sửa bởi NĐ 70/2025) với người có
+        // chuyên môn; người bán đặt `orders.invoice_kind` thì lựa chọn đó thắng (D-20261128-invoice-advice-exempt).
         let kind = if at_counter && requirements.cash_register_required {
             Some("cash_register_invoice".to_owned())
         } else if !at_counter && found.regime != "vat_credit" {
