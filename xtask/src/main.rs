@@ -46,6 +46,8 @@
 //! - `test-filter --base <ref>` — in filterset của nextest chọn đúng các crate mà `test-affected
 //!   --base <ref>` chạy; CI dùng khi chạy test từ archive (`./gate.sh --pr --only build`,
 //!   D-20261120-ci-nextest-archive).
+//! - `test-shards [--tests <file> --filter <file>] [--postgres-18]` — in matrix các máy chạy test của CI: gate đầy đủ chia cố định,
+//!   pull request chia theo số test được chọn (xem `test_shards.rs`, D-20261127-ci-runner-budget).
 //! - Hai lệnh test trên nhận thêm `--shard <k>/<n>` ở cuối: chỉ chạy phần thứ k trong n phần của
 //!   mọi test, để CI chạy n phần trên n máy cùng lúc (`./gate.sh --shard`, D-20261119-ci-faster).
 
@@ -81,6 +83,7 @@ mod site_links;
 mod source;
 mod tenancy;
 mod tenant_scope;
+mod test_shards;
 mod toolchain;
 mod upgrade;
 mod workspace;
@@ -107,6 +110,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask test-affected --base <ref> --keep-env   on TEST_DATABASE_URL instead of SQLite
        cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)
        cargo xtask test-filter --base <ref>       nextest filterset of the crates test-affected would run
+       cargo xtask test-shards [--tests <file> --filter <file>] [--postgres-18]   CI test machines (JSON matrix)
        ... test-all | test-affected ... --shard <k>/<n>   only part k of n of the tests
        ... semver ... --shard <k>/<n>             only part k of n of the contract crates";
 
@@ -169,6 +173,7 @@ fn main() -> ExitCode {
         ["test-affected", "--base", base] => test_affected(Some(base), false, shard),
         ["test-affected", "--base", base, "--keep-env"] => test_affected(Some(base), true, shard),
         ["test-filter", "--base", base] => test_filter(base),
+        ["test-shards", rest @ ..] => test_shards(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::FAILURE
@@ -632,4 +637,60 @@ fn test_filter(base: &str) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn test_shards(args: &[&str]) -> ExitCode {
+    let (mut tests, mut filter) = (None, None);
+    let mut postgres_18 = false;
+    let mut rest = args.iter();
+    while let Some(arg) = rest.next() {
+        match *arg {
+            "--tests" => match rest.next() {
+                Some(file) => tests = Some(*file),
+                None => {
+                    eprintln!("{USAGE}");
+                    return ExitCode::FAILURE;
+                }
+            },
+            "--filter" => match rest.next() {
+                Some(file) => filter = Some(*file),
+                None => {
+                    eprintln!("{USAGE}");
+                    return ExitCode::FAILURE;
+                }
+            },
+            "--postgres-18" => postgres_18 = true,
+            _ => {
+                eprintln!("{USAGE}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+    let read = |file: &str| {
+        std::fs::read_to_string(file).map_err(|error| format!("cannot read {file}: {error}"))
+    };
+    let selected = match (tests, filter) {
+        (None, None) => None,
+        (Some(tests), Some(filter)) => match read(tests)
+            .and_then(|json| read(filter).and_then(|filter| test_shards::count(&json, &filter)))
+        {
+            Ok(selected) => {
+                eprintln!(
+                    "xtask test-shards: {} tests of autoxide and {} other tests selected",
+                    selected.app, selected.other
+                );
+                Some(selected)
+            }
+            Err(error) => {
+                eprintln!("xtask test-shards: {error}");
+                return ExitCode::FAILURE;
+            }
+        },
+        _ => {
+            eprintln!("xtask test-shards: --tests and --filter go together\n{USAGE}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("{}", test_shards::matrix(selected, postgres_18));
+    ExitCode::SUCCESS
 }

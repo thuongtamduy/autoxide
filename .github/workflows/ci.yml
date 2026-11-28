@@ -12,6 +12,11 @@ on:
   pull_request:
   # Chạy tay (Actions → Run workflow), vd sau khi đổi cài đặt của repo.
   workflow_dispatch:
+    inputs:
+      publish-check:
+        description: "Also run crates.io packaging (cargo xtask publish-check, ~1.5 h)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,6 +37,131 @@ concurrency:
 # gate.yml (dùng chung với release.yml, D-20261120-release-gate-sharded); job `gate (PostgreSQL …)` gộp
 # kết quả dưới tên check cũ (D-20261119-ci-faster, D-20261120-ci-nextest-archive). Cache: xem gate.yml.
 jobs:
+  # Một job quyết định mọi phần "chỉ chạy khi file liên quan đổi" (D-20261127-ci-runner-budget). Job bị bỏ qua ở mức JOB
+  # (`if:` dưới đây) không xin máy nào và được tính là đạt; trước đây mỗi job tự xin một máy, checkout cả lịch sử rồi mới
+  # biết mình không cần chạy. So với đâu:
+  # - pull request: nhánh gốc của PR (`base.sha`), như trước;
+  # - push vào `main`: commit của lần CI xanh gần nhất trên `main` — không phải commit liền trước, để thay đổi của lần
+  #   chạy bị huỷ (lần chờ bị thay bởi lần mới hơn) hay đỏ vẫn được tính. Không tìm được (chưa có lần xanh, commit đó không
+  #   còn là tổ tiên) thì chạy hết. Chạy lại cả workflow của một commit ĐÃ xanh trên `main` thì mốc là chính HEAD: các job
+  #   theo mẫu bị bỏ qua (kết quả xanh của chúng đã có);
+  # - chạy tay: chạy hết.
+  # Push `main` và chạy tay LUÔN chạy test nâng cấp và dựng thử image (D-20261121-ci-batch-release-faster, chủ dự án quyết;
+  # image dựng bản release từ mọi mã Rust), song song với gate nên không làm lâu thêm; mẫu file chỉ áp cho pull request.
+  # Theo mẫu ở cả push `main`: MCP OAuth, luật cảnh báo, MSRV. Commit phát hành luôn đổi `Cargo.toml` và `Cargo.lock` nên MCP
+  # OAuth và MSRV chạy trên đúng commit được phát hành; luật cảnh báo chỉ chạy khi `deploy/prometheus` đổi (kết quả chỉ
+  # phụ thuộc thư mục đó). Gate (gate.yml) không thuộc job này: push `main` luôn chạy đủ.
+  plan:
+    name: plan
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # Đọc lần chạy CI xanh gần nhất trên `main`.
+      actions: read
+    outputs:
+      upgrade: ${{ steps.plan.outputs.upgrade }}
+      image: ${{ steps.plan.outputs.image }}
+      mcp: ${{ steps.plan.outputs.mcp }}
+      alerts: ${{ steps.plan.outputs.alerts }}
+      rust: ${{ steps.plan.outputs.rust }}
+      semver: ${{ steps.plan.outputs.semver }}
+      release: ${{ steps.plan.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: What changed, and which checks it needs
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PUBLISH_CHECK: ${{ inputs.publish-check }}
+        run: |
+          base=""
+          case "$EVENT" in
+            pull_request) base="$BASE_SHA" ;;
+            push)
+              green="$(gh api -X GET "repos/$REPO/actions/workflows/ci.yml/runs" -f branch=main -f event=push \
+                -f status=success -f per_page=1 --jq '.workflow_runs[0].head_sha // empty' || true)"
+              if [ -n "$green" ] && git merge-base --is-ancestor "$green" HEAD 2>/dev/null; then
+                base="$green"
+              fi
+              ;;
+          esac
+          if [ -n "$base" ]; then
+            echo "Changes since $base:"
+            changed="$(git diff --name-only "$base" HEAD)"
+            printf '%s\n' "$changed"
+          else
+            echo "No base to compare with ($EVENT): every check runs."
+          fi
+          # Có file nào đã đổi khớp mẫu (regex mở rộng) không; không có mốc so sánh thì luôn có.
+          touches() {
+            [ -z "$base" ] && { echo true; return; }
+            if grep -E -q "$1" <<<"$changed"; then echo true; else echo false; fi
+          }
+          # Chỉ pull request lọc theo mẫu; push `main` và chạy tay luôn chạy (D-20261121-ci-batch-release-faster).
+          pr_touches() {
+            if [ "$EVENT" = pull_request ]; then touches "$1"; else echo true; fi
+          }
+          # File Rust (trước hoặc sau thay đổi) khai bảng — `#[derive(Record)]` hay entity SeaORM — dù không nằm trong thư
+          # mục `entity`: đổi nó có thể đổi dạng dữ liệu đã lưu.
+          declares_records() {
+            [ -z "$base" ] && return 0
+            local file
+            while IFS= read -r file; do
+              case "$file" in *.rs) ;; *) continue ;; esac
+              { git show "HEAD:$file" 2>/dev/null; git show "$base:$file" 2>/dev/null; } |
+                grep -E -q 'derive\([^)]*\b(Record|DeriveEntityModel)\b' && return 0
+            done <<<"$changed"
+            return 1
+          }
+          upgrade="$(pr_touches '(^|/)migrations?(/|\.rs$)|(^|/)entity(/|\.rs$)|^crates/kernel/src/data/|^Cargo\.lock$|^xtask/src/upgrade\.rs$|^crates/app/tests/.*upgrade|^\.github/workflows/|(^|/)Dockerfile')"
+          if [ "$upgrade" = false ] && declares_records; then upgrade=true; fi
+          {
+            # Test nâng cấp (D-20261121-ci-batch-release-faster): thứ có thể đổi dạng dữ liệu đã lưu.
+            echo "upgrade=$upgrade"
+            # Dựng thử image: thứ làm nên image.
+            echo "image=$(pr_touches '^(Dockerfile|\.dockerignore|about\.toml|about\.hbs|deny\.toml|rust-toolchain\.toml|Cargo\.lock)$|^\.github/workflows/(release|ci)\.yml$')"
+            # OAuth cho MCP bằng client MCP chính thức (D-20261127-mcp-sdk-ci-check).
+            echo "mcp=$(touches '^modules/auth/|^crates/kernel/src/(http|mcp|security|data/|module)|^crates/app/|^scripts/mcp-oauth|^Cargo\.(lock|toml)$|^\.github/workflows/ci\.yml$')"
+            # Luật cảnh báo Prometheus.
+            echo "alerts=$(touches '^deploy/prometheus/|^\.github/workflows/ci\.yml$')"
+          } >> "$GITHUB_OUTPUT"
+          # Có chạm Rust không (D-20261125-ci-skip-rust): MSRV.
+          if [ -n "$base" ]; then
+            echo "rust=$(scripts/rust-changed.sh "$base")" >> "$GITHUB_OUTPUT"
+          else
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+          fi
+          # Hợp đồng Rust (chỉ pull request, xem job `semver`) và PR phát hành (đổi `version` của Cargo.toml gốc).
+          semver=skip
+          release=false
+          if [ "$EVENT" = pull_request ]; then
+            version() { sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' | head -n 1; }
+            before="$(git show "$BASE_SHA:Cargo.toml" | version)"
+            after="$(version < Cargo.toml)"
+            public='^(crates/kernel/|crates/testkit/|crates/app/src/lib\.rs$|modules/[^/]+/src/(lib\.rs$|api\.rs$|api/))'
+            [ "$before" != "$after" ] && release=true
+            if [ "$release" = true ] || grep -Eq '^xtask/src/semver\.rs$' <<<"$changed"; then
+              semver=release
+            elif grep -Eq "$public" <<<"$changed"; then
+              semver=pull-request
+            else
+              echo "No public Rust API changed and the version is unchanged ($after): semver check skipped."
+            fi
+          fi
+          # Chạy tay có thể bật riêng `publish-check` (thử job trên một nhánh mà không phải mở PR phát hành).
+          [ "$EVENT" = workflow_dispatch ] && [ "$PUBLISH_CHECK" = true ] && release=true
+          echo "semver=$semver" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   # Gate chia nhiều máy, định nghĩa ở gate.yml (dùng chung với release.yml). Tên job gọi `gate` nên các
   # check vẫn tên "gate / lint", "gate / build tests", "gate / sqlite 1/4"… như khi còn nằm ở đây.
   parts:
@@ -110,11 +240,11 @@ jobs:
 
   # Đăng nhập OAuth cho MCP bằng client MCP CHÍNH THỨC (`@modelcontextprotocol/sdk`, ghim ở scripts/mcp-oauth/) tới
   # `autoxide serve` thật, trên SQLite rồi PostgreSQL: khám phá `/.well-known`, đăng ký client, PKCE, consent, gọi tool,
-  # refresh, thu hồi (D-20261127-mcp-sdk-ci-check). Ở pull request chỉ chạy khi PR chạm phần có thể đổi luồng đó; push
-  # `main` và chạy tay luôn chạy. Kiểm trong một bước (không dùng `paths:`) để job vẫn báo xong khi là check bắt buộc.
+  # refresh, thu hồi (D-20261127-mcp-sdk-ci-check). Chỉ chạy khi thay đổi chạm phần có thể đổi luồng đó (job `plan`).
   mcp-oauth:
     name: MCP OAuth with the official MCP SDK client
-    if: ${{ !github.event.repository.private }}
+    needs: plan
+    if: ${{ needs.plan.outputs.mcp == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
@@ -133,38 +263,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - name: changed
-        id: changed
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ "$EVENT" != "pull_request" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          pattern='^modules/auth/|^crates/kernel/src/(http|mcp|security|data/|module)|^crates/app/|^scripts/mcp-oauth|^Cargo\.(lock|toml)$|^\.github/workflows/ci\.yml$'
-          if git diff --name-only "$BASE_SHA" HEAD | grep -E -q "$pattern"; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "This pull request does not touch OAuth, MCP or the HTTP layer: check skipped."
-          fi
       - run: rustup toolchain install
-        if: steps.changed.outputs.run == 'true'
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: steps.changed.outputs.run == 'true'
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: steps.changed.outputs.run == 'true'
         with:
           node-version: "22.23.4"
       - run: cargo build --locked -p autoxide
-        if: steps.changed.outputs.run == 'true'
       - run: scripts/mcp-oauth-e2e.sh
-        if: steps.changed.outputs.run == 'true'
         env:
           MCP_OAUTH_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
 
@@ -180,40 +287,11 @@ jobs:
   # docs/RELEASING.md, mục "Kiểm hợp đồng Rust".
   # Crate chia ra 4 máy (`--shard k/4`), mỗi máy một target dir chung cho mọi crate của nó; job
   # "Rust API compatibility (cargo-semver-checks)" gộp kết quả và là tên check ổn định (D-20261125-semver-job-time).
-  semver-plan:
-    name: semver (plan)
-    if: ${{ github.event_name == 'pull_request' && !github.event.repository.private }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    outputs:
-      mode: ${{ steps.changed.outputs.mode }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: changed
-        id: changed
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          version() { sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' | head -n 1; }
-          before="$(git show "$BASE_SHA:Cargo.toml" | version)"
-          after="$(version < Cargo.toml)"
-          public='^(crates/kernel/|crates/testkit/|crates/app/src/lib\.rs$|modules/[^/]+/src/(lib\.rs$|api\.rs$|api/))'
-          if [ "$before" != "$after" ] || git diff --name-only "$BASE_SHA...HEAD" | grep -Eq '^xtask/src/semver\.rs$'; then
-            echo "mode=release" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE_SHA...HEAD" | grep -Eq "$public"; then
-            echo "mode=pull-request" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=skip" >> "$GITHUB_OUTPUT"
-            echo "No public Rust API changed and the version is unchanged ($after): semver check skipped."
-          fi
-
+  # Chế độ (release / pull-request / skip) do job `plan` tính (D-20261127-ci-runner-budget).
   semver-shards:
     name: semver ${{ matrix.shard }}/4
-    needs: semver-plan
-    if: ${{ needs.semver-plan.outputs.mode != 'skip' }}
+    needs: plan
+    if: ${{ needs.plan.outputs.semver != 'skip' }}
     runs-on: ubuntu-24.04
     # Đo ở #506 (đủ 28 crate): các phần 12–22 phút, cả job ~23 phút; giới hạn chỉ để chặn job treo.
     timeout-minutes: 45
@@ -236,7 +314,7 @@ jobs:
           tool: cargo-semver-checks@0.51.0
       - name: cargo xtask semver
         env:
-          MODE: ${{ needs.semver-plan.outputs.mode }}
+          MODE: ${{ needs.plan.outputs.semver }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           SHARD: ${{ matrix.shard }}
         run: |
@@ -264,7 +342,7 @@ jobs:
 
   semver:
     name: Rust API compatibility (cargo-semver-checks)
-    needs: [semver-plan, semver-shards]
+    needs: [plan, semver-shards]
     permissions:
       contents: read
       pull-requests: read
@@ -276,14 +354,14 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         # Shards cancelled by a newer commit upload nothing: skip the download then, but never hide a download
         # failure when the shards ran.
-        if: needs.semver-plan.outputs.mode != 'skip' && needs.semver-shards.result != 'cancelled'
+        if: needs.plan.outputs.semver != 'skip' && needs.semver-shards.result != 'cancelled'
         with:
           pattern: semver-*
           path: parts
       - name: Every part of the check passed; one summary
         env:
-          PLAN: ${{ needs.semver-plan.result }}
-          MODE: ${{ needs.semver-plan.outputs.mode }}
+          PLAN: ${{ needs.plan.result }}
+          MODE: ${{ needs.plan.outputs.semver }}
           SHARDS: ${{ needs.semver-shards.result }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -338,11 +416,47 @@ jobs:
           fi
           [ "$SHARDS" = success ]
 
+  # Đóng gói như crates.io (docs/RELEASING.md, "Đăng lên crates.io"; D-20261127-ci-runner-budget): `cargo xtask publish-check`
+  # chạy `cargo package` cho mọi crate sẽ đăng rồi build từng gói từ bản đã đóng với phiên bản thư viện mới nhất hợp lệ.
+  # Chỉ trên PR PHÁT HÀNH (đổi `version`) hay khi chạy tay với `publish-check` bật, song song với mọi job khác; trước đây
+  # chạy tay trên máy (~85 phút). auto-release.yml chỉ xem CI của push `main`, không xem job này: chờ nó xanh rồi mới
+  # merge PR phát hành (docs/RELEASING.md bước 5). Lâu như một lần build sạch (không dùng cache: `--exclude-lockfile` chọn
+  # thư viện mới nhất, khác `Cargo.lock`). Không đăng gì.
+  publish-check:
+    name: crates.io packaging (publish-check)
+    needs: plan
+    if: ${{ needs.plan.outputs.release == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+      # Gói đã đóng không mang `[profile]` của workspace nên mặc định build kèm đầy đủ thông tin debug: tắt để đỡ đĩa và
+      # thời gian. Không đổi điều được kiểm (gói có đóng và build được không).
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      # Máy miễn phí còn ~14 GB đĩa trống; build ~43 gói riêng lẻ cần nhiều hơn. Xoá bộ công cụ không dùng (Android, .NET,
+      # Haskell, CodeQL) của image runner.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - run: cargo xtask publish-check
+      - run: df -h /
+        if: always()
+
   upgrade:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.
     name: upgrade from the last release (${{ matrix.database }})
-    if: ${{ !github.event.repository.private }}
+    # Pull request: chỉ khi thay đổi có thể đổi dạng dữ liệu đã lưu; push `main` và chạy tay: luôn (job `plan`,
+    # D-20261121-ci-batch-release-faster).
+    needs: plan
+    if: ${{ needs.plan.outputs.upgrade == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -370,43 +484,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Cả lịch sử và tag: chọn tag phát hành trước HEAD; và để so với nhánh gốc của PR.
+          # Cả lịch sử và tag: chọn tag phát hành trước HEAD.
           fetch-depth: 0
-      # D-20261121-ci-batch-release-faster: ở pull request, test nâng cấp chỉ chạy khi PR đụng thứ có thể
-      # đổi dạng dữ liệu đã lưu (migration, entity, kernel/data, Cargo.lock, chính test nâng cấp, workflow,
-      # Dockerfile). Push vào `main` và chạy tay luôn chạy. Kiểm trong một bước (không dùng `paths:` ở trigger)
-      # để job vẫn báo xong khi nó là check bắt buộc.
-      - name: changed
-        id: changed
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ "$EVENT" != "pull_request" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          pattern='(^|/)migrations?(/|\.rs$)|(^|/)entity(/|\.rs$)|^crates/kernel/src/data/|^Cargo\.lock$|^xtask/src/upgrade\.rs$|^crates/app/tests/.*upgrade|^\.github/workflows/|(^|/)Dockerfile'
-          if git diff --name-only "$BASE_SHA" HEAD | grep -E -q "$pattern"; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "This pull request does not touch migrations, entities or the stored format: upgrade test skipped."
-          fi
       - run: rustup toolchain install
-        if: steps.changed.outputs.run == 'true'
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: steps.changed.outputs.run == 'true'
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        if: steps.changed.outputs.run == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: cargo xtask upgrade-test --database ${{ matrix.database }}
-        if: steps.changed.outputs.run == 'true'
 
   # Kiểm bảo mật và cú pháp của chính các workflow (D-20261123-supply-chain): zizmor (quyền token, action chưa ghim
   # SHA hay SHA không thuộc repo của action, chèn lệnh từ dữ liệu PR, trigger nguy hiểm, lộ credential qua checkout)
@@ -487,11 +576,12 @@ jobs:
 
   # MSRV (D-20261126-road-to-1-0, G8; docs/COMPATIBILITY.md, "Minimum supported Rust version"): biên dịch cả workspace
   # bằng đúng `rust-version` của Cargo.toml — thấp hơn toolchain ghim — để một tính năng ngôn ngữ mới không lọt vào mà
-  # không ai biết. Chỉ `cargo check` (không test): MSRV là lời hứa "biên dịch được". Pull request không chạm Rust thì bỏ
-  # qua như phần nặng của gate (`scripts/rust-changed.sh`); push main và chạy tay luôn chạy.
+  # không ai biết. Chỉ `cargo check` (không test): MSRV là lời hứa "biên dịch được". Thay đổi không chạm Rust thì bỏ
+  # qua như phần nặng của gate (`scripts/rust-changed.sh`, quyết ở job `plan`; push main so với lần CI xanh gần nhất).
   msrv:
     name: MSRV build (rust-version)
-    if: ${{ !github.event.repository.private }}
+    needs: plan
+    if: ${{ needs.plan.outputs.rust == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -501,32 +591,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - name: Rust changed, and the MSRV
+      - name: The MSRV
         id: plan
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          if [ "$EVENT_NAME" = pull_request ]; then
-            run="$(scripts/rust-changed.sh "origin/$BASE_REF")"
-          else
-            run=true
-          fi
-          echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)" >> "$GITHUB_OUTPUT"
+        run: echo "msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)" >> "$GITHUB_OUTPUT"
       - name: Install the MSRV toolchain
-        if: steps.plan.outputs.run == 'true'
         env:
           MSRV: ${{ steps.plan.outputs.msrv }}
         run: rustup toolchain install "$MSRV" --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: steps.plan.outputs.run == 'true'
         with:
           shared-key: msrv
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: cargo check with the MSRV
-        if: steps.plan.outputs.run == 'true'
         env:
           MSRV: ${{ steps.plan.outputs.msrv }}
         # `+$MSRV` thắng `rust-toolchain.toml`. `--locked`: Cargo.lock không được đổi.
@@ -572,39 +648,19 @@ jobs:
 
   # Dựng thử image (không push) khi pull request chạm thứ làm nên image (Dockerfile, about.*, toolchain, workflow phát hành):
   # `cargo auditable chef cook`, RUSTFLAGS, `cargo about` chạy lần đầu ở đây chứ không phải lúc phát hành. Kiểm thêm binary
-  # có danh sách crate nhúng (`.dep-v0`) và image có văn bản giấy phép bên thứ ba. Push main và chạy tay luôn dựng.
+  # có danh sách crate nhúng (`.dep-v0`) và image có văn bản giấy phép bên thứ ba. Push main và chạy tay luôn dựng (job `plan`).
   image-build:
     name: image builds (no push)
-    if: ${{ !github.event.repository.private }}
+    needs: plan
+    if: ${{ needs.plan.outputs.image == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - name: Does this change touch the image?
-        id: plan
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          if [ "$EVENT_NAME" != pull_request ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          base="$(git merge-base "origin/$BASE_REF" HEAD)"
-          if git diff --name-only "$base" HEAD -- Dockerfile .dockerignore about.toml about.hbs deny.toml rust-toolchain.toml Cargo.lock \
-            .github/workflows/release.yml | grep -q .; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Nothing that makes the image changed: not built."
-          fi
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-        if: steps.plan.outputs.run == 'true'
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        if: steps.plan.outputs.run == 'true'
         with:
           context: .
           push: false
@@ -613,7 +669,6 @@ jobs:
           cache-from: type=gha,scope=image-test
           cache-to: type=gha,mode=max,scope=image-test
       - name: The binary lists its crates and the image carries the licenses
-        if: steps.plan.outputs.run == 'true'
         run: |
           container="$(docker create autoxide:ci)"
           docker cp "$container:/usr/local/bin/autoxide" "$RUNNER_TEMP/autoxide"
@@ -624,39 +679,20 @@ jobs:
 
   # Luật cảnh báo Prometheus (deploy/prometheus): cú pháp (`promtool check rules`) và test, kể cả ca series chưa tồn tại
   # (`promtool test rules`). `promtool` dựng từ mã nguồn ghim phiên bản (module Go v0.316.0 = Prometheus 3.16, đã ra ≥ 7 ngày;
-  # go.sum kiểm bởi proxy Go) bằng Go có sẵn trên runner. Chỉ chạy khi PR chạm thư mục đó; push main và chạy tay luôn chạy.
+  # go.sum kiểm bởi proxy Go) bằng Go có sẵn trên runner. Chỉ chạy khi thay đổi chạm thư mục đó (job `plan`).
   alert-rules:
     name: alert rules (promtool)
-    if: ${{ !github.event.repository.private }}
+    needs: plan
+    if: ${{ needs.plan.outputs.alerts == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - name: Does this change touch the alert rules?
-        id: plan
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          if [ "$EVENT_NAME" != pull_request ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          base="$(git merge-base "origin/$BASE_REF" HEAD)"
-          if git diff --name-only "$base" HEAD -- deploy/prometheus .github/workflows/ci.yml | grep -q .; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "The alert rules did not change: not tested."
-          fi
       - name: Build promtool
-        if: steps.plan.outputs.run == 'true'
         run: GOBIN="$RUNNER_TEMP/bin" go install github.com/prometheus/prometheus/cmd/promtool@v0.316.0
       - name: Check and test the rules
-        if: steps.plan.outputs.run == 'true'
         working-directory: deploy/prometheus
         run: |
           "$RUNNER_TEMP/bin/promtool" check rules autoxide-alerts.yml

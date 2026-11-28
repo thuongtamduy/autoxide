@@ -29,7 +29,8 @@
 #                       lại cả core ở workspace riêng).
 #   --only build        đi kèm gate đầy đủ hoặc `--pr`: build mọi chương trình test MỘT lần thành archive
 #                       của nextest ở GATE_ARCHIVE_DIR (D-20261120-ci-nextest-archive), kèm file `filter`
-#                       (filterset chọn test: `all()` ở gate đầy đủ, crate bị ảnh hưởng ở `--pr`). Gate đầy
+#                       (filterset chọn test: `all()` ở gate đầy đủ, crate bị ảnh hưởng ở `--pr`; `--pr` ghi thêm
+#                       `tests.json` — các test được chọn — để CI chọn số máy chạy test). Gate đầy
 #                       đủ chạy luôn doc-test ở đây (chúng cần trình biên dịch). Không chạy test nào khác.
 #   --archive DIR       đi kèm `--only sqlite|postgres`: chạy test từ archive trong DIR (do `--only build`
 #                       làm, có thể ở máy khác) bằng nextest thay vì build rồi chạy bằng `cargo xtask`;
@@ -472,6 +473,11 @@ if [ "$ONLY" = build ]; then
     BASE="${GATE_BASE:-origin/main}"
     step "tests to run: crates changed since $BASE and their dependents (cargo xtask test-filter)"
     cargo xtask test-filter --base "$BASE" > "$ARCHIVE_DIR/filter"
+    # Danh sách test được chọn (JSON của nextest): CI tính số máy chạy test từ đây (`cargo xtask test-shards`,
+    # D-20261127-ci-runner-budget). Cùng cấu hình build nên cargo không biên dịch lại gì, chỉ hỏi từng chương trình test.
+    step "tests selected by the filter (cargo nextest list)"
+    cargo nextest list --workspace --locked ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} \
+      --filterset "$(cat "$ARCHIVE_DIR/filter")" --message-format json > "$ARCHIVE_DIR/tests.json"
   else
     echo "all()" > "$ARCHIVE_DIR/filter"
     # Doc-test cần trình biên dịch nên chạy ở đây, không ở máy chạy archive; như bước 7 của gate
