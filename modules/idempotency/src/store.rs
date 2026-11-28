@@ -5,26 +5,24 @@
 //! `InProgress` (hoặc kết quả, nếu bên đầu đã xong). Key thuộc khách của request (bước 33): mọi truy vấn qua
 //! `tenant.db()`, handle tự lọc theo khách.
 
-use std::time::Duration;
-
 use autoxide_kernel::db::{Queries as _, TenantKey};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::idempotency::{Begin, IdempotencyStore, StoredResponse};
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
 use autoxide_kernel::tenancy::TenantContext;
-use autoxide_kernel::time::{SignedDuration, Timestamp};
+use autoxide_kernel::time::{Duration, Timestamp};
 use uuid::Uuid;
 
 use crate::entity::IdempotencyRecord as Row;
 
 /// Giữ một key chừng này: gửi lại trong khoảng đó nhận lại kết quả cũ.
-const KEEP: SignedDuration = SignedDuration::from_hours(24);
+const KEEP: Duration = Duration::from_hours(24);
 /// Loại job dọn key hết hạn (cũng là tên lịch).
 pub(crate) const CLEANUP: &str = "idempotency.cleanup";
 
 /// Dọn mỗi giờ.
 pub(crate) fn cleanup_schedule() -> Schedule {
-    Schedule::new(CLEANUP, CLEANUP, Duration::from_secs(3600))
+    Schedule::new(CLEANUP, CLEANUP, std::time::Duration::from_secs(3600))
 }
 
 // Store không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
