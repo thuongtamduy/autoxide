@@ -6,12 +6,17 @@ Quyết định: Bổ sung lớp 1 của D-20261126-tenant-isolation (không tha
 
 1. **Chốt chặn lúc chạy** (`crates/kernel/src/data/db/guard.rs`). Mọi câu mà handle của khách (`tenant.db()`) gửi xuống
    database đi qua `guard::check` ngay trước khi chạy — câu của bộ dựng `db`, SQL viết tay `handle.sql(…)`, câu SeaORM module
-   tự dựng chạy qua cầu `ConnectionTrait` chuyển tiếp, và câu của kernel nhận `&impl Executor` trên handle đó. Luật: câu chạm
-   một bảng cấp khách thì với **mỗi** bảng cấp khách khác nhau trong câu phải có một vế `tenant_id = <tham số>` (hay đảo hai vế)
-   mà tham số đó là **đúng khách của handle**; câu `INSERT` phải ghi cột `tenant_id` và gắn giá trị của khách. Câu không tham
-   số (`execute_unprepared`) không gắn được khách nên bị từ chối trên handle của khách. Bảng cấp khách = bảng của mọi record
-   `scope = tenant` mà module khai (`Manifest::records`), ghi vào sổ của tiến trình lúc dựng `Modules` (như sổ bảng
-   control-plane). Câu vi phạm không tới database: trả lỗi `internal_error` (lỗi lập trình, client không cần biết chi tiết),
+   tự dựng chạy qua cầu `ConnectionTrait` chuyển tiếp, và câu của kernel nhận `&impl Executor` trên handle đó. Luật: **mỗi lần**
+   một bảng cấp khách được dùng làm bảng (sau FROM / JOIN / UPDATE / USING, trong subquery, ở mỗi vế UNION, kể cả nối bảng với
+   chính nó) phải có vế lọc **riêng** `<tên gắn>.tenant_id = <tham số>` (hay đảo hai vế; tên gắn = alias, không có alias thì
+   tên bảng) mà tham số đó là **đúng khách của handle**; vế không ghi bảng `tenant_id = <tham số>` dùng được cho đúng một lần.
+   Hai vế lọc trên cùng một alias không thay cho bảng thứ hai. Câu `INSERT` phải ghi cột `tenant_id` và gắn giá trị của khách;
+   `ON CONFLICT … DO UPDATE` còn phải lọc khách ở nhánh cập nhật (bộ dựng `db` vốn thêm `WHERE <bảng>.tenant_id = …`). Câu
+   không tham số (`execute_unprepared`) không gắn được khách nên bị từ chối trên handle của khách. Bảng cấp khách = (a) bảng của
+   mọi record `scope = tenant` mà module khai (`Manifest::records`), ghi lúc dựng `Modules`, và (b) **mọi bảng có cột
+   `tenant_id` trong schema thật** trừ bảng control-plane module khai, đọc ở `Modules::check_records` sau migration — nên chốt
+   phủ cả bảng của module chưa chuyển sang record và bảng cấp khách của kernel khi câu chạm chúng đi qua handle của khách.
+   Câu vi phạm không tới database: trả lỗi `internal_error` (lỗi lập trình, client không cần biết chi tiết),
    log `error` nêu tên bảng, đếm `kernel_tenant_guard_blocked_total`. Handle control-plane và `all_tenants("lý do")` không
    kiểm (không có khách để so).
 2. **Khách chịu hạn mức là một kiểu riêng**: `tenancy::SignedInTenant`, chỉ dựng được từ `Principal` đã xác thực
@@ -27,13 +32,25 @@ tên trong ngoặc kép giữ nguyên, tên trần đổi chữ thường; tham 
 "không thêm thư viện thừa"). Chốt **bắt câu quên lọc** (lớp lỗi mà lint `tenant-scope` tìm) ở lúc chạy, dù câu dựng bằng
 đường nào; nó **không** cam kết chống câu cố tình vô hiệu bộ lọc (`… OR 1 = 1`) — code module chạy chung tiến trình và được tin.
 Rào chữ `:tenant` cũ của `db.sql` giữ nguyên (báo lỗi rõ hơn, sớm hơn); chốt mới bắt cả trường hợp rào cũ cho qua (`:tenant`
-chỉ nằm trong comment — có test).
+chỉ nằm trong comment — có test). Giới hạn đã biết, ghi để không ai tưởng chốt làm được hơn: comment lồng nhau của Postgres
+và chuỗi `$$…$$` lừa được bộ tách token (chỉ đáng lo với câu cố tình phá, không phải câu quên lọc); một số dạng lọc đúng
+nghĩa bị chặn nhầm vì chốt không đọc chúng — `tenant_id IN (:tenant)`, `IS NOT DISTINCT FROM`, lọc nằm trong `WITH … INSERT`
+— nên tài liệu của `sql` bảo viết đúng dạng `tenant_id = :tenant`. `SignedInTenant::of` nhận mọi `Principal`, kể cả tự dựng
+(test cần): kiểu này chống truyền nhầm, không chống code cố ý.
 
-Phạm vi lúc này và đường nâng cấp: module còn đi đường cũ (`TenantContext::database()`, đếm ở baseline `raw-database`) chưa qua
-handle nên chưa được chốt — vẫn do lint `tenant-scope` canh. Mỗi cụm chuyển sang `db` (D-20261128-library-layer-plan mục 6)
+Phạm vi lúc này và đường nâng cấp: chốt chỉ chạy trên câu đi qua **handle** của khách. Module còn đi đường cũ
+(`TenantContext::database()`, đếm ở baseline `raw-database` — đa số truy vấn của 38 module hôm nay) không qua handle nên chưa
+được chốt — vẫn do lint `tenant-scope` canh; sổ bảng đã phủ bảng của chúng, nên câu nào của chúng chuyển sang handle (kể cả
+qua cầu SeaORM) là được chốt ngay. Mỗi cụm chuyển sang `db` (D-20261128-library-layer-plan mục 6)
 tự vào phạm vi chốt mà không phải làm gì thêm: record của cụm vào sổ, mọi câu của nó đi qua handle. Khi baseline rỗng và
 `database()` thành nội bộ, mọi truy vấn của module đi qua chốt, lint `tenant-scope` gỡ (D-20261126-tenant-isolation mục 3).
 RLS trên Postgres vẫn là tuỳ chọn sau 1.0 với bốn điều kiện đã ghi.
+
+Khi sổ bảng mở rộng theo schema, chốt bắt ngay ba câu thật trên handle của khách: `orders` cập nhật `orders_payments` chỉ
+theo khoá chính (`ActiveModel::update`, sửa thành `Entity::update(…).scoped(tenant)`), và hai test của `compliance`,
+`conversations` đọc bảng của khách không lọc (sửa test). Kiểm độc lập lần 1 (PR #624) dò ra bản đầu chỉ đếm số bảng khác
+nhau nên lọt subquery cùng bảng, self-join lọc một phía, vế UNION không lọc, lọc hai lần trên cùng alias; luật "mỗi lần dùng
+một vế lọc riêng" ở trên và test cho cả bốn câu là bản sửa.
 
 Module viết ngoài repo: không đổi API của `db` (handle, bộ dựng, `sql`); câu của họ được chốt như module trong repo khi khai
 record trong `Manifest::records` (đã bắt buộc). Họ chỉ bị ảnh hưởng nếu đang chạy câu SeaORM không lọc khách trên handle của

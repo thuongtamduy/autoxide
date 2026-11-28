@@ -22,18 +22,54 @@ use uuid::Uuid;
 
 use crate::error::Error;
 
-// Sổ bảng cấp khách của tiến trình: bảng của mọi record `scope = tenant` mà module khai (`Module::records`), ghi khi
-// dựng `Modules`; chỉ thêm. Đọc ở mỗi câu của handle theo khách — tập nhỏ, khoá đọc rẻ.
-static TENANT_TABLES: OnceLock<RwLock<BTreeSet<&'static str>>> = OnceLock::new();
+// Sổ bảng cấp khách của tiến trình: bảng của mọi record `scope = tenant` mà module khai (`Module::records`, ghi khi
+// dựng `Modules`), cộng mọi bảng có cột `tenant_id` trong schema thật trừ bảng control-plane (ghi ở
+// `Modules::check_records`, sau migration); chỉ thêm. Đọc ở mỗi câu của handle theo khách — khoá đọc rẻ.
+static TENANT_TABLES: OnceLock<RwLock<BTreeSet<String>>> = OnceLock::new();
 
-fn tenant_tables() -> &'static RwLock<BTreeSet<&'static str>> {
+fn tenant_tables() -> &'static RwLock<BTreeSet<String>> {
     TENANT_TABLES.get_or_init(|| RwLock::new(BTreeSet::new()))
 }
 
 /// Records `tables` as tenant tables (called when the modules are built, from the declared records).
-pub(crate) fn register_tenant_tables(tables: impl IntoIterator<Item = &'static str>) {
+pub(crate) fn register_tenant_tables<T: Into<String>>(tables: impl IntoIterator<Item = T>) {
     let mut set = tenant_tables().write().unwrap_or_else(PoisonError::into_inner);
-    set.extend(tables);
+    set.extend(tables.into_iter().map(Into::into));
+}
+
+/// Registers every table of the live schema of `database` that has a `tenant_id` column as a tenant table, except
+/// the control-plane tables modules declare: the guard then covers the tables of modules not moved to `db` records
+/// yet, and the kernel's own tenant tables. Called by `Modules::check_records` once the migrations are applied.
+pub(crate) async fn register_live_tenant_tables(
+    database: &crate::database::Database,
+) -> Result<(), String> {
+    use sea_orm::ConnectionTrait as _;
+    let connection = database.read();
+    let backend = connection.get_database_backend();
+    let sql = match backend {
+        DbBackend::Sqlite => {
+            "SELECT m.name AS name FROM sqlite_master m JOIN pragma_table_info(m.name) p \
+             WHERE m.type = 'table' AND p.name = 'tenant_id'"
+        }
+        DbBackend::Postgres => {
+            "SELECT table_name::text AS name FROM information_schema.columns \
+             WHERE table_schema = current_schema() AND column_name = 'tenant_id'"
+        }
+        other => return Err(format!("unsupported database {other:?}")),
+    };
+    let rows = connection
+        .query_all_raw(crate::database::statement(backend, sql, Vec::<Value>::new()))
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut tables = Vec::new();
+    for row in &rows {
+        let name = row.try_get::<String>("", "name").map_err(|error| error.to_string())?;
+        if !super::check::is_control_plane(&name) {
+            tables.push(name.to_ascii_lowercase());
+        }
+    }
+    register_tenant_tables(tables);
+    Ok(())
 }
 
 /// Only for tests: registers tenant tables without building modules.
@@ -59,13 +95,16 @@ pub(crate) fn check(tenant: Option<Uuid>, statement: &Statement) -> Result<(), E
         Some(table) => {
             drop(registered);
             metrics::counter!("kernel_tenant_guard_blocked_total").increment(1);
+            // Chữ câu có tham số `?`/`$n`, không có giá trị: ghi log được, giúp tìm câu thiếu lọc.
+            let sql: String = statement.sql.chars().take(400).collect();
             tracing::error!(
                 table = %table,
+                sql = %sql,
                 "a statement on a tenant handle touches a tenant table without filtering by the tenant; refused"
             );
             Err(Error::internal(format!(
                 "statement on a tenant handle reads or writes `{table}` without `tenant_id = <tenant>`; \
-                 build it with the `db` query builder or add the tenant filter"
+                 build it with the `db` query builder or add the tenant filter: {sql}"
             )))
         }
     }
@@ -202,66 +241,168 @@ fn tokens(sql: &str, backend: DbBackend) -> Vec<Token> {
     tokens
 }
 
-// Bảng cấp khách đầu tiên mà câu chạm mà không lọc; `None` khi câu đạt.
+// Từ không bao giờ là alias của bảng (từ khoá có thể đứng ngay sau tên bảng).
+const NOT_ALIAS: &[&str] = &[
+    "all",
+    "and",
+    "as",
+    "asc",
+    "by",
+    "case",
+    "conflict",
+    "cross",
+    "default",
+    "delete",
+    "desc",
+    "distinct",
+    "do",
+    "else",
+    "end",
+    "except",
+    "exists",
+    "for",
+    "from",
+    "full",
+    "group",
+    "having",
+    "in",
+    "inner",
+    "insert",
+    "intersect",
+    "into",
+    "is",
+    "join",
+    "lateral",
+    "left",
+    "limit",
+    "natural",
+    "not",
+    "nulls",
+    "offset",
+    "on",
+    "only",
+    "or",
+    "order",
+    "outer",
+    "returning",
+    "right",
+    "select",
+    "set",
+    "then",
+    "union",
+    "update",
+    "using",
+    "values",
+    "when",
+    "where",
+    "window",
+    "with",
+];
+
+/// One place a tenant table is used as a table (not as the qualifier of a column).
+struct Reference {
+    table: String,
+    /// The name the statement filters it by: its alias, or the table's own name.
+    binding: String,
+    /// The target of `INSERT INTO`.
+    into: bool,
+}
+
+// Bảng cấp khách đầu tiên mà câu chạm mà không lọc; `None` khi câu đạt. Đếm theo TỪNG LẦN bảng được dùng làm bảng
+// (sau FROM / JOIN / UPDATE / INTO / USING, trong subquery, ở mỗi vế UNION…), không theo số bảng khác nhau: mỗi lần
+// phải có một vế `<tên gắn>.tenant_id = <tham số của khách>` riêng (tên gắn = alias, hay chính tên bảng), hay một vế
+// không ghi bảng `tenant_id = <tham số>` (mỗi vế như vậy chỉ dùng được cho một lần).
 fn problem(
     sql: &str,
     values: &[Value],
     backend: DbBackend,
     tenant: Uuid,
-    registered: &BTreeSet<&'static str>,
+    registered: &BTreeSet<String>,
 ) -> Option<String> {
     let tokens = tokens(sql, backend);
-    let mut touched: Vec<&str> = Vec::new();
-    for token in &tokens {
-        if let Token::Name(name) = token
-            && let Some(table) = registered.get(name.as_str())
-            && !touched.contains(table)
-        {
-            touched.push(table);
+    let name_at = |index: usize| match tokens.get(index) {
+        Some(Token::Name(name)) => Some(name.as_str()),
+        _ => None,
+    };
+    let mut references = Vec::new();
+    for (index, token) in tokens.iter().enumerate() {
+        let Token::Name(name) = token else { continue };
+        // `"t"."cột"`: tên bảng làm tiền tố của cột, không phải một lần dùng bảng.
+        if !registered.contains(name.as_str()) || tokens.get(index + 1) == Some(&Token::Dot) {
+            continue;
         }
+        let into = index.checked_sub(1).and_then(name_at) == Some("into");
+        let mut next = index + 1;
+        if name_at(next) == Some("as") {
+            next += 1;
+        }
+        let binding = match name_at(next) {
+            Some(alias) if !NOT_ALIAS.contains(&alias) && !registered.contains(alias) => {
+                alias.to_owned()
+            }
+            _ => name.clone(),
+        };
+        references.push(Reference { table: name.clone(), binding, into });
     }
-    if touched.is_empty() {
+    if references.is_empty() {
         return None;
     }
     let is_tenant = |index: usize| matches!(values.get(index), Some(Value::Uuid(Some(value))) if *value == tenant);
     let tenant_bound =
         values.iter().any(|value| matches!(value, Value::Uuid(Some(v)) if *v == tenant));
-    // Mỗi lần `tenant_id = <tham số của khách>` (hay đảo hai vế) là một lần lọc.
-    let mut filters = 0_usize;
+    // Mỗi vế `tenant_id = <tham số của khách>` (hay đảo hai vế), với tên gắn ở trước dấu chấm nếu có.
+    let mut qualified: Vec<String> = Vec::new();
+    let mut unqualified = 0_usize;
+    let column_at = |index: usize| name_at(index) == Some("tenant_id");
+    let bound_at =
+        |index: usize| matches!(tokens.get(index), Some(Token::Placeholder(i)) if is_tenant(*i));
     for (index, token) in tokens.iter().enumerate() {
-        if *token != Token::Equals {
+        if *token != Token::Equals || index == 0 {
             continue;
         }
-        let before = index.checked_sub(1).and_then(|i| tokens.get(i));
-        let after = tokens.get(index + 1);
-        let column =
-            |token: Option<&Token>| matches!(token, Some(Token::Name(name)) if name == "tenant_id");
-        let bound =
-            |token: Option<&Token>| matches!(token, Some(Token::Placeholder(i)) if is_tenant(*i));
-        // `"t"."tenant_id" = $1`: cột đứng ngay trước dấu `=`; `$1 = tenant_id`: ngay sau.
-        if (column(before) && bound(after)) || (bound(before) && column(after)) {
-            filters += 1;
+        let column = if column_at(index - 1) && bound_at(index + 1) {
+            Some(index - 1)
+        } else if bound_at(index - 1) && column_at(index + 1) {
+            Some(index + 1)
+        } else {
+            None
+        };
+        let Some(column) = column else { continue };
+        let qualifier = column
+            .checked_sub(2)
+            .filter(|_| tokens.get(column - 1) == Some(&Token::Dot))
+            .and_then(name_at);
+        match qualifier {
+            Some(qualifier) => qualified.push(qualifier.to_owned()),
+            None => unqualified += 1,
         }
     }
-    let first = tokens.iter().find_map(|token| match token {
-        Token::Name(name) => Some(name.as_str()),
-        _ => None,
-    });
-    // `INSERT INTO t (…, tenant_id, …) VALUES (…)`: bảng đích không có `WHERE`; kernel (hay module) ghi cột
-    // `tenant_id` và gắn giá trị của khách. Bảng khác trong câu (`INSERT … SELECT`) vẫn phải được lọc.
-    if first == Some("insert") {
-        let names_column =
-            tokens.iter().any(|token| matches!(token, Token::Name(name) if name == "tenant_id"));
-        if !(names_column && tenant_bound) {
-            return touched.first().map(|table| (*table).to_owned());
+    let names_column =
+        tokens.iter().any(|token| matches!(token, Token::Name(name) if name == "tenant_id"));
+    // `ON CONFLICT … DO UPDATE`: nhánh cập nhật chạm dòng đang có, nên cũng phải lọc khách.
+    let do_update = tokens
+        .windows(2)
+        .any(|pair| matches!(pair, [Token::Name(a), Token::Name(b)] if a == "do" && b == "update"));
+    for reference in &references {
+        if reference.into {
+            // Bảng đích của `INSERT`: ghi cột `tenant_id` với giá trị của khách.
+            if !(names_column && tenant_bound) {
+                return Some(reference.table.clone());
+            }
+            if !do_update {
+                continue;
+            }
         }
-        return (filters + 1 < touched.len()).then(|| touched[touched.len() - 1].to_owned());
+        if let Some(found) = qualified.iter().position(|qualifier| *qualifier == reference.binding)
+        {
+            qualified.swap_remove(found);
+        } else if unqualified > 0 {
+            unqualified -= 1;
+        } else {
+            return Some(reference.table.clone());
+        }
     }
-    if filters < touched.len() {
-        touched.get(filters).map(|table| (*table).to_owned())
-    } else {
-        None
-    }
+    None
 }
 
 #[cfg(test)]
@@ -271,8 +412,8 @@ mod tests {
     const TENANT: Uuid = Uuid::from_u128(7);
     const OTHER: Uuid = Uuid::from_u128(8);
 
-    fn registered() -> BTreeSet<&'static str> {
-        ["notes_note", "notes_tag"].into_iter().collect()
+    fn registered() -> BTreeSet<String> {
+        ["notes_note", "notes_tag"].into_iter().map(str::to_owned).collect()
     }
 
     fn uuid(value: Uuid) -> Value {
@@ -339,5 +480,40 @@ mod tests {
         // Ép kiểu của Postgres và tên trong ngoặc kép có dấu nháy kép bên trong.
         let cast = r#"SELECT "a""b" FROM notes_note WHERE $1::uuid = tenant_id"#;
         assert_eq!(postgres(cast, &[uuid(TENANT)]), None);
+    }
+
+    // Bốn câu kiểm độc lập dò ra (PR #624): mỗi lần dùng bảng phải có vế lọc riêng, kể cả khi cùng một bảng.
+    #[test]
+    fn moi_lan_dung_bang_phai_loc_rieng() {
+        let t = || uuid(TENANT);
+        // Subquery cùng bảng không lọc: đọc vị trí lớn nhất của MỌI khách.
+        let sub = "UPDATE notes_note SET position = (SELECT max(position) FROM notes_note) WHERE tenant_id = ?";
+        assert_eq!(sqlite(sub, &[t()]).as_deref(), Some("notes_note"));
+        let sub_ok = "UPDATE notes_note SET position = (SELECT max(position) FROM notes_note WHERE tenant_id = ?) WHERE tenant_id = ?";
+        assert_eq!(sqlite(sub_ok, &[t(), t()]), None);
+        // Nối bảng với chính nó, chỉ lọc một phía.
+        let self_join = "SELECT a.id FROM notes_note a JOIN notes_note b ON b.id = a.parent_id WHERE a.tenant_id = $1";
+        assert_eq!(postgres(self_join, &[t()]).as_deref(), Some("notes_note"));
+        let self_join_ok = "SELECT a.id FROM notes_note AS a JOIN notes_note AS b ON b.id = a.parent_id WHERE a.tenant_id = $1 AND b.tenant_id = $2";
+        assert_eq!(postgres(self_join_ok, &[t(), t()]), None);
+        // Vế sau của UNION không lọc.
+        let union = "SELECT id FROM notes_note WHERE tenant_id = ? UNION SELECT id FROM notes_note";
+        assert_eq!(sqlite(union, &[t()]).as_deref(), Some("notes_note"));
+        // Nối hai bảng nhưng lọc hai lần trên cùng một alias.
+        let twice = "SELECT n.id FROM notes_note n JOIN notes_tag g ON g.note_id = n.id WHERE n.tenant_id = ? AND n.tenant_id = ?";
+        assert_eq!(sqlite(twice, &[t(), t()]).as_deref(), Some("notes_tag"));
+        let both = "SELECT n.id FROM notes_note n JOIN notes_tag g ON g.note_id = n.id WHERE n.tenant_id = ? AND g.tenant_id = ?";
+        assert_eq!(sqlite(both, &[t(), t()]), None);
+    }
+
+    #[test]
+    fn upsert_do_update_phai_loc_khach() {
+        let t = || uuid(TENANT);
+        let bare = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "title" = "excluded"."title""#;
+        assert_eq!(sqlite(bare, &[uuid(OTHER), t()]).as_deref(), Some("notes_note"));
+        let guarded = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "title" = "excluded"."title" WHERE "notes_note"."tenant_id" = ?"#;
+        assert_eq!(sqlite(guarded, &[uuid(OTHER), t(), t()]), None);
+        let nothing = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES (?, ?) ON CONFLICT ("id") DO NOTHING"#;
+        assert_eq!(sqlite(nothing, &[uuid(OTHER), t()]), None);
     }
 }

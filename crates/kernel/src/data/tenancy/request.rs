@@ -96,7 +96,8 @@ impl TenantHint {
 /// without a credential that names a tenant (`Autoxide-Tenant`, `Host`) can neither drain that tenant's budget
 /// nor be refused because that tenant is at its limit (D-20261126-tenant-rate-limit,
 /// D-20261128-tenant-runtime-guard). The quota functions take this type, so a tenant read from a hint cannot be
-/// passed to them by mistake.
+/// passed to them by mistake. It guards against mistakes only, not against hostile code: anyone can build a
+/// `Principal` (tests do), so build this from the request's authenticated caller, never from a hand-made one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SignedInTenant(super::TenantId);
 

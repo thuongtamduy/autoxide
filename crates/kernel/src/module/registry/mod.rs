@@ -402,6 +402,8 @@ impl Modules {
     /// (migrations applied), and that the control-plane tables of turned-off modules are their own. Call it after the migrations and before serving; a mismatch is an error listing
     /// every problem.
     pub async fn check_records(&self, database: &Database) -> Result<(), ModuleError> {
+        // Sổ bảng cấp khách của chốt chặn lúc chạy, từ schema thật (D-20261128-tenant-runtime-guard).
+        crate::db::register_live_tenant_tables(database).await.map_err(ModuleError)?;
         let mut problems = Vec::new();
         // Module đang tắt không qua bước dựng `Modules`: kiểm tiền tố bảng control-plane của nó ở đây.
         for module in &self.dormant {

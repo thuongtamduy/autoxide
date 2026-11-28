@@ -133,8 +133,10 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [x] Cách ly khách khi chạy, không chỉ lint đọc mã nguồn: lớp kết nối gắn khách (hay row-level security tuỳ chọn trên
       Postgres) chặn truy vấn thiếu `tenant_id`; khách của request chưa xác thực không lấy từ gợi ý chưa kiểm cho việc
       tính hạn mức. **Xong:** chốt chặn lúc chạy trên mọi câu của handle theo khách (bộ dựng, `sql`, cầu SeaORM), cả hai
-      database; hạn mức chỉ nhận `SignedInTenant` (D-20261128-tenant-runtime-guard). Module còn đi đường cũ vào phạm vi
-      chốt khi cụm của nó chuyển sang `db`
+      database, sổ bảng = mọi bảng có `tenant_id` trong schema; hạn mức chỉ nhận `SignedInTenant`
+      (D-20261128-tenant-runtime-guard)
+      - [ ] Truy vấn còn đi đường cũ `TenantContext::database()` (đa số module) chưa qua chốt: vào phạm vi khi cụm của
+            module chuyển sang `db` (D-20261128-library-layer-plan mục 6); tới lúc đó lint `tenant-scope` vẫn canh
 - [x] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
       chéo lúc lưu, có cache. **Xong:** `SettingSystem` của kernel — hai phạm vi, một cache, luật chéo `SettingRule` chạy
       trong transaction sau khoá theo khách; `organizations` cắm kho giá trị vào (D-20261128-settings-one-system)

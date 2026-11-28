@@ -15,6 +15,12 @@ use crate::error::Error;
 /// to the handle's tenant) — a **secondary** guard only: it reads the text, so it cannot tell a real filter
 /// from `:tenant` in a comment. The tenant guarantee comes from the query builder; each use of `sql` needs a
 /// measured reason and its own tenant-isolation test, and `cargo xtask check` counts the uses.
+///
+/// When the statement runs, the runtime tenant guard (D-20261128-tenant-runtime-guard) also requires, for **each**
+/// use of a tenant table (every `FROM` / `JOIN`, subquery, `UNION` branch), its own `<alias or table>.tenant_id =
+/// :tenant` (or an unqualified `tenant_id = :tenant`). Write the filter in exactly that shape: the guard refuses
+/// equivalent forms it does not read, such as `tenant_id IN (:tenant)`, `tenant_id IS NOT DISTINCT FROM :tenant`,
+/// or a filter only inside a `WITH … INSERT` it cannot match to the table.
 pub struct Sql<'h, H> {
     handle: &'h H,
     text: String,

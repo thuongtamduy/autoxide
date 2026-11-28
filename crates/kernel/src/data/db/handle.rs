@@ -510,9 +510,8 @@ impl<A: Access> ConnectionTrait for Tx<A> {
 // cấp khách mà không lọc theo khách bị từ chối như trên đường của `db` (D-20261128-tenant-runtime-guard). Lỗi trả về
 // dạng `DbErr` vì cầu phải theo chữ ký của SeaORM; nguyên nhân đã ghi log ở `guard::check`.
 fn guarded(tenant: Option<Uuid>, statement: &Statement) -> Result<(), DbErr> {
-    super::guard::check(tenant, statement).map_err(|_| {
-        DbErr::Custom("statement refused by the tenant guard (see the log)".to_owned())
-    })
+    super::guard::check(tenant, statement)
+        .map_err(|error| DbErr::Custom(format!("statement refused by the tenant guard: {error}")))
 }
 
 // Câu không tham số (`execute_unprepared`) không gắn được khách nên không lọc được: handle của khách từ chối luôn.
