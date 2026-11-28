@@ -354,6 +354,8 @@ pub(crate) struct FindQuery {
 pub(crate) struct FindState {
     pub sources: FinderSources,
     pub entitlements: EntitlementsHandle,
+    /// Time limit of one source (`AUTOXIDE_SOURCE_TIMEOUT_MS`).
+    pub timeout: std::time::Duration,
 }
 
 impl FindState {
@@ -383,9 +385,10 @@ impl FindState {
                 allowed.push(source);
             }
         }
+        let timeout = self.timeout;
         let answers = futures_util::future::join_all(allowed.iter().map(|source| async move {
             let found = tokio::time::timeout(
-                crate::ops::work::SOURCE_TIMEOUT,
+                timeout,
                 source.find_query(tenant, principal, target, query, limit),
             )
             .await;
