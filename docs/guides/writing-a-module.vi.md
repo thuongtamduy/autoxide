@@ -320,7 +320,7 @@ Thứ nó không thấy được nằm trong database và do test của bạn ki
 2. Đổi tag trong `Cargo.toml` của workspace (cả ba crate của core) rồi build: cargo cập nhật `Cargo.lock` cho các crate của core. Chạy test trên cả hai database.
 3. Trên từng máy chủ: `acme migrate up`, rồi khởi động binary mới — như với máy chủ chính thức ([`docs/DEPLOY.vi.md`](../DEPLOY.vi.md)).
 
-Điều core cam kết: khi phiên bản còn `0.x`, thay đổi phá vỡ hợp đồng module chỉ đến ở bản minor (`0.17` → `0.18`), không bao giờ ở bản patch; thứ sắp bỏ được đánh dấu `#[deprecated]` ít nhất một bản minor trước; trait `Module` chỉ lớn thêm bằng hàm có thân mặc định. Từ `1.0` hợp đồng theo Semantic Versioning. Bản đầy đủ ở [`MODULE_GUIDE.vi.md`](../MODULE_GUIDE.vi.md), mục "Độ ổn định của hợp đồng module".
+Điều core cam kết: khi phiên bản còn `0.x`, thay đổi phá vỡ hợp đồng module chỉ đến ở bản minor (`0.17` → `0.18`), không bao giờ ở bản patch; thứ sắp bỏ được đánh dấu `#[deprecated]` ít nhất một bản minor trước; hợp đồng module chỉ lớn thêm bằng hàm builder mới của `Manifest` và hàm đăng ký mới của `StartContext`. Từ `1.0` hợp đồng theo Semantic Versioning. Bản đầy đủ ở [`MODULE_GUIDE.vi.md`](../MODULE_GUIDE.vi.md), mục "Độ ổn định của hợp đồng module".
 
 Các crate của core chưa có trên crates.io; cho tới khi có, git tag là cách phụ thuộc vào chúng.
 

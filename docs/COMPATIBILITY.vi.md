@@ -115,8 +115,9 @@ Luật, theo [hướng dẫn SemVer của Cargo](https://doc.rust-lang.org/cargo
   không có mặc định, …) chỉ có ở bản **major**.
 - Trước khi bị bỏ, một thứ được đánh dấu `#[deprecated]` kèm ghi chú nêu thứ thay thế, ít nhất một bản
   minor.
-- Tính năng mới cho module đến dưới dạng method mới của trait **có cài đặt mặc định**, nên module sẵn
-  có biên dịch được mà không phải sửa.
+- Tính năng mới cho module đến dưới dạng hàm builder mới của `Manifest` hay hàm đăng ký mới của
+  `StartContext` (xem [Khai báo module](MODULE_GUIDE.vi.md#khai-báo-module)), nên module sẵn có biên dịch
+  được mà không phải sửa.
 - `cargo-semver-checks` so các crate này với bản phát hành trước ở mọi pull request chạm vào chúng và
   ở mọi pull request phát hành; từ 1.0, có phá vỡ thì kiểm tra đỏ.
 - Thư viện bên thứ ba ra phiên bản lớn mới **không** buộc Autoxide ra bản major, và không buộc
@@ -135,6 +136,36 @@ Luật, theo [hướng dẫn SemVer của Cargo](https://doc.rust-lang.org/cargo
 - Phiên bản Rust tối thiểu theo bản Rust ổn định gần đây (`rust-toolchain.toml`). Nâng nó chỉ ở bản
   minor, không bao giờ ở bản patch, và có ghi trong changelog.
 
+#### Các hạng hợp đồng của Rust API
+
+Phần Rust công khai chia ba hạng (D-20261126-contract-tiers). Chỉ hạng đầu chịu các luật ở trên.
+
+| Hạng | Ở đâu | Cam kết |
+| ---- | ----- | ------- |
+| **Ổn định** | `autoxide_kernel::<mô-đun>`, `autoxide_testkit`, `autoxide::Autoxide`, `api` của module core và official | Semantic Versioning từ 1.0: chỉ phá vỡ ở bản major, có `#[deprecated]` trước ít nhất một bản minor |
+| **Thử nghiệm** | `autoxide_kernel::unstable::<mô-đun>`, sau Cargo feature `unstable` của kernel (tắt mặc định) | Đổi được ở bất kỳ bản minor nào; mọi thay đổi có trong changelog. Module dùng nó phải bật feature, nên thấy rõ mình dựa vào gì |
+| **Nội bộ** | Crate `autoxide-host`: thứ chỉ binary `autoxide` dùng (backup, transfer, cài đặt log, route của kernel…) | Không cam kết: không phải phụ thuộc của module |
+
+Hạng thử nghiệm gồm hợp đồng của bộ nối nhà cung cấp (`einvoice`, `zns`, `voice`, `sms`, `push`, `payment`), tính
+năng chưa chốt hình dạng (`blocks`, `analytics`, `report`, `automation`, `custom_fields`, `sync`, các công cụ vận hành như
+`find`, `suggest`, `summary`, `work`, `tags`, `bulk`…) và phần đa khách mở rộng
+(`tenancy::{sandbox, distribution, moves, domains, site, link_token}`). Danh sách đủ ở
+[`docs/research/kernel-contract-1-0.md`](research/kernel-contract-1-0.md#21-phân-loại-70-mô-đun-hiện-có) (§2.1); đưa
+một mục lên hạng ổn định là một quyết định có ghi lại. Trong [`Manifest`](MODULE_GUIDE.vi.md#khai-báo-module), khái niệm
+thử nghiệm khai qua `Manifest::unstable`.
+
+Trước 1.0 các mục này còn ở đường dẫn hiện tại; chúng chuyển sang `unstable::` (và `bench_seed` sang testkit) trong một
+bản phát hành trước 1.0, ghi ở **Breaking (Rust)** của changelog. Tới lúc đó, coi các mục trong danh sách trên là thử
+nghiệm dù đang ở đâu.
+
+Hạng của **module** (`official` / `experimental`, [`docs/MODULES.vi.md`](MODULES.vi.md)) tách khỏi hạng của API kernel:
+module official được dùng phần thử nghiệm của kernel bên trong, nhưng `api` của nó không bao giờ lộ chúng.
+
+Enum và struct công khai của hạng ổn định có thể còn lớn thêm mang `#[non_exhaustive]` (dựng struct bằng hàm dựng, thêm
+nhánh `_ =>` khi `match` enum); thêm biến thể hay trường cho chúng không phải phá vỡ. Hiện đã làm cho hợp đồng module
+(`Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `Manifest` không có trường công khai) và một số kiểu
+vận hành; phần còn lại của hạng ổn định được gắn, kèm phép kiểm trong `cargo xtask check`, trước 1.0.
+
 ### SDK TypeScript
 
 SDK (`sdk/typescript`) sinh từ `docs/openapi.json` và mang cùng số phiên bản. Nó theo luật của REST:
@@ -152,6 +183,8 @@ Những thứ sau có thể đổi ở bất kỳ bản nào, kể cả bản pa
 - Thứ được đánh dấu **experimental** ở chỗ khác: operation OpenAPI có `"x-stability":
   "experimental"`, tool MCP có `"stability": "experimental"`, và tính năng mà tài liệu ghi
   "experimental".
+- Hạng thử nghiệm và hạng nội bộ của Rust API (xem [Các hạng hợp đồng của Rust
+  API](#các-hạng-hợp-đồng-của-rust-api)).
 - Phần Rust không công khai: `pub(crate)` và thứ riêng tư, thứ có `#[doc(hidden)]`, và mọi thứ trong
   crate module ngoài `api` và `module(…)`. Module mẫu `notes` và crate `xtask` hoàn toàn không thuộc
   hợp đồng.

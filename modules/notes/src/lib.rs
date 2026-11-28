@@ -25,77 +25,54 @@ mod tests;
 
 use std::sync::Arc;
 
-use autoxide_kernel::access::Permission;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::{EventInfo, Subscription};
-use autoxide_kernel::mcp::Tool;
-use autoxide_kernel::migration::MigrationTrait;
-use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::event::Subscription;
+use autoxide_kernel::module::{Manifest, Module, StartContext};
 
 use crate::service::NoteService;
 
 /// Module `notes`, để binary đăng ký trong `crates/app/src/modules.rs`.
 pub fn module() -> impl Module {
-    NotesModule::default()
+    NotesModule
 }
 
-#[derive(Default)]
-struct NotesModule {
-    /// Có sau `start`.
-    service: Option<Arc<NoteService>>,
-}
+struct NotesModule;
 
+// Hợp đồng module (D-20261126-module-manifest): `manifest` khai mọi thứ biết được khi chưa khởi động, `start` dựng
+// service rồi đăng ký những gì cần service (route, tool MCP, đăng ký nhận event, trait cho module khác).
 impl Module for NotesModule {
-    fn name(&self) -> &'static str {
-        "notes"
-    }
-
-    fn description(&self) -> &'static str {
-        "Sample module: personal notes, showing every part of the module contract."
-    }
-
-    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        migration::all()
-    }
-
-    fn records(&self) -> Vec<autoxide_kernel::db::RecordInfo> {
-        vec![autoxide_kernel::db::RecordInfo::of::<entity::Note>()]
-    }
-
-    fn permissions(&self) -> Vec<Permission> {
-        permissions::all()
-    }
-
-    fn events(&self) -> Vec<EventInfo> {
-        events::all()
-    }
-
-    fn translations(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("vi", include_str!("../locales/vi.json"))]
-    }
-
-    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
-        vec![service::NOTES_LIMIT]
+    fn manifest(&self) -> Manifest {
+        Manifest::new(
+            "notes",
+            "Sample module: personal notes, showing every part of the module contract.",
+        )
+        // `migration::all` là con trỏ hàm: kernel tự gọi khi cần, manifest vẫn rẻ để dựng lại.
+        .migrations(migration::all)
+        .records([autoxide_kernel::db::RecordInfo::of::<entity::Note>()])
+        .permissions(permissions::all())
+        .events(events::all())
+        .translation("vi", include_str!("../locales/vi.json"))
+        .limits([service::NOTES_LIMIT])
+        // Ghi chú đồng bộ được với app ngoại tuyến (bước 69 P2): luồng thay đổi ở `GET /api/v1/notes/changes`, ghi
+        // qua lô `POST /api/v1/kernel/sync/batch`. Đồng bộ còn ở hạng thử nghiệm nên khai trong `unstable`.
+        .unstable(|unstable| unstable.sync_resources([service::NOTES_SYNC]))
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let service = Arc::new(NoteService::new(
-            context.outbox()?,
-            context.entitlements(),
-            context.sync_log(),
-        ));
+        // `kernel::<…>()`: một cách lấy mọi handle của kernel; kiểu đích cho trình biên dịch biết lấy handle nào.
+        let service =
+            Arc::new(NoteService::new(context.kernel()?, context.kernel()?, context.kernel()?));
         context.usage_counter(&service::NOTES_LIMIT, Arc::new(service::NoteCounter))?;
-        self.service = Some(service.clone());
-        // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>`: module khác chỉ thấy trait.
+        // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>` / `Arc<dyn PersonalData>`…: bên nhận chỉ thấy trait.
         context.personal_data(service.clone())?;
-        context.provide::<dyn api::Notes>(service)
-    }
-
-    fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: xoá ghi chú của người đó.
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![Subscription::new(autoxide_kernel::privacy::USER_DELETED, service)]
-        })
+        context.subscribe(Subscription::new(
+            autoxide_kernel::privacy::USER_DELETED,
+            service.clone(),
+        ))?;
+        context.routes(http::routes(service.clone()))?;
+        context.tools(tools::all(&service))?;
+        context.provide::<dyn api::Notes>(service)
     }
 
     // Chế độ "nghỉ" (bước 70 P9, D-20261125-dormant-modules): module có trong chương trình nhưng đang tắt
@@ -107,19 +84,5 @@ impl Module for NotesModule {
         let part = Arc::new(service::DormantNotes { sync: context.sync_log() });
         context.personal_data(part.clone())?;
         context.on_user_deleted(part)
-    }
-
-    fn endpoints(&self) -> autoxide_kernel::http::Routes {
-        self.service.clone().map_or_else(autoxide_kernel::http::Routes::new, http::routes)
-    }
-
-    fn tools(&self) -> Vec<Tool> {
-        self.service.as_ref().map_or_else(Vec::new, tools::all)
-    }
-
-    // Ghi chú đồng bộ được với app ngoại tuyến (bước 69 P2): luồng thay đổi ở
-    // `GET /api/v1/notes/changes`, ghi qua lô `POST /api/v1/kernel/sync/batch`.
-    fn sync_resources(&self) -> Vec<autoxide_kernel::sync::SyncResource> {
-        vec![service::NOTES_SYNC]
     }
 }

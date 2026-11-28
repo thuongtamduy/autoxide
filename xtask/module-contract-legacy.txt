@@ -1,0 +1,43 @@
+# Module còn khai bằng hàm cũ của trait `Module` (D-20261126-module-manifest, D-20261127-transition-paths;
+# `cargo xtask check`, luật `module-contract-legacy`). Mỗi dòng: `<luật> <số hàm cũ tối đa> <đường dẫn>` như
+# `security-baseline.txt`. Chỉ được giảm: chuyển xong một module sang `Module::manifest` thì xoá dòng của nó.
+# Không thêm dòng cho module mới. Danh sách rỗng thì gỡ các hàm cũ khỏi trait (trước 1.0).
+
+module-contract-legacy 11 modules/address/src/lib.rs
+module-contract-legacy 12 modules/ai/src/lib.rs
+module-contract-legacy 16 modules/analytics/src/lib.rs
+module-contract-legacy 14 modules/audit/src/lib.rs
+module-contract-legacy 30 modules/auth/src/lib.rs
+module-contract-legacy 14 modules/automations/src/lib.rs
+module-contract-legacy 16 modules/bookings/src/lib.rs
+module-contract-legacy 21 modules/catalog/src/lib.rs
+module-contract-legacy 22 modules/comments/src/lib.rs
+module-contract-legacy 21 modules/compliance/src/lib.rs
+module-contract-legacy 30 modules/content/src/lib.rs
+module-contract-legacy 16 modules/conversations/src/lib.rs
+module-contract-legacy 16 modules/customers/src/lib.rs
+module-contract-legacy 4 modules/einvoice_sepay/src/lib.rs
+module-contract-legacy 5 modules/esms/src/lib.rs
+module-contract-legacy 16 modules/files/src/lib.rs
+module-contract-legacy 18 modules/forms/src/lib.rs
+module-contract-legacy 5 modules/ghn/src/lib.rs
+module-contract-legacy 9 modules/idempotency/src/lib.rs
+module-contract-legacy 20 modules/inventory/src/lib.rs
+module-contract-legacy 16 modules/invoices/src/lib.rs
+module-contract-legacy 18 modules/ledger/src/lib.rs
+module-contract-legacy 15 modules/mail/src/lib.rs
+module-contract-legacy 20 modules/media/src/lib.rs
+module-contract-legacy 15 modules/menus/src/lib.rs
+module-contract-legacy 5 modules/momo/src/lib.rs
+module-contract-legacy 18 modules/newsletter/src/lib.rs
+module-contract-legacy 17 modules/notifications/src/lib.rs
+module-contract-legacy 19 modules/orders/src/lib.rs
+module-contract-legacy 14 modules/organizations/src/lib.rs
+module-contract-legacy 15 modules/plans/src/lib.rs
+module-contract-legacy 19 modules/promotions/src/lib.rs
+module-contract-legacy 12 modules/reporting/src/lib.rs
+module-contract-legacy 4 modules/sepay/src/lib.rs
+module-contract-legacy 16 modules/shipping/src/lib.rs
+module-contract-legacy 14 modules/support/src/lib.rs
+module-contract-legacy 16 modules/tax/src/lib.rs
+module-contract-legacy 16 modules/webhooks/src/lib.rs

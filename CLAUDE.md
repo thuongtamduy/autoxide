@@ -250,10 +250,12 @@ SDK, mục lục quyết định); gate trên máy kiểm sớm bằng `cargo xt
   `#[deprecated]` trước. `examples/external-module/` là workspace Cargo RIÊNG (ví dụ chạy thật, `./gate.sh --only
   example`); phụ thuộc nội bộ ở `[workspace.dependencies]` ghim `version = "=<phiên bản workspace>"`
   (D-20261121-external-modules).
-- Module cài trait `Module` của `autoxide_kernel::module` (tên, migration, cấu
-  hình…) và được đăng ký ở đúng một chỗ: `crates/app/src/modules.rs`. Phần mới của
-  core cần module khai thêm gì thì thêm một hàm vào `Module` **kèm cài đặt mặc
-  định** — không bắt module cũ phải sửa (D-038).
+- Module cài trait `Module` của `autoxide_kernel::module` và được đăng ký ở đúng một chỗ:
+  `crates/app/src/modules.rs`. Mỗi khái niệm một đường (D-20261126-module-manifest): thứ tĩnh khai trong
+  `Module::manifest` (`Manifest::new(…)…`), thứ cần service đăng ký trên `StartContext` trong `start`. Phần mới của
+  core cần module khai thêm gì thì thêm một hàm builder vào `Manifest` hay một hàm đăng ký vào `StartContext` —
+  không bắt module cũ phải sửa. Hàm khai báo cũ của `Module` chỉ còn cho module trong
+  `xtask/module-contract-legacy.txt` (chỉ giảm; D-20261128-manifest-defaults).
 
 ## Luật kiến trúc
 
