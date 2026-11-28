@@ -560,15 +560,15 @@ impl<'a> TestAppBuilder<'a> {
         database.observe_statements(statements.observer());
         migrator.up(&database).await.map_err(|e| fail("migrations", e))?;
         modules.check_records(&database).await.map_err(|e| fail("records", e))?;
-        let registry = if self.multi {
-            // Đặt thẳng chế độ (đặt `AUTOXIDE_TENANCY_MODE=multi` thì phải có cả khoá gốc); các
-            // biến `AUTOXIDE_TENANCY_*` khác test đặt bằng `setting` vẫn có tác dụng.
-            let mut tenancy: TenancyConfig = config.tenancy.clone();
-            tenancy.mode = TenancyMode::Multi;
-            DatabaseRegistry::new(database.clone(), config.database.clone(), tenancy)
-        } else {
-            DatabaseRegistry::single(database.clone())
-        };
+        // Dựng registry như binary thật (`runtime.rs`): từ cấu hình đã đọc, nên mọi biến
+        // `AUTOXIDE_TENANCY_*` test đặt bằng `setting` có tác dụng ở CẢ hai chế độ. Trước đây chế độ một
+        // khách dùng `DatabaseRegistry::single` với cấu hình mặc định: `AUTOXIDE_TENANCY_CACHE_SECONDS`
+        // bị bỏ qua, cache cài đặt khách vẫn hết hạn sau 10 giây giữa bài đo số câu SQL và làm nó đỏ
+        // chập chờn trên máy CI chậm. Chế độ đặt thẳng (đặt `AUTOXIDE_TENANCY_MODE=multi` thì phải có
+        // cả khoá gốc).
+        let mut tenancy: TenancyConfig = config.tenancy.clone();
+        tenancy.mode = if self.multi { TenancyMode::Multi } else { TenancyMode::Single };
+        let registry = DatabaseRegistry::new(database.clone(), config.database.clone(), tenancy);
         let dns = FakeDns::default();
         modules.use_dns(Arc::new(dns.clone()));
         modules.start_in(&registry).map_err(|e| fail("start", e))?;
