@@ -40,8 +40,9 @@ record trong `Manifest::records` (đã bắt buộc). Họ chỉ bị ảnh hư�
 khách qua cầu chuyển tiếp — chính lối vượt mà cầu đó sẽ bị gỡ (mục 5 của kế hoạch) — hay gọi hai hàm hạn mức ở trên.
 
 Chi phí, đo được: một lần quét chữ của câu (O(độ dài câu)) và tra sổ dưới một khoá đọc, không thêm truy vấn. Đo bằng vòng lặp
-trên câu `SELECT` 2 bảng của bộ dựng (~250 ký tự): cỡ micro giây mỗi câu, nhỏ hơn hai bậc so với một vòng truy vấn SQLite
-trong bộ nhớ; không đáng thêm cache. Test cũ của lớp `db` (join, subquery, upsert `DO UPDATE`, keyset, `adjust`) chạy xanh với
+100.000 lần trên câu `SELECT` nối 2 bảng dạng bộ dựng sinh (284 ký tự): ~2,5 µs mỗi câu ở bản release (~14 µs bản debug) —
+cỡ một phần mười một truy vấn SQLite nhỏ, một phần trăm một vòng Postgres qua mạng; chưa đáng tối ưu thêm hay cache. Câu không
+chạm bảng cấp khách vẫn quét một lần (không biết trước nó chạm bảng nào). Test cũ của lớp `db` (join, subquery, upsert `DO UPDATE`, keyset, `adjust`) chạy xanh với
 chốt bật trên cả hai database, tức câu của bộ dựng đều đạt luật.
 
 Lý do: lớp 1 lọc khách khi dựng câu, nhưng ba đường vẫn chạy câu không qua bộ lọc: SQL viết tay (rào chữ dễ lừa), cầu
