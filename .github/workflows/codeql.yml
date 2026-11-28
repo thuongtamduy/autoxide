@@ -1,8 +1,9 @@
 # CodeQL: phân tích tĩnh mã Rust, TypeScript của SDK và chính các workflow (D-20261126-road-to-1-0, G8). Kết quả vào
 # tab Security → Code scanning. Chạy khi push main, trên pull request, và mỗi tuần (lỗ hổng mới trong bộ truy vấn).
 # Pull request không chạm Rust (`scripts/rust-changed.sh`, cùng danh sách `scripts/rust-free-paths.txt` với gate) thì bỏ
-# `analyze (rust)` — phần mất hơn 20 phút; push main, lịch hằng tuần và chạy tay luôn quét đủ ba ngôn ngữ
-# (D-20261128-codeql-rust-on-change).
+# phần quét của `analyze (rust)` — phần mất hơn 20 phút — và chỉ tải lên một kết quả rỗng cho cấu hình `/language:rust`
+# để check "Code scanning results" không báo thiếu cấu hình; push main, lịch hằng tuần và chạy tay luôn quét đủ ba ngôn
+# ngữ (D-20261128-codeql-rust-on-change, D-20261128-codeql-rust-placeholder).
 # Chỉ chạy khi repo công khai (D-197): repo riêng tư cần GitHub Advanced Security có phí.
 name: CodeQL
 
@@ -58,20 +59,41 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # `rust` và `actions` không cần build (build-mode none); JS/TS cũng vậy. JS/TS và actions mỗi phần chỉ chừng một
-        # phút nên luôn chạy; `rust` bỏ khi `plan` nói chắc chắn PR không chạm Rust (đúng chuỗi `false`). Ngôn ngữ bị bỏ
-        # không tạo check nào, nên không có check đỏ hay "pending" treo.
-        language: ${{ fromJSON(needs.plan.outputs.rust == 'false' && '["javascript-typescript", "actions"]' || '["rust", "javascript-typescript", "actions"]') }}
+        # `rust` và `actions` không cần build (build-mode none); JS/TS cũng vậy. Matrix luôn đủ ba ngôn ngữ: Code scanning
+        # so cấu hình (workflow + job + matrix + category) của PR với nhánh gốc, thiếu `rust` thì check "Code scanning
+        # results" đỏ "1 configuration not found". Khi `plan` nói chắc chắn PR không chạm Rust (đúng chuỗi `false`), phần
+        # `rust` không quét mà tải lên kết quả rỗng cho đúng cấu hình đó (D-20261128-codeql-rust-placeholder).
+        language: ["rust", "javascript-typescript", "actions"]
+    env:
+      # `true` chỉ khi đây là phần `rust` và `plan` in đúng `false`; mọi trường hợp khác quét thật (không lỗi mở theo
+      # hướng bỏ quét).
+      PLACEHOLDER: ${{ matrix.language == 'rust' && needs.plan.outputs.rust == 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        if: ${{ env.PLACEHOLDER != 'true' }}
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           # Bỏ qua code chỉ dùng cho test (D-20261127-codeql-skip-tests).
           config-file: ./.github/codeql/codeql-config.yml
       - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        if: ${{ env.PLACEHOLDER != 'true' }}
         with:
           category: /language:${{ matrix.language }}
+      # PR không chạm Rust: kết quả Rust giống hệt nhánh gốc (đã quét khi vào `main`), nên tải lên một run CodeQL rỗng.
+      # `upload-sarif` lấy matrix của job này làm khoá cấu hình, nên khớp đúng cấu hình `analyze (rust)` của `main`.
+      - name: Write empty Rust result (pull request does not touch Rust)
+        if: ${{ env.PLACEHOLDER == 'true' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/codeql-placeholder"
+          cat > "$RUNNER_TEMP/codeql-placeholder/rust.sarif" <<'SARIF'
+          {"version":"2.1.0","$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[{"tool":{"driver":{"name":"CodeQL","informationUri":"https://codeql.github.com","rules":[]}},"results":[]}]}
+          SARIF
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        if: ${{ env.PLACEHOLDER == 'true' }}
+        with:
+          sarif_file: ${{ runner.temp }}/codeql-placeholder/rust.sarif
+          category: /language:rust
