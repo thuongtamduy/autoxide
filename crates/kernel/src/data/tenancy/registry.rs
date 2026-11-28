@@ -96,9 +96,8 @@ struct Inner {
     default: TenantContext,
     tenants: Mutex<HashMap<TenantId, (Instant, TenantContext)>>,
     slugs: Mutex<HashMap<String, (Instant, TenantId)>>,
-    /// Domain → (tenant, node bound to the domain) verified; `None`: none.
-    domains: Mutex<HashMap<String, (Instant, Option<DomainSite>)>>,
-    /// Every verified domain → tenant (for CORS): `None` until read, or after a domain changed on this server.
+    /// Every verified domain → (tenant, node bound to the domain), for CORS and `domain_site`: `None` until
+    /// read, or after a domain changed on this server.
     verified: super::verified_domains::VerifiedDomains,
     pools: Mutex<Pools>,
     /// Root key used to open encrypted placement URLs; the `kernel` module sets it at startup.
@@ -123,13 +122,6 @@ impl std::fmt::Debug for DatabaseRegistry {
         f.debug_struct("DatabaseRegistry").field("mode", &self.0.mode).finish_non_exhaustive()
     }
 }
-
-/// Tenant and node (website) of a verified domain.
-type DomainSite = (TenantId, Option<OrgId>);
-
-/// At most this many domains (found or not) are kept in the cache: a client sending random `Host` / `Origin`
-/// values cannot grow it without bound.
-const MAX_CACHED_DOMAINS: usize = 10_000;
 
 /// Locks `mutex` even if another thread panicked while holding it: the data inside is only a cache.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -157,7 +149,6 @@ impl DatabaseRegistry {
             base,
             tenants: Mutex::default(),
             slugs: Mutex::default(),
-            domains: Mutex::default(),
             verified: Default::default(),
             pools: Mutex::default(),
             secret: OnceLock::new(),
@@ -336,12 +327,17 @@ impl DatabaseRegistry {
             return Ok(None);
         }
         let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
-        let cached = lock(&self.0.domains).get(&host).cloned();
-        if let Some((at, found)) = cached
-            && at.elapsed() < self.ttl()
-        {
-            return Ok(found);
+        // Ảnh chụp mọi tên miền đã xác minh (chung với CORS): `Host` không phải tên miền của ai thì tra bản đồ, không
+        // truy vấn và không để lại gì — dội `Host` ngẫu nhiên không đẩy được tên miền thật ra khỏi cache
+        // (D-20261128-domain-site-snapshot).
+        let known = self.0.verified.known(&self.0.control, self.ttl()).await?;
+        if let Some(site) = known.site(&host) {
+            return Ok(Some(site));
         }
+        if known.is_complete() {
+            return Ok(None);
+        }
+        // Quá trần của ảnh chụp (hơn 100 000 tên miền): tên miền ngoài ảnh chụp đọc thẳng database, không cache.
         let select = Query::select()
             .column(Alias::new("tenant_id"))
             .column(Alias::new("org_id"))
@@ -349,25 +345,13 @@ impl DatabaseRegistry {
             .and_where(Expr::col(Alias::new("domain")).eq(host.as_str()))
             .and_where(Expr::col(Alias::new("status")).eq("verified"))
             .to_owned();
-        let found = match self.0.control.read().query_one(&select).await? {
+        Ok(match self.0.control.read().query_one(&select).await? {
             Some(row) => Some((
                 TenantId::from_uuid(row.try_get::<Uuid>("", "tenant_id")?),
                 row.try_get::<Option<Uuid>>("", "org_id")?.map(OrgId::from_uuid),
             )),
             None => None,
-        };
-        let mut domains = lock(&self.0.domains);
-        if domains.len() >= MAX_CACHED_DOMAINS {
-            // Đầy: bỏ mục hết hạn trước; vẫn đầy (bị dội tên lạ) thì xoá sạch — cache chỉ để đỡ truy vấn,
-            // xoá không sai, chỉ tốn vài lần đọc lại.
-            let ttl = self.ttl();
-            domains.retain(|_, (at, _)| at.elapsed() < ttl);
-            if domains.len() >= MAX_CACHED_DOMAINS {
-                domains.clear();
-            }
-        }
-        domains.insert(host, (Instant::now(), found));
-        Ok(found)
+        })
     }
 
     /// The tenant that verified domain `domain` (already normalized), from a snapshot of every verified domain
@@ -380,7 +364,8 @@ impl DatabaseRegistry {
         if self.0.mode == TenancyMode::Single {
             return Ok(None);
         }
-        self.0.verified.owner(&self.0.control, self.ttl(), domain).await
+        let known = self.0.verified.known(&self.0.control, self.ttl()).await?;
+        Ok(known.site(domain).map(|(tenant, _)| tenant))
     }
 
     /// Number of times the verified-domain snapshot was read from the database (tests).
@@ -510,9 +495,8 @@ impl DatabaseRegistry {
 
     /// Drops the domain `domain` from the cache (after verifying it, revoking it, or changing its tenant on
     /// this server): the next request re-reads the table.
-    pub fn invalidate_domain(&self, domain: &str) {
-        let domain = domain.trim().trim_end_matches('.').to_ascii_lowercase();
-        lock(&self.0.domains).remove(&domain);
+    pub fn invalidate_domain(&self, _domain: &str) {
+        // Ảnh chụp đọc lại cả bảng nên không cần biết tên miền nào đổi.
         self.0.verified.invalidate();
     }
 
@@ -520,7 +504,6 @@ impl DatabaseRegistry {
     pub fn invalidate(&self, id: TenantId) {
         lock(&self.0.tenants).remove(&id);
         lock(&self.0.slugs).retain(|_, (_, known)| *known != id);
-        lock(&self.0.domains).retain(|_, (_, known)| known.map(|(tenant, _)| tenant) != Some(id));
     }
 
     /// Every database this server runs jobs and events for: `(placement, name, database)`; only placements

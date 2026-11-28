@@ -47,6 +47,8 @@ pub(crate) struct Automations {
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
     /// Số liệu dùng được làm kích hoạt `metric`.
     pub metrics: crate::metrics::MetricSources,
+    /// Mọi permission đã khai (permission không theo nút thì giới hạn chỉ theo tên).
+    pub permissions: autoxide_kernel::access::PermissionCatalog,
     pub config: AutomationsConfig,
 }
 
@@ -64,25 +66,24 @@ impl Automations {
         let Some(owner) = authenticator.principal_of(tenant, rule.run_as).await? else {
             return Ok(None);
         };
-        bounded(owner, rule).map(Some)
+        bounded(tenant, owner, rule, &self.permissions).await.map(Some)
     }
 }
 
-/// `owner` giới hạn bởi bản chụp quyền của API key trong `rule` (không có thì giữ nguyên).
-pub(crate) fn bounded(
+/// `owner` giới hạn bởi bản chụp quyền lúc lưu / bật luật trong `rule` (không có thì giữ nguyên): theo tên
+/// permission VÀ phạm vi (nút, độ sâu) — quyền được nới sau đó, kể cả nới phạm vi, không tới luật
+/// (D-20261128-bound-keeps-scope).
+pub(crate) async fn bounded(
+    tenant: &autoxide_kernel::tenancy::TenantContext,
     owner: autoxide_kernel::access::Principal,
     rule: &crate::entity::rule::Model,
+    catalog: &autoxide_kernel::access::PermissionCatalog,
 ) -> Result<autoxide_kernel::access::Principal, Error> {
     let Some(raw) = &rule.run_as_limit else { return Ok(owner) };
     let limit: autoxide_kernel::access::PrincipalSnapshot =
         serde_json::from_str(raw).map_err(Error::internal)?;
     let limit = limit.restore();
-    let mut bounded = if limit.has_all_permissions() {
-        owner
-    } else {
-        let names = limit.permissions();
-        owner.only(names.iter().map(String::as_str))
-    };
+    let mut bounded = owner.bounded_by(tenant, &limit, catalog).await?;
     if let Some(fence) = limit.fence() {
         bounded = bounded.with_fence(fence);
     }

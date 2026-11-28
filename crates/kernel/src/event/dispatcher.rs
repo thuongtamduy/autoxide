@@ -35,8 +35,8 @@ use crate::tenancy::{DatabaseRegistry, PlacementId, TenantId, TenantStatus};
 
 /// The maximum number of delivery attempts of an event to ONE subscribing module; beyond it that module's
 /// delivery goes to the dead-letter queue (`failed_at` of its `kernel_event_deliveries` row), except account
-/// deletion events ([`USER_DELETED`](crate::privacy::USER_DELETED)), which retry forever. Other modules are not
-/// affected.
+/// deletion events ([`USER_DELETED`](crate::privacy::USER_DELETED)) and account access revocation events
+/// ([`ACCESS_REVOKED`](crate::accounts::ACCESS_REVOKED)), which retry forever. Other modules are not affected.
 pub const MAX_ATTEMPTS: i32 = 10;
 /// The number of events processed per table in one pass.
 const BATCH: u64 = 100;

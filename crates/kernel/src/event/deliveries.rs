@@ -200,8 +200,10 @@ pub(super) async fn mark_failed(
         .value(Alias::new("last_error"), message.clone())
         .and_where(Expr::col(Alias::new("id")).eq(retry.id));
     // Xoá dữ liệu của tài khoản đã xoá là nghĩa vụ, không phải việc phụ: không bỏ cuộc, cứ thử lại (tối đa mỗi giờ
-    // một lần) tới khi bên nhận này xong (D-149). Tài khoản đã mất nên người dùng không tự xin xoá lại được.
-    let never_give_up = event_name == crate::privacy::USER_DELETED;
+    // một lần) tới khi bên nhận này xong (D-149). Tài khoản đã mất nên người dùng không tự xin xoá lại được. Cắt cửa
+    // vào tài khoản cũng vậy: bên nhận dừng thứ người lạ có thể đã dựng khi giữ tài khoản (luật tự động hoá), bỏ cuộc
+    // thì không còn đường nào khác dừng chúng (D-20261128-access-revoked-retry).
+    let never_give_up = NEVER_GIVE_UP.contains(&event_name);
     if attempts >= super::MAX_ATTEMPTS && !never_give_up {
         update.value(Alias::new("failed_at"), now);
         tracing::error!(
@@ -220,7 +222,7 @@ pub(super) async fn mark_failed(
             subscriber = %retry.subscriber,
             attempts,
             error = %message,
-            "erasing a deleted user's data keeps failing in this module; it is retried every hour"
+            "an event that must reach every subscriber keeps failing in this module; it is retried every hour"
         );
     } else {
         tracing::warn!(
@@ -235,6 +237,9 @@ pub(super) async fn mark_failed(
     database.write().execute(&update).await?;
     Ok(())
 }
+
+/// Events whose delivery to a subscriber never gives up (retried at most hourly after `MAX_ATTEMPTS`).
+const NEVER_GIVE_UP: [&str; 2] = [crate::privacy::USER_DELETED, crate::accounts::ACCESS_REVOKED];
 
 /// Retry `id` can never succeed (its event row is gone or unreadable): straight to the dead-letter queue.
 pub(super) async fn mark_dead(database: &Database, id: Uuid, error: &str) -> Result<(), Error> {

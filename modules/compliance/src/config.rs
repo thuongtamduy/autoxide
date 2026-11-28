@@ -102,6 +102,31 @@ pub(crate) const CASE_TRACKING_URL: Setting = Setting::new(
      carries the API path `GET /api/v1/compliance/public/cases/{id}?token=…`.",
 );
 
+/// Origin khách cho phép làm địa chỉ quay về sau khi xác minh danh tính, ngoài tên miền đã xác minh (L-11,
+/// D-20261128-return-url-kernel).
+pub(crate) const KYC_RETURN_ORIGINS: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::new(
+        "compliance.kyc.return_origins",
+        "Addresses a person may be sent back to after an identity check at the provider (`return_url` \
+         of a KYC session), besides this tenant's verified domains: origins separated by commas, such \
+         as `https://shop.example.com, http://localhost:3000`. Only the scheme, host and port count.",
+    )
+    .checked(check_return_origins);
+
+fn check_return_origins(raw: &str) -> Result<(), autoxide_kernel::error::FieldError> {
+    let bad = autoxide_kernel::tenancy::invalid_return_origins(raw);
+    if bad.is_empty() {
+        return Ok(());
+    }
+    Err(autoxide_kernel::error::FieldError::new(
+        "value",
+        "compliance.return_origins_invalid",
+        "must be origins such as `https://shop.example.com`, separated by commas (no path, no `*`: \
+         list each host); not valid: {items}",
+    )
+    .with_param("items", bad.join(", ")))
+}
+
 /// Trang theo dõi vụ việc theo từng khách (D-20261125-tenant-link-templates).
 pub(crate) const CASE_TRACKING_LINK: autoxide_kernel::tenancy::TenantSetting =
     autoxide_kernel::tenancy::TenantSetting::link(

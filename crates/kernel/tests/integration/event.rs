@@ -286,40 +286,48 @@ async fn ben_nhan_loi_thi_giao_lai_roi_danh_dau_hong() {
     .unwrap();
 }
 
-/// Event xoá tài khoản không bao giờ bị bỏ: quá số lần thử vẫn được giao lại (D-149), theo từng bên nhận.
+/// Event xoá tài khoản (D-149) và cắt cửa vào tài khoản (D-20261128-access-revoked-retry) không bao giờ bị bỏ: quá
+/// số lần thử vẫn được giao lại, theo từng bên nhận.
 #[tokio::test]
 async fn event_xoa_tai_khoan_thu_lai_mai() {
-    TestDatabase::run(async |test| {
-        let recorder = Arc::new(Recorder { fail: true, ..Recorder::default() });
-        let listener = Listener { event: Subscription::ALL, recorder: recorder.clone() };
-        let setup = setup(test, listener).await;
-        record(&setup, "erase me").await;
-        let backend = setup.database.write().get_database_backend();
-        let rename =
-            format!("UPDATE notes_events SET name = '{}'", autoxide_kernel::privacy::USER_DELETED);
-        setup.database.write().execute_raw(Statement::from_string(backend, rename)).await.unwrap();
-        let dispatcher = setup.modules.dispatcher().unwrap();
+    for name in [autoxide_kernel::privacy::USER_DELETED, autoxide_kernel::accounts::ACCESS_REVOKED]
+    {
+        TestDatabase::run(async |test| {
+            let recorder = Arc::new(Recorder { fail: true, ..Recorder::default() });
+            let listener = Listener { event: Subscription::ALL, recorder: recorder.clone() };
+            let setup = setup(test, listener).await;
+            record(&setup, "erase me").await;
+            let backend = setup.database.write().get_database_backend();
+            let rename = format!("UPDATE notes_events SET name = '{name}'");
+            setup
+                .database
+                .write()
+                .execute_raw(Statement::from_string(backend, rename))
+                .await
+                .unwrap();
+            let dispatcher = setup.modules.dispatcher().unwrap();
 
-        for attempt in 1..=MAX_ATTEMPTS + 2 {
-            assert_eq!(dispatcher.run_once().await.unwrap(), 1, "attempt {attempt}");
-            retries_due(&setup).await;
-        }
-        let row = setup
-            .database
-            .read()
-            .query_one_raw(Statement::from_string(
-                backend,
-                "SELECT attempts, failed_at FROM kernel_event_deliveries",
-            ))
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(row.try_get::<i32>("", "attempts").unwrap(), MAX_ATTEMPTS + 2);
-        let failed: Option<Timestamp> = row.try_get("", "failed_at").unwrap();
-        assert!(failed.is_none());
-    })
-    .await
-    .unwrap();
+            for attempt in 1..=MAX_ATTEMPTS + 2 {
+                assert_eq!(dispatcher.run_once().await.unwrap(), 1, "{name}: attempt {attempt}");
+                retries_due(&setup).await;
+            }
+            let row = setup
+                .database
+                .read()
+                .query_one_raw(Statement::from_string(
+                    backend,
+                    "SELECT attempts, failed_at FROM kernel_event_deliveries",
+                ))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(row.try_get::<i32>("", "attempts").unwrap(), MAX_ATTEMPTS + 2, "{name}");
+            let failed: Option<Timestamp> = row.try_get("", "failed_at").unwrap();
+            assert!(failed.is_none(), "{name}");
+        })
+        .await
+        .unwrap();
+    }
 }
 
 /// Hai bộ phát (như hai máy chủ) chạy cùng lúc: mỗi event được giao đúng một lần.

@@ -1,7 +1,10 @@
-//! Snapshot of every verified tenant domain → its tenant, for CORS (`http::cors`, D-20261125-tenant-cors).
+//! Snapshot of every verified tenant domain → its tenant and website node, for CORS (`http::cors`,
+//! D-20261125-tenant-cors) and for finding the site of a request's `Host` (`DatabaseRegistry::domain_site`,
+//! D-20261128-domain-site-snapshot).
 //!
-//! - The domains table lives only in the control database, so one query reads them all; an origin that is
-//!   nobody's domain is a map lookup, never a query.
+//! - The domains table lives only in the control database, so one query reads them all; an origin or host
+//!   that is nobody's domain is a map lookup, never a query, and leaves nothing behind (a flood of random
+//!   `Host` values cannot push real domains out).
 //! - Re-read lazily, at most once per TTL (`AUTOXIDE_TENANCY_CACHE_SECONDS`), by one party at a time: the
 //!   others wait and use what it read.
 //! - [`VerifiedDomains::invalidate`] (a domain was verified, revoked, failed or moved on this server) drops
@@ -12,6 +15,7 @@
 //!   requests fail at once (CORS refused, fail closed) instead of each one querying again in turn.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
@@ -20,7 +24,7 @@ use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
 use uuid::Uuid;
 
-use super::TenantId;
+use super::{OrgId, TenantId};
 use crate::database::Database;
 use crate::error::Error;
 
@@ -35,7 +39,30 @@ pub(crate) const FAILURE_PAUSE: Duration = Duration::from_secs(1);
 /// pool's own timeout behind a hung control database.
 pub(crate) const READ_TIMEOUT: Duration = Duration::from_secs(3);
 
-type Snapshot = Arc<HashMap<String, TenantId>>;
+/// Tenant and node (website) of a verified domain.
+pub(crate) type DomainSite = (TenantId, Option<OrgId>);
+
+/// What one read of the table found.
+#[derive(Debug, Default)]
+pub(crate) struct Known {
+    sites: HashMap<String, DomainSite>,
+    /// Every verified domain is in `sites` (not cut at [`MAX_VERIFIED_DOMAINS`]).
+    complete: bool,
+}
+
+impl Known {
+    /// The site of `domain` (already normalized), if the snapshot holds it.
+    pub(crate) fn site(&self, domain: &str) -> Option<DomainSite> {
+        self.sites.get(domain).copied()
+    }
+
+    /// Every verified domain is held: a domain missing from it is nobody's.
+    pub(crate) fn is_complete(&self) -> bool {
+        self.complete
+    }
+}
+
+type Snapshot = Arc<Known>;
 
 #[derive(Default)]
 pub(crate) struct VerifiedDomains {
@@ -56,31 +83,33 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl VerifiedDomains {
-    /// The tenant that verified `domain` (already normalized), reading `control` when the snapshot is
-    /// missing or older than `ttl`.
-    pub(crate) async fn owner(
-        &self,
-        control: &Database,
-        ttl: Duration,
-        domain: &str,
-    ) -> Result<Option<TenantId>, Error> {
-        if let Some(map) = self.fresh(ttl) {
-            return Ok(map.get(domain).copied());
+    /// The snapshot, reading `control` when it is missing or older than `ttl`.
+    pub(crate) async fn known(&self, control: &Database, ttl: Duration) -> Result<Snapshot, Error> {
+        self.known_with(ttl, || read(control)).await
+    }
+
+    /// Like [`known`](Self::known), with the read of the table given (tests stand in a read that hangs).
+    async fn known_with<F, R>(&self, ttl: Duration, read: R) -> Result<Snapshot, Error>
+    where
+        R: FnOnce() -> F,
+        F: Future<Output = Result<Known, Error>>,
+    {
+        if let Some(known) = self.fresh(ttl) {
+            return Ok(known);
         }
         self.check_failure()?;
         // Một bên đọc lại, các bên khác chờ rồi dùng bản vừa đọc (không dội database khi bản cũ hết hạn).
         let _reading = self.reading.lock().await;
-        if let Some(map) = self.fresh(ttl) {
-            return Ok(map.get(domain).copied());
+        if let Some(known) = self.fresh(ttl) {
+            return Ok(known);
         }
         // Bên vừa đọc trước mình lỗi: trả lỗi ngay, không xếp hàng hỏi lại database đang hỏng.
         self.check_failure()?;
         let generation = self.generation.load(Ordering::SeqCst);
-        let outcome = tokio::time::timeout(READ_TIMEOUT, read(control))
-            .await
-            .unwrap_or_else(|_| Err(unavailable()));
-        let map = match outcome {
-            Ok(map) => Arc::new(map),
+        let outcome =
+            tokio::time::timeout(READ_TIMEOUT, read()).await.unwrap_or_else(|_| Err(unavailable()));
+        let known = match outcome {
+            Ok(known) => Arc::new(known),
             Err(error) => {
                 *lock(&self.failed_at) = Some(Instant::now());
                 return Err(error);
@@ -88,8 +117,8 @@ impl VerifiedDomains {
         };
         self.reads.fetch_add(1, Ordering::Relaxed);
         *lock(&self.failed_at) = None;
-        self.store(generation, map.clone());
-        Ok(map.get(domain).copied())
+        self.store(generation, known.clone());
+        Ok(known)
     }
 
     /// Keeps `map`, read while the generation was `generation`, unless an invalidation happened since: a read
@@ -135,29 +164,34 @@ fn unavailable() -> Error {
     )
 }
 
-async fn read(control: &Database) -> Result<HashMap<String, TenantId>, Error> {
-    // tenant-scope: ảnh chụp tên miền đã xác minh của mọi khách, để biết origin thuộc khách nào.
+async fn read(control: &Database) -> Result<Known, Error> {
+    // tenant-scope: ảnh chụp tên miền đã xác minh của mọi khách, để biết origin / host thuộc khách nào.
     let select = Query::select()
         .column(Alias::new("domain"))
         .column(Alias::new("tenant_id"))
+        .column(Alias::new("org_id"))
         .from(Alias::new("kernel_tenant_domains"))
         .and_where(Expr::col(Alias::new("status")).eq("verified"))
         .order_by(Alias::new("id"), Order::Asc)
         .limit(MAX_VERIFIED_DOMAINS + 1)
         .to_owned();
     let rows = control.read().query_all(&select).await?;
-    if rows.len() as u64 > MAX_VERIFIED_DOMAINS {
+    let complete = rows.len() as u64 <= MAX_VERIFIED_DOMAINS;
+    if !complete {
         tracing::error!(
             limit = MAX_VERIFIED_DOMAINS,
-            "more verified tenant domains than the CORS snapshot holds: the newest get no CORS"
+            "more verified tenant domains than the snapshot holds: the newest get no CORS, and their \
+             websites are looked up one query per request"
         );
     }
-    let mut map = HashMap::with_capacity(rows.len());
+    let mut sites = HashMap::with_capacity(rows.len());
     for row in rows.iter().take(MAX_VERIFIED_DOMAINS as usize) {
         let domain = row.try_get::<String>("", "domain")?;
-        map.insert(domain, TenantId::from_uuid(row.try_get::<Uuid>("", "tenant_id")?));
+        let tenant = TenantId::from_uuid(row.try_get::<Uuid>("", "tenant_id")?);
+        let org = row.try_get::<Option<Uuid>>("", "org_id")?.map(OrgId::from_uuid);
+        sites.insert(domain, (tenant, org));
     }
-    Ok(map)
+    Ok(Known { sites, complete })
 }
 
 #[cfg(test)]
@@ -235,6 +269,16 @@ mod tests {
             }
             assert_eq!(registry.verified_domain_owner("wait.test").await.unwrap(), None);
             assert_eq!(registry.verified_domain_reads(), 1);
+            // Website theo `Host` dùng cùng ảnh chụp (P16): dội `Host` ngẫu nhiên không truy vấn, không đẩy tên miền
+            // thật ra; tên miền chưa xác minh không phải website của ai.
+            for index in 0..20_000 {
+                let host = format!("flood-{index}.test");
+                assert_eq!(registry.domain_site(&host).await.unwrap(), None);
+            }
+            let site = registry.domain_site("Shop.Test.").await.unwrap();
+            assert_eq!(site, Some((TenantId::from_uuid(owner), None)));
+            assert_eq!(registry.domain_site("wait.test").await.unwrap(), None);
+            assert_eq!(registry.verified_domain_reads(), 1);
             // Sửa khách không ép đọc lại; tên miền đổi thì đọc lại đúng một lần.
             registry.invalidate(TenantId::from_uuid(owner));
             registry.verified_domain_owner("shop.test").await.unwrap();
@@ -259,12 +303,62 @@ mod tests {
         .unwrap();
     }
 
+    // Database điều khiển treo (P16): lượt đọc quá `READ_TIMEOUT` thành lỗi `tenant_domains_unavailable`, không
+    // chờ tới timeout của pool; trong `FAILURE_PAUSE` sau đó request khác lỗi ngay mà không đọc lại; hết lúc
+    // tạm dừng thì đọc lại được. Không cần database: lượt đọc giả không bao giờ trả lời.
+    #[tokio::test]
+    async fn luot_doc_treo_qua_read_timeout_thanh_loi() {
+        let snapshot = VerifiedDomains::default();
+        let ttl = Duration::from_secs(60);
+        let calls = AtomicU64::new(0);
+        let hang = || async {
+            calls.fetch_add(1, Ordering::SeqCst);
+            std::future::pending::<Result<Known, Error>>().await
+        };
+        let started = Instant::now();
+        let error = snapshot.known_with(ttl, hang).await.unwrap_err();
+        assert_eq!(error.code(), "tenant_domains_unavailable");
+        let waited = started.elapsed();
+        assert!(waited >= READ_TIMEOUT, "{waited:?}");
+        assert!(
+            waited < READ_TIMEOUT + Duration::from_secs(2),
+            "gives up at READ_TIMEOUT: {waited:?}"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        // Ngay sau đó: lỗi ngay, không đọc lại database đang treo.
+        let error = snapshot.known_with(ttl, hang).await.unwrap_err();
+        assert_eq!(error.code(), "tenant_domains_unavailable");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(snapshot.reads(), 0);
+
+        // Hết lúc tạm dừng, database trả lời: đọc lại và nhớ bản mới.
+        tokio::time::sleep(FAILURE_PAUSE).await;
+        let answer = || async {
+            Ok(Known {
+                sites: HashMap::from([(
+                    "shop.test".to_owned(),
+                    (TenantId::from_uuid(Uuid::nil()), None),
+                )]),
+                complete: true,
+            })
+        };
+        let known = snapshot.known_with(ttl, answer).await.unwrap();
+        assert!(known.site("shop.test").is_some());
+        assert_eq!(snapshot.reads(), 1);
+    }
+
     #[test]
     fn luot_doc_cu_khong_ghi_de_sau_khi_thu_hoi() {
         let snapshot = VerifiedDomains::default();
         let ttl = Duration::from_secs(60);
-        let map: Snapshot =
-            Arc::new(HashMap::from([("shop.test".to_owned(), TenantId::from_uuid(Uuid::nil()))]));
+        let map: Snapshot = Arc::new(Known {
+            sites: HashMap::from([(
+                "shop.test".to_owned(),
+                (TenantId::from_uuid(Uuid::nil()), None),
+            )]),
+            complete: true,
+        });
         // Lượt đọc lấy thế hệ, thu hồi chạy trước khi nó lưu: không lưu bản cũ.
         let generation = snapshot.generation.load(Ordering::SeqCst);
         snapshot.invalidate();

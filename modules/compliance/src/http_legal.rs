@@ -466,6 +466,7 @@ async fn accept(
         method: input.method.unwrap_or_else(|| "checkbox".to_owned()),
         ip_fingerprint: client
             .ip
+            // address-key: không phải khoá giới hạn — dấu vết của đúng địa chỉ, lưu làm bằng chứng chấp nhận.
             .map(|ip| autoxide_kernel::secret::sha256(&format!("acceptance-ip|{ip}"))),
         user_agent: client.user_agent.clone(),
     };
@@ -595,6 +596,7 @@ async fn set_my_consent(
             source: "me".to_owned(),
             ip_fingerprint: client
                 .ip
+                // address-key: không phải khoá giới hạn — dấu vết của đúng địa chỉ, lưu làm bằng chứng đồng ý.
                 .map(|ip| autoxide_kernel::secret::sha256(&format!("consent-ip|{ip}"))),
         };
         service.grant_consent(&tenant, actor, &subject, &key, &evidence, &source_ref).await?

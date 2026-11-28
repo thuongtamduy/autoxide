@@ -59,6 +59,19 @@ fn kyc_required(activity: Activity, status: &str) -> Error {
     .with_param("profile_status", status)
 }
 
+/// Địa chỉ quay về đã được tin (D-20261128-return-url-kernel): kiểm theo danh sách của khách khi người gọi API gửi
+/// ([`ComplianceService::start_caller_session`]), hay do module gọi qua `KycGate` lấy từ cấu hình máy chủ
+/// ([`ReturnUrl::from_module`]). Kiểu riêng để đường gọi mới không truyền nhầm chuỗi chưa kiểm.
+pub(crate) struct ReturnUrl(String);
+
+impl ReturnUrl {
+    /// Địa chỉ module khác truyền qua `KycGate`: trách nhiệm của module đó (vd `plans` lấy từ
+    /// `AUTOXIDE_PLANS_SIGNUP_RETURN_URL` của người vận hành), không phải chuỗi của người gọi API.
+    pub(crate) fn from_module(url: String) -> Self {
+        ReturnUrl(url)
+    }
+}
+
 /// Job xử lý một callback đã lưu.
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct ProcessCallback {
@@ -160,8 +173,11 @@ impl ComplianceService {
             .ok_or_else(|| Error::internal("a KYC profile vanished"))
     }
 
-    /// Bắt đầu một lượt xác thực ở nhà cung cấp cho hồ sơ `profile_id`.
-    pub(crate) async fn start_session(
+    /// Như [`start_session`](Self::start_session), với `return_url` do NGƯỜI GỌI API gửi (REST, MCP): nhà cung cấp
+    /// chuyển TRÌNH DUYỆT của người xác minh về đây, nên chỉ nhận địa chỉ của chính khách — tên miền đã xác minh
+    /// (https) hay origin khai ở `compliance.kyc.return_origins` — như `return_url` của thanh toán (L-11,
+    /// D-20261128-return-url-kernel). Sai thì 422 trên ô `return_url`.
+    pub(crate) async fn start_caller_session(
         &self,
         tenant: &TenantContext,
         actor: Actor,
@@ -169,7 +185,51 @@ impl ComplianceService {
         method: Option<VerificationMethod>,
         return_url: Option<String>,
     ) -> Result<KycSession, Error> {
+        let return_url = match return_url {
+            Some(url) => Some(ReturnUrl(self.allowed_return_url(tenant, &url).await?)),
+            None => None,
+        };
+        self.start_session(tenant, actor, profile_id, method, return_url).await
+    }
+
+    async fn allowed_return_url(&self, tenant: &TenantContext, url: &str) -> Result<String, Error> {
+        use autoxide_kernel::tenancy::ReturnUrlProblem;
+        let listed = self.settings.get(tenant, &crate::config::KYC_RETURN_ORIGINS).await?;
+        let checked = autoxide_kernel::tenancy::check_return_url(
+            tenant,
+            url,
+            self.domains.as_deref(),
+            listed.as_ref().map(|value| value.as_str()),
+        )
+        .await?;
+        match checked {
+            Ok(normalized) => Ok(normalized),
+            Err(ReturnUrlProblem::Format) => Err(Error::validation(vec![FieldError::new(
+                "return_url",
+                "format",
+                "must be an http(s) URL of at most 2000 characters",
+            )])),
+            Err(ReturnUrlProblem::NotAllowed) => Err(Error::validation(vec![FieldError::new(
+                "return_url",
+                "compliance.return_url_not_allowed",
+                "must be on one of this tenant's own addresses: a verified domain (https) or an origin \
+                 listed in the tenant setting `compliance.kyc.return_origins`",
+            )])),
+        }
+    }
+
+    /// Bắt đầu một lượt xác thực ở nhà cung cấp cho hồ sơ `profile_id`. `return_url` đã được tin: kiểm ở
+    /// [`start_caller_session`](Self::start_caller_session), hay đến từ cấu hình máy chủ qua `KycGate`.
+    pub(crate) async fn start_session(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        profile_id: Uuid,
+        method: Option<VerificationMethod>,
+        return_url: Option<ReturnUrl>,
+    ) -> Result<KycSession, Error> {
         let verifier = self.verifier.clone().ok_or_else(verification_disabled)?;
+        let return_url = return_url.map(|url| url.0);
         let method = match method {
             Some(method) => method,
             None => *verifier.methods().first().ok_or_else(verification_disabled)?,

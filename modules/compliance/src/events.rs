@@ -41,8 +41,8 @@ events! {
     POLICY_UPDATED, PolicyUpdated, "compliance.policy_updated", "A compliance policy of the tenant was set (`key`).";
     LEGAL_PROFILE_UPDATED, LegalProfileUpdated, "compliance.legal_profile_updated", "A legal (owner) profile was created or changed (`profile_id`, `org_id`).";
     WEBSITE_CREATED, WebsiteCreated, "compliance.website_created", "A website was added for the Ministry of Industry and Trade checklist (`website_id`, `org_id`, `domain`, `kind`).";
-    WEBSITE_UPDATED, WebsiteUpdated, "compliance.website_updated", "A website or its linked mandatory pages changed (`website_id`, `domain`, `kind`).";
-    WEBSITE_STATUS_CHANGED, WebsiteStatusChanged, "compliance.website_status_changed", "The notification / registration status of a website with the Ministry of Industry and Trade changed (`website_id`, `domain`, `kind`, `status`, `previous_status`).";
+    WEBSITE_UPDATED, WebsiteUpdated, "compliance.website_updated", "A website or its linked mandatory pages changed (`website_id`, `org_id`, `domain`, `kind`).";
+    WEBSITE_STATUS_CHANGED, WebsiteStatusChanged, "compliance.website_status_changed", "The notification / registration status of a website with the Ministry of Industry and Trade changed (`website_id`, `org_id`, `domain`, `kind`, `status`, `previous_status`).";
     PURPOSE_UPDATED, PurposeUpdated, "compliance.purpose_updated", "A processing purpose of the tenant was added or changed (`key`, `legal_basis`, `active`).";
     RESIDENCY_CHANGED, ResidencyChanged, "compliance.residency_changed", "Where the tenant must keep its data changed (`data_residency`, `previous`).";
     INCIDENT_OPENED, IncidentOpened, "compliance.incident_opened", "A personal data breach was recorded (`incident_id`, `severity`, `status`, `report_due_at`).";

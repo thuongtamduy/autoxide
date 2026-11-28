@@ -248,6 +248,7 @@
   "kernel.reason_unknown": "`{code}` không phải lý do đang bật của `{list}`; xem `GET /api/v1/kernel/reasons/{list}`.",
   "kernel.record_not_found": "Không có bản ghi `{kind}` `{id}` nào bạn được xem.",
   "kernel.search_kind_unknown": "Không module nào khai loại tài liệu tìm được `{kind}`.",
+  "kernel.ws_origin_not_allowed": "Origin của trang này không được mở WebSocket event. Mở từ một origin có trong AUTOXIDE_HTTP_CORS_ORIGINS hoặc từ tên miền đã xác minh của khách hàng.",
   "kernel.stream_disabled": "Máy chủ này chưa bật stream event (`AUTOXIDE_EVENTS_STREAM`).",
   "kernel.stream_too_many": "Đang mở quá nhiều stream event ({limit}). Hãy đóng bớt rồi mở lại.",
   "kernel.stream_unknown_event": "Event `{name}` không có hoặc không stream được. Sổ module (`GET /api/v1/kernel/modules`) ghi `stream_permission` của từng event.",

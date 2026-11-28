@@ -84,6 +84,11 @@ curl -sS -X PUT "$API/api/v1/kernel/settings/ledger.payments.return_origins" \
   -d '{"value": "https://shop.example.com"}'
 ```
 
+Xác minh danh tính người bán hay nhân viên theo cùng luật: `return_url` của
+`POST /api/v1/compliance/kyc/profiles/{id}/sessions` (và `/me/kyc/sessions`) phải là `https://` trên tên miền đã xác
+minh hoặc origin khai ở cấu hình `compliance.kyc.return_origins` (cùng dạng, vd `https://shop.example.com`); không thì
+lời gọi trả 422 `compliance.return_url_not_allowed`.
+
 **eSMS** — tin SMS gửi người mua. Chưa đặt thì thông báo SMS được bỏ qua với lý do `channel_disabled` (không thử
 lại, không báo lỗi):
 

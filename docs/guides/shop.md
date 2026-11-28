@@ -86,6 +86,11 @@ curl -sS -X PUT "$API/api/v1/kernel/settings/ledger.payments.return_origins" \
   -d '{"value": "https://shop.example.com"}'
 ```
 
+Identity checks of your sellers or staff follow the same rule: the `return_url` of
+`POST /api/v1/compliance/kyc/profiles/{id}/sessions` (and `/me/kyc/sessions`) must be `https://` on a verified domain
+or an origin listed in the setting `compliance.kyc.return_origins` (same format, e.g. `https://shop.example.com`);
+otherwise the call answers 422 `compliance.return_url_not_allowed`.
+
 **eSMS** — the SMS sent to buyers. Until you set it, SMS notifications are skipped with the reason
 `channel_disabled` (nothing is retried, nothing fails):
 
