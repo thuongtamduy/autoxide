@@ -563,7 +563,7 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   TypeScript chạy như test: website, đăng nhập, API key, gọi lại an toàn, pagination, lỗi,
   nối AI agent qua MCP
 - [`sdk/typescript/`](sdk/typescript/README.vi.md) — client TypeScript có kiểu, sinh từ
-  `docs/openapi.json`; [`docs/mcp-tools.json`](docs/mcp-tools.json) — hợp đồng của mọi tool MCP
+  `docs/openapi.json` (dựng ứng dụng web với nó: [`docs/guides/web-app.vi.md`](docs/guides/web-app.vi.md)); [`docs/mcp-tools.json`](docs/mcp-tools.json) — hợp đồng của mọi tool MCP
 - [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md) — cài đặt và deploy: Docker Compose với
   PostgreSQL hoặc một binary với SQLite, reverse proxy, cập nhật, backup
 - [`docs/MEDIA.vi.md`](docs/MEDIA.vi.md) — dùng thư viện media: tải lên, thư mục, link

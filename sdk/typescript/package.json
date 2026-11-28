@@ -9,7 +9,8 @@
   "types": "src/index.ts",
   "files": ["src", "README.md", "README.vi.md", "LICENSE-MIT", "LICENSE-APACHE"],
   "scripts": {
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
   },
   "devDependencies": {
     "typescript": "7.0.2"

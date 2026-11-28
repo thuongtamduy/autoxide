@@ -571,7 +571,7 @@ never share foreign keys. These rules are checked automatically by the gate.
   TypeScript examples that run as tests: a website, signing in, API keys, retries,
   pagination, errors, connecting an AI agent over MCP
 - [`sdk/typescript/`](sdk/typescript/README.md) — a typed TypeScript client generated from
-  `docs/openapi.json`; [`docs/mcp-tools.json`](docs/mcp-tools.json) — the contract of every MCP tool
+  `docs/openapi.json` (building a web app with it: [`docs/guides/web-app.md`](docs/guides/web-app.md)); [`docs/mcp-tools.json`](docs/mcp-tools.json) — the contract of every MCP tool
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — installing and deploying: Docker Compose with
   PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
 - [`docs/MEDIA.md`](docs/MEDIA.md) — using the media library: upload, folders, public
