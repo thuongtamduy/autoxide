@@ -24,7 +24,8 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::api::{
-    MethodKind, Quote, QuoteItem, QuoteRequest, ShippingOption, ShippingRates, UnavailableMethod,
+    MAX_SIDE_MM, MethodKind, Quote, QuoteItem, QuoteRequest, ShippingOption, ShippingRates,
+    UnavailableMethod,
 };
 use crate::entity::{method, pickup_point, rate, zone_region};
 use crate::errors;
@@ -72,9 +73,9 @@ pub(crate) fn parcel_sides(items: &[QuoteItem]) -> (Option<i64>, Option<i64>, Op
         }
         length = length.max(l);
         width = width.max(w);
-        // Đầu vào đã kiểm (cạnh ≤ 10⁷ mm, số lượng ≤ 10⁷) nên tích không tràn `i64`; tổng nhiều dòng
-        // thì vẫn có thể, nên cộng bão hoà — chiều cao chỉ là thông tin gửi hãng, cân mới quyết phí.
-        height = height.saturating_add(h.saturating_mul(item.quantity));
+        // Chiều cao xếp chồng chỉ là thông tin gửi hãng (cân mới quyết phí): kẹp về trần cạnh
+        // `MAX_SIDE_MM`, như mọi cạnh khác gửi hãng.
+        height = height.saturating_add(h.saturating_mul(item.quantity)).min(MAX_SIDE_MM);
         any = true;
     }
     if any { (Some(length), Some(width), Some(height)) } else { (None, None, None) }

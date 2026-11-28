@@ -171,6 +171,16 @@ fn settle(event: &Delivered, outcome: Result<(), Error>) -> Result<(), Error> {
     }
 }
 
+/// Đơn không có hàng theo dõi tồn (hàng số, dịch vụ) thì `orders` không giữ chỗ, nên xác nhận đơn gặp
+/// `inventory.reservation_not_found`: không có gì để xác nhận — không đếm, không cảnh báo (như `issue`). Chỗ
+/// giữ đã hết hạn / đã trả (`inventory.reservation_expired`) thì vẫn là lỗi cần người xem.
+fn nothing_to_confirm(outcome: Result<(), Error>) -> Result<(), Error> {
+    match outcome {
+        Err(error) if error.code() == "inventory.reservation_not_found" => Ok(()),
+        other => other,
+    }
+}
+
 /// Nhãn `event` của số đo: chỉ tên event `inventory` nghe (tập nhỏ cố định), còn lại `other`.
 fn event_label(name: &str) -> &'static str {
     const KNOWN: [&str; 7] = [
@@ -194,8 +204,7 @@ impl EventHandler for OrderEvents {
             ORDER_CONFIRMED => {
                 let Some(order) = order_id(after) else { return Ok(()) };
                 let outcome = self.0.confirm(tenant, order).await.map(|_| ());
-                // Đơn không có hàng theo dõi tồn (hàng số, dịch vụ) thì không có chỗ giữ.
-                settle(event, outcome)
+                settle(event, nothing_to_confirm(outcome))
             }
             ORDER_CANCELLED => {
                 let Some(order) = order_id(after) else { return Ok(()) };
@@ -364,5 +373,13 @@ mod label_tests {
     fn nhan_so_do_chi_thuoc_tap_co_dinh() {
         assert_eq!(event_label(ORDER_DELIVERED), ORDER_DELIVERED);
         assert_eq!(event_label("orders.something_new"), "other");
+    }
+
+    #[test]
+    fn xac_nhan_don_khong_co_cho_giu_khong_dem() {
+        let order = Uuid::now_v7();
+        assert!(nothing_to_confirm(Err(crate::reservations::not_found(order))).is_ok());
+        let expired = nothing_to_confirm(Err(crate::reservations::expired(order))).unwrap_err();
+        assert_eq!(expired.code(), "inventory.reservation_expired");
     }
 }

@@ -91,7 +91,7 @@ pub(crate) fn not_found(order: Uuid) -> Error {
     .with_param("order_id", order)
 }
 
-fn expired(order: Uuid) -> Error {
+pub(crate) fn expired(order: Uuid) -> Error {
     Error::conflict(
         "inventory.reservation_expired",
         "The stock reservation of order `{order_id}` expired or was released; reserve again.",
