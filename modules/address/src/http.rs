@@ -4,54 +4,40 @@
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::http::{
+    Params, Path, PublicCache, Query, Routes, Schema, State, ValidJson, Validate, endpoint,
+};
 use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
-use axum::extract::{Path, Query, State};
-use axum::http::{HeaderValue, header};
-use axum::response::{IntoResponse, Response};
+use autoxide_kernel::routes;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
-use validator::Validate;
 
 use crate::api::{Address, AddressInput, AdministrativeUnit};
 use crate::service::AddressService;
 
-pub(crate) fn routes(service: Arc<AddressService>) -> OpenApiRouter {
-    OpenApiRouter::new()
-        .routes(routes!(list_provinces))
-        .routes(routes!(list_communes))
-        .routes(routes!(search_units))
-        .routes(routes!(get_unit))
-        .routes(routes!(validate_address))
+pub(crate) fn routes(service: Arc<AddressService>) -> Routes {
+    routes![list_provinces, list_communes, search_units, get_unit, validate_address]
         .with_state(service)
 }
 
+/// Dữ liệu công khai giữ trong cache một ngày.
+const CACHE_SECONDS: u32 = 86_400;
+
 // Thêm `ETag` (phiên bản bộ dữ liệu của `country`) và `Cache-Control` cho dữ liệu công khai.
-async fn cached(
+async fn cached<T>(
     service: &AddressService,
     country: &str,
-    response: Response,
-) -> Result<Response, Error> {
-    let mut response = response;
-    if let Some(version) = service.version(&service.country(country)?).await?
-        && let Ok(value) = HeaderValue::from_str(&version)
-    {
-        response.headers_mut().insert(header::ETAG, value);
-    }
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=86400"));
-    Ok(response)
+    body: T,
+) -> Result<PublicCache<T>, Error> {
+    let version = service.version(&service.country(country)?).await?;
+    Ok(PublicCache::new(body, CACHE_SECONDS).with_etag(version))
 }
 
 fn default_country() -> String {
     "VN".to_owned()
 }
 
-#[derive(Debug, Deserialize, IntoParams)]
+#[derive(Debug, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct ListQuery {
     /// ISO country code; only `VN` for now. Defaults to `VN`.
@@ -67,11 +53,10 @@ pub(crate) struct ListQuery {
 ///
 /// No sign-in needed. In code order (the order of the official list) unless `order=desc`; paged
 /// with `limit` / `cursor`. Cached for a day; the `ETag` changes when a new list is imported.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/provinces",
-    extensions(("x-public" = json!(true))),
-    operation_id = "list_provinces",
+    public,
     security((), ("bearer" = [])),
     params(ListQuery, NaturalOrderPageQuery),
     responses(
@@ -84,21 +69,20 @@ async fn list_provinces(
     State(service): State<Arc<AddressService>>,
     Query(query): Query<ListQuery>,
     Query(page): Query<NaturalOrderPageQuery>,
-) -> Result<Response, Error> {
+) -> Result<PublicCache<Page<AdministrativeUnit>>, Error> {
     let page = PageRequest::try_from(page)?;
     let units = service.provinces(&query.country, query.as_of.as_deref(), &page).await?;
-    cached(&service, &query.country, units.into_response()).await
+    cached(&service, &query.country, units).await
 }
 
 /// List the communes, wards and special zones of a province.
 ///
 /// No sign-in needed. In code order unless `order=desc`; paged with `limit` / `cursor`; cached like
 /// the provinces.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/provinces/{code}/communes",
-    extensions(("x-public" = json!(true))),
-    operation_id = "list_communes",
+    public,
     security((), ("bearer" = [])),
     params(("code" = String, Path, description = "Code of the province, e.g. `01`."), ListQuery, NaturalOrderPageQuery),
     responses(
@@ -113,13 +97,13 @@ async fn list_communes(
     Path(code): Path<String>,
     Query(query): Query<ListQuery>,
     Query(page): Query<NaturalOrderPageQuery>,
-) -> Result<Response, Error> {
+) -> Result<PublicCache<Page<AdministrativeUnit>>, Error> {
     let page = PageRequest::try_from(page)?;
     let units = service.communes(&query.country, &code, query.as_of.as_deref(), &page).await?;
-    cached(&service, &query.country, units.into_response()).await
+    cached(&service, &query.country, units).await
 }
 
-#[derive(Debug, Deserialize, Validate, IntoParams)]
+#[derive(Debug, Deserialize, Validate, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct SearchQuery {
     /// ISO country code; only `VN` for now. Defaults to `VN`.
@@ -139,10 +123,10 @@ pub(crate) struct SearchQuery {
 /// Search administrative units by name.
 ///
 /// No sign-in needed. Units in force today, in code order.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/units",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "search_administrative_units",
     security((), ("bearer" = [])),
     params(SearchQuery, PageQuery),
@@ -156,7 +140,7 @@ async fn search_units(
     Query(search): Query<SearchQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<AdministrativeUnit>, Error> {
-    search.validate().map_err(Error::from)?;
+    search.check()?;
     let page = PageRequest::try_from(query)?;
     service
         .search(
@@ -170,7 +154,7 @@ async fn search_units(
 }
 
 /// An administrative unit with the unit above it.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Schema)]
 pub(crate) struct AdministrativeUnitDetail {
     #[serde(flatten)]
     unit: AdministrativeUnit,
@@ -178,7 +162,7 @@ pub(crate) struct AdministrativeUnitDetail {
     parent: Option<AdministrativeUnit>,
 }
 
-#[derive(Debug, Deserialize, IntoParams)]
+#[derive(Debug, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct CountryQuery {
     /// ISO country code; only `VN` for now. Defaults to `VN`.
@@ -190,10 +174,10 @@ pub(crate) struct CountryQuery {
 /// Get an administrative unit by code.
 ///
 /// No sign-in needed.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/units/{code}",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "get_administrative_unit",
     security((), ("bearer" = [])),
     params(("code" = String, Path, description = "Code of the unit."), CountryQuery),
@@ -207,18 +191,13 @@ async fn get_unit(
     State(service): State<Arc<AddressService>>,
     Path(code): Path<String>,
     Query(query): Query<CountryQuery>,
-) -> Result<Response, Error> {
+) -> Result<PublicCache<Data<AdministrativeUnitDetail>>, Error> {
     let (unit, parent) = service.get(&query.country, &code).await?;
-    cached(
-        &service,
-        &query.country,
-        Data { data: AdministrativeUnitDetail { unit, parent } }.into_response(),
-    )
-    .await
+    cached(&service, &query.country, Data { data: AdministrativeUnitDetail { unit, parent } }).await
 }
 
 /// An address to check.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 pub(crate) struct ValidateRequest {
     #[serde(flatten)]
     address: AddressInput,
@@ -227,11 +206,10 @@ pub(crate) struct ValidateRequest {
 /// Check an address and fill in the names.
 ///
 /// No sign-in needed. The commune must be in force and belong to the province.
-#[utoipa::path(
+#[endpoint(
     post,
     path = "/validate",
-    extensions(("x-public" = json!(true))),
-    operation_id = "validate_address",
+    public,
     security((), ("bearer" = [])),
     request_body = AddressInput,
     responses(

@@ -126,19 +126,19 @@ pub(crate) use guard::{register_live_tenant_tables, register_tenant_tables};
 #[doc(hidden)]
 pub use handle::Connection;
 pub(crate) use handle::Via;
-#[cfg(feature = "testing")]
-#[doc(hidden)]
-pub use handle::all_tenants_for_tests;
 pub use handle::{
     AcceptedBy, Access, AllTenants, AllTenantsRead, AllTenantsTx, ControlPlane, ControlPlaneOnly,
     EveryTenant, Executor, GlobalRead, GlobalTx, Handle, InTenant, Read, TenantDb, TenantRead,
     TenantTx, Tx,
 };
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub use handle::{all_tenants_for_tests, control_plane_for_tests};
 pub use query::{Find, Grouped, HasId, Queries, Sub};
 pub use record::{
     Agg, Col, ColName, Cond, Expr, Global, On, Record, Scope, Selectable, Selection, Tenant,
     Updated, count, count_distinct, max, min, sum,
 };
 pub use sql::Sql;
-pub use value::{DbValue, FromRow, Row, Settable, TenantKey, Value};
+pub use value::{DbValue, FromRow, Row, Settable, SortKey, TenantKey, Value};
 pub use write::{Bounds, Delete, Insert, UNIQUE_VIOLATION, Update, is_unique_violation};

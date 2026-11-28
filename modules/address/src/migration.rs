@@ -29,7 +29,7 @@ impl MigrationName for CreateAddress {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl MigrationTrait for CreateAddress {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
@@ -109,7 +109,7 @@ impl MigrationName for ListIndexes {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl MigrationTrait for ListIndexes {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for (name, columns) in LIST_INDEXES {

@@ -54,6 +54,15 @@ pub fn derive_params(input: TokenStream) -> TokenStream {
         .into()
 }
 
+/// Hidden: registers `#[serde(…)]` as a helper attribute and expands to nothing. The shadow copy of
+/// `#[derive(Params)]` derives it, because utoipa's `IntoParams` reads `serde` attributes (`default`, `rename`)
+/// without declaring them, so the copy would not compile on its own.
+#[doc(hidden)]
+#[proc_macro_derive(SerdeAttributes, attributes(serde))]
+pub fn derive_serde_attributes(_input: TokenStream) -> TokenStream {
+    TokenStream::new()
+}
+
 /// Input checks on fields: `#[validate(length(…))]`, `range(…)`, `email`, `url`, `nested`. Use it as
 /// `autoxide_kernel::http::Validate`.
 #[proc_macro_derive(Validate, attributes(validate))]

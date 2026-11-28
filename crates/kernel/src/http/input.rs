@@ -235,4 +235,32 @@ mod tests {
             );
         }
     }
+
+    // `#[derive(Params)]` với `#[serde(default)]` trên trường: bản sao vẫn biên dịch, và tham số có giá trị mặc định
+    // không bắt buộc — như `IntoParams` viết thẳng.
+    #[derive(serde::Deserialize, autoxide_macros::Params)]
+    #[into_params(parameter_in = Query)]
+    #[allow(dead_code)]
+    struct CountryQuery {
+        /// ISO country code.
+        #[serde(default = "vn")]
+        #[param(example = "VN")]
+        country: String,
+        #[serde(rename = "asOf")]
+        as_of: String,
+    }
+
+    fn vn() -> String {
+        "VN".to_owned()
+    }
+
+    #[test]
+    fn params_nhan_thuoc_tinh_serde() {
+        use utoipa::IntoParams as _;
+        let params = CountryQuery::into_params(|| None);
+        let country = params.iter().find(|param| param.name == "country").unwrap();
+        assert!(country.required != utoipa::openapi::Required::True);
+        let as_of = params.iter().find(|param| param.name == "asOf").unwrap();
+        assert!(as_of.required == utoipa::openapi::Required::True);
+    }
 }

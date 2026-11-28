@@ -129,8 +129,10 @@ pub(crate) fn expand(kind: Kind, input: &DeriveInput) -> syn::Result<TokenStream
             params_where
                 .predicates
                 .push(syn::parse_quote!(#shadow_name #type_generics: utoipa::IntoParams));
+            // `SerdeAttributes`: utoipa đọc `#[serde(default, rename…)]` nhưng `IntoParams` không khai `serde` là thuộc
+            // tính phụ — trên kiểu thật `Deserialize` khai giùm, trên bản sao thì không ai khai.
             quote! {
-                #[derive(utoipa::IntoParams)]
+                #[derive(utoipa::IntoParams, ::autoxide_kernel::__private::SerdeAttributes)]
                 #shadow
 
                 impl #impl_generics utoipa::IntoParams for #name #type_generics #params_where {
