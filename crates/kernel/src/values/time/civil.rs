@@ -98,14 +98,17 @@ impl TimeOfDay {
         jiff::civil::Time::strptime("%H:%M", raw).ok().map(TimeOfDay)
     }
 
+    /// The hour, 0 to 23.
     pub fn hour(self) -> i8 {
         self.0.hour()
     }
 
+    /// The minute, 0 to 59.
     pub fn minute(self) -> i8 {
         self.0.minute()
     }
 
+    /// The second, 0 to 59.
     pub fn second(self) -> i8 {
         self.0.second()
     }
@@ -198,14 +201,17 @@ impl DateTime {
         DateTime(jiff::civil::DateTime::from_parts(date.to_jiff(), time.0))
     }
 
+    /// The calendar date.
     pub fn date(self) -> Date {
         Date::from(self.0.date())
     }
 
+    /// The time of day.
     pub fn time(self) -> TimeOfDay {
         TimeOfDay(self.0.time())
     }
 
+    /// The day of the week of the date.
     pub fn weekday(self) -> Weekday {
         Weekday::from(self.0.weekday())
     }

@@ -8,3 +8,6 @@
   `OneTimeTokens::issue` accepts either duration type. The re-export `time::SignedDuration` and the functions
   `time::zone`, `time::from_local`, `time::parse_clock` still work and will be deprecated once no module in the
   repository uses them.
+  On that old path, `checked_add`/`checked_sub` with a `jiff::SignedDuration` now drop anything below a microsecond
+  (timestamps the program makes are already microsecond-precise). A new `cargo xtask check` rule, `time-legacy`,
+  counts the remaining uses of the old paths in `xtask/time-legacy-baseline.txt` (may only shrink).

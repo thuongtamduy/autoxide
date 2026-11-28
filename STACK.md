@@ -55,9 +55,9 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | JSON               | `serde` + `serde_json`          | 1.0       |                                                     |
 | Validate đầu vào   | `validator`                     | 0.21      | Module đã chuyển dùng `#[derive(Validate)]` của kernel (sinh đúng mã của `validator`) |
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |
-| Thời gian          | `jiff` qua `autoxide_kernel::time` (`Timestamp`, `Date`) | 1.0 | Lưu UTC; dạng lưu, JSON, OpenAPI như `chrono` trước đây (giá trị đối chiếu ở `crates/kernel/src/values/time/golden.json`). `chrono` / `chrono-tz` đã gỡ khỏi cây phụ thuộc (D-20261121-time-library) |
+| Thời gian          | `jiff` qua `autoxide_kernel::time` (`Timestamp`, `Date`, `Duration`, `TimeZone`, `TimeOfDay`, `Weekday`, `DateTime`) | 1.0 | Lưu UTC; dạng lưu, JSON, OpenAPI như `chrono` trước đây (giá trị đối chiếu ở `crates/kernel/src/values/time/golden.json`). `chrono` / `chrono-tz` đã gỡ khỏi cây phụ thuộc (D-20261121-time-library) |
 | Số thập phân       | `rust_decimal` (chỉ `std`)      | 1.43      | Chỉ để TÍNH tiền, thuế, tỉ giá; lưu tiền vẫn là số nguyên `Money`, lưu số thập phân dạng chữ (D-322). Đã có trong cây phụ thuộc qua SeaORM |
-| Múi giờ IANA       | `jiff::tz` (cơ sở dữ liệu múi giờ nhúng trong binary) | 1.0 | Kiểm tên múi giờ của nút (`organizations.timezone`, D-306) qua `autoxide_kernel::time::zone`. Đã thay `chrono-tz` (D-20261121-time-library) |
+| Múi giờ IANA       | `jiff::tz` (cơ sở dữ liệu múi giờ nhúng trong binary) | 1.0 | Kiểm tên múi giờ của nút (`organizations.timezone`, D-306) qua `autoxide_kernel::time::TimeZone::get` (D-20261128-time-duration-ops). Đã thay `chrono-tz` (D-20261121-time-library) |
 | CLI                | `clap`                          | 4.6       | `serve`, `migrate`, `user`, `db copy`…              |
 | Đọc file `.env`    | `dotenvy`                       | 0.15      | Chỉ đọc thành cặp tên / giá trị; biến môi trường thật thắng |
 | Trait `async` qua `dyn` | `async-trait`                | 0.1       | Hợp đồng giữa các module (`api`); đã có sẵn trong cây phụ thuộc qua SeaORM |

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use autoxide_kernel::event::{Delivered, EventHandler, Outbox};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
 use autoxide_kernel::tenancy::TenantContext;
-use autoxide_kernel::time::{SignedDuration, Timestamp};
+use autoxide_kernel::time::{Duration, Timestamp};
 use autoxide_testkit::http::StatusCode;
 use autoxide_testkit::{TestApp, TestDatabase, leak_check, tool};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set, Statement};
@@ -64,7 +64,7 @@ async fn old_bookmark(tenant: &TenantContext, owner: u128, age_days: i64) {
         owner_id: Set(Uuid::from_u128(owner)),
         url: Set(format!("https://example.com/{age_days}")),
         title: Set("old".to_owned()),
-        created_at: Set(Timestamp::now() - SignedDuration::from_hours(24 * age_days)),
+        created_at: Set(Timestamp::now() - Duration::from_days(age_days)),
     }
     .insert(tenant.database().write())
     .await
