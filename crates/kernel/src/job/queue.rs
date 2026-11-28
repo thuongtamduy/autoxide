@@ -66,9 +66,10 @@ impl JobQueue {
         options: EnqueueOptions,
     ) -> Result<Option<Uuid>, Error>
     where
-        C: ConnectionTrait,
+        C: crate::db::Executor,
         J: Job,
     {
+        let connection = &crate::db::Via::of(connection);
         self.enqueue_value(
             connection,
             tenant.id(),
@@ -89,9 +90,10 @@ impl JobQueue {
         options: EnqueueOptions,
     ) -> Result<Option<Uuid>, Error>
     where
-        C: ConnectionTrait,
+        C: crate::db::Executor,
         J: Job,
     {
+        let connection = &crate::db::Via::of(connection);
         self.enqueue_value(
             connection,
             NO_TENANT,

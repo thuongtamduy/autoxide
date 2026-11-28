@@ -11,7 +11,6 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, PoisonError, RwLock};
 
-use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -175,13 +174,14 @@ impl SearchIndex {
 
     /// Queues the sync of records `ids` of kind `kind`, on the caller's `connection` (the transaction of the
     /// change); the job runs after commit.
-    pub async fn enqueue<C: ConnectionTrait>(
+    pub async fn enqueue<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         kind: &str,
         ids: &[Uuid],
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         self.kinds.kind(kind)?;
         for chunk in ids.chunks(MAX_SYNC_IDS) {
             let job = SyncJob { kind: kind.to_owned(), ids: chunk.to_vec() };

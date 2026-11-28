@@ -247,7 +247,7 @@ Your routes are in the API document at `$API/api/v1/openapi.json` (also `acme op
 
 ## 5. Tests on both databases
 
-Tests get an empty database each from `TestDatabase::run`; `TestApp` builds your module the way the server does and calls it over REST and with a real MCP client:
+Tests get an empty database each from `TestDatabase::run`; `TestApp` builds your module the way the server does and calls it over REST and with a real MCP client. Status codes and methods come from `autoxide_testkit::http`, so tests do not declare `axum` or `http`:
 
 ```rust
 #[tokio::test]
@@ -266,7 +266,7 @@ async fn a_bookmark_can_be_created() {
             .send()
             .await
             .unwrap();
-        assert_eq!(answer.status(), StatusCode::CREATED);
+        assert_eq!(answer.status_code(), StatusCode::CREATED);
     })
     .await
     .unwrap();

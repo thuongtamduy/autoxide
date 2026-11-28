@@ -354,7 +354,9 @@ pub trait Executor: sealed_executor::Sealed + Sync {
 }
 
 mod sealed_executor {
-    // Niêm phong: chỉ kernel quyết kiểu nào là `Executor` (module ngoài không tự cài được).
+    // Niêm phong một nửa: module ngoài không cài thẳng `Executor` được, nhưng impl chung dưới đây cho mọi kiểu có
+    // `ConnectionTrait` — crate ngoài tự cài `ConnectionTrait` cho kiểu của mình vẫn thành `Executor`. Thành niêm
+    // phong thật khi gỡ impl chung (cùng lúc gỡ đường cũ, D-20261128-library-layer-plan mục 5).
     pub trait Sealed {}
     impl<C: sea_orm::ConnectionTrait> Sealed for C {}
 }

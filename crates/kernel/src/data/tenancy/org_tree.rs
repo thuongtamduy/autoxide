@@ -92,16 +92,21 @@ impl OrgTree {
     /// Locks the tenant's root row until the end of `transaction`: every tree-changing command of the same
     /// tenant queues up. Call before any other row. A tenant with no root yet locks nothing (on SQLite the
     /// write permission on the whole database is held from the start of the transaction).
-    pub async fn lock<C: ConnectionTrait>(transaction: &C, tenant: TenantId) -> Result<(), Error> {
+    pub async fn lock<C: crate::db::Executor>(
+        transaction: &C,
+        tenant: TenantId,
+    ) -> Result<(), Error> {
+        let transaction = &crate::db::Via::of(transaction);
         rows::lock_one(transaction, unit_by_id(tenant, root_of(tenant))).await?;
         Ok(())
     }
 
     /// Creates the tenant's root node (ID = the tenant's ID) if missing; re-runnable.
-    pub async fn insert_root<C: ConnectionTrait>(
+    pub async fn insert_root<C: crate::db::Executor>(
         transaction: &C,
         tenant: TenantId,
     ) -> Result<OrgId, Error> {
+        let transaction = &crate::db::Via::of(transaction);
         let root = root_of(tenant);
         if unit_by_id(tenant, root).one(transaction).await?.is_some() {
             return Ok(root);
@@ -114,13 +119,14 @@ impl OrgTree {
     /// Adds node `id` under `parent`; a tree deeper than `max_depth` levels (root = 0) gives
     /// `org_depth_exceeded`. A new node is writable; for an inactive node, also call
     /// [`set_writable`](Self::set_writable) in the same transaction.
-    pub async fn insert<C: ConnectionTrait>(
+    pub async fn insert<C: crate::db::Executor>(
         transaction: &C,
         tenant: TenantId,
         id: OrgId,
         parent: OrgId,
         max_depth: u8,
     ) -> Result<(), Error> {
+        let transaction = &crate::db::Via::of(transaction);
         Self::lock(transaction, tenant).await?;
         let parent_row = find_unit(transaction, tenant, parent).await?;
         let depth = parent_row.depth + 1;
@@ -147,13 +153,14 @@ impl OrgTree {
     /// Moves node `id` (with its whole branch) under `new_parent`. The root cannot be moved
     /// (`org_root_immutable`); moving into itself or its own branch → `org_cycle`; a tree deeper than
     /// `max_depth` → `org_depth_exceeded`.
-    pub async fn move_subtree<C: ConnectionTrait>(
+    pub async fn move_subtree<C: crate::db::Executor>(
         transaction: &C,
         tenant: TenantId,
         id: OrgId,
         new_parent: OrgId,
         max_depth: u8,
     ) -> Result<(), Error> {
+        let transaction = &crate::db::Via::of(transaction);
         Self::lock(transaction, tenant).await?;
         let node = find_unit(transaction, tenant, id).await?;
         if node.parent_id.is_none() {
@@ -265,12 +272,13 @@ impl OrgTree {
     }
 
     /// Sets the writable flag of node `id` (the `organizations` module calls it when the node status changes).
-    pub async fn set_writable<C: ConnectionTrait>(
+    pub async fn set_writable<C: crate::db::Executor>(
         transaction: &C,
         tenant: TenantId,
         id: OrgId,
         writable: bool,
     ) -> Result<(), Error> {
+        let transaction = &crate::db::Via::of(transaction);
         Self::lock(transaction, tenant).await?;
         let mut row: unit::ActiveModel = find_unit(transaction, tenant, id).await?.into();
         row.writable = Set(writable);
@@ -281,11 +289,12 @@ impl OrgTree {
 
     /// The ancestor chain of node `id`, **including itself**, nearest first, root last. Empty when the node
     /// is not in the tree.
-    pub async fn ancestors<C: ConnectionTrait>(
+    pub async fn ancestors<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
         id: OrgId,
     ) -> Result<Vec<OrgId>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let rows = closure::Entity::find()
             .filter(closure::Column::TenantId.eq(tenant.as_uuid()))
             .filter(closure::Column::DescendantId.eq(id.as_uuid()))
@@ -298,11 +307,12 @@ impl OrgTree {
     /// Whether `id` is a unit of `tenant`: the tenant's root (which exists even before a tree is built) or a
     /// node of its tree. A permission decision uses it so that a caller with a tenant-wide grant cannot
     /// attach a record to a unit that does not exist or belongs to another tenant (D-20261125-org-must-exist).
-    pub async fn contains<C: ConnectionTrait>(
+    pub async fn contains<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
         id: OrgId,
     ) -> Result<bool, Error> {
+        let connection = &crate::db::Via::of(connection);
         if id == root_of(tenant) {
             return Ok(true);
         }
@@ -318,21 +328,23 @@ impl OrgTree {
     /// Like [`contains`](Self::contains), as an error: 404 `org_not_found` when `id` is not a unit of `tenant`.
     /// For a module that takes a unit from the caller outside a permission decision (a public endpoint, a
     /// unit used only as a label).
-    pub async fn ensure_exists<C: ConnectionTrait>(
+    pub async fn ensure_exists<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
         id: OrgId,
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         if Self::contains(connection, tenant, id).await? { Ok(()) } else { Err(org_not_found(id)) }
     }
 
     /// Whether node `id` belongs to the branch of one of `roots` (including those nodes themselves).
-    pub async fn is_within<C: ConnectionTrait>(
+    pub async fn is_within<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
         id: OrgId,
         roots: &[OrgId],
     ) -> Result<bool, Error> {
+        let connection = &crate::db::Via::of(connection);
         if roots.is_empty() {
             return Ok(false);
         }
@@ -353,11 +365,12 @@ impl OrgTree {
     /// a node-locking command ([`set_writable`](Self::set_writable)) waits for every write in progress to
     /// finish; a write that starts after the locking command commits sees the new flag. SQLite: the write
     /// transaction already holds the write permission on the whole database.
-    pub async fn ensure_writable<C: ConnectionTrait>(
+    pub async fn ensure_writable<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
         id: OrgId,
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         let lineage = Query::select()
             .column(closure::Column::AncestorId)
             .from(closure::Entity)
@@ -384,11 +397,12 @@ impl OrgTree {
     /// transaction (an early check before opening a transaction, read connections). It cannot block a
     /// node-locking command in between: the actual write should still re-check with `ensure_writable` inside
     /// the transaction.
-    pub async fn ensure_writable_unlocked<C: ConnectionTrait>(
+    pub async fn ensure_writable_unlocked<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
         id: OrgId,
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         let lineage = Query::select()
             .column(closure::Column::AncestorId)
             .from(closure::Entity)
@@ -410,10 +424,11 @@ impl OrgTree {
     /// Every (ancestor, descendant) pair of the tenant's tree, including each node's self-pointing pair; lets
     /// in-memory tree aggregation be computed with one statement (e.g. the number of staff at each node).
     /// Row count = nodes × average depth.
-    pub async fn pairs<C: ConnectionTrait>(
+    pub async fn pairs<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
     ) -> Result<Vec<(OrgId, OrgId)>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let rows: Vec<(Uuid, Uuid)> = closure::Entity::find()
             .select_only()
             .column(closure::Column::AncestorId)
@@ -434,11 +449,12 @@ impl OrgTree {
     /// places that must filter by branch in a database OTHER than the one holding the tree (e.g. a combined
     /// reporting store in the root tenant's database, step 38), where the subquery of
     /// [`subtree_condition`](Self::subtree_condition) cannot run.
-    pub async fn descendants<C: ConnectionTrait>(
+    pub async fn descendants<C: crate::db::Executor>(
         connection: &C,
         tenant: TenantId,
         roots: &[OrgId],
     ) -> Result<Vec<OrgId>, Error> {
+        let connection = &crate::db::Via::of(connection);
         if roots.is_empty() {
             return Ok(Vec::new());
         }

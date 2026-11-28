@@ -37,8 +37,8 @@ pub struct McpClientError {
 }
 
 impl McpClientError {
-    /// The HTTP status of the response, as the test kit's type (the field `status` is the `http` crate's type, old
-    /// path).
+    /// The HTTP status of the response, as the test kit's type. The field `status` (the `http` crate's type) is the
+    /// old path and goes away with [`TestResponse::status`](crate::TestResponse::status).
     pub fn status_code(&self) -> crate::http::StatusCode {
         crate::http::StatusCode::from(self.status)
     }

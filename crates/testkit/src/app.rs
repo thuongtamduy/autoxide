@@ -849,14 +849,15 @@ pub struct TestResponse {
 }
 
 impl TestResponse {
-    /// The status as the `http` crate's type. Old path: new tests use [`status_code`](Self::status_code), so they
-    /// do not depend on `http` / `axum`; from 1.0 `status()` returns the test kit's type.
+    /// The status as the `http` crate's type. Old path: tests use [`status_code`](Self::status_code), so they do
+    /// not depend on `http` / `axum`. `status()` is deprecated once no test in the repository calls it, and
+    /// removed in the following minor release.
     pub fn status(&self) -> StatusCode {
         self.status
     }
 
     /// The status (`assert_eq!(response.status_code(), StatusCode::CREATED)` with
-    /// [`autoxide_testkit::http::StatusCode`](crate::http::StatusCode)).
+    /// [`autoxide_testkit::http::StatusCode`](crate::http::StatusCode)). The accessor that stays.
     pub fn status_code(&self) -> crate::http::StatusCode {
         crate::http::StatusCode::from(self.status)
     }

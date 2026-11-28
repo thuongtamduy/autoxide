@@ -55,7 +55,7 @@ impl crate::event::Event for JobRetried {
 /// as `enqueue`). `label`: an English sentence for the viewer (e.g. "Export of the submissions of
 /// “Contact”").
 #[allow(clippy::too_many_arguments)]
-pub async fn track<C: ConnectionTrait>(
+pub async fn track<C: crate::db::Executor>(
     connection: &C,
     tenant: &TenantContext,
     module: &str,
@@ -65,6 +65,7 @@ pub async fn track<C: ConnectionTrait>(
     requested_by: Option<Uuid>,
     org_id: Option<Uuid>,
 ) -> Result<(), Error> {
+    let connection = &crate::db::Via::of(connection);
     let now = crate::job::queue::now();
     let insert = SqlQuery::insert()
         .into_table(Alias::new(TABLE))
@@ -98,12 +99,13 @@ pub async fn track<C: ConnectionTrait>(
 }
 
 /// The progress of job `id` (called by the job runner): `done` out of `total`.
-pub async fn progress<C: ConnectionTrait>(
+pub async fn progress<C: crate::db::Executor>(
     connection: &C,
     id: Uuid,
     done: u64,
     total: u64,
 ) -> Result<(), Error> {
+    let connection = &crate::db::Via::of(connection);
     let update = SqlQuery::update()
         .table(Alias::new(TABLE))
         .value(
@@ -123,11 +125,12 @@ pub async fn progress<C: ConnectionTrait>(
 }
 
 /// The result of job `id` (JSON, e.g. row count, file code, per-record results of a bulk operation).
-pub async fn set_result<C: ConnectionTrait>(
+pub async fn set_result<C: crate::db::Executor>(
     connection: &C,
     id: Uuid,
     result: &Value,
 ) -> Result<(), Error> {
+    let connection = &crate::db::Via::of(connection);
     let update = SqlQuery::update()
         .table(Alias::new(TABLE))
         .value(Alias::new("result"), serde_json::to_string(result).map_err(Error::internal)?)

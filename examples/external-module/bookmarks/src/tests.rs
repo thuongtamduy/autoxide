@@ -12,7 +12,7 @@ use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::{SignedDuration, Timestamp};
 use autoxide_testkit::{TestApp, TestDatabase, leak_check, tool};
-use axum::http::StatusCode;
+use autoxide_testkit::http::StatusCode;
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set, Statement};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -46,7 +46,7 @@ async fn create(app: &TestApp, token: &str, url: &str, title: &str) -> (StatusCo
         .send()
         .await
         .unwrap();
-    (answer.status(), answer.json())
+    (answer.status_code(), answer.json())
 }
 
 async fn events(app: &TestApp) -> Vec<String> {
@@ -110,7 +110,7 @@ async fn rest_and_mcp_share_one_service() {
         let deleted = ada.call_tool(tool("bookmarks.delete_bookmark", json!({"id": id}))).await;
         assert_eq!(deleted.unwrap().is_error, Some(false));
         let gone = app.get(&format!("/api/v1/bookmarks/{id}")).token("ada").send().await.unwrap();
-        assert_eq!(gone.status(), StatusCode::NOT_FOUND);
+        assert_eq!(gone.status_code(), StatusCode::NOT_FOUND);
         assert_eq!(gone.json()["code"], "bookmarks.bookmark_not_found");
 
         // One event per successful write, in the outbox table of the module.
@@ -138,13 +138,13 @@ async fn permissions_are_checked_and_users_see_only_their_own() {
         assert_eq!(problem["code"], "permission_denied");
         // No token at all.
         let anonymous = app.get("/api/v1/bookmarks").send().await.unwrap();
-        assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(anonymous.status_code(), StatusCode::UNAUTHORIZED);
 
         // `bob` may read, but not the bookmarks of `ada`.
         let list = app.get("/api/v1/bookmarks").token("bob").send().await.unwrap();
         assert_eq!(list.json()["data"], json!([]));
         let one = app.get(&format!("/api/v1/bookmarks/{id}")).token("bob").send().await.unwrap();
-        assert_eq!(one.status(), StatusCode::NOT_FOUND);
+        assert_eq!(one.status_code(), StatusCode::NOT_FOUND);
 
         // The trait other modules use sees the same data.
         let bookmarks = app.api::<dyn Bookmarks>().unwrap();
@@ -211,7 +211,7 @@ async fn tenants_do_not_see_each_other() {
             assert_eq!(leaks, Vec::<String>::new());
             let uri = format!("/api/v1/bookmarks/{id}");
             let removed = app.delete(&uri).token(other).send().await.unwrap();
-            assert_eq!(removed.status(), StatusCode::NOT_FOUND);
+            assert_eq!(removed.status_code(), StatusCode::NOT_FOUND);
             let mine = app.get(&uri).token(owner).send().await.unwrap();
             assert_eq!(mine.json()["data"]["title"], marker);
         }
