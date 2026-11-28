@@ -180,7 +180,12 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
 /// lệnh cần chạy (`kernel.migrations_pending`).
 pub(crate) async fn require_applied(modules: &Modules, database: &Database) -> Result<(), String> {
     let migrator = modules.migrator().map_err(|error| error.to_string())?;
-    let pending = migrator.pending(database).await.map_err(|error| error.to_string())?;
+    // Database mới hơn binary: báo lỗi `kernel.database_newer` (cách sửa), không phải lỗi migration chung.
+    let pending =
+        migrator.pending(database).await.map_err(|error| match error.database_newer() {
+            Some(newer) => newer.error().message(),
+            None => error.to_string(),
+        })?;
     if pending.is_empty() {
         return Ok(());
     }

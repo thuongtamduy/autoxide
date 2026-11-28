@@ -185,7 +185,17 @@ async fn probe_database(database: &Database) -> Finding {
 
 async fn probe_migrations(modules: &Modules, database: &Database) -> Finding {
     let pending = match modules.migrator() {
-        Ok(migrator) => migrator.pending(database).await.map_err(|error| error.to_string()),
+        Ok(migrator) => match migrator.pending(database).await {
+            Ok(pending) => Ok(pending),
+            Err(error) => match error.database_newer() {
+                // Database mới hơn binary (bước 71 G3): không phải migration hỏng, cách sửa khác hẳn.
+                Some(newer) => {
+                    return Finding::failed(newer.error().message())
+                        .with_hint(newer_database_hint(newer.module()));
+                }
+                None => Err(error.to_string()),
+            },
+        },
         Err(error) => Err(error.to_string()),
     };
     match pending {
@@ -203,6 +213,26 @@ async fn probe_migrations(modules: &Modules, database: &Database) -> Finding {
                 .with_hint("Run `autoxide migrate up`.")
         }
         Err(error) => Finding::failed(error),
+    }
+}
+
+/// Cách sửa khi database mới hơn binary. `rollback --to` chỉ lùi module có trong bảng phiên bản nhúng (`releases.rs`):
+/// module ghép từ ngoài (`.module(…)`) bị nó để nguyên, nên khi đó chỉ khuyên chạy bản mới hay khôi phục backup.
+fn newer_database_hint(module: &str) -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    let tracked = crate::releases::MigrationReleases::embedded()
+        .is_ok_and(|releases| releases.tracks_module(module));
+    if tracked {
+        format!(
+            "Run the newer Autoxide that migrated this database, or go back with `autoxide rollback --to \
+             {version}` run by that newer binary."
+        )
+    } else {
+        format!(
+            "Run the newer binary that migrated this database, or restore the backup taken before the upgrade: \
+             module `{module}` is not in the release table of Autoxide {version}, so `autoxide rollback --to` \
+             leaves it as it is."
+        )
     }
 }
 
@@ -311,6 +341,7 @@ fn render(lines: &[Line], healthy: bool) -> String {
 mod tests {
     use autoxide_kernel::config::ConfigSource;
     use autoxide_testkit::TestDatabase;
+    use sea_orm::ConnectionTrait as _;
 
     use super::*;
 
@@ -433,6 +464,30 @@ mod tests {
                 text.ends_with("No failed checks; 9 warning(s) to look at before going live.\n"),
                 "{text}"
             );
+
+            // Database được một bản mới hơn migrate (bước 71 G3): báo `kernel.database_newer` và cách sửa riêng,
+            // không phải "migration hỏng".
+            let database = Database::connect(&setup.config.database).await.unwrap();
+            let write = database.write();
+            let sql = "INSERT INTO kernel_migrations (version, applied_at) \
+                       VALUES ('m9999_from_a_newer_release', 0)";
+            write
+                .execute_raw(autoxide_kernel::database::statement(
+                    write.get_database_backend(),
+                    sql,
+                    [],
+                ))
+                .await
+                .unwrap();
+            database.close().await.unwrap();
+            let lines = diagnose(settings(test.url(), &dir)).await;
+            let migrations = lines.iter().find(|line| line.name == "migrations").unwrap();
+            assert_eq!(migrations.status, "failed");
+            assert!(migrations.message.contains("m9999_from_a_newer_release"), "{migrations:?}");
+            assert!(migrations.message.contains("newer Autoxide"), "{migrations:?}");
+            let hint = migrations.hint.as_deref().unwrap_or_default();
+            assert!(hint.contains("rollback --to"), "{hint}");
+            assert!(newer_database_hint("bookmarks").contains("restore the backup"));
             let _ = std::fs::remove_dir_all(dir);
         })
         .await

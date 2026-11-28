@@ -97,23 +97,82 @@ pub mod prelude {
 
 /// Error while declaring or running migrations.
 #[derive(Debug)]
-pub struct MigrationError(String);
+pub struct MigrationError {
+    message: String,
+    newer: Option<DatabaseNewer>,
+}
 
 impl fmt::Display for MigrationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "migration: {}", self.0)
+        write!(f, "migration: {}", self.message)
     }
 }
 
 impl std::error::Error for MigrationError {}
 
-/// Words of the error for a migration recorded in the database but unknown to this program.
-const UNKNOWN_APPLIED: &str = "its file is missing";
-
 impl MigrationError {
+    fn new(message: impl Into<String>) -> Self {
+        MigrationError { message: message.into(), newer: None }
+    }
+
     /// The database holds migrations this program does not know: a newer version of the program migrated it.
+    /// Shorthand for `database_newer().is_some()`.
     pub fn is_from_newer_program(&self) -> bool {
-        self.0.contains(UNKNOWN_APPLIED)
+        self.newer.is_some()
+    }
+
+    /// The database is newer than this program, and how: see [`DatabaseNewer`].
+    pub fn database_newer(&self) -> Option<&DatabaseNewer> {
+        self.newer.as_ref()
+    }
+}
+
+/// The database was migrated by a newer version of the program: a module's history table records migrations
+/// this program does not know. Not a broken migration — the fix is to run the newer program, or to go back
+/// with that newer program: `autoxide rollback --to <this version>` (only it can revert its own migrations; it
+/// leaves modules the release table does not track as they are) or restoring the backup taken before the
+/// upgrade. [`DatabaseNewer::error`] gives the error, code `kernel.database_newer`.
+//
+// Kiểu riêng (bước 71 G3): trước đây lỗi này chung chuỗi với lỗi migration, nên `serve`, `doctor`, `upgrade` không
+// báo được đúng cách sửa.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatabaseNewer {
+    module: String,
+    migrations: Vec<String>,
+}
+
+impl DatabaseNewer {
+    /// The first module (in registration order) found with unknown migrations.
+    pub fn module(&self) -> &str {
+        &self.module
+    }
+
+    /// Names of the migrations of [`DatabaseNewer::module`] recorded in the database but unknown to this
+    /// program, by name.
+    pub fn migrations(&self) -> &[String] {
+        &self.migrations
+    }
+
+    /// The error for a command or an API response: code `kernel.database_newer` (409), with `module`, `first`
+    /// (up to three names), `count` and `version` (the version of this program, to pass to `rollback --to`).
+    pub fn error(&self) -> Error {
+        const SHOWN: usize = 3;
+        let mut first = self.migrations.iter().take(SHOWN).cloned().collect::<Vec<_>>().join(", ");
+        let more = self.migrations.len().saturating_sub(SHOWN);
+        if more > 0 {
+            first = format!("{first}, and {more} more");
+        }
+        Error::conflict(
+            "kernel.database_newer",
+            "the database was migrated by a newer Autoxide than this program ({version}): module \
+             `{module}` has {count} migration(s) this program does not know (first: {first}); run the newer \
+             program, or go back with that newer program (`autoxide rollback --to {version}`, or restore the \
+             backup taken before the upgrade), then use this one",
+        )
+        .with_param("version", env!("CARGO_PKG_VERSION"))
+        .with_param("module", &self.module)
+        .with_param("count", self.migrations.len())
+        .with_param("first", first)
     }
 }
 
@@ -282,7 +341,7 @@ impl Migrator {
         if problems.is_empty() {
             Ok(Migrator { modules, keys: KeyConfig::default(), key_database: None })
         } else {
-            Err(MigrationError(problems.join("; ")))
+            Err(MigrationError::new(problems.join("; ")))
         }
     }
 
@@ -411,7 +470,7 @@ impl Migrator {
     ) -> Result<Vec<MigrationState>, MigrationError> {
         let set = self.modules.iter().find(|set| set.module == module).ok_or_else(|| {
             let known: Vec<&str> = self.modules.iter().map(|set| set.module).collect();
-            MigrationError(format!(
+            MigrationError::new(format!(
                 "unknown module `{module}`; modules with migrations (turned-off modules included): {}",
                 if known.is_empty() { "(none)".to_owned() } else { known.join(", ") }
             ))
@@ -452,28 +511,17 @@ async fn applied_names<C: sea_orm::ConnectionTrait>(
         .await
         .map_err(|error| failure(set.module, "cannot read migration status", &error))?;
     let known: BTreeSet<String> = set.names().into_iter().collect();
-    let missing: Vec<String> = recorded
-        .iter()
-        .filter(|name| !known.contains(*name))
-        .map(|name| {
-            format!(
-                "Migration file of version '{name}' is missing, this migration has been applied but \
-                 {UNKNOWN_APPLIED}"
-            )
-        })
-        .collect();
-    if !missing.is_empty() {
-        return Err(failure(
-            set.module,
-            "cannot read migration status",
-            &DbErr::Custom(missing.join("\n")),
-        ));
+    let unknown: Vec<String> =
+        recorded.iter().filter(|name| !known.contains(*name)).cloned().collect();
+    if !unknown.is_empty() {
+        let newer = DatabaseNewer { module: set.module.to_owned(), migrations: unknown };
+        return Err(MigrationError { message: newer.error().message(), newer: Some(newer) });
     }
     Ok(recorded.into_iter().collect())
 }
 
 fn failure(module: &str, action: &str, error: &DbErr) -> MigrationError {
-    MigrationError(format!("module `{module}`: {action}: {error}"))
+    MigrationError::new(format!("module `{module}`: {action}: {error}"))
 }
 
 impl Migrator {

@@ -186,7 +186,9 @@ async fn migration_hong_giua_chung_khong_de_lai_gi() {
         ])
         .unwrap();
 
-        let error = migrator.up(&db).await.unwrap_err().to_string();
+        let error = migrator.up(&db).await.unwrap_err();
+        assert!(!error.is_from_newer_program(), "migration hỏng không phải database mới hơn");
+        let error = error.to_string();
 
         assert!(error.contains("module `broken`: cannot apply migrations"), "{error}");
         assert!(error.contains("deliberate failure"), "{error}");
@@ -222,10 +224,21 @@ async fn migration_da_ap_dung_ma_mat_khoi_code_la_loi() {
         // Bản code "cũ hơn database": thiếu migration thứ hai đã được áp dụng.
         let older =
             Migrator::new(vec![ModuleMigrations::new("notes", notes_first_only())]).unwrap();
-        let error = older.status(&db).await.unwrap_err().to_string();
+        let error = older.status(&db).await.unwrap_err();
+        let text = error.to_string();
+        assert!(text.contains("module `notes`"), "{text}");
+        assert!(text.contains("m0002_create_draft"), "{text}");
+        assert!(text.contains("rollback --to"), "nêu cách sửa: {text}");
 
-        assert!(error.contains("module `notes`"), "{error}");
-        assert!(error.contains("m0002_create_draft"), "{error}");
+        // Kiểu lỗi riêng (bước 71 G3): người gọi phân biệt được với migration hỏng.
+        let newer = error.database_newer().expect("database mới hơn chương trình");
+        assert_eq!(newer.module(), "notes");
+        assert_eq!(newer.migrations(), ["m0002_create_draft"]);
+        assert_eq!(newer.error().code(), "kernel.database_newer");
+        for older_call in [older.pending(&db).await.unwrap_err(), older.up(&db).await.unwrap_err()]
+        {
+            assert!(older_call.is_from_newer_program(), "{older_call}");
+        }
     })
     .await
     .unwrap();

@@ -225,8 +225,8 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
   - [x] (b) `autoxide backup` giữ nguyên schema nguồn (không cần migrate trước) và sao lưu cả mọi nơi đặt dữ liệu kèm kho
         file của chúng — xong qua #596
   - [ ] (c) sao lưu nằm BÊN TRONG `autoxide upgrade` (tự gọi backup trước migrate, từ chối khi không có `--no-backup`)
-  - [ ] Kiểu lỗi riêng cho "database mới hơn binary" (hiện chung với lỗi migration), để `upgrade` và `doctor` báo đúng
-        cách sửa (chạy binary mới hơn hay `rollback`)
+  - [x] Kiểu lỗi riêng cho "database mới hơn binary" (hiện chung với lỗi migration), để `upgrade` và `doctor` báo đúng
+        cách sửa (chạy binary mới hơn hay `rollback`) — `migration::DatabaseNewer`, mã `kernel.database_newer`
 - [ ] `autoxide rollback --to X.Y.Z`: ghi phiên bản binary cạnh mỗi migration đã chạy; lùi theo bản phát hành qua mọi
       module và mọi khách đúng thứ tự phụ thuộc; CI kiểm binary cũ chạy lại được sau khi lùi
 - [ ] Ma trận test nâng cấp trong CI: từ bản trước và từ bản cũ nhất còn hỗ trợ, nhiều khách có database riêng, bản cũ và

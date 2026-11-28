@@ -78,7 +78,7 @@ impl Migrator {
             return Ok(RollbackPlan::default());
         }
         let data_loss = loss::measure(database, &steps, limits).await.map_err(|error| {
-            MigrationError(format!("cannot measure the data the rollback removes: {error}"))
+            MigrationError::new(format!("cannot measure the data the rollback removes: {error}"))
         })?;
         Ok(RollbackPlan { steps: plan_steps, data_loss })
     }
@@ -132,7 +132,7 @@ impl Migrator {
                     continue;
                 }
                 if let Some(kept) = &kept_after {
-                    return Err(MigrationError(format!(
+                    return Err(MigrationError::new(format!(
                         "module `{}`: the target release keeps `{kept}` but not `{}`, which runs before it; \
                          a rollback can only revert the newest migrations of a module",
                         set.module,
@@ -142,7 +142,7 @@ impl Migrator {
                 if let Entry::Schema(migration) = &entry
                     && migration.irreversible()
                 {
-                    return Err(MigrationError(format!(
+                    return Err(MigrationError::new(format!(
                         "module `{}`: migration `{}` cannot be reverted (it removed data an earlier release \
                          needs); restore the backup taken before the upgrade instead",
                         set.module,
