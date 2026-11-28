@@ -424,7 +424,9 @@ async fn khoan_nhan_khac_tien_te_cua_don_khong_cong_vao_don() {
         assert_eq!(undelivered(shop).await, 1);
         let database = shop.database();
         let backend = database.read().get_database_backend();
-        let sql = "SELECT last_error FROM ledger_events WHERE delivered_at IS NULL";
+        // Lỗi của từng bên nhận nằm ở bảng giao của kernel, không ở `ledger_events` (D-20261128-event-per-subscriber).
+        let sql = "SELECT last_error FROM kernel_event_deliveries WHERE module = 'ledger' \
+                   AND subscriber = 'orders' AND delivered_at IS NULL";
         let row =
             database.read().query_one_raw(statement(backend, sql, [])).await.unwrap().unwrap();
         let error: String = row.try_get("", "last_error").unwrap();

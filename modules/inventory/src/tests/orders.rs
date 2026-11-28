@@ -106,6 +106,15 @@ async fn redeliver(app: &TestApp) {
         .unwrap()
         .unwrap();
     assert_eq!(row.try_get::<i64>("", "n").unwrap(), 0, "every event was delivered again");
+    // Bên nhận trả lỗi thì event vẫn được đánh dấu đã chia, lỗi nằm ở bảng giao của kernel
+    // (D-20261128-event-per-subscriber): kiểm cả ở đó.
+    let sql = "SELECT COUNT(*) AS n FROM kernel_event_deliveries WHERE delivered_at IS NULL";
+    let row = write
+        .query_one_raw(autoxide_kernel::database::statement(backend, sql, []))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.try_get::<i64>("", "n").unwrap(), 0, "no subscriber failed on a redelivery");
 }
 
 #[tokio::test]
