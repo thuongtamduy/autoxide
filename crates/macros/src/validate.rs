@@ -3,10 +3,10 @@
 //! Rules: `length(min, max, equal)`, `range(min, max, exclusive_min, exclusive_max)`, `email`, `url`, `nested`; each
 //! (but `nested`) takes `message = "…"` and `code = "…"`. They are the rules modules use; a new rule is added here.
 
-// Mã sinh ra giống TỪNG DÒNG mã của `validator_derive` 0.20 cho cùng thuộc tính (cùng trait kiểm, cùng tham số lỗi,
-// cùng cách bọc trường `Option`), chỉ khác đường dẫn: `::autoxide_kernel::__private::validator` thay `::validator`.
-// Nhờ vậy lỗi trả về (mã, tham số, thứ tự) không đổi khi module chuyển từ derive của `validator` sang derive này,
-// và module khác lồng (`nested`) kiểu cũ hay mới đều được.
+// Mã sinh ra cài thẳng `autoxide_kernel::http::Validate` và gọi hàm kiểm của kernel (`__private::check`), không còn
+// sinh mã của `validator_derive` (D-20261128-library-layer-plan mục 2). Luật giữ như `validator_derive` 0.20 (cùng
+// cách bọc trường `Option`, cùng tham số lỗi, `nested` bỏ qua trường đã có lỗi) nên lỗi trả về (mã, tham số, câu,
+// đường dẫn) không đổi; test `http::input::tests` của kernel so với derive của `validator`.
 
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -123,30 +123,48 @@ fn is_number(ty: &syn::Type) -> bool {
     })
 }
 
-fn check(
-    rule: &str,
-    bounds: &Bounds,
-    call: TokenStream,
-    value: &TokenStream,
-    field_name: &str,
-) -> TokenStream {
+fn check(rule: &str, bounds: &Bounds, call: TokenStream, field_name: &str) -> TokenStream {
     let code = bounds.code.as_ref().map_or_else(|| rule.to_string(), LitStr::value);
-    let message = bounds.message.as_ref().map(|message| {
-        quote!(err.message = ::std::option::Option::Some(::std::borrow::Cow::from(#message));)
-    });
-    let params = bounds
-        .values
-        .iter()
-        .map(|(name, value)| quote!(err.add_param(::std::borrow::Cow::from(#name), &#value);));
+    let message = match &bounds.message {
+        Some(message) => quote!(::std::option::Option::Some(#message)),
+        None => quote!(::std::option::Option::None),
+    };
+    let params = bounds.values.iter().map(|(name, value)| quote!((#name, check::json!(#value))));
     quote! {
         if !#call {
-            let mut err = validator::ValidationError::new(#code);
-            #message
-            #(#params)*
-            err.add_param(::std::borrow::Cow::from("value"), &#value);
-            errors.add(#field_name, err);
+            errors.fail(#field_name, #code, #message, &[#(#params),*]);
         }
     }
+}
+
+// Kiểu ngoài cùng (sau khi bỏ `Option`) là `Vec<…>`: `nested` kiểm từng phần tử.
+fn is_vec(ty: &syn::Type) -> bool {
+    let mut current = ty;
+    loop {
+        let syn::Type::Path(path) = current else { return false };
+        let Some(last) = path.path.segments.last() else { return false };
+        let inner = match &last.arguments {
+            syn::PathArguments::AngleBracketed(arguments) => match arguments.args.first() {
+                Some(syn::GenericArgument::Type(inner)) => Some(inner),
+                _ => None,
+            },
+            _ => None,
+        };
+        match (last.ident.to_string().as_str(), inner) {
+            ("Option", Some(inner)) => current = inner,
+            ("Vec", _) => return true,
+            _ => return false,
+        }
+    }
+}
+
+fn cast_u64(value: TokenStream) -> TokenStream {
+    // `Some(1)` / `None` -> `Some((1) as u64)`; hằng kiểu `usize` của module cũng dùng được.
+    let text = value.to_string();
+    if text.contains("None") {
+        return value;
+    }
+    quote!(#value.map(|bound| bound as u64))
 }
 
 fn some_or_none(bounds: &Bounds, name: &str) -> TokenStream {
@@ -200,46 +218,41 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
             ));
         }
         let mut field_checks = Vec::new();
+        // Tham chiếu tới giá trị: trường thường thì `&self.x`; trong nhánh `Some(ref x)` thì `x` đã là tham chiếu.
+        let reference = if depth > 0 { quote!(#ident) } else { quote!(&self.#ident) };
         if let Some(bounds) = &rules.length {
             let (min, max, equal) = (
-                some_or_none(bounds, "min"),
-                some_or_none(bounds, "max"),
-                some_or_none(bounds, "equal"),
+                cast_u64(some_or_none(bounds, "min")),
+                cast_u64(some_or_none(bounds, "max")),
+                cast_u64(some_or_none(bounds, "equal")),
             );
-            let call = quote!(#value.validate_length(#min, #max, #equal));
-            field_checks.push(check("length", bounds, call, &value, &field_name));
+            let call = quote!(check::length(#reference, #min, #max, #equal));
+            field_checks.push(check("length", bounds, call, &field_name));
         }
         if let Some(bounds) = &rules.email {
-            field_checks.push(check(
-                "email",
-                bounds,
-                quote!(#value.validate_email()),
-                &value,
-                &field_name,
-            ));
+            let call = quote!(check::email(::std::convert::AsRef::<str>::as_ref(#reference)));
+            field_checks.push(check("email", bounds, call, &field_name));
         }
         if let Some(bounds) = &rules.url {
-            field_checks.push(check(
-                "url",
-                bounds,
-                quote!(#value.validate_url()),
-                &value,
-                &field_name,
-            ));
+            let call = quote!(check::url(::std::convert::AsRef::<str>::as_ref(#reference)));
+            field_checks.push(check("url", bounds, call, &field_name));
         }
         if let Some(bounds) = &rules.range {
             let (min, max) = (some_or_none(bounds, "min"), some_or_none(bounds, "max"));
             let (exclusive_min, exclusive_max) =
                 (some_or_none(bounds, "exclusive_min"), some_or_none(bounds, "exclusive_max"));
-            let call = quote!(#value.validate_range(#min, #max, #exclusive_min, #exclusive_max));
-            field_checks.push(check("range", bounds, call, &value, &field_name));
+            let call = quote!(check::range(#value, #min, #max, #exclusive_min, #exclusive_max));
+            field_checks.push(check("range", bounds, call, &field_name));
         }
         if rules.nested {
+            let call = if is_vec(&field.ty) {
+                quote!(errors.nested_list(#field_name, #reference))
+            } else {
+                quote!(errors.nested(#field_name, #reference))
+            };
             field_checks.push(quote! {
-                if let ::std::collections::hash_map::Entry::Vacant(_) =
-                    errors.0.entry(::std::borrow::Cow::Borrowed(#field_name))
-                {
-                    errors.merge_self(#field_name, validator::Validate::validate(&#value));
+                if !errors.has(#field_name) {
+                    #call;
                 }
             });
         }
@@ -249,18 +262,13 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     Ok(quote! {
         #[allow(clippy::all, clippy::pedantic, unused_imports)]
         const _: () = {
-            use ::autoxide_kernel::__private::validator;
-            use validator::{ValidateEmail as _, ValidateLength as _, ValidateRange as _, ValidateUrl as _};
+            use ::autoxide_kernel::__private::check;
 
-            impl #impl_generics validator::Validate for #name #type_generics #where_clause {
-                fn validate(&self) -> ::std::result::Result<(), validator::ValidationErrors> {
-                    let mut errors = validator::ValidationErrors::new();
+            impl #impl_generics ::autoxide_kernel::http::Validate for #name #type_generics #where_clause {
+                fn check(&self) -> ::std::result::Result<(), ::autoxide_kernel::error::Error> {
+                    let mut errors = check::Errors::new();
                     #(#checks)*
-                    if errors.is_empty() {
-                        ::std::result::Result::Ok(())
-                    } else {
-                        ::std::result::Result::Err(errors)
-                    }
+                    errors.finish()
                 }
             }
         };

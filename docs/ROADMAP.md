@@ -161,8 +161,10 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             sau; `status_code()` là hàm ở lại sau 1.0 (không đổi kiểu trả về của `status()`)
       - [ ] Chặn 1.0: quyết `http::Validate` còn gắn với `validator` hay không (impl chung cho kiểu của `validator`, derive
             của kernel sinh mã của `validator_derive`); bỏ thì kernel tự kiểm năm luật, lỗi giữ nguyên mã
-            (D-20261127-http-layer-choices). Đã quyết: bỏ — derive sinh mã kiểm của kernel, impl chung gỡ khi module cuối
-            bỏ `validator` (D-20261128-library-layer-plan mục 2); còn phần làm
+            (D-20261127-http-layer-choices). Đã quyết: bỏ (D-20261128-library-layer-plan mục 2). Đã làm: derive của kernel
+            cài thẳng `http::Validate`, gọi hàm kiểm của kernel (`http::check`), lỗi trùng từng trường với derive của
+            `validator` (test so). Còn: gỡ impl chung `impl<T: validator::Validate> Validate for T` và `From<ValidationErrors>
+            for Error` khi module cuối bỏ `validator` (theo cụm)
       - [ ] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
             cần chúng
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào

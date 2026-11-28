@@ -39,6 +39,7 @@ macro_rules! scalar_script_url {
 
 mod body_limit;
 mod cache;
+pub(crate) mod check;
 mod client;
 mod compression;
 mod conditional;

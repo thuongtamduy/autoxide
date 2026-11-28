@@ -59,7 +59,10 @@ pub mod __private {
     pub use axum;
     pub use utoipa;
     pub use uuid::Uuid;
-    pub use validator;
+    /// The checks `#[derive(Validate)]` generates calls to.
+    pub mod check {
+        pub use crate::http::check::*;
+    }
 
     /// Written only by `#[derive(Record)]`: a hand-written `impl Record` cannot exist.
     pub trait RecordSeal {}
