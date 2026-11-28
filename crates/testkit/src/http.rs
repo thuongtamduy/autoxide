@@ -45,6 +45,8 @@ macro_rules! status_codes {
 status_codes! {
     CONTINUE = 100, "Continue";
     SWITCHING_PROTOCOLS = 101, "Switching Protocols";
+    PROCESSING = 102, "Processing";
+    EARLY_HINTS = 103, "Early Hints";
     OK = 200, "OK";
     CREATED = 201, "Created";
     ACCEPTED = 202, "Accepted";
@@ -52,11 +54,15 @@ status_codes! {
     NO_CONTENT = 204, "No Content";
     RESET_CONTENT = 205, "Reset Content";
     PARTIAL_CONTENT = 206, "Partial Content";
+    MULTI_STATUS = 207, "Multi-Status";
+    ALREADY_REPORTED = 208, "Already Reported";
+    IM_USED = 226, "IM Used";
     MULTIPLE_CHOICES = 300, "Multiple Choices";
     MOVED_PERMANENTLY = 301, "Moved Permanently";
     FOUND = 302, "Found";
     SEE_OTHER = 303, "See Other";
     NOT_MODIFIED = 304, "Not Modified";
+    USE_PROXY = 305, "Use Proxy";
     TEMPORARY_REDIRECT = 307, "Temporary Redirect";
     PERMANENT_REDIRECT = 308, "Permanent Redirect";
     BAD_REQUEST = 400, "Bad Request";
@@ -76,6 +82,7 @@ status_codes! {
     UNSUPPORTED_MEDIA_TYPE = 415, "Unsupported Media Type";
     RANGE_NOT_SATISFIABLE = 416, "Range Not Satisfiable";
     EXPECTATION_FAILED = 417, "Expectation Failed";
+    IM_A_TEAPOT = 418, "I'm a teapot";
     MISDIRECTED_REQUEST = 421, "Misdirected Request";
     UNPROCESSABLE_ENTITY = 422, "Unprocessable Entity";
     LOCKED = 423, "Locked";
@@ -92,6 +99,11 @@ status_codes! {
     SERVICE_UNAVAILABLE = 503, "Service Unavailable";
     GATEWAY_TIMEOUT = 504, "Gateway Timeout";
     HTTP_VERSION_NOT_SUPPORTED = 505, "HTTP Version Not Supported";
+    VARIANT_ALSO_NEGOTIATES = 506, "Variant Also Negotiates";
+    INSUFFICIENT_STORAGE = 507, "Insufficient Storage";
+    LOOP_DETECTED = 508, "Loop Detected";
+    NOT_EXTENDED = 510, "Not Extended";
+    NETWORK_AUTHENTICATION_REQUIRED = 511, "Network Authentication Required";
 }
 
 impl StatusCode {
@@ -310,6 +322,10 @@ mod tests {
         assert_eq!(axum::http::StatusCode::CREATED, StatusCode::CREATED);
         assert_eq!(StatusCode::from(axum::http::StatusCode::IM_A_TEAPOT).as_u16(), 418);
         assert_eq!(StatusCode::UNPROCESSABLE_ENTITY.to_string(), "422 Unprocessable Entity");
+        assert_eq!(
+            StatusCode::IM_A_TEAPOT.to_string(),
+            axum::http::StatusCode::IM_A_TEAPOT.to_string()
+        );
         assert_eq!(format!("{:?}", StatusCode::CONFLICT), "409");
         assert_eq!(StatusCode::from_u16(99), None);
         assert!(StatusCode::TOO_MANY_REQUESTS.is_client_error());
