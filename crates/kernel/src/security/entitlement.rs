@@ -212,7 +212,9 @@ pub trait Entitlements: Send + Sync {
         reference: &str,
     ) -> Result<(), Error>;
 
-    /// The reserved slot becomes permanent (the module's record has been committed).
+    /// The reserved slot becomes permanent (the module's record has been committed). Already confirmed: `Ok`.
+    /// No hold for `reference` (it expired, was released by a concurrent call, or `reserve` was never called):
+    /// [`hold_missing`] (`limit_hold_missing`) — the caller can match that code and settle again.
     async fn confirm(&self, tenant: TenantId, limit: &Limit, reference: &str) -> Result<(), Error>;
 
     /// Gives back a reserved or confirmed slot; calling it many times or with an unknown `reference` is always `Ok`.
@@ -798,6 +800,17 @@ pub fn limit_exceeded(limit: &str, used: i64, max: i64) -> Error {
     .with_param("limit", limit.to_owned())
     .with_param("used", used)
     .with_param("max", max)
+}
+
+/// `limit_hold_missing` (409): [`Entitlements::confirm`] found no hold for `reference` — it expired, a
+/// concurrent call released it, or `reserve` was not called.
+pub fn hold_missing(limit: &str, reference: &str) -> Error {
+    Error::conflict(
+        "limit_hold_missing",
+        "There is no hold on the limit `{limit}` for `{reference}` (it expired or was released); reserve again.",
+    )
+    .with_param("limit", limit.to_owned())
+    .with_param("reference", reference.to_owned())
 }
 
 /// `quota_exhausted` (429): this period's quota has been used up; a new period starts after `retry_after` seconds.

@@ -5,7 +5,9 @@
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
-use autoxide_kernel::entitlement::{Entitlements, Limit, TenantEntitlements, limit_exceeded};
+use autoxide_kernel::entitlement::{
+    Entitlements, Limit, TenantEntitlements, hold_missing, limit_exceeded,
+};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
@@ -30,6 +32,8 @@ struct Members {
     /// Lần `confirm` kế tiếp: trả chỗ trước rồi báo "không có chỗ giữ" — như một lượt đồng thời gọi `release` chen
     /// giữa `reserve` và `confirm`.
     drop_before_confirm: Mutex<bool>,
+    /// Lần `confirm` kế tiếp hỏng vì lý do khác (database…): lỗi đó không được nuốt.
+    fail_confirm: Mutex<bool>,
 }
 
 impl Members {
@@ -77,7 +81,10 @@ impl Entitlements for Members {
     async fn confirm(&self, _: TenantId, _: &Limit, reference: &str) -> Result<(), Error> {
         if std::mem::take(&mut *self.drop_before_confirm.lock().unwrap()) {
             self.used.lock().unwrap().remove(reference);
-            return Err(Error::internal(format!("confirm `{reference}`: there is no hold")));
+            return Err(hold_missing("auth.members", reference));
+        }
+        if std::mem::take(&mut *self.fail_confirm.lock().unwrap()) {
+            return Err(Error::internal("the plans database is unreachable"));
         }
         Ok(())
     }
@@ -122,6 +129,7 @@ async fn setup(test: &TestDatabase) -> Setup {
         max: Mutex::new(100),
         used: Mutex::new(BTreeSet::new()),
         drop_before_confirm: Mutex::new(false),
+        fail_confirm: Mutex::new(false),
     });
     let provider: Arc<dyn Entitlements> = plan.clone();
     let app = TestApp::builder(test)
@@ -488,6 +496,42 @@ async fn cho_bi_tra_giua_giu_va_xac_nhan_thi_giu_lai() {
         roles.set_user_roles(tenant, Actor::system(), who, vec![role]).await.unwrap();
         assert!(crate::role::has_membership(tenant, who).await.unwrap());
         assert!(setup.plan.used().contains(&slot), "người giữ role phải có chỗ");
+    })
+    .await
+    .unwrap();
+}
+
+/// Kiểm độc lập #614: lượt gán chỉ coi là "chỗ bị trả" khi `confirm` trả đúng `limit_hold_missing`; lỗi khác của
+/// `confirm` (database của `plans` hỏng…) không bị nuốt mà trả về bên gọi.
+#[tokio::test]
+async fn xac_nhan_loi_khac_khong_bi_nuot() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let roles = crate::role::RoleService::new(
+            setup.services.roles.catalog().clone(),
+            autoxide_kernel::event::Outbox::standalone("auth"),
+        )
+        .with_entitlements(setup.app.modules().entitlements());
+        let tenant = &setup.tenant;
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "staff".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.users.read".to_owned()],
+            grants: Vec::new(),
+        };
+        let role = roles.create(tenant, Actor::system(), input).await.unwrap().id;
+        let who = NewUser {
+            email: "broken@alpha.example".to_owned(),
+            name: "Broken".to_owned(),
+            password: None,
+        };
+        let who = setup.services.users.create(tenant, Actor::system(), who).await.unwrap().id;
+        *setup.plan.fail_confirm.lock().unwrap() = true;
+        let error =
+            roles.set_user_roles(tenant, Actor::system(), who, vec![role]).await.unwrap_err();
+        assert_eq!(error.code(), "internal_error", "{error:?}");
     })
     .await
     .unwrap();

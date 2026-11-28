@@ -380,7 +380,7 @@ async fn get_role(
     responses(
         (status = 200, description = "The role after the change.", body = Data<RoleResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`), or turns off `requires_mfa` of a role you could not give (code `auth.role_beyond_you`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens, unbans, removes, narrows or bans a permission you do not have as widely (code `auth.permission_beyond_you`), or turns off `requires_mfa` of a role you could not give (code `auth.role_beyond_you`).", body = Problem),
         (status = 404, description = "No role has this id; code `auth.role_not_found`.", body = Problem),
         (status = 409, description = "Another role has this name (`auth.role_name_taken`), or the role is the built-in `admin` (`auth.role_builtin`).", body = Problem),
         (status = 422, description = "A value is invalid, e.g. an unknown permission; see `errors`.", body = Problem),

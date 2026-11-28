@@ -148,7 +148,8 @@ impl PlansService {
     }
 
     /// Chỗ đã giữ thành vĩnh viễn. Đã xác nhận rồi thì `Ok`; không có chỗ giữ của khách đang bị
-    /// giới hạn là lỗi của module gọi (quên `reserve`).
+    /// giới hạn (hết hạn, bị lượt đồng thời trả, hay quên `reserve`) là `limit_hold_missing`
+    /// (`entitlement::hold_missing`): bên gọi bắt đúng mã đó để làm lại.
     pub(crate) async fn confirm(
         &self,
         tenant: TenantId,
@@ -194,10 +195,7 @@ impl PlansService {
             Some(row) if row.status == "confirmed" => Ok(()),
             // Khách không giới hạn không ghi chỗ giữ (xem `reserve`).
             None if self.snapshot(tenant).await?.unrestricted => Ok(()),
-            _ => Err(Error::internal(format!(
-                "confirm `{}` `{reference}`: there is no hold (it expired, or reserve was not called)",
-                key
-            ))),
+            _ => Err(autoxide_kernel::entitlement::hold_missing(key, reference)),
         }
     }
 
