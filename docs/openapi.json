@@ -119025,7 +119025,7 @@
                 }
               }
             },
-            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens or unbans a permission you do not have as widely (code `auth.permission_beyond_you`), or turns off `requires_mfa` of a role you could not give (code `auth.role_beyond_you`)."
+            "description": "Missing permission `auth.roles.manage` (code `permission_denied`), or the change adds, widens, unbans, removes, narrows or bans a permission you do not have as widely (code `auth.permission_beyond_you`), or turns off `requires_mfa` of a role you could not give (code `auth.role_beyond_you`)."
           },
           "404": {
             "content": {
