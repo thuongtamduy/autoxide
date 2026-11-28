@@ -408,8 +408,7 @@ fn problem(
             // cột đó trong MỌI dòng.
             let rows_fit = match insert_tenant_values(&tokens) {
                 Some(values) => {
-                    !values.is_empty()
-                        && values.iter().all(|value| value.is_some_and(|i| is_tenant(i)))
+                    !values.is_empty() && values.iter().all(|value| value.is_some_and(is_tenant))
                 }
                 None => names_column && tenant_bound,
             };
@@ -506,10 +505,11 @@ fn insert_tenant_values(tokens: &[Token]) -> Option<Vec<Option<usize>>> {
                 }
                 _ => {}
             }
-            if depth > 0 && !(depth == 1 && *token == Token::Comma) {
-                if let Some(part) = parts.get_mut(position) {
-                    part.push(token);
-                }
+            if depth > 0
+                && !(depth == 1 && *token == Token::Comma)
+                && let Some(part) = parts.get_mut(position)
+            {
+                part.push(token);
             }
             index += 1;
         }
