@@ -17,7 +17,7 @@ use serde::Deserialize;
 /// Đặt cột thời gian `column` của mọi dòng về một giây trước (giả lập quá hạn giữ / hết hạn).
 async fn set_all(database: &Database, column: autoxide_kernel::db::Col<Row, Timestamp>) {
     let transaction = all_tenants(database).begin_write().await.unwrap();
-    let past = now() - SignedDuration::from_secs(1);
+    let past = now() - autoxide_kernel::time::Duration::from_secs(1);
     transaction.update::<Row>().set(column, past).exec().await.unwrap();
     transaction.commit().await.unwrap();
 }
@@ -333,7 +333,7 @@ async fn key_het_han_va_lan_dau_chet_giua_chung() {
         let (app, _, database) = setup(test).await;
         let store = Store;
         let tenant = app.default_tenant();
-        let soon = now() + SignedDuration::from_secs(60);
+        let soon = now() + autoxide_kernel::time::Duration::from_secs(60);
 
         let Begin::Started { id } = store.begin(&tenant, "s", "k", "f", soon).await.unwrap() else {
             panic!("first request must start");
@@ -383,7 +383,7 @@ async fn cung_key_o_hai_khach_deu_chay() {
             .build()
             .await
             .unwrap();
-        let soon = now() + SignedDuration::from_secs(60);
+        let soon = now() + autoxide_kernel::time::Duration::from_secs(60);
         let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
         for tenant in [&a, &b, &app.default_tenant()] {
             let started = Store.begin(tenant, "s", "k", "f", soon).await.unwrap();

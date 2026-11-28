@@ -192,8 +192,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             cài thẳng `http::Validate`, gọi hàm kiểm của kernel (`http::check`), lỗi trùng từng trường với derive của
             `validator` (test so). Còn: gỡ impl chung `impl<T: validator::Validate> Validate for T` và `From<ValidationErrors>
             for Error` khi module cuối bỏ `validator` (theo cụm)
-      - [ ] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
-            cần chúng
+      - [x] `time::Duration` (thay `jiff::SignedDuration`) và các kiểu lịch dân sự của kernel, làm cùng cụm module đầu tiên
+            cần chúng (D-20261128-time-duration-ops; `Duration`, `TimeZone`, `TimeOfDay`, `Weekday`, `DateTime`; đường cũ
+            `SignedDuration`/`zone`/`from_local`/`parse_clock` còn tới khi module cuối chuyển)
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
       - [ ] Cụm 1 (D-20261128-library-layer-plan mục 7). Kernel thêm `http::NoStore<T>`, `JobContext::all_tenants`.

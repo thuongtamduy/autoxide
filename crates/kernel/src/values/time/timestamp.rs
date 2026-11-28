@@ -9,7 +9,7 @@ use jiff::{RoundMode, SignedDuration, TimestampRound, Unit};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::format::{self, UtcSuffix};
-use super::{Date, ParseError, Precision};
+use super::{Date, DateTime, Duration, ParseError, Precision, Zone};
 
 /// An instant (UTC). Replaces `chrono::DateTime<Utc>` / `sea_orm::prelude::DateTimeUtc` (D-20261121-time-library).
 ///
@@ -106,19 +106,31 @@ impl Timestamp {
         floor_div(self.0, 1_000_000_000)
     }
 
-    /// Adds a span; `None` when it exceeds the representable range.
-    pub fn checked_add(self, duration: SignedDuration) -> Option<Self> {
-        self.0.checked_add(duration).ok().map(Timestamp)
+    /// Adds a span; `None` when the result leaves the representable range (years ±9999).
+    //
+    // `impl Into<Duration>`: chỗ gọi cũ còn truyền `jiff::SignedDuration` vẫn biên dịch (đường cũ).
+    pub fn checked_add(self, duration: impl Into<Duration>) -> Option<Self> {
+        self.0.checked_add(duration.into().to_jiff()).ok().map(Timestamp)
     }
 
-    /// Subtracts a span; `None` when it exceeds the representable range.
-    pub fn checked_sub(self, duration: SignedDuration) -> Option<Self> {
-        self.0.checked_sub(duration).ok().map(Timestamp)
+    /// Subtracts a span; `None` when the result leaves the representable range (years ±9999).
+    pub fn checked_sub(self, duration: impl Into<Duration>) -> Option<Self> {
+        self.0.checked_sub(duration.into().to_jiff()).ok().map(Timestamp)
     }
 
-    /// `self - earlier` (negative when `earlier` is later).
+    /// `self - earlier` as a [`Duration`], negative when `earlier` is later; below a microsecond is truncated.
+    pub fn since(self, earlier: Timestamp) -> Duration {
+        Duration::from(self.0.duration_since(earlier.0))
+    }
+
+    /// Old path: use [`Timestamp::since`]. `self - earlier` (negative when `earlier` is later).
     pub fn duration_since(self, earlier: Timestamp) -> SignedDuration {
         self.0.duration_since(earlier.0)
+    }
+
+    /// The local date and time of this instant in `zone` (below a second is dropped).
+    pub fn to_local(self, zone: &super::TimeZone) -> DateTime {
+        DateTime::from_jiff(self.0.to_zoned_datetime(zone.jiff_zone().clone()).datetime())
     }
 
     /// Truncates to unit `unit` (seconds, minutes…), without rounding up.
@@ -129,8 +141,8 @@ impl Timestamp {
     }
 
     /// The calendar date in time zone `zone` (e.g. the Vietnam date of an order).
-    pub fn date_in(self, zone: &TimeZone) -> Date {
-        Date::from(self.0.to_zoned_datetime(zone.clone()).date())
+    pub fn date_in(self, zone: &impl Zone) -> Date {
+        Date::from(self.0.to_zoned_datetime(zone.jiff_zone().clone()).date())
     }
 
     /// RFC 3339 as JSON returns it: `2026-11-21T10:00:00.123456Z` (UTC, `Z` suffix, 0/3/6/9 fractional digits).
@@ -140,8 +152,8 @@ impl Timestamp {
 
     /// RFC 3339 in the local time of `zone`, with the offset (`2026-11-23T09:00:00+07:00`), like
     /// `chrono`'s `with_timezone(&tz).to_rfc3339()`: so a reader sees the time at that place.
-    pub fn to_rfc3339_in(self, zone: &TimeZone) -> String {
-        format::write_zoned(self.0, zone)
+    pub fn to_rfc3339_in(self, zone: &impl Zone) -> String {
+        format::write_zoned(self.0, zone.jiff_zone())
     }
 
     /// RFC 3339 with the `+00:00` suffix — exactly the string `chrono::DateTime<Utc>::to_rfc3339()` produces
@@ -166,12 +178,12 @@ impl Timestamp {
 
     /// The calendar date in UTC.
     pub fn date_utc(self) -> Date {
-        self.date_in(&TimeZone::UTC)
+        self.date_in(&super::TimeZone::UTC)
     }
 
-    /// This instant in time zone `zone` (to get local time, weekday…).
-    pub fn in_zone(self, zone: &TimeZone) -> jiff::ZonedDateTime {
-        self.0.to_zoned_datetime(zone.clone())
+    /// Old path: use [`Timestamp::to_local`]. This instant in time zone `zone` (to get local time, weekday…).
+    pub fn in_zone(self, zone: &impl Zone) -> jiff::ZonedDateTime {
+        self.0.to_zoned_datetime(zone.jiff_zone().clone())
     }
 
     /// From milliseconds since 1970-01-01T00:00:00Z.

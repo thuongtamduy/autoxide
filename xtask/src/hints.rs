@@ -172,6 +172,10 @@ const FIXES: &[(&str, &str)] = &[
         "Remove `features = [\"testing\"]` from the dependency on `autoxide-kernel`; tests get direct table access through `autoxide_testkit::all_tenants`.",
     ),
     (
+        "time-legacy",
+        "Use the kernel time types instead of the old paths that take or return `jiff` types: `time::Duration` (not `SignedDuration`), `TimeZone::get` (not `time::zone`), `TimeZone::to_timestamp` (not `from_local`), `TimeOfDay::parse_hm` (not `parse_clock`), `Timestamp::since` (not `duration_since`), `Timestamp::to_local` (not `in_zone`), `Date::day_of_week` (not `weekday`); then lower or remove the file's line in xtask/time-legacy-baseline.txt.",
+    ),
+    (
         "toolchain",
         "Change the Rust version in rust-toolchain.toml, `rust-version` in the root Cargo.toml, examples/external-module (channel and rust-version) and the Dockerfile `ARG RUST_VERSION` together.",
     ),

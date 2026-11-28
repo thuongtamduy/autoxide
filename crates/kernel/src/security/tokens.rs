@@ -17,7 +17,6 @@ use crate::migration::prelude::{
 };
 use crate::migration::schema;
 use crate::time::Timestamp;
-use jiff::SignedDuration;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
 use uuid::Uuid;
@@ -99,13 +98,13 @@ impl OneTimeTokens {
         purpose: &str,
         subject: &str,
         data: Option<&str>,
-        ttl: SignedDuration,
+        ttl: impl Into<crate::time::Duration>,
     ) -> Result<Issued, Error> {
         let connection = &crate::db::Via::of(connection);
         let token = random_token(32)?;
         let id = Uuid::now_v7();
         let now = now();
-        let expires_at = now + ttl;
+        let expires_at = now + ttl.into();
         let insert = Query::insert()
             .into_table(Alias::new(&self.table))
             .columns(

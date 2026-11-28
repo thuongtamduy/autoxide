@@ -50,9 +50,20 @@ impl Date {
         super::Timestamp::now().date_utc()
     }
 
-    /// Day of the week.
+    /// Old path: use [`Date::day_of_week`]. Day of the week as a `jiff` value.
     pub fn weekday(self) -> jiff::civil::Weekday {
         self.0.weekday()
+    }
+
+    /// Day of the week.
+    pub fn day_of_week(self) -> super::Weekday {
+        super::Weekday::from(self.0.weekday())
+    }
+
+    /// This date at time of day `time` (a local wall-clock time; place it in a zone with
+    /// [`TimeZone::to_timestamp`](super::TimeZone::to_timestamp)).
+    pub fn at(self, time: super::TimeOfDay) -> super::DateTime {
+        super::DateTime::new(self, time)
     }
 
     /// Day of the year (1–366).
@@ -114,8 +125,8 @@ impl Date {
 
     /// The instant this date starts in time zone `zone` (a day where daylight saving starts at 01:00 gives
     /// that time).
-    pub fn start_of_day_in(self, zone: &jiff::tz::TimeZone) -> Option<super::Timestamp> {
-        let zoned = self.0.to_zoned_datetime(zone.clone()).ok()?;
+    pub fn start_of_day_in(self, zone: &impl super::Zone) -> Option<super::Timestamp> {
+        let zoned = self.0.to_zoned_datetime(zone.jiff_zone().clone()).ok()?;
         zoned.start_of_day().ok().map(|start| super::Timestamp::exact(start.timestamp()))
     }
 

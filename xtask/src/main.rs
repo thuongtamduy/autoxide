@@ -85,6 +85,7 @@ mod source;
 mod tenancy;
 mod tenant_scope;
 mod test_shards;
+mod time_legacy;
 mod toolchain;
 mod upgrade;
 mod workspace;
@@ -391,6 +392,14 @@ fn check() -> ExitCode {
             eprintln!("{warning}");
         }
         violations.extend(contract.violations);
+        // Đường cũ của `autoxide_kernel::time` (nhận / trả kiểu `jiff`): chỗ cũ ở `time-legacy-baseline.txt`, chỉ giảm
+        // (D-20261128-time-duration-ops).
+        let time = time_legacy::check(&workspace)?;
+        let time = baseline::apply_file(&workspace.root, time_legacy::BASELINE, time)?;
+        for warning in &time.warnings {
+            eprintln!("{warning}");
+        }
+        violations.extend(time.violations);
         violations.extend(library_layer::check_private_paths(&workspace)?);
         violations.extend(library_layer::check_single_copies(&workspace.root)?);
         violations.extend(library_layer::check_strict(&workspace)?);

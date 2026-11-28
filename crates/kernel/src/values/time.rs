@@ -22,13 +22,17 @@
 //! `Statement::from_sql_and_values`). Do not write `CAST(? AS timestamptz)` yourself: SQLite reads an unknown
 //! type as a number.
 //!
-//! Time zones, durations and calendar computation (adding months, weekday…) use `jiff` directly
-//! (`jiff::tz::TimeZone`, `jiff::SignedDuration`, `jiff::civil`): there is nothing to store or return, so no
-//! wrapper is needed.
+//! Spans and the civil calendar have kernel types too (D-20261128-library-layer-plan point 3): [`Duration`]
+//! (signed, microseconds), [`TimeZone`], [`TimeOfDay`], [`Weekday`], [`DateTime`]. Module code uses these, not
+//! `jiff`: the library stays inside the kernel. The re-export [`SignedDuration`] and the functions [`zone`],
+//! [`from_local`], [`parse_clock`] (which take or return `jiff` types) are the old path, kept until the last
+//! module has moved (D-20261127-transition-paths).
 //!
 //! `chrono` / `chrono-tz` have been removed entirely; tests compare against `chrono` values recorded in `time/golden.json`.
 
+mod civil;
 mod date;
+mod duration;
 mod format;
 mod sql;
 mod timestamp;
@@ -38,14 +42,15 @@ mod tests;
 
 use std::fmt;
 
+pub use civil::{DateTime, TimeOfDay, TimeZone, Weekday, Zone};
 pub use date::Date;
-/// A signed duration (`jiff::SignedDuration`), re-exported so modules can add to and subtract from
-/// [`Timestamp`] (`Timestamp::now() - SignedDuration::from_hours(24)`) without declaring `jiff` themselves
-/// (D-20261122-module-helpers).
+pub use duration::Duration;
+/// Old path: `jiff`'s signed duration. Use [`Duration`]; kept until the last module has moved
+/// (D-20261127-transition-paths).
 pub use jiff::SignedDuration;
 pub use timestamp::Timestamp;
 
-/// An IANA time zone by name (`Asia/Ho_Chi_Minh`, `UTC`), taken from the time zone data packaged in the
+/// Old path: use [`TimeZone::get`]. An IANA time zone by name (`Asia/Ho_Chi_Minh`, `UTC`), taken from the time zone data packaged in the
 /// binary (independent of the server). The name must use the same casing as in the data — as `chrono-tz` did
 /// before; `jiff` itself also accepts `asia/ho_chi_minh`, but a stored name is read back and matched
 /// elsewhere, so keep one form.
@@ -54,7 +59,7 @@ pub fn zone(name: &str) -> Option<jiff::tz::TimeZone> {
     (zone.iana_name() == Some(name)).then_some(zone)
 }
 
-/// The point in time of local time `local` in zone `zone` — like `chrono`
+/// Old path: use [`TimeZone::to_timestamp`]. The point in time of local time `local` in zone `zone` — like `chrono`
 /// `from_local_datetime(…).earliest()`: a local time that does not exist (daylight saving jump) gives `None`,
 /// a repeated time (clocks set back) takes the earlier one.
 pub fn from_local(zone: &jiff::tz::TimeZone, local: jiff::civil::DateTime) -> Option<Timestamp> {
@@ -68,7 +73,7 @@ pub fn from_local(zone: &jiff::tz::TimeZone, local: jiff::civil::DateTime) -> Op
     offset.to_timestamp(local).ok().map(Timestamp::from)
 }
 
-/// A time of day written `HH:MM` (`09:00`, `9:00` is also accepted), like opening hours. Seconds and `24:00` are not accepted.
+/// Old path: use [`TimeOfDay::parse_hm`]. A time of day written `HH:MM` (`09:00`, `9:00` is also accepted), like opening hours. Seconds and `24:00` are not accepted.
 pub fn parse_clock(raw: &str) -> Option<jiff::civil::Time> {
     jiff::civil::Time::strptime("%H:%M", raw).ok()
 }
