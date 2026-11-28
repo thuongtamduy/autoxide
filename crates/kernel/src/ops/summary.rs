@@ -216,6 +216,8 @@ pub(crate) struct SummaryState {
     pub metrics: SummaryMetrics,
     pub entitlements: EntitlementsHandle,
     pub translations: Translations,
+    /// Time limit of one source (`AUTOXIDE_SOURCE_TIMEOUT_MS`).
+    pub timeout: std::time::Duration,
 }
 
 impl SummaryState {
@@ -240,12 +242,10 @@ impl SummaryState {
                 allowed.push(metric);
             }
         }
+        let timeout = self.timeout;
         let answers = futures_util::future::join_all(allowed.iter().map(|metric| async move {
-            let value = tokio::time::timeout(
-                crate::ops::work::SOURCE_TIMEOUT,
-                metric.value(tenant, principal, target),
-            )
-            .await;
+            let value =
+                tokio::time::timeout(timeout, metric.value(tenant, principal, target)).await;
             (metric.info(), value)
         }))
         .await;

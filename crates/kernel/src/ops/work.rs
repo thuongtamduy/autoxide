@@ -35,8 +35,27 @@ use crate::tenancy::{OrgId, TenantContext, root_of};
 /// on busy CI machines, so 300 ms occasionally put a normal source into `incomplete` — the work inbox and
 /// global search tests failed randomly on Postgres. Debug builds get 1.5 s: still shorter than the simulated
 /// slow source in tests (sleeping 2 s), so the "drop a slow source" behavior is still verified.
+///
+/// This is the default when [`SOURCE_TIMEOUT_MS`] is not set; the value in effect comes from that setting.
 pub const SOURCE_TIMEOUT: Duration =
     if cfg!(debug_assertions) { Duration::from_millis(1500) } else { Duration::from_millis(300) };
+
+/// `AUTOXIDE_SOURCE_TIMEOUT_MS`: overrides [`SOURCE_TIMEOUT`] for this process.
+pub const SOURCE_TIMEOUT_MS: crate::config::Setting = crate::config::Setting::new(
+    "AUTOXIDE_SOURCE_TIMEOUT_MS",
+    "Milliseconds one module source may take in the work inbox, global search, summary, setup steps and \
+     open-by-code before it is skipped and listed in `incomplete` (50 to 60000). Unset: 300 (1500 in debug builds).",
+);
+
+/// Reads [`SOURCE_TIMEOUT_MS`]; unset gives [`SOURCE_TIMEOUT`].
+pub(crate) fn read_source_timeout(
+    reader: &mut crate::config::ConfigReader<'_>,
+) -> Result<Duration, crate::config::Invalid> {
+    let millis = reader.optional_with(&SOURCE_TIMEOUT_MS, |raw| {
+        crate::config::parse_in_range(raw, 50u64, 60_000)
+    })?;
+    Ok(millis.map_or(SOURCE_TIMEOUT, Duration::from_millis))
+}
 /// How long counters are kept in memory.
 const COUNT_CACHE: Duration = Duration::from_secs(10);
 /// Maximum number of work items one source returns in one collection.
@@ -234,6 +253,8 @@ pub(crate) struct WorkState {
     pub sources: WorkSources,
     pub entitlements: EntitlementsHandle,
     pub translations: Translations,
+    /// Time limit of one source (`AUTOXIDE_SOURCE_TIMEOUT_MS`).
+    pub timeout: Duration,
     counts: Arc<Mutex<CountCache>>,
 }
 
@@ -245,8 +266,9 @@ impl WorkState {
         sources: WorkSources,
         entitlements: EntitlementsHandle,
         translations: Translations,
+        timeout: Duration,
     ) -> Self {
-        WorkState { sources, entitlements, translations, counts: Arc::default() }
+        WorkState { sources, entitlements, translations, timeout, counts: Arc::default() }
     }
 
     /// Sources the caller may see at `target`: the module is enabled for the tenant and the caller has the source's permission.
@@ -285,7 +307,7 @@ impl WorkState {
         let answers =
             futures_util::future::join_all(sources.iter().map(|(_, source)| async move {
                 let found = tokio::time::timeout(
-                    SOURCE_TIMEOUT,
+                    self.timeout,
                     source.items(tenant, principal, target, PER_SOURCE),
                 )
                 .await;
@@ -377,7 +399,7 @@ impl WorkState {
             futures_util::future::join_all(sources.iter().map(|(_, source)| async move {
                 (
                     source.id(),
-                    tokio::time::timeout(SOURCE_TIMEOUT, source.count(tenant, principal, target))
+                    tokio::time::timeout(self.timeout, source.count(tenant, principal, target))
                         .await,
                 )
             }))
@@ -490,4 +512,28 @@ async fn count_work(
     Query(query): Query<WorkQuery>,
 ) -> Result<Data<WorkCounts>, Error> {
     Ok(Data { data: state.counts(&tenant, &principal, query.org_id).await? })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{ConfigReader, ConfigSource};
+
+    fn read(pairs: &[(&str, &str)]) -> Result<Duration, crate::config::Invalid> {
+        let source = ConfigSource::from_pairs(pairs.iter().copied());
+        let mut reader = ConfigReader::new(&source);
+        read_source_timeout(&mut reader)
+    }
+
+    #[test]
+    fn tran_cua_nguon_doc_tu_cau_hinh() {
+        assert_eq!(read(&[]).unwrap(), SOURCE_TIMEOUT, "không đặt thì dùng mặc định");
+        assert_eq!(
+            read(&[("AUTOXIDE_SOURCE_TIMEOUT_MS", "800")]).unwrap(),
+            Duration::from_millis(800)
+        );
+        assert!(read(&[("AUTOXIDE_SOURCE_TIMEOUT_MS", "10")]).is_err(), "dưới 50 ms");
+        assert!(read(&[("AUTOXIDE_SOURCE_TIMEOUT_MS", "60001")]).is_err(), "trên 60 s");
+        assert!(read(&[("AUTOXIDE_SOURCE_TIMEOUT_MS", "abc")]).is_err());
+    }
 }

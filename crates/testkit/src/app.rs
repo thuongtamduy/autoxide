@@ -336,7 +336,9 @@ pub fn tool(name: &str, arguments: Value) -> CallToolRequestParams {
 }
 
 impl<'a> TestAppBuilder<'a> {
-    /// Sets a configuration variable (like an environment variable). `DATABASE_URL` is already set.
+    /// Sets a configuration variable (like an environment variable). `DATABASE_URL` is already set, and
+    /// `AUTOXIDE_SOURCE_TIMEOUT_MS` is 60000 unless set here (a busy test machine must not push a normal source
+    /// into `incomplete`).
     pub fn setting(mut self, name: &str, value: &str) -> Self {
         self.settings.push((name.to_owned(), value.to_owned()));
         self
@@ -501,10 +503,16 @@ impl<'a> TestAppBuilder<'a> {
     pub async fn build(self) -> Result<TestApp, TestAppError> {
         let mut pairs = vec![("DATABASE_URL".to_owned(), self.test.url().to_owned())];
         pairs.extend(self.settings);
+        let has = |pairs: &[(String, String)], name: &str| pairs.iter().any(|(n, _)| n == name);
+        // Trần của mỗi nguồn (hộp việc, tìm chung, số liệu, bước thiết lập, mở theo mã) là đồng hồ thật: máy CI bận
+        // làm nguồn bình thường quá trần 1,5 s và rơi vào `incomplete` ngẫu nhiên. Test không đo trần thì cho trần rộng;
+        // test về nguồn chậm tự đặt trần ngắn bằng `.setting(…)`.
+        if !has(&pairs, "AUTOXIDE_SOURCE_TIMEOUT_MS") {
+            pairs.push(("AUTOXIDE_SOURCE_TIMEOUT_MS".to_owned(), "60000".to_owned()));
+        }
         // Mặc định của `files` và `mail` là thư mục tương đối `data/files`, `data/mail` — tức ngay trong
         // thư mục chạy test (`crates/app`), và test upload để rác ở đó mãi. Bài test chưa chọn thư mục
         // (hay S3) thì cho một thư mục tạm riêng, xoá khi `TestApp` bị bỏ.
-        let has = |pairs: &[(String, String)], name: &str| pairs.iter().any(|(n, _)| n == name);
         let mut scratch = None;
         let needs_files =
             !has(&pairs, "AUTOXIDE_FILES_DIR") && !has(&pairs, "AUTOXIDE_FILES_S3_BUCKET");
