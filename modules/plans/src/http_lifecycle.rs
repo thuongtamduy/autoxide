@@ -208,10 +208,12 @@ async fn change_subscription(
 ///
 /// Requires `plans.billing.manage`. By default at the end of the current period (undo with
 /// `POST /subscription/resume`).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/subscription/cancel",
-    extensions(("x-permissions" = json!(["plans.billing.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.billing.manage"]))),
     operation_id = "cancel_own_subscription",
     security(("bearer" = [])),
     request_body = CancelRequest,
@@ -268,10 +270,12 @@ async fn resume_subscription(
 ///
 /// Platform staff with `plans.subscriptions.manage`. The tenant becomes read-only; its data is kept
 /// for the plan's retention days.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/tenants/{tenant_id}/subscription/cancel",
-    extensions(("x-permissions" = json!(["plans.subscriptions.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.subscriptions.manage"]))),
     operation_id = "cancel_tenant_subscription",
     security(("bearer" = [])),
     params(("tenant_id" = Uuid, Path, description = "Id of the tenant.")),
@@ -299,10 +303,12 @@ async fn cancel_tenant_subscription(
 /// Platform staff with `plans.subscriptions.manage`. Unlike a suspended subscription (read-only),
 /// every request of the tenant is refused (`tenant_suspended`), reads included. Reactivate with
 /// `PATCH /api/v1/kernel/tenants/{id}` (`status: active`).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/tenants/{tenant_id}/subscription/suspend",
-    extensions(("x-permissions" = json!(["plans.subscriptions.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.subscriptions.manage"]))),
     operation_id = "suspend_tenant",
     security(("bearer" = [])),
     params(("tenant_id" = Uuid, Path, description = "Id of the tenant.")),
@@ -426,10 +432,12 @@ async fn get_billing_period(
 ///
 /// Platform staff with `plans.subscriptions.manage`, for payments checked by hand (no payment
 /// provider yet). A past-due or suspended subscription becomes active again.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/billing-periods/{id}/mark-paid",
-    extensions(("x-permissions" = json!(["plans.subscriptions.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.subscriptions.manage"]))),
     operation_id = "mark_billing_period_paid",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the billing period.")),
@@ -460,10 +468,12 @@ async fn mark_paid(
 /// Platform staff with `plans.subscriptions.manage`. When the period already has an invoice, it is cancelled
 /// afterwards by a background job, not within this request: an e-invoice the tax rules no longer let cancel
 /// (Vietnam since 2025-06-01) gets a full decrease adjustment instead. Read the invoice later to see the result.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/billing-periods/{id}/void",
-    extensions(("x-permissions" = json!(["plans.subscriptions.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.subscriptions.manage"]))),
     operation_id = "void_billing_period",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the billing period.")),
@@ -500,10 +510,12 @@ pub(crate) struct PayRequest {
 /// payment partner and returns its checkout page; the period is marked paid when the partner reports
 /// the payment. Calling again returns the payment still waiting, or starts a new one when the last
 /// one expired.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/billing-periods/{id}/pay",
-    extensions(("x-permissions" = json!(["plans.billing.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["plans.billing.manage"]))),
     operation_id = "pay_billing_period",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the billing period.")),

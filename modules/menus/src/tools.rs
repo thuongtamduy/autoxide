@@ -176,6 +176,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
             },
         )
         .requires(MENUS_MANAGE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
     ]
 }

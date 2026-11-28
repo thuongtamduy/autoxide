@@ -722,10 +722,12 @@ async fn update_oidc_provider(
 ///
 /// Requires `auth.oidc.manage`. Every account link to it goes too; people who signed in only
 /// with it reset their password by email.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/oidc-providers/{id}",
-    extensions(("x-permissions" = json!(["auth.oidc.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.oidc.manage"]))),
     operation_id = "delete_oidc_provider",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the provider.")),

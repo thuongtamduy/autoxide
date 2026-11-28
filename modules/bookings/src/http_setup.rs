@@ -764,10 +764,12 @@ async fn create_exception(
 /// Remove time off or extra hours.
 ///
 /// Requires `bookings.services.manage` at the resource's unit.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/exceptions/{id}",
-    extensions(("x-permissions" = json!(["bookings.services.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["bookings.services.manage"]))),
     operation_id = "delete_booking_exception",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the exception.")),

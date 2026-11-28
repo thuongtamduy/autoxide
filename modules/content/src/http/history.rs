@@ -359,10 +359,12 @@ pub(crate) async fn create_schedule(
 /// Cancel a pending schedule.
 ///
 /// Requires `content.publish`.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/schedules/{id}",
-    extensions(("x-permissions" = json!(["content.publish"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.publish"]))),
     operation_id = "cancel_content_schedule",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the schedule.")),

@@ -472,10 +472,12 @@ async fn replace_menu(
 /// Delete a website menu.
 ///
 /// Requires `menus.manage`. Deletes the menu and all its items; it cannot be restored.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/{id}",
-    extensions(("x-permissions" = json!(["menus.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["menus.manage"]))),
     operation_id = "delete_menu",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the menu.")),

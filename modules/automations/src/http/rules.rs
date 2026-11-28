@@ -316,10 +316,12 @@ pub(crate) async fn update_rule(
 /// Delete an automation rule.
 ///
 /// Requires `automations.manage` covering the rule. The log of its runs stays until it expires.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/rules/{id}",
-    extensions(("x-permissions" = json!(["automations.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["automations.manage"]))),
     operation_id = "delete_automation_rule",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the rule."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the rule is deleted only if nobody changed it since; otherwise `412`.")),

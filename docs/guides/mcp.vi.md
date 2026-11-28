@@ -389,6 +389,19 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 
 <!-- tools:end -->
 
+### Lệnh chờ người duyệt
+
+Khi AI agent (API key loại `agent`, hay client MCP / OAuth) gọi lệnh xoá dữ liệu, chạm tiền hay không hoàn tác được —
+hoàn tiền, chi trả, phát hành hoá đơn điện tử, gửi chiến dịch newsletter, xoá khách, mọi lệnh `DELETE` — chưa có gì
+chạy. REST trả `202` kèm một yêu cầu duyệt (`x-approval: "agent"` trong tài liệu OpenAPI đánh dấu các lệnh này); tool MCP
+trả `approval_required` và chỉ tới endpoint REST đó. Một người duyệt hay từ chối trong hộp việc của họ
+(`POST /api/v1/kernel/approvals/{id}/approve` | `/reject`); rồi agent gửi lại đúng request cũ, cùng `Idempotency-Key`,
+kèm header `Autoxide-Approval: <id>`.
+
+Ai duyệt: người có một trong các permission của lệnh, trong phiên đăng nhập của chính họ. Lệnh không đòi permission nào
+(huỷ hay trả tiền đơn của chính mình) do chính chủ của agent duyệt. Agent không bao giờ tự duyệt yêu cầu của mình. Thu
+hồi credential và sửa dữ liệu nhỏ của chính người gọi (ghim, bộ lọc đã lưu, danh sách yêu thích) không phải chờ.
+
 ## 4. Resource và prompt
 
 Ngoài tool, `/mcp` có **resource** (tài liệu chỉ đọc: `resources/list`, `resources/read`) và **prompt** (mẫu lời nhắc cho việc hay làm: `prompts/list`, `prompts/get`). Cả hai theo permission như tool: resource chỉ hiện với người gọi có permission của nó, prompt chỉ hiện với người gọi được mọi tool mà prompt dẫn tới. Resource hay prompt người gọi không được dùng trả lời y hệt cái không tồn tại.

@@ -111,10 +111,12 @@ pub(crate) async fn set_policy(
 ///
 /// Requires `support.settings.manage` at the unit. The unit then inherits the policy of the units
 /// above (or the defaults).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/policies/{org_id}",
-    extensions(("x-permissions" = json!(["support.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["support.settings.manage"]))),
     operation_id = "reset_support_policy",
     security(("bearer" = [])),
     params(("org_id" = Uuid, Path, description = "The unit.")),

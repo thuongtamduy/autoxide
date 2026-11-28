@@ -275,7 +275,8 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
             },
         )
         .requires(REFUND)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
         Tool::new(
             "list_returns",
             "List return requests of shops in your scope, newest first, with lines, photos \

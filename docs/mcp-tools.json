@@ -1197,7 +1197,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -1228,7 +1228,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -2621,7 +2621,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -3219,7 +3219,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -9659,7 +9659,7 @@
       "annotations": {
         "destructive": false,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -9865,7 +9865,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -10712,7 +10712,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -11130,7 +11130,7 @@
       "annotations": {
         "destructive": false,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -12568,7 +12568,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -13000,7 +13000,7 @@
       "annotations": {
         "destructive": false,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -13835,7 +13835,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -14448,7 +14448,7 @@
       "annotations": {
         "destructive": false,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -15173,7 +15173,7 @@
       "annotations": {
         "destructive": false,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,
@@ -16145,7 +16145,7 @@
       "annotations": {
         "destructive": true,
         "read_only": false,
-        "requires_approval_for_agent": false,
+        "requires_approval_for_agent": true,
         "returns_secret": false
       },
       "deprecation": null,

@@ -267,10 +267,12 @@ pub(crate) async fn update_term(
 ///
 /// Requires `content.manage`. It is removed from every entry. A category with
 /// subcategories cannot be deleted.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/terms/{id}",
-    extensions(("x-permissions" = json!(["content.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.manage"]))),
     operation_id = "delete_content_term",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the term.")),
@@ -500,10 +502,12 @@ pub(crate) async fn update_author(
 /// Delete an author profile.
 ///
 /// Requires `content.manage`. It is removed from every entry; the entries stay.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/authors/{id}",
-    extensions(("x-permissions" = json!(["content.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.manage"]))),
     operation_id = "delete_content_author",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the author.")),

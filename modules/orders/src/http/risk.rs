@@ -204,10 +204,12 @@ pub(crate) async fn create_rule(
 /// End a cash-on-delivery rule.
 ///
 /// Requires `orders.risk.manage` at the node. The rule stops applying now; it is kept.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/risk/cod-rules/{id}",
-    extensions(("x-permissions" = json!(["orders.risk.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["orders.risk.manage"]))),
     operation_id = "end_cod_rule",
     params(("id" = Uuid, Path, description = "Id of the rule.")),
     responses(
@@ -343,10 +345,12 @@ pub(crate) async fn create_block(
 /// Lift a cash-on-delivery block.
 ///
 /// Requires `orders.risk.manage`. Lifting again changes nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/risk/cod-blocks/{id}",
-    extensions(("x-permissions" = json!(["orders.risk.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["orders.risk.manage"]))),
     operation_id = "lift_cod_block",
     params(("id" = Uuid, Path, description = "Id of the block.")),
     responses(

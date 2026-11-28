@@ -265,10 +265,12 @@ pub(crate) struct PayoutsQuery {
 /// `partner_collect` mode. The balance is taken first, then the payout partner pays from its
 /// collection account; if it refuses, the amount goes back to the balance. Payouts never exceed
 /// the available balance, even when sent at the same time.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/payouts",
-    extensions(("x-permissions" = json!(["ledger.payouts_create"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["ledger.payouts_create"]))),
     operation_id = "create_ledger_payout",
     security(("bearer" = [])),
     request_body = PayoutRequest,

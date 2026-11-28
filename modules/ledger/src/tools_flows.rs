@@ -211,7 +211,8 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(PAYOUTS_CREATE),
+        .requires(PAYOUTS_CREATE)
+        .requires_approval_for_agent(),
         Tool::new(
             "create_vietqr_payment",
             "Create a VietQR bank transfer payment into the unit's own bank account: returns the QR \

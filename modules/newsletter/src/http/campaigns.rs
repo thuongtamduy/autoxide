@@ -372,10 +372,12 @@ pub(crate) async fn update_campaign(
 ///
 /// Requires `newsletter.manage`. `If-Match` is required. Only a campaign that never sent (a
 /// draft, a scheduled one, or one cancelled before sending) can be deleted.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/campaigns/{id}",
-    extensions(("x-permissions" = json!(["newsletter.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -409,10 +411,12 @@ pub(crate) async fn delete_campaign(
 /// blocked and unsubscribed people are skipped. Needs `AUTOXIDE_HTTP_PUBLIC_URL` and
 /// `AUTOXIDE_NEWSLETTER_PREFERENCES_URL` (and `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` for
 /// advertising). Follow the progress with `GET /campaigns/{id}`.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/campaigns/{id}/send",
-    extensions(("x-permissions" = json!(["newsletter.send"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["newsletter.send"]))),
     operation_id = "send_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),

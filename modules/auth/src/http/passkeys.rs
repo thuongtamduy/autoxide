@@ -325,10 +325,12 @@ async fn list_user_passkeys(
 /// stops working at once. The password and the user's sessions stay as they are (like
 /// `DELETE /api/v1/auth/users/{id}/mfa`). Check who is asking before using this. The event
 /// `auth.passkey_removed` records `by_administrator`.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/users/{id}/passkeys/{passkey_id}",
-    extensions(("x-permissions" = json!(["auth.passkeys.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.passkeys.manage"]))),
     operation_id = "remove_user_passkey",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user."), ("passkey_id" = Uuid, Path, description = "Id of the passkey.")),
@@ -355,10 +357,12 @@ async fn remove_user_passkey(
 /// Requires `auth.passkeys.manage`, and that the user has no permission you lack. The user
 /// signs in with the password and can add new passkeys. The password and sessions stay as they
 /// are. Answers 204 also when the user had none.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/users/{id}/passkeys",
-    extensions(("x-permissions" = json!(["auth.passkeys.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.passkeys.manage"]))),
     operation_id = "remove_user_passkeys",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),

@@ -330,10 +330,12 @@ pub(crate) async fn put_placement(
 /// Delete a display placement.
 ///
 /// Requires `content.manage`. Refused while it has banners (archived ones too).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/placements/{key}",
-    extensions(("x-permissions" = json!(["content.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.manage"]))),
     operation_id = "delete_content_placement",
     security(("bearer" = [])),
     params(("key" = String, Path, description = "Key of the placement.")),

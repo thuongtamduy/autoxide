@@ -566,10 +566,12 @@ async fn update_tag(
 /// Delete a tag.
 ///
 /// Requires `kernel.tags.manage`. Records that carried it lose it.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/tags/{id}",
-    extensions(("x-permissions" = json!(["kernel.tags.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.tags.manage"]))),
     operation_id = "delete_tag",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the tag.")),
@@ -605,10 +607,12 @@ async fn delete_tag(
 ///
 /// Requires `kernel.tags.manage`. Every record carrying this tag carries `into` instead; this tag
 /// is deleted.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/tags/{id}/merge",
-    extensions(("x-permissions" = json!(["kernel.tags.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.tags.manage"]))),
     operation_id = "merge_tag",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the tag to merge away.")),

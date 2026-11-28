@@ -245,7 +245,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
   - [ ] **Sau 1.0**: xác thực client bằng `private_key_jwt` (#599)
 - [ ] Uỷ quyền cho agent: thông tin đăng nhập gắn với một người, phạm vi hẹp, có hạn, thu hồi được (token exchange RFC 8693
       hay tương đương); hạn mức và ngân sách theo từng agent; nhật ký hành động của agent ghi rõ agent nào làm thay ai
-- [ ] Người duyệt: rà mọi lệnh xoá, lệnh chạm tiền và lệnh không hoàn tác được để gắn `x-approval` khi agent gọi
+- [x] Người duyệt: rà mọi lệnh xoá, lệnh chạm tiền và lệnh không hoàn tác được để gắn `x-approval` khi agent gọi — gate
+      `api-approval` / `mcp-approval`, ngoại lệ có lý do ở `xtask/approval-allow.txt` (D-20261128-agent-approval-audit);
+      lệnh của comments, files, forms, mail, media, webhooks gắn sau khi phiên chuyển module merge
 - [ ] Chống chèn lệnh qua dữ liệu (prompt injection): kết quả tool và API đánh dấu phần nội dung do người dùng cuối nhập là
       chưa tin cậy; hướng dẫn cho người viết agent
 - [ ] Hợp đồng tool MCP đủ: `outputSchema` khớp `structuredContent`, `title`, `idempotentHint`, `openWorldHint`; phân

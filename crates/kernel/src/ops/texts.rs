@@ -444,10 +444,12 @@ async fn set_text(
 /// Go back to the default text.
 ///
 /// Requires `kernel.texts.manage`. Answers 204 even when the tenant had not replaced it.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/texts/{locale}/{key}",
-    extensions(("x-permissions" = json!(["kernel.texts.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.texts.manage"]))),
     operation_id = "delete_text",
     security(("bearer" = [])),
     params(

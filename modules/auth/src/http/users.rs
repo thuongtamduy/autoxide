@@ -379,10 +379,12 @@ async fn update_user(
 /// Requires `auth.users.manage`, and every permission the user has. Data kept by other
 /// modules is deleted shortly after. This cannot be undone; to only stop someone from
 /// signing in, disable the account with `PATCH /api/v1/auth/users/{id}` instead.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/users/{id}",
-    extensions(("x-permissions" = json!(["auth.users.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "delete_user",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),

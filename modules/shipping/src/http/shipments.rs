@@ -427,10 +427,12 @@ pub(crate) async fn book_shipment(
 ///
 /// Needs `shipping.shipments.manage`. A booked shipment is cancelled at the carrier too; once the
 /// carrier picked it up it cannot be cancelled.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/shipments/{id}/cancel",
-    extensions(("x-permissions" = json!(["shipping.shipments.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["shipping.shipments.manage"]))),
     operation_id = "cancel_shipping_shipment",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the shipment.")),

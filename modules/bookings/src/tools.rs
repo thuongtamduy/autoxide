@@ -179,6 +179,7 @@ pub(crate) fn all(service: &Arc<BookingsService>) -> Vec<Tool> {
             },
         )
         .requires(BOOKINGS_MANAGE)
-        .destructive(),
+        .destructive()
+        .requires_approval_for_agent(),
     ]
 }

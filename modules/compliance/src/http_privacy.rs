@@ -995,10 +995,12 @@ async fn update_subject_request(
 /// keeps about them (send it to the person; it is not stored); `erasure` of an email address or
 /// phone number empties it from the consent ledger; erasing a whole account is
 /// `DELETE /api/v1/auth/users/{id}`. Other kinds are done by hand and only recorded.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/subject-requests/{id}/fulfil",
-    extensions(("x-permissions" = json!(["compliance.privacy.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["compliance.privacy.manage"]))),
     operation_id = "fulfil_compliance_subject_request",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the request.")),

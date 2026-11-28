@@ -273,7 +273,8 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(NEWSLETTER_SEND),
+        .requires(NEWSLETTER_SEND)
+        .requires_approval_for_agent(),
         Tool::new(
             "schedule_campaign",
             "Schedule a draft or scheduled campaign to start sending at `at`. Pass the \

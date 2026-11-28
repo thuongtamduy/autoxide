@@ -240,10 +240,12 @@ pub(crate) async fn update_redirect(
 /// Delete a redirect.
 ///
 /// Requires `content.manage`. The old address then answers 404.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/redirects/{id}",
-    extensions(("x-permissions" = json!(["content.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.manage"]))),
     operation_id = "delete_content_redirect",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the redirect.")),

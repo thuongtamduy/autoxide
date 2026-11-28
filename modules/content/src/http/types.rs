@@ -259,10 +259,12 @@ pub(crate) async fn update_type(
 /// Delete a custom content type.
 ///
 /// Requires `content.types.manage`. A type that still has entries is not deleted (`409`).
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/types/{key}",
-    extensions(("x-permissions" = json!(["content.types.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.types.manage"]))),
     operation_id = "delete_content_type",
     security(("bearer" = [])),
     params(("key" = String, Path, description = "Key of the content type.")),

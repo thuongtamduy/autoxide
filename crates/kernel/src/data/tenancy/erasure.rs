@@ -274,10 +274,12 @@ pub(super) fn routes() -> utoipa_axum::router::OpenApiRouter<Arc<TenantAdmin>> {
 /// and every file of it is deleted, except the tables modules must keep (accounting records); its
 /// domains are released. The tenant stays listed with status `deleted`, and every request to it
 /// answers `404 tenant_not_found`.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/tenants/{id}/erase",
-    extensions(("x-permissions" = json!(["kernel.tenants.delete"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.tenants.delete"]))),
     operation_id = "erase_tenant",
     security(("bearer" = [])),
     params(("id" = String, Path, description = "Id or slug of the tenant.")),

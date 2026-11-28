@@ -348,7 +348,8 @@ fn plan_tools(service: &Arc<PlansService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(PLANS_MANAGE),
+        .requires(PLANS_MANAGE)
+        .requires_approval_for_agent(),
     ]
 }
 

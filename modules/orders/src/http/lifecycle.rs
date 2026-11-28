@@ -90,10 +90,12 @@ pub(crate) struct CancelRequest {
 /// Signed in: an order you placed. Allowed until the status the shop's policy says
 /// (`orders.buyer_cancel_until`, by default while the order is not being prepared yet); a paid
 /// order is refunded through the payment partner.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/me/orders/{id}/cancel",
-    extensions(("x-permissions" = json!([]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!([]))),
     operation_id = "cancel_my_order",
     params(("id" = Uuid, Path, description = "Id of the order.")),
     request_body = CancelRequest,
@@ -326,10 +328,12 @@ pub(crate) async fn my_payment_link(
 /// Signed in: for your order with pre-ordered items paid in part, once the balance is asked (the
 /// items are ready). Returns the balance payment to follow; a link that expired is opened again
 /// while the time to pay lasts. Calling again returns the same payment.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/me/orders/{id}/payments",
-    extensions(("x-permissions" = json!([]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!([]))),
     operation_id = "pay_my_order_balance",
     params(("id" = Uuid, Path, description = "Id of the order.")),
     responses(

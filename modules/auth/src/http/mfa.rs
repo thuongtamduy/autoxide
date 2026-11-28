@@ -251,10 +251,12 @@ async fn disable_totp(
 ///
 /// Requires `auth.users.manage`. The user signs in with the password alone and can
 /// set up a new device. Check who is asking before using this.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/users/{id}/mfa",
-    extensions(("x-permissions" = json!(["auth.users.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "reset_user_mfa",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),

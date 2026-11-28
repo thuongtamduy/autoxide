@@ -195,10 +195,12 @@ async fn update_domain(
 /// Requires `kernel.domains.manage`. The domain becomes `revoked`: requests to it no longer reach
 /// the tenant (other servers follow within `AUTOXIDE_TENANCY_CACHE_SECONDS`) and no new TLS
 /// certificate is issued for it. Removing it again changes nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/domains/{id}",
-    extensions(("x-permissions" = json!(["kernel.domains.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.domains.manage"]))),
     operation_id = "remove_tenant_domain",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the domain.")),

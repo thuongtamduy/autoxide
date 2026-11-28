@@ -186,10 +186,12 @@ async fn update_category(
 /// Delete an empty category.
 ///
 /// Requires `catalog.categories.manage`. The category must have no subcategories or products.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/categories/{id}",
-    extensions(("x-permissions" = json!(["catalog.categories.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.categories.manage"]))),
     operation_id = "delete_catalog_category",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the category.")),
@@ -759,10 +761,12 @@ async fn create_price_guard(
 /// Delete a price floor.
 ///
 /// Requires `catalog.prices.write` covering the rule.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/price-guards/{id}",
-    extensions(("x-permissions" = json!(["catalog.prices.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["catalog.prices.write"]))),
     operation_id = "delete_catalog_price_guard",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the rule.")),

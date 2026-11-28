@@ -187,10 +187,12 @@ pub(crate) async fn install_page_templates(
 /// Delete a page template.
 ///
 /// Requires `content.write` at the template's unit. Pages made from it are not changed.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/page-templates/{id}",
-    extensions(("x-permissions" = json!(["content.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["content.write"]))),
     operation_id = "delete_content_page_template",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the template.")),

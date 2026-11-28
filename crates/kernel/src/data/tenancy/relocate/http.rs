@@ -83,10 +83,12 @@ pub(crate) struct RelocationRequest {
 /// `"dry_run": false` the tenants answer `503 tenant_maintenance` while a background job copies the
 /// rows (keeping their ids), checks them, switches the tenants and cleans the source; follow it at
 /// the `Location` of the answer. Source and target must be two databases.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post,
     path = "/relocations",
-    extensions(("x-permissions" = json!(["kernel.tenants.relocate"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.tenants.relocate"]))),
     operation_id = "relocate_tenant",
     security(("bearer" = [])),
     request_body = RelocationRequest,

@@ -389,6 +389,19 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 
 <!-- tools:end -->
 
+### Commands that wait for a person
+
+When an AI agent (an API key of kind `agent`, or an MCP / OAuth client) calls a command that deletes data, touches
+money or cannot be undone — refunds, payouts, issuing an e-invoice, sending a newsletter campaign, erasing a tenant,
+any `DELETE` — nothing runs yet. REST answers `202` with an approval request (`x-approval: "agent"` in the OpenAPI
+document marks these operations); the MCP tool answers `approval_required` and points to that REST endpoint. A person
+approves or rejects it from their work inbox (`POST /api/v1/kernel/approvals/{id}/approve` | `/reject`); then the
+agent sends exactly the same request again, with the same `Idempotency-Key` and the header `Autoxide-Approval: <id>`.
+
+Who approves: a person holding one of the command's permissions, in their own signed-in session. A command that needs
+no permission (cancelling or paying one's own order) is approved by the agent's owner. An agent never approves its
+own requests. Revoking a credential and editing the caller's own small data (pins, saved views, wishlist) do not wait.
+
 ## 4. Resources and prompts
 
 Besides tools, `/mcp` offers **resources** (read-only documents: `resources/list`, `resources/read`) and **prompts** (templates for common jobs: `prompts/list`, `prompts/get`). Both follow permissions like tools: a resource is listed only to callers with its permission, and a prompt only to callers who may call every tool it leads to. A resource or prompt the caller may not use answers exactly like one that does not exist.

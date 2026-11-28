@@ -85,8 +85,7 @@ fn describe(tool: &Tool) -> Value {
             "read_only": tool.is_read_only(),
             "destructive": tool.is_destructive(),
             "returns_secret": tool.is_secret(),
-            // Có thật từ bước 51 (P12); tới đó luôn `false`.
-            "requires_approval_for_agent": false,
+            "requires_approval_for_agent": tool.needs_approval_for_agent(),
         },
         "input_schema": tool.input_schema(),
         // `Tool` chưa khai schema kết quả (đặc tả 31 A6).

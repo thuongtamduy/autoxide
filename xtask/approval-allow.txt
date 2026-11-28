@@ -1,0 +1,83 @@
+# Lệnh rủi ro được chạy ngay khi AI agent gọi, không chờ người duyệt (luật `api-approval` / `mcp-approval`,
+# xtask/src/api_approval.rs, D-20261128-agent-approval-audit). Mỗi dòng: `<luật> <METHOD|TOOL> <đường dẫn|tool> # lý do`.
+# Chỉ ba loại được miễn: thu hồi quyền (phải tức thì, hoàn tác bằng cách cấp lại), dữ liệu nhỏ của chính người gọi,
+# trạng thái quy trình không mất dữ liệu. Lệnh của module đang được chuyển sang lớp kernel (3B/3C) ghi tạm ở cuối,
+# gắn duyệt ngay sau khi phiên đó merge — chỉ giảm.
+
+# Thu hồi quyền: chậm lại là rủi ro bảo mật; hoàn tác bằng cách cấp credential mới.
+api-approval DELETE /api/v1/auth/all-api-keys/{id} # thu hồi API key
+api-approval DELETE /api/v1/auth/api-keys/{id} # thu hồi API key của chính mình
+api-approval DELETE /api/v1/auth/delegations/{id} # thu hồi uỷ quyền xuống khách con
+api-approval DELETE /api/v1/auth/invitations/{id} # thu hồi lời mời chưa nhận
+api-approval DELETE /api/v1/auth/me/oauth-grants/{id} # thu hồi client OAuth của chính mình
+api-approval DELETE /api/v1/auth/me/sessions # đăng xuất các phiên của chính mình
+api-approval DELETE /api/v1/auth/me/sessions/{id} # đăng xuất một phiên của chính mình
+api-approval DELETE /api/v1/auth/oauth-grants/{id} # thu hồi client OAuth
+api-approval DELETE /api/v1/auth/scim/tokens/{id} # thu hồi token SCIM
+api-approval DELETE /api/v1/auth/support-access/{id} # thu hồi quyền vào hỗ trợ của nhân viên nền tảng
+api-approval DELETE /api/v1/auth/support-grants/{id} # thu hồi cho phép hỗ trợ
+api-approval DELETE /api/v1/auth/users/{id}/sessions # đăng xuất mọi phiên của một người (ứng phó sự cố)
+mcp-approval TOOL auth.revoke_api_key # thu hồi API key, như REST
+
+# Chỉ phiên đăng nhập gọi được (handler trả `auth.session_required` với API key và client OAuth): agent không tới.
+api-approval DELETE /api/v1/auth/me # xoá tài khoản: chỉ phiên đăng nhập, kèm mật khẩu
+api-approval DELETE /api/v1/auth/me/email # chỉ phiên đăng nhập
+api-approval DELETE /api/v1/auth/me/identities/{id} # chỉ phiên đăng nhập
+api-approval DELETE /api/v1/auth/me/passkeys/{id} # chỉ phiên đăng nhập
+
+# Dữ liệu nhỏ của chính người gọi, tạo lại được.
+api-approval POST /api/v1/conversations/me/threads/{id}/close # đóng hội thoại của mình; tin mới mở lại
+api-approval DELETE /api/v1/conversations/me/threads/{id}/callbacks/{callback_id} # huỷ yêu cầu gọi lại của mình
+api-approval POST /api/v1/customers/me/wishlist/merge # gộp danh sách yêu thích của mình
+api-approval DELETE /api/v1/customers/me/wishlist/{product_id} # bỏ một món khỏi danh sách yêu thích
+api-approval DELETE /api/v1/me/flags/{key} # cờ giao diện của mình
+api-approval DELETE /api/v1/me/pins/{id} # ghim của mình
+api-approval DELETE /api/v1/me/views/{id} # bộ lọc đã lưu của mình
+api-approval DELETE /api/v1/me/work/{key}/snooze # bỏ hoãn việc của mình
+api-approval DELETE /api/v1/notifications/me/device-tokens/{id} # thiết bị nhận push của mình
+api-approval DELETE /api/v1/notifications/me/push-subscriptions/{id} # đăng ký push của mình
+api-approval POST /api/v1/orders/carts/{id}/merge # gộp giỏ khách vào giỏ của mình
+api-approval DELETE /api/v1/orders/public/reviews/{id}/helpful # bỏ bình chọn "hữu ích" của mình
+api-approval DELETE /api/v1/promotions/public/promotions/{id}/reminders # bỏ nhắc khuyến mãi của mình
+api-approval DELETE /api/v1/shipping/me/addresses/{id} # sổ địa chỉ của mình
+
+# Trạng thái quy trình, không mất dữ liệu (làm lại được) hay là hướng an toàn.
+api-approval DELETE /api/v1/content/entries/{id}/edit-lock # nhả khoá sửa
+api-approval DELETE /api/v1/content/entries/{id}/request-review # rút yêu cầu duyệt bài
+api-approval POST /api/v1/content/entries/{id}/move # dời trang sang cha khác, dời lại được
+api-approval POST /api/v1/catalog/categories/{id}/move # dời danh mục, dời lại được
+api-approval POST /api/v1/organizations/units/{id}/move # dời đơn vị, dời lại được
+api-approval POST /api/v1/compliance/cases/{id}/close # đóng hồ sơ xử lý, quyết định đã ghi riêng
+api-approval POST /api/v1/conversations/callbacks/{id}/close # đóng yêu cầu gọi lại
+api-approval POST /api/v1/conversations/threads/{id}/close # đóng hội thoại; tin mới mở lại
+api-approval DELETE /api/v1/conversations/threads/{id}/block # bỏ chặn khách, chặn lại được
+api-approval POST /api/v1/inventory/adjustments # điều chỉnh tồn thường ngày, mỗi dòng có lý do, bù được bằng lần khác
+api-approval POST /api/v1/inventory/counts/{id}/cancel # huỷ phiếu kiểm kho đang mở, chưa ghi tồn
+api-approval POST /api/v1/inventory/purchase-orders/{id}/cancel # chỉ huỷ được đơn nháp hay chưa nhận gì
+api-approval POST /api/v1/inventory/transfers/{id}/cancel # chỉ huỷ được phiếu nháp
+api-approval POST /api/v1/ledger/payments # tạo yêu cầu thu qua đối tác: không chuyển tiền đi
+api-approval POST /api/v1/promotions/promotions/{id}/cancel # dừng khuyến mãi là hướng an toàn; tạo lại được
+api-approval POST /api/v1/newsletter/campaigns/{id}/cancel # dừng gửi là hướng an toàn
+api-approval POST /api/v1/orders/pos/shifts/{id}/close # thu ngân đóng ca thường ngày; chênh lệch tiền đã có bước duyệt riêng
+mcp-approval TOOL content.unpublish # gỡ bài, đăng lại được
+mcp-approval TOOL inventory.release_reservation # nhả giữ hàng, giữ lại được
+mcp-approval TOOL orders.transition_order # luồng đơn thường ngày; hoàn tiền đi qua orders.refund_order có duyệt
+mcp-approval TOOL orders.decide_return # quyết đổi trả; hoàn tiền đi qua orders.refund_order có duyệt
+mcp-approval TOOL organizations.change_unit_status # đổi trạng thái đơn vị, đổi lại được
+
+# Module đang được phiên 3B/3C chuyển sang lớp kernel: gắn duyệt sau khi phiên đó merge (tránh xung đột).
+api-approval DELETE /api/v1/comments/bans/{id} # chờ 3B/3C chuyển module comments
+api-approval DELETE /api/v1/comments/data # chờ 3B/3C chuyển module comments
+api-approval DELETE /api/v1/comments/{id} # chờ 3B/3C chuyển module comments
+api-approval DELETE /api/v1/files/{id} # chờ 3B/3C chuyển module files
+api-approval DELETE /api/v1/forms/data # chờ 3B/3C chuyển module forms
+api-approval DELETE /api/v1/forms/submissions/{id} # chờ 3B/3C chuyển module forms
+api-approval DELETE /api/v1/forms/{id} # chờ 3B/3C chuyển module forms
+api-approval DELETE /api/v1/mail/bounces/{id} # chờ 3B/3C chuyển module mail
+api-approval DELETE /api/v1/media/folders/{id} # chờ 3B/3C chuyển module media
+api-approval DELETE /api/v1/media/tags/{id} # chờ 3B/3C chuyển module media
+api-approval DELETE /api/v1/media/{id} # chờ 3B/3C chuyển module media
+api-approval DELETE /api/v1/media/{id}/alts/{locale} # chờ 3B/3C chuyển module media
+api-approval POST /api/v1/media/{id}/purge # chờ 3B/3C chuyển module media
+api-approval DELETE /api/v1/webhooks/{id} # chờ 3B/3C chuyển module webhooks
+mcp-approval TOOL files.delete_file # chờ 3B/3C chuyển module files

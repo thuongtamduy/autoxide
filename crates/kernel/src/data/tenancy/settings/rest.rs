@@ -97,10 +97,12 @@ async fn set_setting(
 /// Requires `kernel.settings.manage` held at the tenant's root unit, like setting one. The
 /// server-wide configuration applies again. Removing a setting this tenant never set changes
 /// nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/settings/{name}",
-    extensions(("x-permissions" = json!(["kernel.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.settings.manage"]))),
     operation_id = "delete_tenant_setting",
     security(("bearer" = [])),
     params(("name" = String, Path, description = "Name of the setting.")),
@@ -224,10 +226,12 @@ async fn set_tenant_setting(
 /// Requires `kernel.tenants.manage` and an account of the platform tenant. The server-wide
 /// configuration applies to that tenant again. Removing a setting the tenant never set changes
 /// nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/tenants/{id}/settings/{name}",
-    extensions(("x-permissions" = json!(["kernel.tenants.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["kernel.tenants.manage"]))),
     operation_id = "delete_setting_of_tenant",
     security(("bearer" = [])),
     params(

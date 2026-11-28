@@ -561,10 +561,12 @@ async fn update_unit_type(
 /// Delete a unit type.
 ///
 /// Requires `organizations.types.manage`. A type still used by a unit cannot be deleted.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/unit-types/{code}",
-    extensions(("x-permissions" = json!(["organizations.types.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["organizations.types.manage"]))),
     operation_id = "delete_unit_type",
     security(("bearer" = [])),
     params(("code" = String, Path, description = "Code of the unit type.")),
@@ -758,10 +760,12 @@ async fn set_unit_setting(
 ///
 /// Requires `organizations.settings.write` covering the unit; the unit must be active. Clearing a
 /// setting the unit does not set changes nothing.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/units/{id}/settings/{key}",
-    extensions(("x-permissions" = json!(["organizations.settings.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["organizations.settings.write"]))),
     operation_id = "clear_unit_setting",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the unit."), ("key" = String, Path, description = "Key of the setting.")),

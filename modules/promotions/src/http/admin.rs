@@ -215,10 +215,12 @@ pub(crate) struct Patch(pub serde_json::Value);
 /// Delete a draft promotion.
 ///
 /// Requires `promotions.write`. Only drafts; end or cancel a promotion that was turned on.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/promotions/{id}",
-    extensions(("x-permissions" = json!(["promotions.write"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["promotions.write"]))),
     operation_id = "delete_promotion",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the promotion.")),

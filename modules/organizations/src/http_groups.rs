@@ -262,10 +262,12 @@ async fn update_group(
 ///
 /// Requires `organizations.groups.manage`. The units and the report facts stay; only the group and
 /// its member list go.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/groups/{id}",
-    extensions(("x-permissions" = json!(["organizations.groups.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["organizations.groups.manage"]))),
     operation_id = "delete_unit_group",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the group.")),
@@ -355,10 +357,12 @@ async fn add_group_members(
 ///
 /// Requires `organizations.groups.manage`. Removing a unit that is not in the group also answers
 /// 204.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/groups/{id}/members/{org_id}",
-    extensions(("x-permissions" = json!(["organizations.groups.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["organizations.groups.manage"]))),
     operation_id = "remove_unit_group_member",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the group."), ("org_id" = Uuid, Path, description = "Id of the unit.")),

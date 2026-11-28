@@ -439,10 +439,12 @@ async fn create_scim_group_mapping(
 /// Requires `auth.scim.manage`, and you must be able to give the rule's role at its unit yourself.
 /// Members of the group lose the role at once, unless another group or a hand-made membership gives
 /// it too.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/scim/group-mappings/{id}",
-    extensions(("x-permissions" = json!(["auth.scim.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.scim.manage"]))),
     operation_id = "delete_scim_group_mapping",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the rule.")),

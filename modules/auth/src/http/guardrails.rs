@@ -166,10 +166,12 @@ async fn set_guardrail(
 /// Remove the guardrail this tenant set for a tenant below it.
 ///
 /// Requires `auth.guardrails.manage`. Guardrails set by other tenants above stay.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/guardrails/{tenant_id}",
-    extensions(("x-permissions" = json!(["auth.guardrails.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["auth.guardrails.manage"]))),
     operation_id = "remove_guardrail",
     security(("bearer" = [])),
     params(("tenant_id" = Uuid, Path, description = "Id of the tenant below this one.")),

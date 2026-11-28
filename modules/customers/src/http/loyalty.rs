@@ -534,9 +534,11 @@ pub(crate) async fn list_points_entries(
 ///
 /// Requires `customers.loyalty.adjust` covering the customer's unit (and `customers.read`). The
 /// same `reference` never applies twice; every change is in the history with its reason.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     post, path = "/{id}/points/adjustments",
-    extensions(("x-permissions" = json!(["customers.loyalty.adjust"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["customers.loyalty.adjust"]))),
     operation_id = "adjust_customer_points", security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the customer profile.")),
     request_body = AdjustPointsRequest,

@@ -237,10 +237,12 @@ pub(crate) async fn update_zone(
 /// Delete a shipping zone.
 ///
 /// Its rates in every method go with it.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/zones/{id}",
-    extensions(("x-permissions" = json!(["shipping.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["shipping.settings.manage"]))),
     operation_id = "delete_shipping_zone",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the zone.")),
@@ -670,10 +672,12 @@ pub(crate) async fn update_method(
 /// Delete a shipping method with its tiers and pickup points.
 ///
 /// Shipments already created keep their copy of the method.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/methods/{id}",
-    extensions(("x-permissions" = json!(["shipping.settings.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["shipping.settings.manage"]))),
     operation_id = "delete_shipping_method",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the method.")),

@@ -360,10 +360,12 @@ async fn update_tag(
 /// Remove a tracking tag.
 ///
 /// Requires `compliance.tracking.manage` on its unit.
+///
+/// An AI agent's call waits for a person's approval (202, see `x-approval`).
 #[utoipa::path(
     delete,
     path = "/tracking-tags/{id}",
-    extensions(("x-permissions" = json!(["compliance.tracking.manage"]))),
+    extensions(("x-approval" = json!("agent")), ("x-permissions" = json!(["compliance.tracking.manage"]))),
     operation_id = "delete_compliance_tracking_tag",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the tag.")),
