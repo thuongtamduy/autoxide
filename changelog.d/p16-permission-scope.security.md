@@ -6,3 +6,6 @@
   permission for the whole tenant, not just its name at some unit; deleting, locking or changing the email of another
   account (and revoking their API keys) needs covering each of their permissions at its unit and depth, not only by
   name (`auth.target_has_more_permissions` otherwise).
+  An API key bound to a branch can therefore no longer lock, change the email of, or revoke the keys of a staff
+  member who holds a permission that is not scoped to units (such grants cover the whole tenant), even in the same
+  branch; do that from the root unit.

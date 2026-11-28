@@ -265,13 +265,16 @@ impl RoleService {
         let reference = member_reference(user_id);
         let mut holds = has_membership(tenant, user_id).await?;
         for _ in 0..SETTLE_ROUNDS {
-            if holds {
-                self.keep_member_slot(tenant, user_id, &reference).await?;
+            let acted = if holds {
+                self.keep_member_slot(tenant, user_id, &reference).await?
             } else {
                 self.entitlements.release(tenant.id(), &MEMBERS_LIMIT, &reference).await?;
-            }
+                true
+            };
             let now = has_membership(tenant, user_id).await?;
-            if now == holds {
+            // Xác nhận hụt (chỗ bị lượt đồng thời trả giữa lúc giữ và lúc xác nhận): làm lại theo trạng thái mới đọc,
+            // kể cả khi trạng thái không đổi.
+            if acted && now == holds {
                 return Ok(());
             }
             holds = now;
@@ -280,22 +283,31 @@ impl RoleService {
         Ok(())
     }
 
-    /// Chỗ của người đang giữ role: giữ (không giữ thêm nếu đã có — cùng mã) rồi xác nhận. Hết chỗ ở bước này nghĩa
-    /// là role đã ghi rồi (người giữ role từ trước khi khách vào gói chưa có dòng trong sổ, hay chỗ vừa bị lượt đồng
-    /// thời trả): không làm hỏng lệnh đã commit, ghi `warn`; job đối soát đếm theo role thật.
+    /// Chỗ của người đang giữ role: giữ (không giữ thêm nếu đã có — cùng mã) rồi xác nhận. Trả `false` khi xác nhận
+    /// hụt: một lượt đồng thời đã trả chỗ giữa lúc giữ và lúc xác nhận (`confirm` báo "không có chỗ giữ") — role đã
+    /// ghi rồi, nên không làm hỏng lệnh mà để [`settle_member`](Self::settle_member) đọc lại và làm lượt kế. Hết chỗ ở
+    /// bước giữ (người giữ role từ trước khi khách vào gói chưa có dòng trong sổ, hay chỗ vừa bị lượt kia trả, rồi người
+    /// khác lấy mất): ghi `warn`; job đối soát đếm theo role thật.
     async fn keep_member_slot(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
         reference: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<bool, Error> {
         match self.entitlements.reserve(tenant.id(), &MEMBERS_LIMIT, 1, reference).await {
-            Ok(()) => self.entitlements.confirm(tenant.id(), &MEMBERS_LIMIT, reference).await,
+            Ok(()) => {}
             Err(error) if error.code() == "limit_exceeded" => {
                 tracing::warn!(%user_id, tenant_id = %tenant.id(), "member holds a role beyond the members limit");
-                Ok(())
+                return Ok(true);
             }
-            Err(error) => Err(error),
+            Err(error) => return Err(error),
+        }
+        match self.entitlements.confirm(tenant.id(), &MEMBERS_LIMIT, reference).await {
+            Ok(()) => Ok(true),
+            Err(error) => {
+                tracing::warn!(%user_id, tenant_id = %tenant.id(), %error, "member slot released before confirm; settling again");
+                Ok(false)
+            }
         }
     }
 

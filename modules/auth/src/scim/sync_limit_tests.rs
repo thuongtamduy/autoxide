@@ -27,6 +27,9 @@ const TENANT: &str = "alpha";
 struct Members {
     max: Mutex<usize>,
     used: Mutex<BTreeSet<String>>,
+    /// Lần `confirm` kế tiếp: trả chỗ trước rồi báo "không có chỗ giữ" — như một lượt đồng thời gọi `release` chen
+    /// giữa `reserve` và `confirm`.
+    drop_before_confirm: Mutex<bool>,
 }
 
 impl Members {
@@ -71,7 +74,11 @@ impl Entitlements for Members {
         Ok(())
     }
 
-    async fn confirm(&self, _: TenantId, _: &Limit, _: &str) -> Result<(), Error> {
+    async fn confirm(&self, _: TenantId, _: &Limit, reference: &str) -> Result<(), Error> {
+        if std::mem::take(&mut *self.drop_before_confirm.lock().unwrap()) {
+            self.used.lock().unwrap().remove(reference);
+            return Err(Error::internal(format!("confirm `{reference}`: there is no hold")));
+        }
         Ok(())
     }
 
@@ -111,7 +118,11 @@ async fn login(app: &TestApp, email: &str) -> String {
 async fn setup(test: &TestDatabase) -> Setup {
     let services = crate::testing::services(test).await;
     let mailer: Arc<dyn autoxide_kernel::mail::Mailer> = services.mails.clone();
-    let plan = Arc::new(Members { max: Mutex::new(100), used: Mutex::new(BTreeSet::new()) });
+    let plan = Arc::new(Members {
+        max: Mutex::new(100),
+        used: Mutex::new(BTreeSet::new()),
+        drop_before_confirm: Mutex::new(false),
+    });
     let provider: Arc<dyn Entitlements> = plan.clone();
     let app = TestApp::builder(test)
         .tenant(TENANT)
@@ -440,6 +451,43 @@ async fn hai_lan_doi_role_dong_thoi_khong_lech_cho() {
                 "vòng {round}: chỗ lệch với role thật"
             );
         }
+    })
+    .await
+    .unwrap();
+}
+
+/// Kiểm độc lập #614 (M1): chỗ bị trả giữa `reserve` và `confirm` của lượt gán (lượt gỡ đồng thời gọi `release`) — lệnh
+/// gán không lỗi 500 (role đã ghi), và chỗ được giữ lại khớp với role thật.
+#[tokio::test]
+async fn cho_bi_tra_giua_giu_va_xac_nhan_thi_giu_lai() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let roles = crate::role::RoleService::new(
+            setup.services.roles.catalog().clone(),
+            autoxide_kernel::event::Outbox::standalone("auth"),
+        )
+        .with_entitlements(setup.app.modules().entitlements());
+        let tenant = &setup.tenant;
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "staff".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.users.read".to_owned()],
+            grants: Vec::new(),
+        };
+        let role = roles.create(tenant, Actor::system(), input).await.unwrap().id;
+        let who = NewUser {
+            email: "gap@alpha.example".to_owned(),
+            name: "Gap".to_owned(),
+            password: None,
+        };
+        let who = setup.services.users.create(tenant, Actor::system(), who).await.unwrap().id;
+        let slot = crate::role::member_reference(who);
+        *setup.plan.drop_before_confirm.lock().unwrap() = true;
+        roles.set_user_roles(tenant, Actor::system(), who, vec![role]).await.unwrap();
+        assert!(crate::role::has_membership(tenant, who).await.unwrap());
+        assert!(setup.plan.used().contains(&slot), "người giữ role phải có chỗ");
     })
     .await
     .unwrap();

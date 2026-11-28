@@ -930,9 +930,9 @@ async fn list_settings(
 ///
 /// Requires `kernel.settings.manage` held at the tenant's root unit (a role of a branch, or an
 /// API key bound to a branch, is refused: settings apply to the whole tenant). Creates or replaces
-/// the value; sending it again is safe.
-/// A secret value is stored encrypted and the answer does not contain it. The former name of a
-/// renamed setting is still accepted; the answer carries the current name.
+/// the value; sending it again is safe. A secret value is stored encrypted and the answer does
+/// not contain it. The former name of a renamed setting is still accepted; the answer carries the
+/// current name.
 #[utoipa::path(
     put,
     path = "/settings/{name}",
@@ -962,8 +962,8 @@ async fn set_setting(
 /// Remove one of this tenant's settings.
 ///
 /// Requires `kernel.settings.manage` held at the tenant's root unit, like setting one. The
-/// server-wide configuration applies again. Removing a
-/// setting this tenant never set changes nothing.
+/// server-wide configuration applies again. Removing a setting this tenant never set changes
+/// nothing.
 #[utoipa::path(
     delete,
     path = "/settings/{name}",

@@ -10,7 +10,9 @@ Quyết định (P16 của bước 70, module `auth`):
 2. `RoleService::require_covers` (xoá / khoá / đổi email / nhận về tài khoản, thu hồi API key người khác, token SCIM)
    so từng grant (nút, độ sâu) của người bị tác động bằng `covers_all` — cùng `actor_covers` của luật gán role
    (D-20261121-grant-scope-check), thay vì so tên. Người bị tác động có toàn quyền: người làm phải toàn quyền, không rào.
-   Đây là mục (i) của "các chỗ bất nhất của luật cấp quyền".
+   Đây là mục (i) của "các chỗ bất nhất của luật cấp quyền". Đổi hành vi: API key gắn nhánh không còn khoá, đổi email
+   hay thu hồi key của nhân sự giữ permission không `scoped` (grant của nó có độ sâu `tenant`, mà key bị rào thì không
+   bao được độ sâu `tenant`), kể cả nhân sự cùng nhánh — việc đó cần người làm ở gốc.
 
 Còn mở, không đổi ở đây: (iii) tạo vượt quyền 422 / xoá vượt quyền 403 — đổi mã lỗi là đổi hợp đồng API, cần quyết định
 riêng trước 1.0 (D-20261125-api-break-before-1-0); (iv) thu hẹp permission của role người khác đang giữ không qua luật
