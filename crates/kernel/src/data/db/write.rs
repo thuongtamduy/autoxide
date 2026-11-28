@@ -30,7 +30,7 @@ fn unique_violation() -> Error {
 }
 
 // Lỗi của database khi ghi: vi phạm unique thành mã ổn định cho module; lỗi khác giữ nguyên (lỗi nội bộ).
-fn write_error(error: DbErr) -> Error {
+pub(crate) fn write_error(error: DbErr) -> Error {
     match error.sql_err() {
         Some(SqlErr::UniqueConstraintViolation(_)) => unique_violation().with_source(error),
         _ => Error::from(error),
@@ -212,7 +212,7 @@ impl<A: Access, R: Record> Insert<'_, A, R> {
         }
         let connection = self.tx.connection();
         let changed =
-            connection.execute(connection.build(&self.statement)).await.map_err(write_error)?;
+            connection.execute(connection.build(&self.statement)).await?;
         if self.guarded && changed < self.rows {
             // `DO UPDATE … WHERE tenant_id = <khách>` bỏ qua dòng nào thì dòng đó đụng dòng của khách khác: báo
             // lỗi (cả lô rollback cùng transaction), không lặng lẽ bỏ dòng.
@@ -314,7 +314,7 @@ impl<A: Access, R: Record> Update<'_, A, R> {
             return Err(Error::internal("`update` without `set`"));
         }
         let connection = self.tx.connection();
-        connection.execute(connection.build(&self.statement)).await.map_err(write_error)
+        connection.execute(connection.build(&self.statement)).await
     }
 
     /// Runs it and reads the changed rows back (`RETURNING`, on both databases).
@@ -329,7 +329,7 @@ impl<A: Access, R: Record> Update<'_, A, R> {
             R::COLUMNS.iter().map(|column| Alias::new(*column).into()).collect(),
         ));
         let connection = self.tx.connection();
-        let rows = connection.all(connection.build(&self.statement)).await.map_err(write_error)?;
+        let rows = connection.all(connection.build(&self.statement)).await?;
         rows.iter().map(|row| R::read(&super::Row(row))).collect()
     }
 }

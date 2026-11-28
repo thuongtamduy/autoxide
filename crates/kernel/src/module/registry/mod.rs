@@ -300,6 +300,10 @@ impl Modules {
             crate::db::register_control_plane(
                 modules.iter().flat_map(|module| module.control_plane_tables()),
             );
+            // Sổ bảng cấp khách cho chốt chặn lúc chạy của handle theo khách (D-20261128-tenant-runtime-guard).
+            crate::db::register_tenant_tables(modules.iter().flat_map(|module| {
+                module.records().into_iter().filter(|record| record.tenant).map(|record| record.table)
+            }));
             Ok(Modules {
                 modules,
                 permissions,

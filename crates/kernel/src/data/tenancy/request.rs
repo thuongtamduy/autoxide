@@ -91,6 +91,34 @@ impl TenantHint {
     }
 }
 
+/// The tenant whose budget a request uses — the rate limit per tenant and the plan's `kernel.api_requests` quota.
+/// Built only from an authenticated caller ([`SignedInTenant::of`]), never from [`TenantHint`]: a request
+/// without a credential that names a tenant (`Autoxide-Tenant`, `Host`) can neither drain that tenant's budget
+/// nor be refused because that tenant is at its limit (D-20261126-tenant-rate-limit,
+/// D-20261128-tenant-runtime-guard). The quota functions take this type, so a tenant read from a hint cannot be
+/// passed to them by mistake.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SignedInTenant(super::TenantId);
+
+impl SignedInTenant {
+    /// The tenant `principal` acts in (its own, or one that delegated work to it); `None` for platform staff
+    /// operating in another tenant and for support access, which never use the tenant's budget (so support
+    /// can help a tenant that is at its limit).
+    pub fn of(principal: &Principal) -> Option<Self> {
+        if principal.operator_from().is_some()
+            || matches!(principal.access(), crate::access::AccessPath::Support(_))
+        {
+            return None;
+        }
+        Some(SignedInTenant(principal.tenant_id()))
+    }
+
+    /// The tenant's id.
+    pub fn id(self) -> super::TenantId {
+        self.0
+    }
+}
+
 /// `Shop.Example.:8443` → `shop.example`.
 fn normalize_host(host: &str) -> String {
     let host = host.trim();
@@ -251,7 +279,7 @@ async fn resolve_tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
         let principal = authenticate(&authenticator, parts).await?;
         registry.tenant(principal.tenant_id()).await?
     } else {
-        by_hint(&registry, parts).await?
+        unverified_tenant(&registry, parts).await?
     };
     let tenant = bind_origin(&parts.extensions, tenant)?;
     ensure_serving(&tenant)?;
@@ -283,9 +311,10 @@ fn bind_origin(extensions: &Extensions, tenant: TenantContext) -> Result<TenantC
     })
 }
 
-/// The tenant by the `autoxide-tenant` header / domain, ignoring the credential (a request that is not signed
-/// in).
-async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantContext, Error> {
+/// The tenant a request that is not signed in names, by the `autoxide-tenant` header / domain / page origin:
+/// **not verified** — anyone can send any header. Good for choosing whose public data a public route shows;
+/// never for a budget, quota or policy that protects the tenant (those take [`SignedInTenant`]).
+async fn unverified_tenant(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantContext, Error> {
     let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     match (hint.tenant(), hint.host()) {
         (Some(target), _) => lookup(registry, target).await,
@@ -320,7 +349,7 @@ pub(crate) async fn tenant_ignoring_bad_credential(
                     "an endpoint needs the tenant of the request, but no tenancy registry is set",
                 )
             })?;
-            let tenant = by_hint(&registry, parts).await?;
+            let tenant = unverified_tenant(&registry, parts).await?;
             let tenant = bind_origin(&parts.extensions, tenant)?;
             ensure_serving(&tenant)?;
             ensure_writable(&tenant, &parts.method, &parts.extensions)?;

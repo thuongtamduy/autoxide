@@ -370,8 +370,9 @@ impl EntitlementsHandle {
     }
 
     /// Counts one API request of tenant `tenant` (the HTTP layer calls it). With no provider, or the platform
-    /// tenant: no counting.
-    pub fn count_request(&self, tenant: TenantId) {
+    /// tenant: no counting. Only a signed-in caller's tenant counts ([`SignedInTenant`](crate::tenancy::SignedInTenant)).
+    pub fn count_request(&self, tenant: crate::tenancy::SignedInTenant) {
+        let tenant = tenant.id();
         if self.provider_for(tenant).is_none() {
             return;
         }
@@ -381,7 +382,8 @@ impl EntitlementsHandle {
     }
 
     /// Tenant `tenant` has used up the period's requests: the number of seconds until the next period, to return 429.
-    pub fn request_quota_wait(&self, tenant: TenantId) -> Option<u64> {
+    pub fn request_quota_wait(&self, tenant: crate::tenancy::SignedInTenant) -> Option<u64> {
+        let tenant = tenant.id();
         let mut exhausted = self.meter.exhausted.lock().ok()?;
         let until = *exhausted.get(&tenant)?;
         let now = std::time::Instant::now();

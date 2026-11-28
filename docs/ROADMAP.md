@@ -130,9 +130,11 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Tách `autoxide-host` (phần chỉ binary dùng) khỏi kernel; file trên 880 dòng tách theo trách nhiệm (phần đa khách
       ~21.700 dòng). Tách phần còn lại của kernel theo lớp: **sau 1.0** — đo 26/11/2026 chỉ rút 6–9% thời gian build lại, dưới
       ngưỡng 20% (D-20261126-kernel-crates; mặt tiền giữ đường dẫn nên tách sau không phá vỡ)
-- [ ] Cách ly khách khi chạy, không chỉ lint đọc mã nguồn: lớp kết nối gắn khách (hay row-level security tuỳ chọn trên
+- [x] Cách ly khách khi chạy, không chỉ lint đọc mã nguồn: lớp kết nối gắn khách (hay row-level security tuỳ chọn trên
       Postgres) chặn truy vấn thiếu `tenant_id`; khách của request chưa xác thực không lấy từ gợi ý chưa kiểm cho việc
-      tính hạn mức
+      tính hạn mức. **Xong:** chốt chặn lúc chạy trên mọi câu của handle theo khách (bộ dựng, `sql`, cầu SeaORM), cả hai
+      database; hạn mức chỉ nhận `SignedInTenant` (D-20261128-tenant-runtime-guard). Module còn đi đường cũ vào phạm vi
+      chốt khi cụm của nó chuyển sang `db`
 - [ ] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
       chéo lúc lưu, có cache
 - [x] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
@@ -1725,9 +1727,10 @@ Chỗ trong core làm cấu hình theo khách khó (rút ra khi làm đợt này
 - [ ] Kernel chưa kiểm chéo giữa hai cài đặt lúc lưu (vd ngôn ngữ mặc định phải thuộc danh sách ngôn ngữ): hiện bỏ
       qua lúc dùng thay vì từ chối lúc lưu
 - [ ] Cài đặt theo cây của `organizations` không có cache: mỗi lần đọc (đăng nhập, làm mới phiên…) là một truy vấn
-- [ ] Khách của request trước khi xác thực lấy từ gợi ý chưa xác thực (`Autoxide-Tenant`, `Host`) qua cùng một hàm với
+- [x] Khách của request trước khi xác thực lấy từ gợi ý chưa xác thực (`Autoxide-Tenant`, `Host`) qua cùng một hàm với
       khách đã xác thực: dễ dùng nhầm cho hạn mức hay chính sách (lỗi đã sửa ở D-20261126-tenant-rate-limit) — tách hai
-      hàm rõ tên
+      hàm rõ tên. **Xong:** `unverified_tenant` cho request chưa đăng nhập, kiểu `SignedInTenant` cho hạn mức
+      (D-20261128-tenant-runtime-guard)
 - [ ] Passkey không lưu RP ID của nó: không đổi RP mềm được (cùng mục passkey ở trên)
 
 ## Chờ chủ dự án

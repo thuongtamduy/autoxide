@@ -96,7 +96,7 @@ pub use relocate::{
     RelocationTable, RelocationWarning, SealedColumn, Split, SwitchHook, TENANTS_RELOCATE,
     TablePolicy, TableReport, TenantRelocation, TenantRelocations,
 };
-pub use request::{TENANT_HEADER, TenantHint};
+pub use request::{SignedInTenant, TENANT_HEADER, TenantHint};
 pub use residency::{Residency, parse_country};
 pub use return_url::{
     RETURN_URL_MAX_LEN, ReturnUrlProblem, check_return_url, invalid_return_origins,
