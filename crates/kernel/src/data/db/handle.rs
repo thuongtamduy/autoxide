@@ -304,16 +304,6 @@ impl ControlPlane {
     }
 }
 
-impl<'a> AllTenants<'a> {
-    /// Handles across every tenant of `database` for module `module`, counted in
-    /// `kernel_all_tenant_queries{module}` (see [`ControlPlane::all_tenants`]).
-    pub(crate) fn counted(database: &'a Database, module: &str, reason: &'static str) -> Self {
-        metrics::counter!("kernel_all_tenant_queries", "module" => module.to_owned()).increment(1);
-        tracing::debug!(module, reason, "query across every tenant");
-        AllTenants { database }
-    }
-}
-
 /// See [`ControlPlane::all_tenants`].
 #[derive(Debug, Clone, Copy)]
 pub struct AllTenants<'a> {
@@ -321,6 +311,13 @@ pub struct AllTenants<'a> {
 }
 
 impl<'a> AllTenants<'a> {
+    // Mọi đường mở handle quét mọi khách đi qua đây: đếm theo module (số đo) và ghi lý do (log debug).
+    pub(crate) fn counted(database: &'a Database, module: &str, reason: &'static str) -> Self {
+        metrics::counter!("kernel_all_tenant_queries", "module" => module.to_owned()).increment(1);
+        tracing::debug!(module, reason, "query across every tenant");
+        AllTenants { database }
+    }
+
     /// Reads across every tenant.
     pub fn read(&self) -> AllTenantsRead<'a> {
         Read { connection: self.database.read(), access: EveryTenant }

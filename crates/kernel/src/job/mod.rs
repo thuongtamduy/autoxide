@@ -122,21 +122,24 @@ impl JobContext {
         self
     }
 
-    /// Handles of `db` that read and write the module's tenant records of **every** tenant on the job's
-    /// database, without the tenant filter — for a job of the whole database (cleanup schedules) sweeping
-    /// expired rows. `reason` says why, in a few words; each use is counted in the metric
-    /// `kernel_all_tenant_queries{module}` like `ControlPlane::all_tenants`. A job of one tenant gets an internal
-    /// error: it uses `tenant.db()`, so it never sees another tenant's rows on a shared database.
-    pub fn all_tenants(&self, reason: &'static str) -> Result<crate::db::AllTenants<'_>, Error> {
+    /// Handles of `db` that read and write tenant records of **every** tenant on [`database`](Self::database),
+    /// without the tenant filter: for a job of the whole database (a cleanup schedule) that sweeps rows of all
+    /// its tenants. A job of one tenant uses `tenant.db()` instead. `reason` says why, in a few words; each use
+    /// is counted in the metric `kernel_all_tenant_queries{module}` like
+    /// [`ControlPlane::all_tenants`](crate::db::ControlPlane::all_tenants).
+    ///
+    /// Calling it from a job of one tenant is a programming error: a debug build stops at once, a release build logs
+    /// a warning (D-20261128-job-all-tenants).
+    pub fn all_tenants(&self, reason: &'static str) -> crate::db::AllTenants<'_> {
+        // Job của một khách phải đi qua `tenant.db()`; dùng nhầm thì bắt sớm khi phát triển, bản chạy thật chỉ cảnh báo.
+        debug_assert!(self.tenant.is_none(), "a job of one tenant called JobContext::all_tenants");
         if self.tenant.is_some() {
-            return Err(Error::internal(format!(
-                "job `{}` belongs to one tenant: query through `tenant.db()`, not across every tenant",
-                self.kind
-            )));
+            tracing::warn!(kind = %self.kind, reason, "a job of one tenant swept every tenant");
         }
-        // Loại job là `<module>.<việc>`: phần đầu là module (tập nhỏ cố định, dùng làm nhãn số đo được).
-        let module = self.kind.split('.').next().unwrap_or_default();
-        Ok(crate::db::AllTenants::counted(&self.database, module, reason))
+        // Tên module là phần trước dấu chấm đầu tiên của loại job (`idempotency.cleanup` → `idempotency`); loại job
+        // được kiểm có tiền tố module lúc đăng ký, nên nhãn của số đo chỉ nhận tên module.
+        let module = module_of(&self.kind).unwrap_or_default();
+        crate::db::AllTenants::counted(&self.database, module, reason)
     }
 }
 

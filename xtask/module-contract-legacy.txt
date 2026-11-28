@@ -14,12 +14,9 @@ module-contract-legacy 21 modules/compliance/src/lib.rs
 module-contract-legacy 30 modules/content/src/lib.rs
 module-contract-legacy 16 modules/conversations/src/lib.rs
 module-contract-legacy 16 modules/customers/src/lib.rs
-module-contract-legacy 4 modules/einvoice_sepay/src/lib.rs
-module-contract-legacy 5 modules/esms/src/lib.rs
 module-contract-legacy 16 modules/files/src/lib.rs
 module-contract-legacy 18 modules/forms/src/lib.rs
 module-contract-legacy 5 modules/ghn/src/lib.rs
-module-contract-legacy 9 modules/idempotency/src/lib.rs
 module-contract-legacy 20 modules/inventory/src/lib.rs
 module-contract-legacy 16 modules/invoices/src/lib.rs
 module-contract-legacy 18 modules/ledger/src/lib.rs
@@ -53,8 +50,6 @@ start-context-legacy 8 modules/compliance/src/lib.rs
 start-context-legacy 19 modules/content/src/lib.rs
 start-context-legacy 7 modules/conversations/src/lib.rs
 start-context-legacy 6 modules/customers/src/lib.rs
-start-context-legacy 2 modules/einvoice_sepay/src/lib.rs
-start-context-legacy 1 modules/esms/src/lib.rs
 start-context-legacy 4 modules/files/src/lib.rs
 start-context-legacy 6 modules/forms/src/lib.rs
 start-context-legacy 5 modules/inventory/src/lib.rs

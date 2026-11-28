@@ -145,12 +145,15 @@ pub(crate) fn parse_status(raw: &str) -> ProductStatus {
     }
 }
 
-/// Ai đổi trạng thái sản phẩm.
+/// Ai đổi trạng thái sản phẩm (`write_status`).
 #[derive(Clone, Copy)]
 enum StatusBy<'a> {
-    /// Người (hay API key) có `catalog.products.publish` trên nút của sản phẩm.
+    /// Người (hay API key): `write_status` kiểm `catalog.products.publish` trên nút của sản phẩm (không giả định họ
+    /// đã có); chuyển trạng thái theo [`transition_allowed`].
     Person(&'a Principal),
-    /// Việc nền của chính `catalog` (dừng hàng của người bán không còn định danh).
+    /// Việc nền của chính `catalog` (dừng hàng của người bán không còn định danh, LG-3b): không kiểm permission,
+    /// chỉ đổi hàng đang `active` sang `inactive`; hàng ở trạng thái khác thì bỏ qua (không lỗi), ghi event với
+    /// `Actor::system()`.
     System,
 }
 

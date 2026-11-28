@@ -1,12 +1,12 @@
 //! Event module `compliance` phát. Payload chỉ ID và trạng thái — không email, số điện thoại, số giấy
-//! tờ.
+//! tờ. Event module khác nghe có tên khai MỘT lần ở `crate::api` (hằng công khai); ở đây dùng lại hằng đó.
 
 use autoxide_kernel::event::{Event, EventInfo};
 use serde::Serialize;
 use serde_json::Value;
 
 macro_rules! events {
-    ($($constant:ident, $kind:ident, $name:literal, $description:literal;)*) => {
+    ($($constant:ident, $kind:ident, $name:expr, $description:literal;)*) => {
         $(
             pub(crate) const $constant: EventInfo = EventInfo::new($name, $description);
 
@@ -26,24 +26,24 @@ macro_rules! events {
 
 events! {
     KYC_SUBMITTED, KycSubmitted, "compliance.kyc_submitted", "An identity verification started or documents were sent (`profile_id`, `subject_kind`, `subject_id`, `status`).";
-    KYC_VERIFIED, KycVerified, "compliance.kyc_verified", "An identity was verified (`profile_id`, `subject_kind`, `subject_id`, `status`, `expires_at`).";
-    KYC_REJECTED, KycRejected, "compliance.kyc_rejected", "An identity verification was refused (`profile_id`, `subject_kind`, `subject_id`, `status`, `reason_code`).";
+    KYC_VERIFIED, KycVerified, crate::api::KYC_VERIFIED, "An identity was verified (`profile_id`, `subject_kind`, `subject_id`, `status`, `expires_at`).";
+    KYC_REJECTED, KycRejected, crate::api::KYC_REJECTED, "An identity verification was refused (`profile_id`, `subject_kind`, `subject_id`, `status`, `reason_code`).";
     KYC_INFO_REQUESTED, KycInfoRequested, "compliance.kyc_info_requested", "More information was asked for a verification (`profile_id`, `subject_kind`, `subject_id`).";
-    KYC_EXPIRED, KycExpired, "compliance.kyc_expired", "A verified identity reached its end date (`profile_id`, `subject_kind`, `subject_id`).";
+    KYC_EXPIRED, KycExpired, crate::api::KYC_EXPIRED, "A verified identity reached its end date (`profile_id`, `subject_kind`, `subject_id`).";
     KYC_DETAILS_RECORDED, KycDetailsRecorded, "compliance.kyc_details_recorded", "A reviewer recorded seller details of an identity profile (`profile_id`, `subject_kind`, `subject_id`, `fields` — names only, no values).";
-    KYC_REVOKED, KycRevoked, "compliance.kyc_revoked", "A verified identity was revoked (`profile_id`, `subject_kind`, `subject_id`, `reason_code`).";
+    KYC_REVOKED, KycRevoked, crate::api::KYC_REVOKED, "A verified identity was revoked (`profile_id`, `subject_kind`, `subject_id`, `reason_code`).";
     DOCUMENT_VERSION_PUBLISHED, DocumentVersionPublished, "compliance.document_version_published", "A new version of a legal document was published (`document_id`, `kind`, `version`, `requires_reacceptance`).";
     DOCUMENT_ACCEPTED, DocumentAccepted, "compliance.document_accepted", "A legal document version was accepted (`document_id`, `version`, `subject_kind`, `subject_id`, `channel`).";
     CONSENT_GRANTED, ConsentGranted, "compliance.consent_granted", "A consent was given (`consent_id`, `purpose`, `scope`, `channel`).";
-    CONSENT_WITHDRAWN, ConsentWithdrawn, "compliance.consent_withdrawn", "A consent was withdrawn (`consent_id`, `purpose`, `scope`, `channel`).";
-    PHONE_VERIFIED, PhoneVerified, "compliance.phone_verified", "A user confirmed a phone number with a one-time code (`user_id`).";
+    CONSENT_WITHDRAWN, ConsentWithdrawn, crate::api::CONSENT_WITHDRAWN, "A consent was withdrawn (`consent_id`, `purpose`, `scope`, `channel`).";
+    PHONE_VERIFIED, PhoneVerified, crate::api::PHONE_VERIFIED, "A user confirmed a phone number with a one-time code (`user_id`).";
     PHONE_UNLOCKED, PhoneUnlocked, "compliance.phone_unlocked", "An administrator unlocked sign-in codes for a phone number locked after too many wrong codes (`phone_key`: the tenant's key of the number, not the number).";
-    PHONE_REMOVED, PhoneRemoved, "compliance.phone_removed", "A user removed their verified phone number (`user_id`).";
+    PHONE_REMOVED, PhoneRemoved, crate::api::PHONE_REMOVED, "A user removed their verified phone number (`user_id`).";
     POLICY_UPDATED, PolicyUpdated, "compliance.policy_updated", "A compliance policy of the tenant was set (`key`).";
     LEGAL_PROFILE_UPDATED, LegalProfileUpdated, "compliance.legal_profile_updated", "A legal (owner) profile was created or changed (`profile_id`, `org_id`).";
     WEBSITE_CREATED, WebsiteCreated, "compliance.website_created", "A website was added for the Ministry of Industry and Trade checklist (`website_id`, `org_id`, `domain`, `kind`).";
     WEBSITE_UPDATED, WebsiteUpdated, "compliance.website_updated", "A website or its linked mandatory pages changed (`website_id`, `org_id`, `domain`, `kind`).";
-    WEBSITE_STATUS_CHANGED, WebsiteStatusChanged, "compliance.website_status_changed", "The notification / registration status of a website with the Ministry of Industry and Trade changed (`website_id`, `org_id`, `domain`, `kind`, `status`, `previous_status`).";
+    WEBSITE_STATUS_CHANGED, WebsiteStatusChanged, crate::api::WEBSITE_STATUS_CHANGED, "The notification / registration status of a website with the Ministry of Industry and Trade changed (`website_id`, `org_id`, `domain`, `kind`, `status`, `previous_status`).";
     PURPOSE_UPDATED, PurposeUpdated, "compliance.purpose_updated", "A processing purpose of the tenant was added or changed (`key`, `legal_basis`, `active`).";
     RESIDENCY_CHANGED, ResidencyChanged, "compliance.residency_changed", "Where the tenant must keep its data changed (`data_residency`, `previous`).";
     INCIDENT_OPENED, IncidentOpened, "compliance.incident_opened", "A personal data breach was recorded (`incident_id`, `severity`, `status`, `report_due_at`).";
@@ -60,33 +60,4 @@ events! {
     TARGET_RESTORED, TargetRestored, "compliance.target_restored", "The target of a case may be shown again (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).";
     DISCLOSURE_RECORDED, DisclosureRecorded, "compliance.disclosure_recorded", "Information about a seller or user was given to a competent authority (`disclosure_id`, `case_id`, `subject`, `fields` — names only, no values).";
     RULES_IMPORTED, RulesImported, "compliance.rules_imported", "Legal rules were imported (`jurisdiction`, `rules`).";
-}
-
-#[cfg(test)]
-mod tests {
-    /// Tên event khai cho module khác ở `api` phải khớp tên `compliance` thật sự phát (một nguồn sự thật).
-    #[test]
-    fn ten_event_cong_bo_khop_ten_phat() {
-        let pairs = [
-            (crate::api::KYC_VERIFIED, <super::KycVerified as autoxide_kernel::event::Event>::NAME),
-            (crate::api::KYC_REJECTED, <super::KycRejected as autoxide_kernel::event::Event>::NAME),
-            (crate::api::KYC_EXPIRED, <super::KycExpired as autoxide_kernel::event::Event>::NAME),
-            (crate::api::KYC_REVOKED, <super::KycRevoked as autoxide_kernel::event::Event>::NAME),
-            (
-                crate::api::CONSENT_WITHDRAWN,
-                <super::ConsentWithdrawn as autoxide_kernel::event::Event>::NAME,
-            ),
-            (
-                crate::api::PHONE_VERIFIED,
-                <super::PhoneVerified as autoxide_kernel::event::Event>::NAME,
-            ),
-            (
-                crate::api::PHONE_REMOVED,
-                <super::PhoneRemoved as autoxide_kernel::event::Event>::NAME,
-            ),
-        ];
-        for (published, emitted) in pairs {
-            assert_eq!(published, emitted);
-        }
-    }
 }

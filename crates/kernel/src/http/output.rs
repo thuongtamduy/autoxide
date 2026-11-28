@@ -1,5 +1,5 @@
-//! Responses besides the envelopes of [`response`](crate::response): [`NoContent`], [`Download`] and
-//! [`PublicCache`].
+//! Responses besides the envelopes of [`response`](crate::response): [`NoContent`], [`Download`], [`PublicCache`]
+//! and the [`NoStore`] wrapper.
 
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
@@ -13,6 +13,21 @@ pub struct NoContent;
 impl IntoResponse for NoContent {
     fn into_response(self) -> Response {
         StatusCode::NO_CONTENT.into_response()
+    }
+}
+
+/// A response that carries a secret shown only once (a new API key, a webhook signing secret): the wrapped
+/// response with `Cache-Control: no-store`, so no proxy or browser keeps it and the idempotency layer does not
+/// store it in the database - a retry with the same `Idempotency-Key` gets `409 idempotency_result_not_kept`
+/// instead of the secret again. `Ok(NoStore(Created::new(path, data)))`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoStore<T>(pub T);
+
+impl<T: IntoResponse> IntoResponse for NoStore<T> {
+    fn into_response(self) -> Response {
+        let mut response = self.0.into_response();
+        response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        response
     }
 }
 
@@ -113,6 +128,9 @@ mod tests {
         let disposition =
             response.headers()[header::CONTENT_DISPOSITION].to_str().unwrap_or_default();
         assert!(disposition.starts_with("attachment;"), "{disposition}");
+        let response = NoStore(NoContent).into_response();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
         // Content-Type sai cú pháp: không lỗi, dùng kiểu nhị phân chung.
         let response = Download::new(Vec::new(), "bad\nvalue", "x").into_response();
         assert_eq!(response.headers()[header::CONTENT_TYPE], "application/octet-stream");
