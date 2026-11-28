@@ -186,6 +186,8 @@ thiết kế; tra một tenant trong log và trace).
 | `http_rate_limited_total`, `http_api_key_rate_limited_total`, `http_tenant_rate_limited_total` | gần 0 | `AutoxideRateLimitedClients` trên 1/s trong 15 phút | "Thu hồi hàng loạt" |
 | `webhooks_failed_total` so với `webhooks_delivered_total`  | dưới 5% lỗi                      | `AutoxideWebhooksFailing` trên 20% trong 30 phút  | chủ của các bên nhận         |
 | `mail_bounces_total{kind="hard"}`                         | ít                               | `AutoxideMailHardBounces` trên 20 mỗi giờ         | `DEPLOY.vi.md` "Thư bị dội" |
+| `inventory_delivery_unissued_total`, `inventory_order_event_unapplied_total`, `inventory_delivery_after_manual_release_total` | 0 | `AutoxideStockNotIssued` | `INVENTORY.vi.md` "Hàng đã giao mà tồn không giảm" |
+| `orders_payment_currency_mismatch_total`                  | 0                                | `AutoxidePaymentCurrencyMismatch`                 | `MONEY.vi.md` "Khoản thanh toán khác tiền tệ" |
 
 Các series khác đáng có một panel (mặc định không cảnh báo): `database_write_retries_total` (tranh chấp ghi),
 `kernel_request_log_dropped_total` (request log quá tải), `entitlement_denials_total` (chạm giới hạn gói),

@@ -88,14 +88,42 @@ Module `orders` giữ hàng qua `autoxide_inventory::api::Inventory`:
    (`POST /api/v1/inventory/reservations/{id}/release`; chỗ giữ do nhân viên trả không bao giờ xuất lại, nên event
    sau của đơn — như ghi serial sau — không trừ kho lần hai), rồi ghi số đã bán bằng lệnh điều chỉnh
    (`POST /api/v1/inventory/adjustments`, số âm, lý do `data_entry_fix`).
-   Nâng cấp từ bản trước: đơn đã giao trước bản này giữ chỗ `confirmed` mãi (đơn vị vẫn `reserved`). Liệt kê bằng
-   `GET /api/v1/inventory/reservations?status=confirmed` và đối soát từng đơn đã giao như trên (trả chỗ giữ, rồi
-   điều chỉnh).
+   Nâng cấp từ bản trước 0.20.0: đơn đã giao trước bản đó giữ chỗ `confirmed` mãi (đơn vị vẫn `reserved`); xem mục
+   "Hàng đã giao mà tồn không giảm" bên dưới.
 4. `release` — trả phần chưa xuất (huỷ đơn, thanh toán lỗi…). Trả hai lần chỉ cộng lại một lần.
 5. `restock` — nhập lại hàng trả về (`reference` như `return:<id>`); dòng không bán lại được chỉ được ghi nhận.
 
 Chỗ giữ chưa xác nhận quá `expires_at` được job `inventory.expire_reservations` (mỗi phút) trả lại. Mỗi phần giữ trừ
 tồn bằng một câu `UPDATE` có điều kiện, theo thứ tự cố định, nên 100 người cùng mua cái cuối chỉ đúng một người được.
+
+### Hàng đã giao mà tồn không giảm
+
+`inventory` áp event của đơn sau khi đơn đã đổi, nên khi một event không áp được thì đơn không bị lùi lại: người
+vận hành đối soát tồn. Ba số đo báo việc đó (không có nhãn khách; dòng log cảnh báo mang `order_id`, tên event và
+`code` của lỗi):
+
+| Số đo | Nghĩa là |
+| --- | --- |
+| `inventory_delivery_unissued_total{reason}` | hàng đã giao nhưng không xuất kho (`no_reservation`, `rejected`) |
+| `inventory_order_event_unapplied_total{event}` | event khác của đơn (xác nhận, huỷ, trả hàng, huỷ đặt trước) bị từ chối |
+| `inventory_delivery_after_manual_release_total` | hàng giao sau khi nhân viên trả chỗ giữ: không xuất gì |
+
+Luật cảnh báo `AutoxideStockNotIssued` trong
+[`deploy/prometheus/autoxide-alerts.yml`](../deploy/prometheus/autoxide-alerts.yml) báo khi một trong ba số tăng.
+Với mỗi đơn có trong log:
+
+1. `GET /api/v1/inventory/reservations?order_id=<order_id>` và `GET /api/v1/orders/<order_id>` (đã giao gì, từng
+   dòng).
+2. Chỗ giữ vẫn `held` hay `confirmed` trong khi hàng đã giao: trả chỗ giữ
+   (`POST /api/v1/inventory/reservations/{id}/release`), rồi ghi số đã giao bằng lệnh điều chỉnh
+   (`POST /api/v1/inventory/adjustments`, số âm, lý do `data_entry_fix`) ở đúng kho đã giữ từng dòng.
+3. Chỗ giữ đã do nhân viên trả (số đo thứ ba): tìm lệnh điều chỉnh
+   (`GET /api/v1/inventory/movements?variant_id=<id>&kind=adjustment`); thiếu thì ghi. Nhân viên đã trả thì là
+   xong, event sau của đơn không bao giờ trừ kho lần hai.
+4. Không có chỗ giữ (`no_reservation`) cho hàng theo dõi tồn: chỉ ghi lệnh điều chỉnh.
+
+Đơn đã giao trước bản 0.20.0 giữ chỗ `confirmed` mãi. Tìm bằng `GET /api/v1/orders?status=delivered` và
+`?status=completed`, tra từng đơn như bước 1, rồi đối soát các đơn còn chỗ giữ `confirmed` như bước 2.
 
 ### Hàng đặt trước
 

@@ -818,7 +818,15 @@ impl InventoryService {
                     && status == ReservationStatus::Released
                     && row.release_reason.as_deref() == Some("manual")
                 {
-                    tracing::debug!(order_id = %order, "reservation released by staff; nothing to issue");
+                    // Thường là đối soát tay đã làm (trả chỗ giữ rồi ghi điều chỉnh); nhưng nếu nhân viên trả
+                    // chỗ giữ mà quên ghi điều chỉnh thì hàng đã đi mà tồn không giảm — cảnh báo và đếm để
+                    // người vận hành kiểm (UT-1 tiếp; cách đối soát ở docs/INVENTORY.md).
+                    metrics::counter!("inventory_delivery_after_manual_release_total").increment(1);
+                    tracing::warn!(
+                        order_id = %order,
+                        reservation_id = %row.id,
+                        "goods delivered after staff released the reservation; nothing issued, check that the sale was recorded with an adjustment"
+                    );
                     return load(&transaction, tenant, row).await;
                 }
                 // Chỗ giữ HỆ THỐNG tự trả (hết hạn giữ, thanh toán lỗi) mà hàng vẫn tới tay người mua (vd chuyển

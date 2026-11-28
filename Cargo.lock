@@ -1062,6 +1062,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hmac 0.13.0",
  "jiff",
+ "metrics",
  "proptest",
  "rust_decimal",
  "sea-orm",

@@ -45,14 +45,14 @@ pub(crate) struct Load {
 }
 
 /// Cân quy đổi (gram) của một món: D × R × C mm³ → cm³ (÷ 1000) → kg (÷ divisor) → gram (× 1000),
-/// gộp lại là mm³ / divisor, làm tròn lên. Thiếu một kích thước → 0.
-pub(crate) fn volumetric_grams(item: &QuoteItem, divisor: i64) -> i64 {
+/// gộp lại là mm³ / divisor, làm tròn lên. Thiếu một kích thước → 0. Tính bằng `i128`: với cạnh đã
+/// kiểm (≤ 10⁷ mm) không tràn; nơi gọi so tổng với trần một lần giao.
+pub(crate) fn volumetric_grams(item: &QuoteItem, divisor: i64) -> i128 {
     match (item.length_mm, item.width_mm, item.height_mm) {
         (Some(l), Some(w), Some(h)) if divisor > 0 && l > 0 && w > 0 && h > 0 => {
             let cubic = i128::from(l) * i128::from(w) * i128::from(h);
             let divisor = i128::from(divisor);
-            let grams = (cubic + divisor - 1) / divisor;
-            i64::try_from(grams).unwrap_or(i64::MAX)
+            (cubic + divisor - 1) / divisor
         }
         _ => 0,
     }
@@ -72,47 +72,80 @@ pub(crate) fn parcel_sides(items: &[QuoteItem]) -> (Option<i64>, Option<i64>, Op
         }
         length = length.max(l);
         width = width.max(w);
+        // Đầu vào đã kiểm (cạnh ≤ 10⁷ mm, số lượng ≤ 10⁷) nên tích không tràn `i64`; tổng nhiều dòng
+        // thì vẫn có thể, nên cộng bão hoà — chiều cao chỉ là thông tin gửi hãng, cân mới quyết phí.
         height = height.saturating_add(h.saturating_mul(item.quantity));
         any = true;
     }
     if any { (Some(length), Some(width), Some(height)) } else { (None, None, None) }
 }
 
+/// Kiểm số liệu các món của giỏ (trần cân nặng, kích thước, số lượng): mọi đường báo giá (REST, MCP,
+/// `ShippingRates` cho `orders`, ước tính công khai) đi qua đây. Báo mọi lỗi một lần (D-083).
+pub(crate) fn check_items(items: &[QuoteItem]) -> Result<(), Error> {
+    let mut problems = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        crate::limits::check_item(
+            &mut problems,
+            &format!("items[{index}]"),
+            item.quantity,
+            item.weight_grams,
+            [item.length_mm, item.width_mm, item.height_mm],
+        );
+    }
+    crate::shipments::invalid(problems)
+}
+
+/// Vì sao không tính được số liệu của giỏ.
+#[derive(Debug)]
+pub(crate) enum LoadError {
+    /// Món cần giao thiếu cân nặng và phương thức không có cân mặc định.
+    WeightMissing,
+    /// Cân tính phí vượt trần một lần giao (`shipping.load_too_large`).
+    TooLarge(Error),
+}
+
 /// Cân tính phí và cạnh dài nhất của giỏ. Món cần giao thiếu cân nặng dùng `default_weight`;
-/// không có thì trả SKU của món thiếu.
+/// không có thì `WeightMissing`. Tính bằng `i128` rồi so trần (không bão hoà, P17).
 pub(crate) fn load_of(
     items: &[QuoteItem],
     divisor: i64,
     default_weight: Option<i64>,
-) -> Result<Load, String> {
-    let (mut actual, mut volumetric, mut longest) = (0i64, 0i64, 0i64);
+) -> Result<Load, LoadError> {
+    let (mut actual, mut volumetric, mut longest) = (0i128, 0i128, 0i64);
     for item in items.iter().filter(|item| item.requires_shipping && item.quantity > 0) {
         let Some(weight) = item.weight_grams.or(default_weight) else {
-            return Err(item.sku.clone());
+            return Err(LoadError::WeightMissing);
         };
-        actual = actual.saturating_add(weight.max(0).saturating_mul(item.quantity));
-        volumetric = volumetric
-            .saturating_add(volumetric_grams(item, divisor).saturating_mul(item.quantity));
+        let quantity = i128::from(item.quantity);
+        actual += i128::from(weight.max(0)) * quantity;
+        volumetric += volumetric_grams(item, divisor) * quantity;
         for side in [item.length_mm, item.width_mm, item.height_mm].into_iter().flatten() {
             longest = longest.max(side);
         }
     }
-    Ok(Load { chargeable_grams: actual.max(volumetric), longest_side_mm: longest })
+    let chargeable = crate::limits::within_load(actual.max(volumetric)).map_err(LoadError::TooLarge)?;
+    Ok(Load { chargeable_grams: chargeable, longest_side_mm: longest })
 }
 
 /// Phí của một bậc cho cân `grams`: phí bậc + mỗi `step_grams` (hay phần lẻ) vượt `min_weight`
-/// thêm `step_amount`.
-pub(crate) fn tier_amount(tier: &rate::Model, grams: i64) -> i64 {
-    let mut amount = tier.amount_minor;
+/// thêm `step_amount`. Tràn `i64` → `money.overflow` (422), không bão hoà (P17).
+pub(crate) fn tier_amount(
+    tier: &rate::Model,
+    grams: i64,
+    currency: autoxide_kernel::money::Currency,
+) -> Result<i64, Error> {
+    let mut amount = Money::new(tier.amount_minor, currency);
     if let (Some(step), Some(extra)) = (tier.step_grams, tier.step_amount_minor)
         && step > 0
     {
-        // Không tràn với cân bão hoà tới `i64::MAX` (PT-5): trừ bão hoà, chia làm tròn lên không cộng.
+        // `grams` ≤ trần một lần giao và `min_weight_grams` ≥ 0 nên phép trừ không tràn; chia làm
+        // tròn lên không cộng trước.
         let over = grams.saturating_sub(tier.min_weight_grams).max(0);
         let steps = over / step + i64::from(over % step != 0);
-        amount = amount.saturating_add(steps.saturating_mul(extra));
+        amount = amount.checked_add(Money::new(extra, currency).checked_mul(steps)?)?;
     }
-    amount
+    Ok(amount.minor())
 }
 
 /// Bậc khớp cân và cạnh dài nhất, trong các bậc của một vùng.
@@ -239,6 +272,7 @@ impl ShippingService {
         tenant: &TenantContext,
         request: &QuoteRequest,
     ) -> Result<Quote, Error> {
+        check_items(&request.items)?;
         if !request.items.iter().any(|item| item.requires_shipping && item.quantity > 0) {
             return Ok(Quote::default());
         }
@@ -256,10 +290,11 @@ impl ShippingService {
                 method.default_item_weight_grams,
             ) {
                 Ok(load) => load,
-                Err(_) if kind == MethodKind::Pickup => {
+                Err(LoadError::TooLarge(error)) => return Err(error),
+                Err(LoadError::WeightMissing) if kind == MethodKind::Pickup => {
                     Load { chargeable_grams: 0, longest_side_mm: 0 }
                 }
-                Err(_) => {
+                Err(LoadError::WeightMissing) => {
                     quote.unavailable.push(UnavailableMethod::new(&method.code, WEIGHT_MISSING));
                     continue;
                 }
@@ -274,7 +309,7 @@ impl ShippingService {
                             .push(UnavailableMethod::new(&method.code, COUNTRY_NOT_SERVED));
                         continue;
                     }
-                    match self.table_rate(tenant, &method, destination, load).await? {
+                    match self.table_rate(tenant, &method, destination, load, currency).await? {
                         Some(amount) => vec![(amount, None, None, None)],
                         None => {
                             quote.unavailable.push(UnavailableMethod::new(&method.code, NO_RATE));
@@ -361,7 +396,8 @@ impl ShippingService {
         let amount = if free {
             Money::zero(currency)
         } else {
-            Money::new(base_minor.saturating_add(method.handling_fee_minor), currency)
+            Money::new(base_minor, currency)
+                .checked_add(Money::new(method.handling_fee_minor, currency))?
         };
         let estimated_days =
             days.or_else(|| match (method.estimated_min_days, method.estimated_max_days) {
@@ -406,6 +442,7 @@ impl ShippingService {
         method: &method::Model,
         destination: &crate::api::Address,
         load: Load,
+        currency: autoxide_kernel::money::Currency,
     ) -> Result<Option<i64>, Error> {
         let read = tenant.database().read();
         // Vùng có tỉnh đích, và vùng cả nước (`province_code IS NULL` — không `= NULL`).
@@ -441,9 +478,9 @@ impl ShippingService {
             if candidates.is_empty() {
                 continue;
             }
-            return Ok(
-                pick_tier(&candidates, load).map(|tier| tier_amount(tier, load.chargeable_grams))
-            );
+            return pick_tier(&candidates, load)
+                .map(|tier| tier_amount(tier, load.chargeable_grams, currency))
+                .transpose();
         }
         Ok(None)
     }

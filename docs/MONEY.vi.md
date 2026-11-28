@@ -72,6 +72,16 @@ hàng hay dịch vụ đọc sao kê, qua webhook hay hỏi định kỳ) báo t
 thanh toán thành đã thu, còn lại (sai số tiền, không mã, trả hai lần, trả muộn) vào hàng chờ. Hiện chỉ
 có nguồn giả: bộ nối thật cần hợp đồng với ngân hàng hay dịch vụ.
 
+### Khoản thanh toán khác tiền tệ
+
+Khoản thanh toán của đơn mà sổ cái báo đã nhận bằng tiền khác tiền của đơn (vd một khoản chuyển ngoại tệ được chấp
+nhận khi xử lý hàng chờ đối soát) **không** được tính vào đơn: `orders` không bao giờ ghi đơn vị nhỏ của tiền này
+thành tiền kia. Đơn vẫn chờ thanh toán (và hết hạn như thường), dòng log lỗi nêu `order_id` và `payment_id`, số đo
+`orders_payment_currency_mismatch_total` tăng và luật cảnh báo `AutoxidePaymentCurrencyMismatch` báo. Event
+`ledger.payment_succeeded` giữ mã lỗi `orders.payment_received_currency_mismatch` và vào dead-letter sau lần thử
+cuối (giao lại không đổi được tiền tệ). Cách xử lý: hoàn khoản đó (`POST /api/v1/ledger/payments/{id}/refunds`),
+rồi đề nghị người mua trả lại bằng tiền của đơn, hoặc huỷ đơn.
+
 ## Chứng từ kế toán
 
 `invoices` giữ các loại chứng từ: `vat_invoice`, `sales_invoice`, `cash_register_invoice`,

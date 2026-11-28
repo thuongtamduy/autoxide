@@ -432,6 +432,20 @@ pub(crate) fn payment_currency_mismatch(index: usize, currency: &str) -> Error {
     .with_param("currency", currency)
 }
 
+/// `orders.payment_received_currency_mismatch` (422): `ledger` báo đã thu khoản `payment` bằng tiền khác
+/// tiền của khoản (và của đơn). Chỉ thấy trong log / dead-letter của event, không qua REST.
+pub(crate) fn received_currency_mismatch(payment: uuid::Uuid, received: &str, currency: &str) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.payment_received_currency_mismatch",
+        "Payment {payment_id} was received in {received}, but it is owed in {currency}; it was not \
+         counted towards the order. Refund it through the ledger.",
+    )
+    .with_param("payment_id", payment)
+    .with_param("received", received)
+    .with_param("currency", currency)
+}
+
 pub(crate) fn payments_mismatch(
     paid: autoxide_kernel::money::Money,
     total: autoxide_kernel::money::Money,

@@ -41,7 +41,26 @@ impl ShippingService {
                     "range",
                     "must be more than 0",
                 ));
+            } else if input.weight_grams > crate::api::MAX_PARCEL_WEIGHT_GRAMS {
+                problems.push(
+                    FieldError::new(
+                        format!("parcels[{index}].weight_grams"),
+                        "range",
+                        "must be 1 to {max}",
+                    )
+                    .with_param("max", crate::api::MAX_PARCEL_WEIGHT_GRAMS),
+                );
             }
+            crate::limits::check_sides(
+                &mut problems,
+                &format!("parcels[{index}]"),
+                [input.length_mm, input.width_mm, input.height_mm],
+            );
+        }
+        // Mọi kiện cộng lại cũng không vượt trần một lần giao: hãng nhận tổng không tràn.
+        if problems.is_empty() {
+            let total = parcels.iter().map(|input| i128::from(input.weight_grams)).sum();
+            crate::limits::within_load(total)?;
         }
         invalid(problems)?;
         let transaction = tenant.database().begin_write().await?;
@@ -168,11 +187,12 @@ impl ShippingService {
             .insert(&transaction)
             .await?;
         let parcel_id = Uuid::now_v7();
-        let mut weight = 0i64;
+        // Cân kiện tách ra ≤ cân của vận đơn gốc (đã kiểm trần lúc tạo): tính `i128`, so trần.
+        let mut weight = 0i128;
         for item in items {
             let Some(moving) = lines.get(&item.order_line_key).copied() else { continue };
             let take = moving.min(item.quantity);
-            weight += item.weight_grams.unwrap_or(0).saturating_mul(take);
+            weight += i128::from(item.weight_grams.unwrap_or(0).max(0)) * i128::from(take);
             let mut copy = item.clone();
             copy.id = Uuid::now_v7();
             copy.shipment_id = new_row.id;
@@ -201,7 +221,7 @@ impl ShippingService {
             tenant_id: Set(tenant.id().as_uuid()),
             shipment_id: Set(new_row.id),
             position: Set(1),
-            weight_grams: Set(weight),
+            weight_grams: Set(crate::limits::within_load(weight)?),
             length_mm: Set(None),
             width_mm: Set(None),
             height_mm: Set(None),

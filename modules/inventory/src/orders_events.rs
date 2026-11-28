@@ -156,14 +156,43 @@ fn order_id(after: &Value) -> Option<Uuid> {
     after.get("order_id").and_then(Value::as_str).and_then(|id| id.parse().ok())
 }
 
-/// Lỗi nghiệp vụ không sửa được bằng cách giao lại event: ghi log và thôi (giao lại mãi cũng vậy).
+/// Lỗi nghiệp vụ không sửa được bằng cách giao lại event: ghi cảnh báo, đếm
+/// `inventory_order_event_unapplied_total{event}` cho người vận hành (luật cảnh báo
+/// `AutoxideStockNotIssued`, cách đối soát ở docs/INVENTORY.md) và thôi (giao lại mãi cũng vậy).
 fn settle(event: &Delivered, outcome: Result<(), Error>) -> Result<(), Error> {
     match outcome {
         Err(error) if error.kind().status() < 500 => {
-            tracing::warn!(event_id = %event.id, event = %event.name, code = error.code(), "order event not applied to stock");
+            metrics::counter!("inventory_order_event_unapplied_total", "event" => event_label(&event.name))
+                .increment(1);
+            tracing::warn!(event_id = %event.id, event = %event.name, code = error.code(), "order event not applied to stock; reconcile the stock level by hand");
             Ok(())
         }
         other => other,
+    }
+}
+
+/// Nhãn `event` của số đo: chỉ tên event `inventory` nghe (tập nhỏ cố định), còn lại `other`.
+fn event_label(name: &str) -> &'static str {
+    const KNOWN: [&str; 7] = [
+        ORDER_CONFIRMED,
+        ORDER_CANCELLED,
+        RETURN_RECEIVED,
+        PREORDER_CANCELLED,
+        ORDER_DELIVERED,
+        FULFILLMENT_DELIVERED,
+        LINE_SERIALS_RECORDED,
+    ];
+    KNOWN.into_iter().find(|known| *known == name).unwrap_or("other")
+}
+
+#[cfg(test)]
+mod label_tests {
+    use super::*;
+
+    #[test]
+    fn nhan_so_do_chi_thuoc_tap_co_dinh() {
+        assert_eq!(event_label(ORDER_DELIVERED), ORDER_DELIVERED);
+        assert_eq!(event_label("orders.something_new"), "other");
     }
 }
 

@@ -55,6 +55,18 @@ pub(crate) fn currency_unsupported(currency: &str) -> Error {
     .with_param("currency", currency)
 }
 
+/// `ghn.parcel_too_large` (422): các kiện nặng hơn hay dài hơn mức `shipping` nhận cho một lần giao.
+pub(crate) fn parcel_too_large(max_grams: i64, max_side_mm: i64) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "ghn.parcel_too_large",
+        "The parcels weigh more than {max_grams} grams together, or a side is longer than \
+         {max_side_mm} mm. Check the weight and dimensions of the parcels.",
+    )
+    .with_param("max_grams", max_grams)
+    .with_param("max_side_mm", max_side_mm)
+}
+
 /// `ghn.country_unsupported` (422).
 pub(crate) fn country_unsupported(country: &str) -> Error {
     Error::new(

@@ -77,6 +77,17 @@ right code and amount marks the payment paid, anything else (wrong amount, no co
 goes to the exceptions queue. Only a fake bank feed ships today: a real connector needs a contract
 with the bank or service.
 
+### A payment in another currency
+
+A payment of an order that the ledger reports as received in another currency than the order (for example a
+foreign-currency transfer accepted while resolving an exception) is **not** counted towards the order: `orders`
+never records units of one currency as another. The order stays waiting for payment (and expires as usual), the
+error log line names `order_id` and `payment_id`, the counter `orders_payment_currency_mismatch_total` goes up and
+the alert `AutoxidePaymentCurrencyMismatch` fires. The event `ledger.payment_succeeded` keeps the error code
+`orders.payment_received_currency_mismatch` and goes to the dead-letter queue after its last retry (delivering it
+again cannot change the currency). To handle it: refund the payment (`POST /api/v1/ledger/payments/{id}/refunds`),
+then ask the buyer to pay again in the order's currency, or cancel the order.
+
 ## Accounting documents
 
 `invoices` keeps documents of these kinds: `vat_invoice`, `sales_invoice`, `cash_register_invoice`,

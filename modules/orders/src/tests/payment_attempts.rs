@@ -386,3 +386,47 @@ async fn hai_lan_mo_lai_cung_luc_chi_mot_lan_thu_moi() {
     .await
     .unwrap();
 }
+
+/// P17: `ledger` báo đã thu một khoản bằng tiền khác tiền của đơn (vd đối soát chấp nhận khoản ngoại tệ)
+/// → không cộng vào đơn, đơn vẫn chờ thanh toán, event giữ lỗi có mã để người vận hành xử lý (rồi vào
+/// dead-letter sau lần thử cuối). Khoản đúng tiền tới sau vẫn xác nhận đơn như thường.
+#[tokio::test]
+async fn khoan_nhan_khac_tien_te_cua_don_khong_cong_vao_don() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let shop = &guests.shop;
+        let (order, _, _) = card_order(shop).await;
+        let payment = shop.ledger.payments()[0].clone();
+        let usd = autoxide_kernel::money::Money::new(
+            payment.amount.minor(),
+            autoxide_kernel::money::Currency::USD,
+        );
+        shop.ledger.collect(payment.id);
+        let event = json!({"payment_id": payment.id, "source_module": "orders",
+            "amount": usd, "reference": payment.reference});
+        emit(shop, &PaymentSucceeded(event)).await;
+        drain(shop).await;
+
+        let boss = Call::as_user(shop, "boss");
+        let (_, view) = boss.send("GET", &format!("/{order}"), None).await;
+        assert_eq!(view["data"]["status"], "pending_payment", "{view}");
+        assert_eq!(super::minor(&view["data"]["totals"]["paid"]), 0);
+        // Event chưa giao xong, lỗi ghi mã ổn định cho người vận hành.
+        assert_eq!(undelivered(shop).await, 1);
+        let database = shop.database();
+        let backend = database.read().get_database_backend();
+        let sql = "SELECT last_error FROM ledger_events WHERE delivered_at IS NULL";
+        let row = database.read().query_one_raw(statement(backend, sql, [])).await.unwrap().unwrap();
+        let error: String = row.try_get("", "last_error").unwrap();
+        assert!(error.contains("orders.payment_received_currency_mismatch"), "{error}");
+
+        // Khoản đúng tiền (giao lại với tiền của đơn) vẫn được ghi bình thường.
+        paid(shop, &payment).await;
+        drain(shop).await;
+        let (_, view) = boss.send("GET", &format!("/{order}"), None).await;
+        assert_eq!(view["data"]["status"], "confirmed", "{view}");
+        assert_eq!(super::minor(&view["data"]["totals"]["paid"]), payment.amount.minor());
+    })
+    .await
+    .unwrap();
+}

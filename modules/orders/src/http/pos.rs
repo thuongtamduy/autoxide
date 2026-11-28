@@ -345,15 +345,13 @@ pub(crate) async fn sell(
     let payments = input
         .payments
         .into_iter()
-        .map(|payment| PosPayment {
-            method: payment.method,
-            amount: payment.amount.minor(),
-            tendered: payment.tendered.map(Money::minor),
-            approval_code: payment.approval_code,
-            currencies: std::iter::once(payment.amount)
-                .chain(payment.tendered)
-                .map(|money| money.currency().code().to_owned())
-                .collect(),
+        .map(|payment| {
+            PosPayment::new(
+                payment.method,
+                payment.amount,
+                payment.tendered,
+                payment.approval_code,
+            )
         })
         .collect();
     let sold = service
