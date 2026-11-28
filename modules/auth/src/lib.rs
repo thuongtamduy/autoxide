@@ -268,9 +268,11 @@ impl Module for AuthModule {
             Some(secret) => secret,
             None => {
                 tracing::warn!(
-                    "AUTOXIDE_AUTH_TOKEN_SECRET is not set: using a random key for this \
-                     process. Access tokens stop working after a restart and cannot be shared \
-                     between servers; set it for production."
+                    "AUTOXIDE_AUTH_TOKEN_SECRET is not set, so a random signing key is used for this \
+                     run: every access token stops working when the server restarts (people and \
+                     scripts must sign in or refresh again), and several servers cannot accept each \
+                     other's tokens. Fix: put `AUTOXIDE_AUTH_TOKEN_SECRET=<output of `openssl rand \
+                     -base64 48`>` in .env or the environment, then restart."
                 );
                 random_secret()?
             }

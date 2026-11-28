@@ -34,6 +34,11 @@ const ADMIN_EMAIL: &str = "admin@example.com";
 const SAMPLE_DATA_TASKS: &str = "address.import,tax.import_pack,promotions.load_legal_data";
 
 #[derive(Debug, clap::Args)]
+#[command(after_help = "\
+Port busy? The demo listens on 127.0.0.1:8080. Set another address before the command:\n  \
+AUTOXIDE_HTTP_ADDRESS=127.0.0.1:8081 autoxide demo\n\
+(on Windows PowerShell: $env:AUTOXIDE_HTTP_ADDRESS = \"127.0.0.1:8081\"; .\\autoxide.exe demo).\n\
+With Docker, change the published port instead: -p 127.0.0.1:8081:8080.")]
 pub struct Arguments {
     /// Directory that holds the demo's database, files and secrets. Created when missing;
     /// running the command again with the same directory continues with the same data.
@@ -53,6 +58,24 @@ pub struct Arguments {
     keep_external_services: bool,
 }
 
+/// Địa chỉ nghe mặc định của server (cùng giá trị với `AUTOXIDE_HTTP_ADDRESS`).
+const DEFAULT_ADDRESS: &str = "127.0.0.1:8080";
+
+/// Kiểm cổng còn trống TRƯỚC khi tạo thư mục, sinh mật khẩu hay in banner: cổng bận thì không in gì
+/// gây hiểu nhầm là đã chạy. Giá trị không đọc được thì bỏ qua — bước nạp cấu hình sẽ báo lỗi đúng chỗ.
+fn check_address_free(configured: Option<&str>) -> Result<(), String> {
+    let text = configured.unwrap_or(DEFAULT_ADDRESS);
+    let Ok(address) = text.parse::<std::net::SocketAddr>() else { return Ok(()) };
+    match std::net::TcpListener::bind(address) {
+        Ok(_) => Ok(()),
+        Err(error) => Err(format!(
+            "cannot listen on `{address}`: {error}. Another program (maybe a previous demo) is using the port. \
+             Pick a free one: AUTOXIDE_HTTP_ADDRESS=127.0.0.1:8081 autoxide demo \
+             (with Docker: -p 127.0.0.1:8081:8080, the port inside the container stays 8080)."
+        )),
+    }
+}
+
 /// Giá trị demo sinh một lần và giữ lại giữa các lần chạy.
 struct State {
     token_secret: String,
@@ -66,6 +89,11 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         Ok(source) => source,
         Err(errors) => return report_invalid_configuration(&errors),
     };
+    if let Err(error) = check_address_free(source.get("AUTOXIDE_HTTP_ADDRESS")) {
+        return report_failure(&error);
+    }
+    // Đường dẫn đầy đủ của thư mục demo, tính TRƯỚC khi đổi thư mục làm việc (banner cần in đúng chỗ file nằm).
+    let demo_dir = std::path::absolute(&arguments.dir).unwrap_or_else(|_| arguments.dir.clone());
     if let Err(error) = std::fs::create_dir_all(&arguments.dir) {
         return report_failure(&format!("cannot create `{}`: {error}", arguments.dir.display()));
     }
@@ -93,12 +121,12 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     let database_existed =
         settings.config.database.url.sqlite_path().is_some_and(|path| path.exists());
     let banner = Banner {
-        dir: arguments.dir.clone(),
+        dir: demo_dir.clone(),
         address: settings.config.http.address.to_string(),
         docs: settings.config.http.api_docs,
         database: match (&arguments.database_url, settings.config.database.url.sqlite_path()) {
             (Some(_), _) => "the database given with --database-url".to_owned(),
-            (None, Some(path)) => format!("SQLite file {}", path.display()),
+            (None, Some(path)) => format!("SQLite file {}", demo_dir.join(path).display()),
             (None, None) => "SQLite".to_owned(),
         },
         admin: settings.startup.admin.as_ref().map(|admin| {
@@ -192,8 +220,9 @@ struct Banner {
 
 impl Banner {
     fn render(&self) -> String {
-        // `0.0.0.0` (trong Docker) là địa chỉ nghe, không phải địa chỉ để mở bằng trình duyệt.
-        let shown = self.address.replace("0.0.0.0", "localhost").replace("[::]", "localhost");
+        // `0.0.0.0` (trong Docker) là địa chỉ nghe, không phải địa chỉ để mở bằng trình duyệt; in `127.0.0.1` như
+        // bản chạy trực tiếp để hai cách chạy cho cùng một đường dẫn (README cũng publish cổng ở 127.0.0.1).
+        let shown = self.address.replace("0.0.0.0", "127.0.0.1").replace("[::]", "127.0.0.1");
         let base = format!("http://{shown}");
         let mut text = String::new();
         text.push_str("\nAutoxide demo (for trying out, not for production)\n\n");
@@ -357,6 +386,19 @@ mod tests {
     }
 
     #[test]
+    fn cong_ban_thi_bao_loi_va_cach_doi_cong() {
+        let held = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = held.local_addr().unwrap().to_string();
+        let error = check_address_free(Some(&address)).unwrap_err();
+        assert!(error.contains(&address), "{error}");
+        assert!(error.contains("AUTOXIDE_HTTP_ADDRESS=127.0.0.1:"), "{error}");
+        drop(held);
+        assert!(check_address_free(Some(&address)).is_ok());
+        // Giá trị không đọc được để bước nạp cấu hình báo lỗi.
+        assert!(check_address_free(Some("không-phải-địa-chỉ")).is_ok());
+    }
+
+    #[test]
     fn banner_noi_ro_dich_vu_ngoai() {
         let text = banner(None, false);
         assert!(text.contains("no real email is sent"), "{text}");
@@ -365,7 +407,7 @@ mod tests {
     #[test]
     fn banner_in_dia_chi_mo_duoc_va_mat_khau_dang_chay() {
         let text = banner(Some(("a@b.c".into(), Some("pw".into()))), false);
-        assert!(text.contains("http://localhost:8080/api/docs"), "{text}");
+        assert!(text.contains("http://127.0.0.1:8080/api/docs"), "{text}");
         assert!(text.contains("Password        pw"), "{text}");
         assert!(text.contains("SQLite file data/autoxide.sqlite"), "{text}");
     }

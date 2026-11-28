@@ -202,7 +202,7 @@ impl GuardrailService {
                 problems.push(FieldError::new(
                     format!("max_permissions[{index}]"),
                     "unknown",
-                    "is not a permission of this system",
+                    "is not a permission of this system (list the valid ones with GET /api/v1/auth/permissions)",
                 ));
             }
         }

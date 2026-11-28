@@ -116,7 +116,7 @@
   "field:give either the current password or a second factor, not both": "chỉ gửi mật khẩu hiện tại hoặc một yếu tố xác nhận khác, không gửi cả hai",
   "field:is a commonly used or breached password; choose one that is harder to guess": "là mật khẩu phổ biến hoặc đã bị lộ; hãy chọn mật khẩu khó đoán hơn",
   "field:is not a current code from your authenticator app or an unused recovery code, or was already used; wait for the next code and try again": "không phải mã hiện tại của ứng dụng xác thực hay một mã khôi phục chưa dùng, hoặc đã được dùng; hãy đợi mã kế tiếp rồi thử lại",
-  "field:is not a permission of this system": "không phải permission của hệ thống này",
+  "field:is not a permission of this system (list the valid ones with GET /api/v1/auth/permissions)": "không phải permission của hệ thống này (xem danh sách hợp lệ bằng GET /api/v1/auth/permissions)",
   "field:is not a staff account of the platform": "không phải tài khoản nhân sự của nền tảng",
   "field:is not an organization unit of this tenant": "không phải nút tổ chức của khách hàng này",
   "field:is not valid: {reason}": "không hợp lệ: {reason}",

@@ -205,7 +205,7 @@ jobs:
           docker cp "$container:/usr/local/bin/autoxide" "dist/$name/autoxide"
           docker cp "$container:/usr/share/doc/autoxide/THIRD-PARTY-LICENSES.html" "dist/$name/THIRD-PARTY-LICENSES.html"
           docker rm "$container" >/dev/null
-          cp LICENSE-MIT LICENSE-APACHE README.md "dist/$name/"
+          cp LICENSE-MIT LICENSE-APACHE README.md README.vi.md "dist/$name/"
           file "dist/$name/autoxide"
           # Cùng thư mục cho cùng byte: xếp theo tên, chủ sở hữu và mốc thời gian cố định, gzip không ghi tên/giờ.
           touch -d "@$SOURCE_DATE_EPOCH" "dist/$name"/*
@@ -312,7 +312,7 @@ jobs:
           exe=autoxide
           if [ "$ARCHIVE" = zip ]; then exe=autoxide.exe; fi
           cp "target/release/$exe" "dist/$name/$exe"
-          cp LICENSE-MIT LICENSE-APACHE README.md licenses/THIRD-PARTY-LICENSES.html "dist/$name/"
+          cp LICENSE-MIT LICENSE-APACHE README.md README.vi.md licenses/THIRD-PARTY-LICENSES.html "dist/$name/"
           # Chạy thử ngay trên máy build: binary không khởi động được thì không đính kèm.
           "dist/$name/$exe" --version
           if [ "$ARCHIVE" = zip ]; then
