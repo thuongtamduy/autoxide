@@ -157,7 +157,7 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             `ConnectionTrait` — `Outbox::record`, `SyncLog`, kiểm quyền, `OneTimeTokens`, `JobQueue::enqueue*`,
             `job::runs::{track, progress, set_result}`, `OrgTree::*`, `DirectUploads::*`, `SearchIndex::enqueue`,
             `Distribution::publish`, `custom_fields::write_index`, `numbering::{next, current}`, `antispam` (`Checked::claim`,
-            `purge_nonces`). Hoãn so với D-20261128-library-layer-plan mục 5 ("chuyển sang `Record` trong cùng PR"):
+            `purge_nonces`). Hoãn so với D-20261128-library-layer-plan mục 5 (D-20261128-handle-bridge-by-cluster):
             đưa chỗ dùng cầu về kết nối cũ thì nâng baseline `raw-database` (cấm), chuyển sang `Record` là chuyển một
             phần module mà các phiên khác đang sửa — nên làm ở cụm của từng module. Còn: (a) chỗ module chạy câu
             SeaORM trên handle, chuyển sang `Record` rồi mới gỡ cầu: `auth` `oauth/` (gồm `fetch_page` trên handle ở
