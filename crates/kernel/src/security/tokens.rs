@@ -92,7 +92,7 @@ impl OneTimeTokens {
     }
 
     /// Issues a token of tenant `tenant` for `subject`, for `purpose`, living for `ttl`.
-    pub async fn issue<C: ConnectionTrait>(
+    pub async fn issue<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
@@ -101,6 +101,7 @@ impl OneTimeTokens {
         data: Option<&str>,
         ttl: SignedDuration,
     ) -> Result<Issued, Error> {
+        let connection = &crate::db::Via::of(connection);
         let token = random_token(32)?;
         let id = Uuid::now_v7();
         let now = now();
@@ -136,7 +137,7 @@ impl OneTimeTokens {
     }
 
     /// Tokens issued for `subject` (purpose `purpose`) from `since` until now, newest first.
-    pub async fn recent<C: ConnectionTrait>(
+    pub async fn recent<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
@@ -144,6 +145,7 @@ impl OneTimeTokens {
         subject: &str,
         since: Timestamp,
     ) -> Result<Vec<Recent>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let select = Query::select()
             .columns([Alias::new("data"), Alias::new("created_at")])
             .from(Alias::new(&self.table))
@@ -166,13 +168,14 @@ impl OneTimeTokens {
 
     /// Usable tokens (unused, not expired) of `subject` for `purpose`, newest first — e.g.
     /// an email awaiting verification.
-    pub async fn live<C: ConnectionTrait>(
+    pub async fn live<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         purpose: &str,
         subject: &str,
     ) -> Result<Vec<Live>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let select = Query::select()
             .columns([Alias::new("data"), Alias::new("expires_at")])
             .from(Alias::new(&self.table))
@@ -197,13 +200,14 @@ impl OneTimeTokens {
     /// Consumes `token` for `purpose`: if not expired and unused, marks it used and returns it; otherwise
     /// `None` (unknown token, wrong purpose, expired or already used — the caller returns one and the same
     /// error).
-    pub async fn consume<C: ConnectionTrait>(
+    pub async fn consume<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         purpose: &str,
         token: &str,
     ) -> Result<Option<Consumed>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let hash = sha256(token);
         let now = now();
         let tenant = tenant.id().as_uuid();
@@ -239,13 +243,14 @@ impl OneTimeTokens {
     /// or `None`. For cases that must validate input before spending the token (e.g. an invitation: know the
     /// email before asking for a password) — then still call [`consume`](Self::consume) so only one side
     /// wins.
-    pub async fn peek<C: ConnectionTrait>(
+    pub async fn peek<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         purpose: &str,
         token: &str,
     ) -> Result<Option<Consumed>, Error> {
+        let connection = &crate::db::Via::of(connection);
         let select = Query::select()
             .columns([Alias::new("id"), Alias::new("subject"), Alias::new("data")])
             .from(Alias::new(&self.table))
@@ -268,13 +273,14 @@ impl OneTimeTokens {
     /// Why `token` is unusable for `purpose` (after [`consume`](Self::consume) returned
     /// `None`): already used, expired or nonexistent. The holder knows their own token; nothing is revealed
     /// about other tokens. A token long expired and already purged (`purge`) is `Unknown`.
-    pub async fn rejection<C: ConnectionTrait>(
+    pub async fn rejection<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         purpose: &str,
         token: &str,
     ) -> Result<TokenRejection, Error> {
+        let connection = &crate::db::Via::of(connection);
         let select = Query::select()
             .columns([Alias::new("used_at"), Alias::new("expires_at")])
             .from(Alias::new(&self.table))
@@ -297,13 +303,14 @@ impl OneTimeTokens {
 
     /// Revokes every unused token of `subject` for `purpose` (e.g. after a password
     /// reset). Returns the number of tokens revoked.
-    pub async fn revoke<C: ConnectionTrait>(
+    pub async fn revoke<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         purpose: &str,
         subject: &str,
     ) -> Result<u64, Error> {
+        let connection = &crate::db::Via::of(connection);
         let update = Query::update()
             .table(Alias::new(&self.table))
             .value(Alias::new("used_at"), Some(now()))
@@ -317,12 +324,13 @@ impl OneTimeTokens {
 
     /// Deletes every token of `subject`, for every purpose (e.g. when deleting an account or erasing data on
     /// the data subject's request). Returns the number of rows deleted.
-    pub async fn forget<C: ConnectionTrait>(
+    pub async fn forget<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         subject: &str,
     ) -> Result<u64, Error> {
+        let connection = &crate::db::Via::of(connection);
         let delete = Query::delete()
             .from_table(Alias::new(&self.table))
             .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
@@ -334,11 +342,12 @@ impl OneTimeTokens {
     /// Deletes tokens (all tenants) that expired before `before` (the module's cleanup job) — used tokens go
     /// away when they expire (a few minutes to a day). One condition on an indexed column instead of `OR`
     /// with `used_at` (not indexed, forcing a full table scan — D-158). Returns the number of rows deleted.
-    pub async fn purge<C: ConnectionTrait>(
+    pub async fn purge<C: crate::db::Executor>(
         &self,
         connection: &C,
         before: Timestamp,
     ) -> Result<u64, Error> {
+        let connection = &crate::db::Via::of(connection);
         let delete = Query::delete()
             .from_table(Alias::new(&self.table))
             .and_where(Expr::col(Alias::new("expires_at")).lt(before))

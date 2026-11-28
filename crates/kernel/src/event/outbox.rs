@@ -44,9 +44,10 @@ impl Outbox {
         event: &E,
     ) -> Result<(), Error>
     where
-        C: ConnectionTrait,
+        C: crate::db::Executor,
         E: Event,
     {
+        let connection = &crate::db::Via::of(connection);
         // Lỗi của người viết module, không phải của người dùng: báo to để sửa sớm.
         if E::NAME.split_once('.').map(|(module, _)| module) != Some(self.module) {
             return Err(Error::internal(format!(
