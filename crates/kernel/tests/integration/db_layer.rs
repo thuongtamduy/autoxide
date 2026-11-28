@@ -782,6 +782,19 @@ async fn chot_chan_luc_chay_tu_choi_cau_thieu_khach() {
             [sea_orm::Value::from(b.id().as_uuid())],
         );
         assert!(tx.execute_raw(other).await.is_err());
+        // Bộ câu dò của kiểm độc lập (mỗi lần dùng bảng cần vế lọc riêng): chạy thật trên handle, đều bị chặn.
+        let probes = [
+            "UPDATE kernel_t_line SET amount_minor = (SELECT MAX(amount_minor) FROM kernel_t_line) WHERE tenant_id = :tenant",
+            "SELECT a.id FROM kernel_t_line a JOIN kernel_t_line b ON b.account_id = a.account_id WHERE a.tenant_id = :tenant",
+            "SELECT id FROM kernel_t_line WHERE tenant_id = :tenant UNION SELECT id FROM kernel_t_line",
+            "SELECT id FROM kernel_t_line WHERE tenant_id = :tenant AND account_id IN (SELECT account_id FROM kernel_t_line)",
+            "SELECT id FROM kernel_t_line l WHERE l.tenant_id = :tenant AND EXISTS (SELECT 1 FROM kernel_t_line m WHERE m.id = l.id)",
+            "INSERT INTO kernel_t_line (id, tenant_id, account_id, side, amount_minor, effective_date) \
+             SELECT id, :tenant, account_id, side, amount_minor, effective_date FROM kernel_t_line",
+        ];
+        for probe in probes {
+            assert!(tx.sql(probe).execute().await.is_err(), "let through: {probe}");
+        }
         tx.rollback().await.unwrap();
         assert_eq!(count_of_b().await, before);
     })

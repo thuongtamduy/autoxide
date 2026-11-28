@@ -285,7 +285,7 @@ impl SettingSystem {
     /// The per-node values of tenant `tenant` changed on this server (or a node moved): drops its cache. The
     /// owning module calls it after its write commits.
     pub fn changed(&self, tenant: TenantId) {
-        self.0.tree.forget(tenant);
+        self.0.forget(tenant);
     }
 
     async fn resolve(
@@ -312,6 +312,7 @@ impl SettingSystem {
             return Ok(entry);
         }
         metrics::counter!("kernel_setting_cache_total", "result" => "miss").increment(1);
+        let generation = self.0.generation(tenant.id());
         let rows = match tree.store.get() {
             Some(store) => store.stored(tenant).await?,
             None => Vec::new(),
@@ -322,7 +323,10 @@ impl SettingSystem {
             let ttl = self.0.ttl;
             cache.retain(|_, (at, _)| at.elapsed() < ttl);
         }
-        cache.insert(tenant.id(), (Instant::now(), entry.clone()));
+        // Có lần ghi (`changed`) trong lúc đọc kho: không giữ bản vừa đọc, để không đè giá trị mới bằng bản cũ.
+        if self.0.generation(tenant.id()) == generation {
+            cache.insert(tenant.id(), (Instant::now(), entry.clone()));
+        }
         Ok(entry)
     }
 }

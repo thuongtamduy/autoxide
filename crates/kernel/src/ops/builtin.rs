@@ -919,6 +919,7 @@ impl Module for KernelModule {
             key.clone(),
             self.seeds.clone(),
             self.request_timeout,
+            self.settings.clone(),
         )?;
         let exports = Arc::new(crate::tenancy::TenantExports::new(
             context.tenancy().clone(),

@@ -37,13 +37,20 @@ const CAP: OrgSetting = OrgSetting::new("rulez.cap", "Most items per order.").wi
 struct Store {
     rows: Mutex<Vec<StoredOrgSetting>>,
     reads: AtomicUsize,
+    /// Khi bật: lần đọc chụp giá trị rồi chờ `resume` mới trả (mô phỏng câu đọc chậm).
+    hold: std::sync::atomic::AtomicBool,
+    resume: tokio::sync::Notify,
 }
 
 #[async_trait::async_trait]
 impl OrgSettingStore for Store {
     async fn stored(&self, _: &TenantContext) -> Result<Vec<StoredOrgSetting>, Error> {
+        let rows = self.rows.lock().unwrap().clone();
         self.reads.fetch_add(1, Ordering::SeqCst);
-        Ok(self.rows.lock().unwrap().clone())
+        if self.hold.load(Ordering::SeqCst) {
+            self.resume.notified().await;
+        }
+        Ok(rows)
     }
 }
 
@@ -310,6 +317,43 @@ async fn hai_lan_luu_dong_thoi_khong_cung_lot_luat() {
                 [narrow.0, default.0].iter().filter(|status| **status == StatusCode::OK).count();
             assert_eq!(passed, 1, "{narrow:?} {default:?}");
         }
+    })
+    .await
+    .unwrap();
+}
+
+// Lần đọc trượt cache chụp giá trị cũ, trong lúc đó module ghi giá trị mới và gọi `changed`: bản cũ không được chèn
+// vào cache, lần đọc sau thấy giá trị mới ngay (không phải chờ hết thời gian sống của cache).
+#[tokio::test]
+async fn doc_cham_khong_de_gia_tri_moi_bang_ban_cu() {
+    TestDatabase::run(async |test| {
+        let setup = start(test).await;
+        let (system, tenant, store) =
+            (setup.system.clone(), setup.tenant.clone(), setup.store.clone());
+        let root = root_of(tenant.id());
+        store.rows.lock().unwrap().push(StoredOrgSetting::new(root, LIMIT.key(), json!(7)));
+        system.changed(tenant.id());
+        store.hold.store(true, Ordering::SeqCst);
+        let reads = store.reads.load(Ordering::SeqCst);
+        let slow = {
+            let (system, tenant) = (system.clone(), tenant.clone());
+            tokio::spawn(async move { system.effective(&tenant, root, LIMIT.key()).await.unwrap() })
+        };
+        while store.reads.load(Ordering::SeqCst) == reads {
+            tokio::task::yield_now().await;
+        }
+        // Lần đọc chậm đã chụp `7`; giờ ghi `9`.
+        {
+            let mut rows = store.rows.lock().unwrap();
+            rows.clear();
+            rows.push(StoredOrgSetting::new(root, LIMIT.key(), json!(9)));
+        }
+        system.changed(tenant.id());
+        store.hold.store(false, Ordering::SeqCst);
+        store.resume.notify_one();
+        assert_eq!(slow.await.unwrap().unwrap().value, Some(json!(7)));
+        let fresh = system.effective(&tenant, root, LIMIT.key()).await.unwrap().unwrap();
+        assert_eq!(fresh.value, Some(json!(9)), "the slow read did not put the old value back");
     })
     .await
     .unwrap();

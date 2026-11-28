@@ -24,7 +24,14 @@ theo cây tổ chức (`OrgSetting`, giá trị ở bảng `organizations_settin
 3. **Cache được làm mới khi ghi.** Ghi trên máy chủ này (đặt/bỏ cài đặt cấp khách qua kernel, cài đặt theo cây qua
    `organizations` gọi `SettingSystem::changed` sau commit) xoá cache của khách ngay; máy chủ khác thấy trong thời gian sống
    của cache (như cài đặt cấp khách trước nay). Dời nút trong cây làm chuỗi tổ tiên đã cache cũ đi tối đa chừng đó thời
-   gian — chấp nhận được với cài đặt (không phải phân quyền: kiểm quyền theo cây không qua cache này).
+   gian. Kiểm quyền theo cây (`require_at`) không qua cache này, **nhưng** vài cài đặt theo cây là chính sách có liên
+   quan quyền — `auth.support_access`, `auth.staff_registration`, `auth.customer_registration`,
+   `catalog.price_change_requires_second_person`, `conversations.require_verified_account` — trước đọc thẳng database,
+   nay qua cache như mọi cài đặt cấp khách (vd `auth.step_up`) đã qua từ trước: trên máy chủ nhận lần lưu, giá trị mới
+   có hiệu lực ngay; trên máy chủ khác trễ tối đa `AUTOXIDE_TENANCY_CACHE_SECONDS`. Chấp nhận cùng mức với cài đặt cấp
+   khách; khách cần hiệu lực tức thì trên nhiều máy chủ thì đặt thời gian sống thấp. Lần đọc trượt cache không chèn bản
+   cũ đè lần ghi vừa xảy ra (số thế hệ theo khách: bản đọc chỉ được giữ khi không có lần ghi nào trong lúc đọc). Tách / gộp
+   khách (chuyển dòng cài đặt giữa hai khách) xoá cache của cả hai khi lượt chạy kết thúc.
 4. **Luật chéo lúc lưu** (`SettingRule`). Module đăng ký trong `start` một luật nêu các khoá nó ràng buộc (của một hay cả
    hai phạm vi) và một hàm kiểm nhận `SettingsView` (giá trị **sau** thay đổi đang lưu: cấp khách dạng chữ, theo cây là
    giá trị hiệu lực tại nút đang đổi — đổi cấp khách thì tại nút gốc). Lưu một khoá có luật mà vi phạm → 422

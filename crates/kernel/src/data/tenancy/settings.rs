@@ -425,6 +425,9 @@ pub(crate) struct SettingsService {
     links: OnceLock<LinkTrust>,
     /// The per-node scope of the same system: store, cache, cross-checks (`system`).
     tree: system::Tree,
+    /// Generation of each tenant's settings on this server, raised by every write: a read that missed the cache
+    /// stores what it loaded only when no write happened meanwhile, so it never puts back values a write replaced.
+    generations: Mutex<HashMap<TenantId, u64>>,
 }
 
 /// Purpose (AAD) when encrypting a secret value. The row name is also in the AAD: a secret set under the old
@@ -457,6 +460,7 @@ impl SettingsService {
             cache: Mutex::default(),
             links: OnceLock::new(),
             tree: system::Tree::default(),
+            generations: Mutex::default(),
         }
     }
 
@@ -475,6 +479,7 @@ impl SettingsService {
         {
             return Ok(rows);
         }
+        let generation = self.generation(tenant.id());
         let rows: Stored =
             Arc::new(Entity::find().scoped(tenant).all(tenant.database().read()).await?);
         let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
@@ -482,12 +487,32 @@ impl SettingsService {
             let ttl = self.ttl;
             cache.retain(|_, (at, _)| at.elapsed() < ttl);
         }
-        cache.insert(tenant.id(), (Instant::now(), rows.clone()));
+        // Có lần ghi trong lúc đọc: không giữ bản vừa đọc (có thể đã cũ); lần đọc sau đọc lại.
+        if self.generation(tenant.id()) == generation {
+            cache.insert(tenant.id(), (Instant::now(), rows.clone()));
+        }
         Ok(rows)
     }
 
+    /// The current generation of tenant `tenant`'s settings (see `generations`).
+    fn generation(&self, tenant: TenantId) -> u64 {
+        self.generations
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&tenant)
+            .copied()
+            .unwrap_or_default()
+    }
+
     /// Drops tenant `tenant`'s settings from the cache (after a set / remove on this server).
-    fn forget(&self, tenant: TenantId) {
+    pub(crate) fn forget(&self, tenant: TenantId) {
+        // Thế hệ tăng trước khi xoá: lần đọc trượt cache đang chạy sẽ thấy và không chèn bản cũ.
+        *self
+            .generations
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(tenant)
+            .or_default() += 1;
         self.cache.lock().unwrap_or_else(PoisonError::into_inner).remove(&tenant);
         self.tree.forget(tenant);
     }

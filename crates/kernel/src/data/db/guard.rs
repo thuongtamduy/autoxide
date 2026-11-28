@@ -516,4 +516,68 @@ mod tests {
         let nothing = r#"INSERT INTO "notes_note" ("id", "tenant_id") VALUES (?, ?) ON CONFLICT ("id") DO NOTHING"#;
         assert_eq!(sqlite(nothing, &[uuid(OTHER), t()]), None);
     }
+
+    // Bộ câu dò của kiểm độc lập lần 2 (PR #624): 10 câu phải bị chặn, 1 câu (EXISTS sang bảng khác) cũng bị chặn; mỗi
+    // câu thử với cả cách viết tham số của SQLite (`?`) và Postgres (`$n`).
+    #[test]
+    fn bo_cau_do_kiem_doc_lap() {
+        let probes: [(&str, usize); 11] = [
+            (
+                "UPDATE notes_note SET position = (SELECT max(position) FROM notes_note) WHERE tenant_id = ?",
+                1,
+            ),
+            (
+                "SELECT a.id FROM notes_note a JOIN notes_note b ON b.id = a.parent_id WHERE a.tenant_id = ?",
+                1,
+            ),
+            ("SELECT id FROM notes_note WHERE tenant_id = ? UNION SELECT id FROM notes_note", 1),
+            (
+                "SELECT n.id FROM notes_note n JOIN notes_tag g ON g.note_id = n.id WHERE n.tenant_id = ? AND n.tenant_id = ?",
+                2,
+            ),
+            (
+                "WITH x AS (SELECT id FROM notes_note) SELECT id FROM notes_note WHERE tenant_id = ? AND id IN (SELECT id FROM x)",
+                1,
+            ),
+            (
+                "SELECT id FROM notes_note WHERE tenant_id = ? AND parent_id IN (SELECT id FROM notes_note)",
+                1,
+            ),
+            (
+                "SELECT id FROM notes_note n WHERE n.tenant_id = ? AND EXISTS (SELECT 1 FROM notes_note m WHERE m.id = n.parent_id)",
+                1,
+            ),
+            (
+                "INSERT INTO notes_note (id, tenant_id, title) SELECT id, ?, title FROM notes_note",
+                1,
+            ),
+            (
+                "DELETE FROM notes_note USING notes_tag WHERE notes_note.tenant_id = ? AND notes_tag.note_id = notes_note.id",
+                1,
+            ),
+            (
+                "INSERT INTO notes_note (id, tenant_id) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET title = excluded.title",
+                2,
+            ),
+            (
+                "SELECT id FROM notes_note n WHERE n.tenant_id = ? AND EXISTS (SELECT 1 FROM notes_tag g WHERE g.note_id = n.id)",
+                1,
+            ),
+        ];
+        for (sql, count) in probes {
+            let values = vec![uuid(TENANT); count];
+            assert!(sqlite(sql, &values).is_some(), "SQLite let through: {sql}");
+            let mut numbered = String::new();
+            let mut n = 0;
+            for c in sql.chars() {
+                if c == '?' {
+                    n += 1;
+                    numbered.push_str(&format!("${n}"));
+                } else {
+                    numbered.push(c);
+                }
+            }
+            assert!(postgres(&numbered, &values).is_some(), "Postgres let through: {numbered}");
+        }
+    }
 }
