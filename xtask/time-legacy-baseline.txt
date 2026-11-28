@@ -186,7 +186,6 @@ time-legacy 4 modules/forms/src/tests/data.rs
 time-legacy 2 modules/forms/src/tests/definitions.rs
 time-legacy 3 modules/forms/src/tests/exports.rs
 time-legacy 1 modules/ghn/src/carrier.rs
-time-legacy 3 modules/idempotency/src/store.rs
 time-legacy 2 modules/inventory/src/reservations.rs
 time-legacy 2 modules/inventory/src/tests/alerts.rs
 time-legacy 5 modules/inventory/src/tests/delivery.rs
