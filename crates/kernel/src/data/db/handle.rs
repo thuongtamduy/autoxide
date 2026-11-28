@@ -203,14 +203,14 @@ impl Connection<'_> {
 
     pub(crate) async fn all(&self, statement: Statement) -> Result<Vec<QueryResult>, Error> {
         super::guard::check(self.1, &statement)?;
-        Ok(match self.0 {
+        match self.0 {
             Inner::Read(connection) => ConnectionTrait::query_all_raw(connection, statement).await,
             Inner::Write(transaction) => {
                 ConnectionTrait::query_all_raw(transaction, statement).await
             }
             Inner::Legacy(connection) => connection.raw_query_all(statement).await,
         }
-        .map_err(super::write::write_error)?)
+        .map_err(super::write::write_error)
     }
 
     // Như `all`, database dừng câu sau `limit` (`super::bounded`). Chỉ trên handle đọc: transaction

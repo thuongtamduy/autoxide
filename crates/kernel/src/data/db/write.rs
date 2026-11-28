@@ -358,6 +358,6 @@ impl<A: Access, R: Record> Delete<'_, A, R> {
             return Err(error);
         }
         let connection = self.tx.connection();
-        Ok(connection.execute(connection.build(&self.statement)).await?)
+        connection.execute(connection.build(&self.statement)).await
     }
 }

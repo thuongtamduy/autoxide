@@ -59,7 +59,7 @@ impl<'h, H: Handle> Sql<'h, H> {
     pub async fn execute(self) -> Result<u64, Error> {
         let connection = self.handle.connection();
         let statement = self.render(connection.backend())?;
-        Ok(connection.execute(statement).await?)
+        connection.execute(statement).await
     }
 
     fn render(&self, backend: DbBackend) -> Result<sea_orm::Statement, Error> {
