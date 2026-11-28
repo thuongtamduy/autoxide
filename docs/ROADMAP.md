@@ -289,14 +289,15 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       từ 01/7/2026), chuyển tiếp tới 30/6/2027; sửa `COMPLIANCE.md` / `.vi.md` và mẫu trang
 - [x] LG-2 (chặn 1.0): ngày lập hoá đơn và `tax_point` của đơn theo múi giờ người bán, không theo UTC; test mốc
       31/12/2026 – 01/01/2027 giờ Việt Nam; xong trước 31/12/2026; qua kiểm độc lập
-- [ ] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
-      sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027)
+- [x] LG-3: tài liệu nói rõ cổng KYC người bán chưa chặn đăng bán; cài `ListingGate` gọi `KycGate` là điều kiện của module
+      sàn; đối chiếu trường KYC với NĐ 248 Điều 18 (từ 01/01/2027) — #597 (cổng KYC riêng, D-20261127-seller-kyc-listing), PR P1D
 - [x] LG-4: quy tắc `privacy.subject_requests` v2 theo NĐ 356/2025 Điều 5 (hạn xác nhận và hạn thực hiện, ngày làm việc)
 - [x] LG-5 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): dữ liệu cá nhân của trẻ em — tự khai tuổi khi đăng ký (cấu hình được), sổ đồng ý ghi người giám hộ
 - [x] LG-6 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): module khai bên xử lý và nước nhận dữ liệu (AI, mail, SMS, lưu trữ) vào sổ xử lý; `doctor` cảnh báo bên nhận
       ngoài Việt Nam; `docs/AI.md` thêm mục dữ liệu cá nhân
-- [ ] LG-7: gói thuế `vn` v2 theo NĐ 68/2026 (ngưỡng hộ kinh doanh, tỉ lệ khấu trừ); `orders` hỏi
-      `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos`
+- [x] LG-7: gói thuế `vn` v2 theo NĐ 68/2026 (ngưỡng hộ kinh doanh, tỉ lệ khấu trừ); `orders` hỏi
+      `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos` — PR P1D: gói bản 4, `TaxEngine::invoice_advice`
+      (D-20261128-tax-pack-vn-decree-68)
 - [x] LG-8 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
       kiện của module sàn
 - [x] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025
@@ -314,20 +315,24 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       `withholding_certificate`, dữ liệu tờ khai khấu trừ thay
 - [ ] LG-1b: khi có văn bản gốc NĐ 248/2026 — thêm mục kiểm mới (tiêu chí xếp hạng, quy tắc điểm thưởng, báo cáo
       định kỳ), xác nhận cơ quan tiếp nhận / online.gov.vn và hạn chuyển tiếp (D-20261126-legal-rules-r1-update)
-- [ ] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (đơn vị: ngày theo bản phân tích,
-      chưa xác nhận ngày làm việc hay ngày thường; bên xử lý thứ ba)
-- [ ] LG-3b: `compliance` phát event khi hồ sơ KYC hết hạn / bị thu hồi → `catalog` dừng hàng của nút đó; quét lại hàng
+- [x] LG-4b: tính hạn thực hiện yêu cầu của chủ thể dữ liệu theo `fulfil_within_days` (đơn vị: ngày theo bản phân tích,
+      chưa xác nhận ngày làm việc hay ngày thường; bên xử lý thứ ba) — PR P1D: `fulfil_due_at` theo ngày thường, chưa kéo
+      dài khi có bên thứ ba (D-20261128-subject-request-fulfil)
+- [x] LG-3b: `compliance` phát event khi hồ sơ KYC hết hạn / bị thu hồi → `catalog` dừng hàng của nút đó; quét lại hàng
       đang bán khi đổi `kernel.business_model` hay khi quy tắc bắt đầu áp dụng, gộp khách vào sàn; chuyển cửa hàng con
-      đang có hàng active sang dưới người bán chưa định danh thì hàng vẫn bán (cần chặn hay quét lại)
-- [ ] LG-3c: hồ sơ KYC thiếu mục NĐ 248 Điều 18 (ngày sinh, địa chỉ, người đại diện, nước cấp + hạn hộ chiếu ≥ 6 tháng);
-      livestream / affiliate chưa hỏi `KycGate`
-- [ ] Nhỏ LG-3: `catalog` `products.rs` có `Err(_) => vec![org]` nuốt lỗi đọc chuỗi nút (phải trả lỗi); doc
-      `listing_denied` trong `errors.rs` lệch chỗ
-- [ ] `compliance` `kyc.rs`: thân quy tắc không parse được JSON đang coi là "không bắt buộc" (fail-open) — phải báo lỗi; hồ
-      sơ quá `expires_at` vẫn tính là đã định danh tới khi job hằng ngày chạy — phải kiểm hạn ngay lúc hỏi
+      đang có hàng active sang dưới người bán chưa định danh thì hàng vẫn bán (cần chặn hay quét lại) — PR P1D: event +
+      `organizations.unit_moved` + job hằng ngày `catalog.seller_kyc_sweep` (D-20261128-seller-kyc-pause)
+- [x] LG-3c: hồ sơ KYC thiếu mục NĐ 248 Điều 18 (ngày sinh, địa chỉ, người đại diện, nước cấp + hạn hộ chiếu ≥ 6 tháng);
+      livestream / affiliate chưa hỏi `KycGate` — PR P1D: hồ sơ có mục Điều 18, cổng chặn bán từ 01/01/2027
+      (D-20261128-kyc-article-18); livestream / affiliate vẫn chưa có module để hỏi
+- [x] Nhỏ LG-3: `catalog` `products.rs` có `Err(_) => vec![org]` nuốt lỗi đọc chuỗi nút (phải trả lỗi); doc
+      `listing_denied` trong `errors.rs` lệch chỗ — PR P1D
+- [x] `compliance` `kyc.rs`: thân quy tắc không parse được JSON đang coi là "không bắt buộc" (fail-open) — phải báo lỗi; hồ
+      sơ quá `expires_at` vẫn tính là đã định danh tới khi job hằng ngày chạy — phải kiểm hạn ngay lúc hỏi — PR P1D
+      (phần kiểm hạn lúc hỏi đã có sẵn trong `kyc_status`)
 - [ ] Bảo mật kernel: `set_setting` cho cài đặt cấp khách (vd `kernel.business_model`) ở mọi nhánh chỉ đòi
       `kernel.settings.manage`; cần quyền phạm vi gốc + ghi audit; chạm bảo mật nên qua kiểm độc lập
-- [ ] Số đơn / POS / trả hàng / bảo hành lấy năm theo UTC (#575 N4): lấy theo múi giờ người bán như LG-2
+- [x] Số đơn / POS / trả hàng / bảo hành lấy năm theo UTC (#575 N4): lấy theo múi giờ người bán như LG-2 — PR P1D
 
 ### G13 — Phát hành 1.0 (chủ dự án duyệt ngày 26/11/2026, D-20261126-release-1-0-readiness)
 

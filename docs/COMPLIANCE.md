@@ -233,17 +233,20 @@ not handle yet. Until they are done, the deployer covers them:
   (marketplace → seller → store): one verified branch in that chain is enough. An unverified seller gets
   `compliance.kyc_required` (403); goods of the root and tenants that sell their own goods are not asked. If module
   `compliance` is turned off (for example `AUTOXIDE_MODULES=official,-compliance`), identity cannot be checked, so
-  goods of a seller cannot go on sale on a marketplace (`catalog.seller_verification_unavailable`, 403). Only the
-  change to `active` is checked: goods already on sale stay on sale when the tenant becomes a marketplace, the rule
-  starts to apply or a seller's verification expires or is revoked — stop them yourself
-  (`POST /api/v1/catalog/products/{id}/status`). A marketplace that gives each seller its own child tenant instead
-  of a branch is not checked this way: each child tenant sells its own goods. Still open: livestream and affiliate flows (no module
-  yet), and the profile does not record every item Article 18 lists — individuals: full name, date of birth,
-  personal identification number (one source adds residential address); organisations and household businesses:
-  name, head office, identification number, legal representative; foreign individuals: passport (or equivalent)
-  number and issuing country, valid at least 6 more months at review. The profile keeps the verified name and a
-  hash and last 4 digits of the document; the other items stay with the eKYC provider. Check the originals before
-  relying on this.
+  goods of a seller cannot go on sale on a marketplace (`catalog.seller_verification_unavailable`, 403). Goods
+  already on sale are checked again: when a seller's verification expires or is revoked (`compliance.kyc_expired`,
+  `compliance.kyc_revoked`), when a branch moves in the tree, and every day (job `catalog.seller_kyc_sweep`: the
+  tenant became a marketplace, the rule started to apply). Goods of a seller who no longer passes go `inactive`
+  (event `catalog.product_status_changed`); after verifying again the seller puts them on sale again. A marketplace
+  that gives each seller its own child tenant instead of a branch is not checked this way: each child tenant sells
+  its own goods. From 1 January 2027 (rule `kyc.required_activities` version 2) a seller must also have the items
+  of Article 18 on the profile to sell — individuals: date of birth (name and personal identification number are
+  already kept); organisations and household businesses: head office and legal representative; a passport must be
+  valid at least 6 more months counted from the verification, with its issuing country. Missing items give
+  `compliance.kyc_required` with `profile_status` `incomplete` and the missing names in `missing`. The eKYC
+  provider returns them, or a reviewer records them with `PUT /api/v1/compliance/kyc/profiles/{id}/details`
+  (`compliance.kyc.review`); a profile never stays verified past the document's end date. Still open: livestream
+  and affiliate flows (no module yet). Check the originals before relying on this.
 - **Personal data of children.** Law 91/2025/QH15 sets special rules for children and persons under guardianship
   (consent of a parent or guardian; from age 7 also the child's — the article and ages need checking). Core has no
   birth date, age check or guardian consent: a service aimed at children must collect and keep the guardian's
@@ -311,9 +314,12 @@ phone or from an authority is recorded so it is not lost:
   `withdrawal`), `channel` (`email`, `post`, `phone`, `authority`, `other`), `subject` (a user id, an email
   address or a phone number) and `received_at`. `due_at` comes from the legal rule `privacy.subject_requests`
   in force when it was received: 72 hours, stricter than the 2 working days to answer of Decree 356/2025/ND-CP
-  Article 5 (which replaced Decree 13/2023/ND-CP). Version 2 of the rule also lists the days to carry the
-  request out by kind (`fulfil_within_days`, from secondary sources) for reference; Autoxide does not track
-  that second deadline yet — check the original texts.
+  Article 5 (which replaced Decree 13/2023/ND-CP). `fulfil_due_at` is the deadline to carry the request out:
+  `fulfil_within_days` of the kind in the rule (version 3: 15 days for withdrawal, restriction, objection; 10 for
+  access, rectification; 20 for erasure — from secondary sources), counted in calendar days (`fulfil_unit`) since
+  the sources do not say whether working days are meant; the longer deadline with a third-party processor is not
+  applied. A request is overdue while still `received` past `due_at`, or not done past `fulfil_due_at` — check the
+  original texts.
 - `POST /subject-requests/{id}/fulfil`: `access` of a user returns the personal data of every module (send
   it to the person; it is not stored); `erasure` / `withdrawal` of an email or phone number empties it from
   the consent ledger (the hashed key and the records stay as proof, so nothing is sent again). Erasing a
