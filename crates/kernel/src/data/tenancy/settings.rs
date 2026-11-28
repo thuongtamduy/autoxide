@@ -739,9 +739,9 @@ mod links;
 mod rest;
 mod tools;
 pub(crate) use catalog::{Catalog, copy_plain, declaration_problems};
-pub(crate) use rest::routes;
 pub(crate) use links::LinkTrust;
 pub use links::{DOMAIN_GROUP, LINK_GROUP, SiteLinks};
+pub(crate) use rest::routes;
 pub(crate) use tools::tools;
 
 /// The `kernel_tenant_settings` table (tenant level, has `tenant_id` from the start).

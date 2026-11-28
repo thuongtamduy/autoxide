@@ -18,10 +18,7 @@ pub fn tenant_not_found(tenant: &str) -> Error {
 }
 
 pub fn tenant_suspended() -> Error {
-    Error::forbidden(
-        "tenant_suspended",
-        "This tenant is suspended. Contact the service provider.",
-    )
+    Error::forbidden("tenant_suspended", "This tenant is suspended. Contact the service provider.")
 }
 
 pub fn tenant_read_only() -> Error {
@@ -72,11 +69,8 @@ pub fn tenant_single_mode() -> Error {
 }
 
 pub fn tenant_placement_taken(placement: &str) -> Error {
-    Error::conflict(
-        "tenant_placement_taken",
-        "There is already a placement named `{placement}`.",
-    )
-    .with_param("placement", placement)
+    Error::conflict("tenant_placement_taken", "There is already a placement named `{placement}`.")
+        .with_param("placement", placement)
 }
 
 pub fn tenant_placement_behind(placement: &str) -> Error {
@@ -283,8 +277,7 @@ pub fn tenant_move_count_mismatch(table: &str, source: u64, target: u64) -> Erro
 }
 
 pub fn tenant_move_not_found(id: &str) -> Error {
-    Error::not_found("tenant_move_not_found", "The tenant has no move `{id}`.")
-        .with_param("id", id)
+    Error::not_found("tenant_move_not_found", "The tenant has no move `{id}`.").with_param("id", id)
 }
 
 pub fn tenant_purge_current(placement: &str) -> Error {

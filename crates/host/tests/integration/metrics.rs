@@ -1,15 +1,15 @@
 //! Metrics của lớp HTTP. Bộ thu số đo là toàn tiến trình và chỉ bật được một lần,
-//! nên file này (một tiến trình test riêng) chỉ có MỘT bài test.
+//! nên file này chỉ có MỘT bài test bật bộ thu.
 
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 // Clippy chỉ tự miễn cho hàm `#[test]`, không miễn cho hàm phụ, nên khai ở đây.
 // Trong `src/` thì KHÔNG được khai dòng này (`cargo xtask check` chặn).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_host::metrics::{self as host_metrics, Metrics};
 use autoxide_kernel::config::{ConfigReader, ConfigSource, HttpConfig};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http;
-use autoxide_kernel::metrics::Metrics;
 use axum::body::Body;
 use axum::extract::Path;
 use axum::http::{Request, StatusCode, header};
@@ -43,7 +43,7 @@ async fn so_do_cua_request_duoc_thu_va_phuc_vu_o_metrics() {
     let notes = OpenApiRouter::new().routes(routes!(get_note));
     let api = http::build(
         &config,
-        http::metrics_routes(metrics),
+        host_metrics::routes(metrics),
         vec![("notes", notes)],
         http::Extras::default(),
     );

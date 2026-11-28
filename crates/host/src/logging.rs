@@ -23,7 +23,7 @@ use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::Registry;
 
-use crate::config::{LogConfig, LogFormat, LogLevel};
+use autoxide_kernel::config::{LogConfig, LogFormat, LogLevel};
 
 /// Error when enabling logging.
 #[derive(Debug)]
@@ -60,10 +60,6 @@ where
     W: for<'a> MakeWriter<'a> + Send + Sync + 'static,
 {
     let format: BoxedLayer = match config.format {
-        // Không màu: log thường đi vào file hoặc máy thu gom, mã màu chỉ là rác.
-        LogFormat::Text => {
-            Box::new(tracing_subscriber::fmt::layer().with_ansi(false).with_writer(writer))
-        }
         // Mỗi dòng một đối tượng: các trường của sự kiện nằm ở cấp cao nhất, kèm
         // các trường của span hiện tại (vd request id).
         LogFormat::Json => Box::new(
@@ -74,6 +70,9 @@ where
                 .with_span_list(false)
                 .with_writer(writer),
         ),
+        // `LogFormat::Text`, và dạng kernel thêm sau này (enum `#[non_exhaustive]`) tới khi crate này biết nó.
+        // Không màu: log thường đi vào file hoặc máy thu gom, mã màu chỉ là rác.
+        _ => Box::new(tracing_subscriber::fmt::layer().with_ansi(false).with_writer(writer)),
     };
     let mut layers = vec![format];
     layers.extend(extra);
@@ -134,7 +133,7 @@ mod tests {
 
     #[test]
     fn dang_chu_co_muc_noi_ghi_thong_diep_va_truong() {
-        let config = LogConfig { level: LogLevel::Info, format: LogFormat::Text };
+        let config = LogConfig::new(LogLevel::Info, LogFormat::Text);
 
         let output = capture(config, || tracing::info!(user_id = 7, "password changed"));
 
@@ -147,7 +146,7 @@ mod tests {
 
     #[test]
     fn dang_json_moi_dong_mot_doi_tuong_kem_truong_cua_span() {
-        let config = LogConfig { level: LogLevel::Info, format: LogFormat::Json };
+        let config = LogConfig::new(LogLevel::Info, LogFormat::Json);
 
         let output = capture(config, || {
             let span = tracing::info_span!("request", request_id = "abc");
@@ -167,7 +166,7 @@ mod tests {
 
     #[test]
     fn muc_thap_hon_cau_hinh_bi_bo() {
-        let config = LogConfig { level: LogLevel::Warn, format: LogFormat::Text };
+        let config = LogConfig::new(LogLevel::Warn, LogFormat::Text);
 
         let output = capture(config, || {
             tracing::debug!("debug detail");

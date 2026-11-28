@@ -135,7 +135,7 @@ pub fn check_manifest(package: &Package, manifest: &str) -> Vec<Violation> {
             rule: "layout",
             location: location.clone(),
             message:
-                "crate must live in crates/kernel, crates/macros, crates/testkit, crates/app, \
+                "crate must live in crates/kernel, crates/macros, crates/host, crates/testkit, crates/app, \
                       modules/<name> or xtask"
                     .to_owned(),
         });
@@ -240,7 +240,7 @@ const ENV_ACCESS_FILE: &str = "src/config/source.rs";
 /// được kiểm lúc khởi động và có mặt trong `.env.example`. Testkit và xtask là
 /// công cụ, không thuộc luật này.
 pub fn check_env_access(package: &Package, file: &str, text: &str) -> Vec<Violation> {
-    let governed = matches!(package.role, Role::Kernel | Role::App | Role::Module);
+    let governed = matches!(package.role, Role::Kernel | Role::App | Role::Host | Role::Module);
     if !governed || (package.role == Role::Kernel && file == ENV_ACCESS_FILE) {
         return Vec::new();
     }
@@ -295,9 +295,13 @@ fn forbidden_dependency(from: Role, to: Role, kind: DepKind) -> Option<&'static 
         (_, Role::Testkit) if kind != DepKind::Dev => {
             Some("testkit is test-only; declare it under [dev-dependencies]")
         }
-        (Role::Kernel | Role::Testkit, Role::Module) => {
-            Some("kernel and testkit must not know any module (dependencies point inward)")
+        (Role::Kernel | Role::Testkit | Role::Host, Role::Module) => {
+            Some("kernel, testkit and host must not know any module (dependencies point inward)")
         }
+        (from, Role::Host) if from != Role::App => Some(
+            "autoxide-host is internal to the binary, not a contract; log with `tracing`, record with \
+             `metrics`, and take everything else from `autoxide_kernel`",
+        ),
         (Role::Macros, _) => Some("the macro crate depends on no workspace crate"),
         (from, Role::Macros) if from != Role::Kernel => Some(
             "use the macros through `autoxide_kernel` (`autoxide_kernel::db::Record`), not this crate",
@@ -494,6 +498,7 @@ mod tests {
         let layout = [
             ("autoxide-kernel", "crates/kernel"),
             ("autoxide-testkit", "crates/testkit"),
+            ("autoxide-host", "crates/host"),
             ("autoxide", "crates/app"),
             ("autoxide-auth", "modules/auth"),
             ("autoxide-audit", "modules/audit"),
@@ -579,6 +584,9 @@ mod tests {
             ("autoxide", "autoxide-auth", DepKind::Normal),
             ("autoxide", "autoxide-audit", DepKind::Normal),
             ("autoxide", "autoxide-testkit", DepKind::Dev),
+            ("autoxide-host", "autoxide-kernel", DepKind::Normal),
+            ("autoxide-host", "autoxide-testkit", DepKind::Dev),
+            ("autoxide", "autoxide-host", DepKind::Normal),
             // Thư viện ngoài không thuộc phạm vi luật này.
             ("xtask", "serde", DepKind::Normal),
         ]);
@@ -597,6 +605,12 @@ mod tests {
             ("autoxide", "autoxide-testkit", DepKind::Normal),
             ("autoxide", "xtask", DepKind::Dev),
             ("xtask", "autoxide-kernel", DepKind::Normal),
+            // Chỉ binary dùng `autoxide-host` (D-20261128-host-crate).
+            ("autoxide-auth", "autoxide-host", DepKind::Normal),
+            ("autoxide-auth", "autoxide-host", DepKind::Dev),
+            ("autoxide-kernel", "autoxide-host", DepKind::Dev),
+            ("autoxide-testkit", "autoxide-host", DepKind::Normal),
+            ("autoxide-host", "autoxide-auth", DepKind::Normal),
         ];
         for case in forbidden {
             let violations = check_dependencies(&workspace(&[case]));
