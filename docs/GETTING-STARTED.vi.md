@@ -69,6 +69,30 @@ Demo cũng tắt các dịch vụ bên ngoài lấy từ môi trường (mail SM
 Không dùng cho production: secret nằm trong một file thường ở thư mục demo, và trang tài liệu API nạp
 script xem từ một CDN công cộng.
 
+### Gọi API từ trình duyệt (CORS)
+
+Ứng dụng web ở origin khác — `http://localhost:5173` của Vite, `http://localhost:3000` của Next.js — bị trình
+duyệt chặn ("blocked by CORS policy") cho tới khi máy chủ cho phép origin đó. Liệt kê các origin trong
+`AUTOXIDE_HTTP_CORS_ORIGINS`, ngăn cách bằng dấu phẩy (đúng scheme, host và port, không có `/` ở cuối):
+
+```bash
+AUTOXIDE_HTTP_CORS_ORIGINS=http://localhost:5173,http://localhost:3000 ./autoxide demo
+```
+
+Với Docker: `docker run --rm -it -p 127.0.0.1:8080:8080 -e AUTOXIDE_HTTP_CORS_ORIGINS=http://localhost:5173
+ghcr.io/thuongtamduy/autoxide:latest demo`. `*` cho phép mọi origin; chỉ dùng để thử.
+
+- Trình duyệt được gửi `Authorization`, `Content-Type`, `Accept-Language`, `If-Match`, `If-None-Match`,
+  `Idempotency-Key`, `Autoxide-Tenant` và `X-Request-Id`, với `GET`, `POST`, `PUT`, `PATCH` và `DELETE`.
+- JavaScript đọc được các header sau của câu trả lời: `ETag`, `Location`, `Retry-After`, `X-Request-Id`,
+  `Idempotent-Replayed`, `Content-Disposition`, `Content-Range`, `Accept-Ranges`, `Link`, `Deprecation`,
+  `Sunset` và `Mcp-Session-Id`.
+- Đăng nhập dùng bearer token trong header `Authorization`, không dùng cookie: đừng đặt
+  `credentials: "include"`.
+
+Tiếp theo: [Dựng ứng dụng web với Autoxide](guides/web-app.vi.md) — client TypeScript, đăng nhập và giữ phiên,
+`ETag`, lỗi, tải ảnh và trang công khai, kèm cả file `api.ts` để chép.
+
 ## 2. Quickstart (bản cài một máy chủ thật)
 
 Docker Compose, volume cho dữ liệu, secret của riêng bạn: xem mục Chạy nhanh trong

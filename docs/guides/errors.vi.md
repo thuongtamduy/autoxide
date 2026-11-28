@@ -91,6 +91,41 @@ curl -sS -X PATCH "$API/api/v1/content/entries/$ENTRY" -H "Authorization: Bearer
 # expect: 412
 ```
 
+## Ứng dụng nên làm gì
+
+Các mã ứng dụng web hay di động hay gặp nhất, và cách xử lý từng mã. Rẽ nhánh theo `code`; hiện `detail` cho
+người dùng (đã đúng ngôn ngữ của họ). Mã của module bắt đầu bằng tên module (`content.not_found`,
+`auth.email_taken`): không có cách xử lý riêng thì xử lý theo status.
+
+| Status | `code` | Nghĩa là | Ứng dụng làm gì |
+| ------ | ------ | -------- | --------------- |
+| 401 | `auth.token_expired` | Access token đã hết hạn | Refresh một lần (`POST /api/v1/auth/refresh`) rồi gửi lại request; SDK tự làm khi có tuỳ chọn `refresh` |
+| 401 | `auth.missing_token`, `auth.invalid_token`, `auth.session_ended` | Không có token, token hỏng, hoặc phiên đã kết thúc (đăng xuất, đổi mật khẩu, bị thu hồi) | Quên token, hiện trang đăng nhập |
+| 401 | `auth.invalid_refresh_token`, `auth.refresh_token_reused` | Từ `/auth/refresh`: refresh token không có, hết hạn, hoặc đã dùng rồi (phiên giờ đã kết thúc) | Đăng nhập lại. Không bao giờ refresh hai lần cùng lúc |
+| 401 | `auth.invalid_credentials` | Từ `/auth/login`: sai email hoặc mật khẩu | Báo sai, không nói sai cái nào |
+| 401 | `auth.invalid_mfa_code`, `auth.invalid_mfa_token` | Từ `/auth/login/mfa`: mã sai hoặc đã dùng; lượt đăng nhập hết hạn hay hết số lần thử | Hỏi mã kế tiếp; với `auth.invalid_mfa_token` thì bắt đầu lại từ mật khẩu |
+| 401 | `step_up_required` | Thao tác nhạy cảm cần xác nhận lại là chính bạn | Hỏi mật khẩu hay mã, gọi `POST /api/v1/auth/me/reauth`, rồi gửi lại |
+| 403 | `permission_denied` | Người dùng thiếu permission (`detail` nêu tên) | Ẩn thao tác; gợi ý xin quản trị viên |
+| 403 | `auth.user_disabled` | Tài khoản bị khoá | Báo người dùng; không gửi lại |
+| 404 | `not_found`, `<module>.…_not_found` | Đã mất, chưa từng có (hoặc thuộc khách khác) | Tải lại danh sách hoặc quay lại |
+| 409 | `idempotency_key_in_progress` | Request đầu tiên với key này vẫn đang chạy | Chờ `Retry-After` (1 giây) rồi gửi lại đúng request với **cùng** key |
+| 409 | `<module>.…_taken`, `conflict` | Giá trị duy nhất đã có người dùng, hoặc trạng thái không cho phép | Hiện `detail` cạnh trường |
+| 412 | `precondition_failed` | Có người đã sửa bản ghi sau khi bạn đọc | Đọc lại, hiện bản mới, áp lại thay đổi |
+| 413 | `payload_too_large` | Thân request hay file lớn hơn máy chủ nhận | Báo giới hạn; file lớn thì [tải thẳng lên nơi lưu](direct-uploads.vi.md) |
+| 422 | `validation_failed` | Đầu vào sai; **mọi** trường sai nằm trong `errors[]` | Hiện từng `errors[].detail` cạnh `errors[].field` của nó |
+| 422 | `invalid_body` | Trường lạ hay viết sai, sai kiểu JSON | Lỗi của ứng dụng: sửa request |
+| 422 | `idempotency_key_reused` | Cùng key gửi với một request khác | Lỗi của ứng dụng: mỗi thao tác một key mới |
+| 428 | `precondition_required` | Endpoint cần `If-Match` | Đọc bản ghi, gửi `ETag` của nó trong `If-Match` |
+| 429 | `rate_limited` | Quá nhiều request từ địa chỉ client này (hoặc với API key này) | Chờ `Retry-After` giây, rồi gửi thưa hơn |
+| 429 | `tenant_rate_limited` | Cả khách (mọi người dùng và key cộng lại) vượt giới hạn | Chờ `Retry-After` giây |
+| 429 | `auth.login_throttled` | Quá nhiều lần đăng nhập sai với email này (từ địa chỉ này, hoặc từ mọi nơi) | **Không tự gửi lại.** Bảo người dùng chờ `Retry-After` giây (thường là vài phút); tới lúc đó đúng mật khẩu cũng bị từ chối |
+| 503 | `request_timeout`, `shutting_down` | Request chạy quá lâu, hoặc máy chủ đang khởi động lại | Chờ `Retry-After` (hoặc vài giây) rồi gửi lại; lệnh ghi kèm `Idempotency-Key` |
+
+Hai loại `429` hay gặp đếm riêng: `rate_limited` đếm **request** theo địa chỉ client (mọi endpoint,
+`AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE`), còn `auth.login_throttled` đếm **lần đăng nhập sai** theo email
+(`AUTOXIDE_AUTH_LOGIN_MAX_FAILURES` trong `AUTOXIDE_AUTH_LOGIN_LOCK_MINUTES`). Form đăng nhập không bao giờ được
+tự gửi lại.
+
 ## Với SDK
 
 Lỗi ném ra `AutoxideError`:

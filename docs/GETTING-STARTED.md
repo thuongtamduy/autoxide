@@ -70,6 +70,30 @@ The demo also turns off outside services from your environment (SMTP mail, S3 fi
 Not for production: the secrets sit in a plain file in the demo folder, and the API reference page
 loads its viewer script from a public CDN.
 
+### Calling the API from a browser (CORS)
+
+A web app on another origin — `http://localhost:5173` from Vite, `http://localhost:3000` from Next.js — is
+blocked by the browser ("blocked by CORS policy") until the server allows that origin. List the origins in
+`AUTOXIDE_HTTP_CORS_ORIGINS`, separated by commas (exact scheme, host and port, no trailing slash):
+
+```bash
+AUTOXIDE_HTTP_CORS_ORIGINS=http://localhost:5173,http://localhost:3000 ./autoxide demo
+```
+
+With Docker: `docker run --rm -it -p 127.0.0.1:8080:8080 -e AUTOXIDE_HTTP_CORS_ORIGINS=http://localhost:5173
+ghcr.io/thuongtamduy/autoxide:latest demo`. `*` allows any origin; keep it for trying things out.
+
+- The browser may send `Authorization`, `Content-Type`, `Accept-Language`, `If-Match`, `If-None-Match`,
+  `Idempotency-Key`, `Autoxide-Tenant` and `X-Request-Id`, with `GET`, `POST`, `PUT`, `PATCH` and `DELETE`.
+- JavaScript may read these headers of an answer: `ETag`, `Location`, `Retry-After`, `X-Request-Id`,
+  `Idempotent-Replayed`, `Content-Disposition`, `Content-Range`, `Accept-Ranges`, `Link`, `Deprecation`,
+  `Sunset` and `Mcp-Session-Id`.
+- Sign-in uses bearer tokens in the `Authorization` header, not cookies: do not set
+  `credentials: "include"`.
+
+Next: [Building a web app with Autoxide](guides/web-app.md) — the TypeScript client, signing in and
+staying signed in, `ETag`, errors, uploads and public pages, with a whole `api.ts` to copy.
+
 ## 2. The quickstart (a real single-server install)
 
 Docker Compose, a volume for the data, secrets of your own: see the Quickstart in the
