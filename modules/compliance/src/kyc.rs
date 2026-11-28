@@ -41,7 +41,7 @@ pub(crate) fn kyc_not_found() -> Error {
     Error::not_found("compliance.kyc_not_found", "There is no such identity verification profile.")
 }
 
-fn kyc_state_invalid(status: &str) -> Error {
+pub(crate) fn kyc_state_invalid(status: &str) -> Error {
     Error::conflict(
         "compliance.kyc_state_invalid",
         "The identity verification profile is `{status}`; this cannot be done now.",
@@ -141,6 +141,11 @@ impl ComplianceService {
             reviewed_by: Set(None),
             review_note: Set(None),
             verified_document_hash: Set(None),
+            birth_date: Set(None),
+            address: Set(None),
+            representative_name: Set(None),
+            document_country: Set(None),
+            document_expires_on: Set(None),
             created_at: Set(at),
             updated_at: Set(at),
         })
@@ -338,12 +343,7 @@ impl ComplianceService {
         if outcome.status == OutcomeStatus::Pending {
             return Ok(());
         }
-        let valid_days = self
-            .rule_for(tenant, "kyc.required_activities", Timestamp::now())
-            .await?
-            .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
-            .and_then(|body| body["valid_days"].as_i64())
-            .unwrap_or(730);
+        let valid_days = self.kyc_valid_days(tenant).await?;
         let database = tenant.database();
         let (outbox, outcome) = (&self.outbox, &outcome);
         // Hai hồ sơ cùng một giấy tờ xác thực cùng lúc: bên sau vướng unique của
@@ -457,6 +457,31 @@ impl ComplianceService {
                         active.verified_document_hash = Set(if duplicate { None } else { hash });
                         active.document_last4 = Set(fingerprint.map(|(_, last4)| last4));
                         active.assurance = Set(outcome.assurance.clone());
+                        // Mục NĐ 248/2026 Điều 18 nhà cung cấp trả (LG-3c): ghi đè khi có, giữ khi không.
+                        let date = |value: Option<autoxide_kernel::time::Date>| {
+                            value.map(|date| date.format("%Y-%m-%d"))
+                        };
+                        let details = [
+                            (date(outcome.birth_date), profile.birth_date.clone()),
+                            (outcome.address.clone(), profile.address.clone()),
+                            (
+                                outcome.representative_name.clone(),
+                                profile.representative_name.clone(),
+                            ),
+                            (outcome.document_country.clone(), profile.document_country.clone()),
+                            (
+                                date(outcome.document_expires_on),
+                                profile.document_expires_on.clone(),
+                            ),
+                        ]
+                        .map(|(new, old)| new.or(old));
+                        let [birth_date, address, representative, country, document_expires_on] =
+                            details;
+                        active.birth_date = Set(birth_date);
+                        active.address = Set(address);
+                        active.representative_name = Set(representative);
+                        active.document_country = Set(country);
+                        active.document_expires_on = Set(document_expires_on.clone());
                         if duplicate {
                             active.status = Set("pending".to_owned());
                             active.reason_code = Set(Some("duplicate_document".to_owned()));
@@ -464,11 +489,14 @@ impl ComplianceService {
                             active.status = Set("verified".to_owned());
                             active.reason_code = Set(None);
                             active.verified_at = Set(Some(at));
-                            active.expires_at = Set(Some(
-                                outcome
-                                    .expires_at
-                                    .unwrap_or(at + SignedDuration::from_hours(24 * valid_days)),
-                            ));
+                            // Hồ sơ không sống lâu hơn giấy tờ đã dùng để xác thực.
+                            active.expires_at =
+                                Set(crate::kyc_details::capped_expiry(
+                                    Some(outcome.expires_at.unwrap_or(
+                                        at + SignedDuration::from_hours(24 * valid_days),
+                                    )),
+                                    document_expires_on.as_deref(),
+                                ));
                         }
                         ("verified", None)
                     }
@@ -591,12 +619,7 @@ impl ComplianceService {
     ) -> Result<kyc_profile::Model, Error> {
         principal.require(&KYC_REVIEW)?;
         require_session(principal)?;
-        let valid_days = self
-            .rule_for(tenant, "kyc.required_activities", Timestamp::now())
-            .await?
-            .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
-            .and_then(|body| body["valid_days"].as_i64())
-            .unwrap_or(730);
+        let valid_days = self.kyc_valid_days(tenant).await?;
         let database = tenant.database();
         let (outbox, decision) = (&self.outbox, &decision);
         database
@@ -635,8 +658,10 @@ impl ComplianceService {
                         active.reason_code = Set(None);
                         active.review_note = Set(None);
                         active.verified_at = Set(Some(at));
-                        active.expires_at =
-                            Set(Some(at + SignedDuration::from_hours(24 * valid_days)));
+                        active.expires_at = Set(crate::kyc_details::capped_expiry(
+                            Some(at + SignedDuration::from_hours(24 * valid_days)),
+                            row.document_expires_on.as_deref(),
+                        ));
                         if row.method.is_none() {
                             active.method = Set(Some("manual".to_owned()));
                         }
@@ -853,6 +878,33 @@ impl ComplianceService {
 
     // ---- Cổng ------------------------------------------------------------------------------
 
+    /// Thân quy tắc `kyc.required_activities` đang có hiệu lực; `None` khi vùng pháp lý không có quy tắc này
+    /// (không bắt buộc định danh). Thân không phải JSON (quy tắc nhập hỏng) là lỗi, không coi là "không bắt
+    /// buộc": cổng không được mở khi không đọc được luật (fail-closed, luật số hai).
+    async fn kyc_rule(&self, tenant: &TenantContext) -> Result<Option<Value>, Error> {
+        let Some(row) = self.rule_for(tenant, "kyc.required_activities", Timestamp::now()).await?
+        else {
+            return Ok(None);
+        };
+        serde_json::from_str::<Value>(&row.body).map(Some).map_err(|error| {
+            tracing::error!(rule_version = row.version, %error, "the kyc.required_activities rule body is not JSON");
+            Error::internal(format!(
+                "the rule kyc.required_activities version {} is not valid JSON: {error}",
+                row.version
+            ))
+        })
+    }
+
+    /// Số ngày một định danh còn hiệu lực (`valid_days` của quy tắc, mặc định 730 khi quy tắc không ghi).
+    async fn kyc_valid_days(&self, tenant: &TenantContext) -> Result<i64, Error> {
+        Ok(self
+            .kyc_rule(tenant)
+            .await?
+            .and_then(|body| body["valid_days"].as_i64())
+            .filter(|days| *days > 0)
+            .unwrap_or(730))
+    }
+
     pub(crate) async fn kyc_status(
         &self,
         tenant: &TenantContext,
@@ -884,18 +936,26 @@ impl ComplianceService {
         subject: &Subject,
         activity: Activity,
     ) -> Result<(), Error> {
-        let rule = self.rule_for(tenant, "kyc.required_activities", Timestamp::now()).await?;
-        let required = rule
-            .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
-            .is_some_and(|body| body[activity.as_str()].as_bool() == Some(true));
-        if !required {
+        let Some(rule) = self.kyc_rule(tenant).await? else { return Ok(()) };
+        if rule[activity.as_str()].as_bool() != Some(true) {
             return Ok(());
         }
         let status = self.kyc_status(tenant, subject).await?;
-        if status.status == "verified" {
+        if status.status != "verified" {
+            return Err(kyc_required(activity, &status.status));
+        }
+        if activity != Activity::Sell {
+            return Ok(());
+        }
+        // Bán: hồ sơ phải có đủ mục NĐ 248/2026 Điều 18 mà quy tắc đang có hiệu lực đòi (LG-3c).
+        let row = Self::find_profile(tenant.database().read(), tenant, subject)
+            .await?
+            .ok_or_else(kyc_not_found)?;
+        let missing = crate::kyc_details::missing_for_sale(&rule, &row);
+        if missing.is_empty() {
             Ok(())
         } else {
-            Err(kyc_required(activity, &status.status))
+            Err(kyc_required(activity, "incomplete").with_param("missing", missing.join(", ")))
         }
     }
 

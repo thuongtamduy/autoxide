@@ -39,6 +39,7 @@ pub(crate) fn routes(service: Arc<ComplianceService>) -> OpenApiRouter {
         .routes(routes!(reject))
         .routes(routes!(revoke))
         .routes(routes!(request_info))
+        .routes(routes!(record_details))
         .routes(routes!(receive_callback))
         .with_state(service)
 }
@@ -72,6 +73,16 @@ pub(crate) struct ProfileResponse {
     reason_code: Option<String>,
     /// What the reviewer wrote to the person when refusing or revoking.
     review_note: Option<String>,
+    /// Date of birth of an individual (`YYYY-MM-DD`). Seller detail of Vietnam's Decree 248/2026 Article 18.
+    birth_date: Option<String>,
+    /// Address, or head office of an organization or a household business.
+    address: Option<String>,
+    /// Legal representative of an organization or a household business.
+    representative_name: Option<String>,
+    /// Country that issued the document (ISO 3166-1 alpha-2).
+    document_country: Option<String>,
+    /// Last day the document is valid (`YYYY-MM-DD`); the profile never stays verified past it.
+    document_expires_on: Option<String>,
     /// `true` when the profile waits for the person (`draft` or `needs_info`) and no document has
     /// been sent for a manual review.
     missing_documents: bool,
@@ -117,6 +128,11 @@ impl From<kyc_profile::Model> for ProfileResponse {
             missing_documents,
             reason_code: row.reason_code,
             review_note: row.review_note,
+            birth_date: row.birth_date,
+            address: row.address,
+            representative_name: row.representative_name,
+            document_country: row.document_country,
+            document_expires_on: row.document_expires_on,
             subject_name: None,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -687,4 +703,65 @@ async fn receive_callback(
 ) -> Result<StatusCode, Error> {
     service.receive_callback(&tenant, &provider, &headers, &body).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Seller details checked against the documents (Vietnam's Decree 248/2026 Article 18). An omitted field keeps
+/// its value.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = ComplianceKycDetailsRequest)]
+pub(crate) struct DetailsRequest {
+    /// Date of birth of an individual, `YYYY-MM-DD`, not in the future.
+    birth_date: Option<String>,
+    /// Address, or head office of an organization or a household business; 1 to 500 characters.
+    address: Option<String>,
+    /// Legal representative of an organization or a household business; 1 to 200 characters.
+    representative_name: Option<String>,
+    /// Country that issued the document, ISO 3166-1 alpha-2 (`VN`, `US`…).
+    document_country: Option<String>,
+    /// Last day the document is valid, `YYYY-MM-DD`.
+    document_expires_on: Option<String>,
+}
+
+/// Record seller details of a profile.
+///
+/// Requires `compliance.kyc.review`, signed in as a person (API keys cannot). The reviewer records what they
+/// checked against the documents: date of birth (individual), head office and legal representative
+/// (organization, household business), issuing country and end date of the document. From the date the legal
+/// rule `kyc.required_activities` asks for them (Vietnam: Decree 248/2026 Article 18, from 2027-01-01), a
+/// verified seller missing one cannot sell (`compliance.kyc_required` with `profile_status` `incomplete` and the
+/// missing names in `missing`); a passport must still be valid for the months the rule sets, counted from the
+/// verification. A verified profile never stays verified past `document_expires_on`.
+#[utoipa::path(
+    put,
+    path = "/kyc/profiles/{id}/details",
+    extensions(("x-permissions" = json!(["compliance.kyc.review"]))),
+    operation_id = "record_kyc_details",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the profile.")),
+    request_body = DetailsRequest,
+    responses(
+        (status = 200, description = "The profile with the details.", body = Data<ProfileResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `compliance.kyc.review` (`permission_denied`) or not a person (`compliance.session_required`).", body = Problem),
+        (status = 404, description = "No such profile; code `compliance.kyc_not_found`.", body = Problem),
+        (status = 409, description = "The profile is revoked; code `compliance.kyc_state_invalid`.", body = Problem),
+        (status = 422, description = "A value is invalid, or no detail was given; every problem in `errors`.", body = Problem),
+    )
+)]
+async fn record_details(
+    State(service): State<Arc<ComplianceService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<DetailsRequest>,
+) -> Result<Data<ProfileResponse>, Error> {
+    let details = crate::kyc_details::SellerDetails {
+        birth_date: input.birth_date,
+        address: input.address,
+        representative_name: input.representative_name,
+        document_country: input.document_country,
+        document_expires_on: input.document_expires_on,
+    };
+    Ok(Data { data: service.record_details(&tenant, &principal, id, details).await?.into() })
 }

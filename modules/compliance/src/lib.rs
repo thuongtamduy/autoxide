@@ -32,6 +32,7 @@ mod http_tracking;
 mod http_verification;
 mod incidents;
 mod kyc;
+mod kyc_details;
 mod legal;
 mod migration;
 mod overview;
@@ -57,6 +58,8 @@ mod sign_in_codes_tests;
 mod tests;
 #[cfg(test)]
 mod tests_cases;
+#[cfg(test)]
+mod tests_kyc_details;
 #[cfg(test)]
 mod tests_moit;
 #[cfg(test)]

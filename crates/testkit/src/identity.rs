@@ -1,6 +1,6 @@
 //! Fake identity-verification and SMS providers for tests.
 
-use autoxide_kernel::time::Timestamp;
+use autoxide_kernel::time::{Date, Timestamp};
 use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -39,12 +39,23 @@ impl FakeIdentityVerifier {
     }
 
     /// Sets the outcome of attempt `reference`: verified with a name and document number, or rejected.
+    ///
+    /// A verified outcome also carries the seller details of Vietnam's Decree 248/2026 Article 18 (date of
+    /// birth, address, legal representative, issuing country and end date of the ID card), so a test seller is
+    /// complete whatever rule is in force; use [`complete_with`](Self::complete_with) for another outcome.
     pub fn complete(&self, reference: &str, verified: bool, name: &str, document: &str) {
         let outcome = if verified {
-            VerificationOutcome::new(reference, OutcomeStatus::Verified)
+            let (birth, until) = (Date::new(1990, 1, 1), Date::new(2040, 12, 31));
+            let mut outcome = VerificationOutcome::new(reference, OutcomeStatus::Verified)
                 .verified_name(name)
                 .document("cccd", document)
                 .assurance("vneid_level_2")
+                .address("1 Test Street, Hanoi")
+                .representative(name);
+            if let (Some(birth), Some(until)) = (birth, until) {
+                outcome = outcome.birth_date(birth).document_validity("VN", until);
+            }
+            outcome
         } else {
             VerificationOutcome::new(
                 reference,
@@ -53,6 +64,13 @@ impl FakeIdentityVerifier {
         };
         if let Ok(mut outcomes) = self.outcomes.lock() {
             outcomes.insert(reference.to_owned(), outcome);
+        }
+    }
+
+    /// Sets any outcome for the attempt of `outcome.provider_reference`.
+    pub fn complete_with(&self, outcome: VerificationOutcome) {
+        if let Ok(mut outcomes) = self.outcomes.lock() {
+            outcomes.insert(outcome.provider_reference.clone(), outcome);
         }
     }
 

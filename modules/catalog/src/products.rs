@@ -807,7 +807,7 @@ impl CatalogService {
     }
 
     /// Khách là sàn (`kernel.business_model = marketplace`, D-185)?
-    async fn is_marketplace(&self, tenant: &TenantContext) -> Result<bool, Error> {
+    pub(crate) async fn is_marketplace(&self, tenant: &TenantContext) -> Result<bool, Error> {
         let Some(settings) = &self.settings else { return Ok(false) };
         let model = settings.get(tenant, &autoxide_kernel::tenancy::BUSINESS_MODEL).await?;
         Ok(model.is_some_and(|value| value.as_str().trim() == "marketplace"))
@@ -823,7 +823,11 @@ impl CatalogService {
     /// hàng): một nút trong chuỗi đã định danh là đủ. Không có `KycGate` (module `compliance` bị tắt, vd
     /// `AUTOXIDE_MODULES=official,-compliance`): không kiểm được nên từ chối
     /// (`catalog.seller_verification_unavailable`) — hướng an toàn theo luật số hai.
-    async fn check_seller_identity(&self, tenant: &TenantContext, org: OrgId) -> Result<(), Error> {
+    pub(crate) async fn check_seller_identity(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<(), Error> {
         let root = autoxide_kernel::tenancy::root_of(tenant.id());
         if org == root {
             return Ok(());
@@ -831,13 +835,10 @@ impl CatalogService {
         let Some(kyc) = &self.kyc else {
             return Err(errors::seller_verification_unavailable());
         };
-        // Chuỗi nút của kernel (nút, rồi các nút trên nó, gốc cuối) đọc qua `Site` — lớp có lọc theo khách.
-        // Nút không có trong cây (không xảy ra: sản phẩm chỉ gắn nút có thật) → chỉ hỏi chính nút đó, hướng
-        // chặt hơn.
-        let chain = match autoxide_kernel::tenancy::Site::of(tenant, org).await {
-            Ok(site) => site.lineage().to_vec(),
-            Err(_) => vec![org],
-        };
+        // Chuỗi nút của kernel (nút, rồi các nút trên nó, gốc cuối) đọc qua `Site` — lớp có lọc theo khách. Lỗi
+        // (database, nút không có trong cây) trả ra cho người gọi: không đọc được chuỗi thì không biết người bán
+        // nào đã định danh, không được đoán.
+        let chain = autoxide_kernel::tenancy::Site::of(tenant, org).await?.lineage().to_vec();
         let mut refused = None;
         for node in chain.into_iter().filter(|node| *node != root) {
             let seller = autoxide_compliance::api::Subject::Org(node);

@@ -172,7 +172,10 @@ impl ComplianceService {
             };
             Some(SubjectRequestCounts {
                 open: open().count(read).await?,
-                overdue: open().filter(subject_request::Column::DueAt.lt(at)).count(read).await?,
+                overdue: open()
+                    .filter(crate::subject_requests::overdue_condition(at))
+                    .count(read)
+                    .await?,
             })
         } else {
             None

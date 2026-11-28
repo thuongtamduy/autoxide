@@ -88,20 +88,96 @@ fn consent_subject(row: &subject_request::Model) -> Option<ConsentSubject> {
     }
 }
 
+/// Hạn trả lời và hạn thực hiện theo thân quy tắc `body` (xem [`ComplianceService::request_deadlines`]).
+fn deadlines(
+    body: Option<&Value>,
+    kind: &str,
+    received_at: Timestamp,
+) -> (Timestamp, Option<Timestamp>) {
+    let hours = body
+        .and_then(|body| body.get("respond_within_hours")?.get(kind)?.as_i64())
+        .filter(|hours| *hours > 0)
+        .unwrap_or(72);
+    let due_at = received_at + SignedDuration::from_hours(hours);
+    let days = body
+        .and_then(|body| body.get("fulfil_within_days")?.get(kind)?.as_i64())
+        .filter(|days| *days > 0);
+    let fulfil_due_at = days.map(|days| {
+        let unit = body.and_then(|body| body.get("fulfil_unit")?.as_str()).unwrap_or("days");
+        if unit == "working_days" {
+            let calendar = crate::cases::deadlines(body, "");
+            crate::cases::add_working_days(
+                received_at,
+                days,
+                &calendar.holidays,
+                calendar.utc_offset_minutes,
+            )
+        } else {
+            if unit != "days" {
+                // Đơn vị lạ: dùng ngày thường — hạn ngắn hơn, hướng an toàn cho chủ thể dữ liệu.
+                tracing::warn!(
+                    unit,
+                    "privacy.subject_requests has an unknown fulfil_unit; using days"
+                );
+            }
+            received_at + SignedDuration::from_hours(24 * days)
+        }
+    });
+    (due_at, fulfil_due_at)
+}
+
+/// Yêu cầu quá hạn: chưa trả lời (`received`) mà qua hạn trả lời, hay chưa xong (`received`, `in_progress`) mà
+/// qua hạn thực hiện. Đã nhận xử lý (`in_progress`) thì hạn trả lời đã đạt.
+pub(crate) fn overdue_condition(at: Timestamp) -> sea_orm::Condition {
+    use sea_orm::Condition;
+    Condition::any()
+        .add(
+            Condition::all()
+                .add(subject_request::Column::Status.eq("received"))
+                .add(subject_request::Column::DueAt.lt(at)),
+        )
+        .add(
+            Condition::all()
+                .add(subject_request::Column::Status.is_in(["received", "in_progress"]))
+                .add(subject_request::Column::FulfilDueAt.lt(at)),
+        )
+}
+
+/// Như [`overdue_condition`] cho một dòng đã đọc.
+pub(crate) fn is_overdue(row: &subject_request::Model, at: Timestamp) -> bool {
+    (row.status == "received" && row.due_at < at)
+        || (matches!(row.status.as_str(), "received" | "in_progress")
+            && row.fulfil_due_at.is_some_and(|due| due < at))
+}
+
 impl ComplianceService {
-    /// Hạn trả lời (giờ) của loại `kind` theo quy tắc; mặc định 72.
-    async fn request_hours(
+    /// Hạn trả lời / xác nhận và hạn thực hiện của yêu cầu loại `kind` nhận lúc `received_at`, theo quy tắc
+    /// `privacy.subject_requests` có hiệu lực lúc đó:
+    /// - `respond_within_hours[kind]` (mặc định 72 giờ);
+    /// - `fulfil_within_days[kind]` (LG-4b; không có thì không có hạn thực hiện) theo đơn vị `fulfil_unit`:
+    ///   `days` (ngày thường — mặc định, chặt hơn) hay `working_days` (bỏ thứ Bảy, Chủ nhật, ngày trong
+    ///   `holidays`, giờ địa phương `utc_offset_minutes`). Nguồn chưa thống nhất ngày làm việc hay ngày thường,
+    ///   và hạn dài hơn khi có bên xử lý thứ ba (NĐ 356/2025 Điều 5 theo bản phân tích) — cần đối chiếu văn bản
+    ///   gốc; Autoxide dùng hạn không kéo dài, hướng an toàn cho chủ thể dữ liệu.
+    ///
+    /// Thân quy tắc không phải JSON là lỗi (không đoán hạn).
+    async fn request_deadlines(
         &self,
         tenant: &TenantContext,
         kind: &str,
-        at: Timestamp,
-    ) -> Result<i64, Error> {
-        let rule = self.rule_for(tenant, "privacy.subject_requests", at).await?;
-        Ok(rule
-            .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
-            .and_then(|body| body.get("respond_within_hours")?.get(kind)?.as_i64())
-            .filter(|hours| *hours > 0)
-            .unwrap_or(72))
+        received_at: Timestamp,
+    ) -> Result<(Timestamp, Option<Timestamp>), Error> {
+        let rule = self.rule_for(tenant, "privacy.subject_requests", received_at).await?;
+        let body = match rule {
+            Some(row) => Some(serde_json::from_str::<Value>(&row.body).map_err(|error| {
+                Error::internal(format!(
+                    "the rule privacy.subject_requests version {} is not valid JSON: {error}",
+                    row.version
+                ))
+            })?),
+            None => None,
+        };
+        Ok(deadlines(body.as_ref(), kind, received_at))
     }
 
     pub(crate) async fn record_subject_request(
@@ -147,7 +223,8 @@ impl ComplianceService {
         }
         let (subject_kind, subject) = subject.unwrap_or_default();
         // Hạn tính theo quy tắc hiệu lực lúc nhận yêu cầu.
-        let hours = self.request_hours(tenant, &input.kind, received_at).await?;
+        let (due_at, fulfil_due_at) =
+            self.request_deadlines(tenant, &input.kind, received_at).await?;
         let row = subject_request::Model {
             id: Uuid::now_v7(),
             tenant_id: tenant.id().as_uuid(),
@@ -156,7 +233,8 @@ impl ComplianceService {
             subject_kind: subject_kind.to_owned(),
             subject,
             received_at,
-            due_at: received_at + SignedDuration::from_hours(hours),
+            due_at,
+            fulfil_due_at,
             status: "received".to_owned(),
             reason: None,
             notes: input.notes,
@@ -170,6 +248,7 @@ impl ComplianceService {
         let saved = subject_request::ActiveModel::from(row).insert(&transaction).await?;
         let event = events::SubjectRequestReceived(json!({
             "request_id": saved.id, "kind": saved.kind, "channel": saved.channel, "due_at": saved.due_at,
+            "fulfil_due_at": saved.fulfil_due_at,
         }));
         self.outbox
             .record(
@@ -212,9 +291,7 @@ impl ComplianceService {
             select = select.filter(subject_request::Column::Status.eq(status));
         }
         if overdue {
-            select = select
-                .filter(subject_request::Column::Status.is_in(["received", "in_progress"]))
-                .filter(subject_request::Column::DueAt.lt(Timestamp::now()));
+            select = select.filter(overdue_condition(Timestamp::now()));
         }
         fetch_page(
             select,
