@@ -189,7 +189,9 @@ fn start_context_violations(path: &str, text: &str) -> Vec<Violation> {
         }
         let name = &text[name_start..name_end];
         let message = if let Some((_, handle)) = OLD_GETTERS.iter().find(|(old, _)| *old == name) {
-            format!("`context.{name}()` is the old way to get a kernel handle: use `context.kernel::<{handle}>()`")
+            format!(
+                "`context.{name}()` is the old way to get a kernel handle: use `context.kernel::<{handle}>()`"
+            )
         } else if let Some((_, contract)) = OLD_REGISTRATIONS.iter().find(|(old, _)| *old == name) {
             format!(
                 "`context.{name}(…)` is the old registration: use `context.contribute::<dyn {contract}>(…)`"
@@ -404,7 +406,10 @@ fn dormant(&self, context: &mut DormantContext<'_>) -> Result<(), Error> {
 ";
         let found = start_context_violations("modules/x/src/lib.rs", &without_dormant(text));
         let lines: Vec<&str> = found.iter().map(|violation| violation.location.as_str()).collect();
-        assert_eq!(lines, ["modules/x/src/lib.rs:2", "modules/x/src/lib.rs:3", "modules/x/src/lib.rs:5"]);
+        assert_eq!(
+            lines,
+            ["modules/x/src/lib.rs:2", "modules/x/src/lib.rs:3", "modules/x/src/lib.rs:5"]
+        );
         assert!(found.iter().all(|violation| violation.rule == "start-context-legacy"));
         assert!(found[0].message.contains("context.kernel::<Outbox>()"));
         assert!(found[2].message.contains("contribute::<dyn PersonalData>"));

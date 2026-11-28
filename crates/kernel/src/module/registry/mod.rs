@@ -606,12 +606,17 @@ impl Modules {
         let samples = self
             .per_module::<dyn crate::tenancy::SampleData>("sample_data", |module| {
                 module.sample_data().map(|seed| {
-                    Arc::new(crate::tenancy::SeedAsSample(seed)) as Arc<dyn crate::tenancy::SampleData>
+                    Arc::new(crate::tenancy::SeedAsSample(seed))
+                        as Arc<dyn crate::tenancy::SampleData>
                 })
             })?
             .into_iter()
             .map(|(name, sample)| {
-                (name, Arc::new(crate::tenancy::SampleSeed(sample)) as Arc<dyn crate::tenancy::TenantSeed>)
+                (
+                    name,
+                    Arc::new(crate::tenancy::SampleSeed(sample))
+                        as Arc<dyn crate::tenancy::TenantSeed>,
+                )
             })
             .collect();
         self.seeds.fill(seeds, samples);

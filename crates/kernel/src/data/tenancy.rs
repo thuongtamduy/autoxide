@@ -99,11 +99,11 @@ pub use relocate::{
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use residency::{Residency, parse_country};
-pub use sample::SampleData;
-pub(crate) use sample::{SampleSeed, SeedAsSample};
 pub use return_url::{
     RETURN_URL_MAX_LEN, ReturnUrlProblem, check_return_url, invalid_return_origins,
 };
+pub use sample::SampleData;
+pub(crate) use sample::{SampleSeed, SeedAsSample};
 pub use sandbox::{
     NewSandbox, SANDBOXES_LIMIT, SANDBOXES_MANAGE, SANDBOXES_READ, Sandbox, TenantKind,
     TenantSandboxes,

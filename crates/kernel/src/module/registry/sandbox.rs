@@ -17,9 +17,10 @@ impl Modules {
     /// Collects the sandbox copies (`contribute::<dyn SandboxCopy>` or the old `Module::sandbox_copy`) and `Module::promotable` in registration order. A promotable kind must
     /// be named `<module>.<kind>` and declared once.
     pub(super) fn fill_sandbox(&self) -> Result<(), ModuleError> {
-        let copies = self.per_module::<dyn crate::tenancy::sandbox::SandboxCopy>("sandbox_copy", |module| {
-            module.sandbox_copy()
-        })?;
+        let copies = self
+            .per_module::<dyn crate::tenancy::sandbox::SandboxCopy>("sandbox_copy", |module| {
+                module.sandbox_copy()
+            })?;
         let mut promotables: Vec<(&'static str, crate::tenancy::sandbox::Promotable)> = Vec::new();
         for module in &self.modules {
             let name = module.name();
