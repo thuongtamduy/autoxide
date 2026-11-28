@@ -17,6 +17,7 @@ mod can_plan;
 mod cdn_cache;
 mod client_config;
 mod compression;
+mod contribute;
 mod custom_fields_limit;
 mod database;
 mod db_layer;

@@ -41,6 +41,7 @@ use crate::job::{JobQueue, JobRegistration, Schedule};
 use crate::privacy::{PersonalData, PersonalDataExport};
 
 mod apis;
+mod contribute;
 mod dormant;
 mod later;
 mod manifest;
@@ -147,7 +148,7 @@ pub trait Module: Send + Sync {
     /// `start`, when a tenant is created (`autoxide tenant create`, `POST /api/v1/kernel/tenants`). Must be
     /// re-runnable. Seeds nothing by default.
     ///
-    /// Old way: use [`StartContext::seed_tenant`](StartContext::seed_tenant) instead.
+    /// Old way: use `context.contribute::<dyn TenantSeed>(…)` ([`StartContext::contribute`]) in `start` instead.
     fn seed_tenant(&self) -> Option<std::sync::Arc<dyn crate::tenancy::TenantSeed>> {
         None
     }
@@ -156,7 +157,7 @@ pub trait Module: Send + Sync {
     /// few records so the tenant can see how the module is used. Runs only for modules the plan enables.
     /// Must be re-runnable and must not create duplicates. None by default.
     ///
-    /// Old way: use [`StartContext::sample_data`](StartContext::sample_data) instead.
+    /// Old way: use `context.contribute::<dyn SampleData>(…)` ([`StartContext::contribute`]) in `start` instead.
     fn sample_data(&self) -> Option<std::sync::Arc<dyn crate::tenancy::TenantSeed>> {
         None
     }
@@ -533,7 +534,7 @@ pub trait Module: Send + Sync {
     /// `kernel.sandbox_copy` job in registration order. Configuration only, never personal data,
     /// transactions or secrets. Called after `start`. Default: copies nothing.
     ///
-    /// Old way: use [`StartContext::sandbox_copy`](StartContext::sandbox_copy) instead.
+    /// Old way: use `context.contribute::<dyn SandboxCopy>(…)` ([`StartContext::contribute`]) in `start` instead.
     fn sandbox_copy(&self) -> Option<Arc<dyn crate::tenancy::sandbox::SandboxCopy>> {
         None
     }
@@ -978,10 +979,21 @@ impl StartContext<'_> {
     /// `context.contribute::<dyn PaymentGateway>(Arc::new(vnpay))?`. Unlike [`provide`](Self::provide)
     /// (exactly one publisher): any number of modules may contribute, and each module contributes each trait
     /// at most once.
+    ///
+    /// It is also the one way to plug into the kernel's extension points: initial data for a new tenant
+    /// (`dyn TenantSeed`), sample data (`dyn SampleData`), sandbox copy (`dyn SandboxCopy`), personal data
+    /// (`dyn PersonalData`), work inbox, search, summary metrics, list exports, bulk actions, code resolvers,
+    /// setup steps, connection probes, references and the posting verifier — see the table in the
+    /// `module::contribute` source, and `docs/MODULE_GUIDE.md`. The older one-function-per-concept
+    /// registrations (`personal_data`, `work_source`…) still work during the transition.
     pub fn contribute<T>(&mut self, api: Arc<T>) -> Result<(), Error>
     where
         T: ?Sized + Send + Sync + 'static,
     {
+        // `&api` (một `&Arc<T>`) tự đổi thành `&dyn Any` để kernel thử từng registry của nó.
+        if let Some(registered) = self.contribute_to_kernel(&api) {
+            return registered;
+        }
         let api = self.partners.wrap(api);
         self.apis.contribute(self.module, api)
     }
