@@ -202,6 +202,44 @@ These may change in any release, including patch releases where it fixes a bug:
 - Database tables, columns and indexes (see above), the order of items where the API does not
   promise one, and performance figures.
 
+## Supported platforms
+
+What the project builds, tests and fixes bugs for. Outside this list Autoxide may work, but the CI does not test it
+and a problem that only shows there may not be fixed. `autoxide doctor` reports the database version it finds
+(check `database_version`) and warns when it is outside the list; the server still starts.
+
+### Databases
+
+| Database   | Supported                                            | Tested by the CI                                   |
+| ---------- | ---------------------------------------------------- | -------------------------------------------------- |
+| PostgreSQL | 16, 17, 18 — the majors the PostgreSQL project still maintains, from 16 up | 16 on every pull request; 16 and 18 on `main` and before every release |
+| SQLite     | 3.45 or newer                                        | the SQLite bundled in the binary (3.54)           |
+
+- **PostgreSQL policy.** A new PostgreSQL major is added in a minor release once the full gate passes on it, and the
+  CI then tests the oldest and the newest supported major. A major is dropped only after the
+  [PostgreSQL project](https://www.postgresql.org/support/versioning/) stops maintaining it (PostgreSQL 16: November
+  2028), announced in the changelog one minor release ahead; `doctor` warns from that date. Upgrading PostgreSQL itself
+  (`pg_upgrade`, dump and restore) needs nothing from Autoxide.
+- **SQLite.** The official binaries and the image bundle SQLite, so the version does not depend on the operating
+  system. Only a build that you link to the system SQLite can be older; such a build is not tested.
+- Managed PostgreSQL services (and PostgreSQL-compatible proxies such as PgBouncer in session mode) work when they speak
+  the PostgreSQL protocol of a supported major; products that only resemble PostgreSQL are not supported.
+
+### Operating systems and CPU architectures
+
+| Artifact                        | Platforms                                                                    |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| Docker image                    | `linux/amd64`, `linux/arm64` (Debian 13 base, distroless)                    |
+| Linux binary                    | `x86_64` and `aarch64` (`*-unknown-linux-gnu`), glibc 2.41 or newer (Debian 13, Ubuntu 25.04 and later) |
+| macOS binary                    | Apple silicon (`aarch64-apple-darwin`) and Intel (`x86_64-apple-darwin`), macOS 11 or newer |
+| Windows binary                  | `x86_64-pc-windows-msvc`, Windows 10 / Server 2016 or newer; not signed       |
+| Build from source               | any target that the [MSRV](#minimum-supported-rust-version-msrv) supports at Rust tier 1 or 2 with `std` |
+
+- Production servers: the image, or the Linux binary. The macOS and Windows binaries are for development and trying
+  Autoxide; the release CI builds them, but the test suite runs on Linux.
+- On an older Linux (glibc below 2.41) use the image, or build from source on that system.
+- A platform is removed only in a minor release announced in the changelog one minor release ahead.
+
 ## Building from source
 
 ### Minimum supported Rust version (MSRV)

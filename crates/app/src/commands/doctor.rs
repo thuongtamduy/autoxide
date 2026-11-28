@@ -1,8 +1,10 @@
 //! Lệnh `autoxide doctor`: kiểm bản cài đặt từng bước và nói cách sửa (D-166).
 //!
-//! Thứ tự: cấu hình → database (đọc và ghi) → migration → khoá ký → từng bước kiểm module khai
+//! Thứ tự: cấu hình → database (đọc và ghi, bản có được hỗ trợ không) → migration → khoá ký → từng bước kiểm module khai
 //! (`Module::checks`). Bước nền hỏng thì các bước dựa vào nó không chạy (báo `skipped`), để
 //! người đọc thấy đúng một nguyên nhân thay vì một loạt lỗi kéo theo.
+
+mod database_version;
 
 use std::process::ExitCode;
 
@@ -127,6 +129,10 @@ async fn diagnose(settings: Settings) -> Vec<Line> {
     let database_ok = probe_database(&database).await;
     let usable = passes(&database_ok);
     lines.push(line("database", Some(database_ok)));
+    // Bản database ngoài danh sách được hỗ trợ chỉ là cảnh báo (G14, docs/COMPATIBILITY.md).
+    if usable {
+        lines.push(line("database_version", Some(database_version::probe(&database).await)));
+    }
     let migrations = if usable { Some(probe_migrations(&modules, &database).await) } else { None };
     let migrated = migrations.as_ref().is_some_and(passes);
     lines.push(line("migrations", migrations));
@@ -380,6 +386,8 @@ mod tests {
                     ("configuration", "ok"),
                     ("modules", "ok"),
                     ("database", "ok"),
+                    // Bản database của CI (PostgreSQL 16 / 18, SQLite nhúng) nằm trong danh sách được hỗ trợ.
+                    ("database_version", "ok"),
                     ("migrations", "failed"),
                     ("secret_key", "skipped")
                 ]
@@ -387,8 +395,8 @@ mod tests {
             // Module đang chạy và đang tắt (bước 70 P1); test đọc cấu hình với mọi module.
             assert!(lines[1].message.contains("modules run: mail, ai,"), "{}", lines[1].message);
             assert!(lines[1].message.ends_with("No module is turned off."), "{}", lines[1].message);
-            assert_eq!(lines[3].hint.as_deref(), Some("Run `autoxide migrate up`."));
-            assert!(lines[3].message.contains(" more"), "{}", lines[3].message);
+            assert_eq!(lines[4].hint.as_deref(), Some("Run `autoxide migrate up`."));
+            assert!(lines[4].message.contains(" more"), "{}", lines[4].message);
 
             let setup = settings(test.url(), &dir);
             autoxide_testkit::prepare_from_template(
