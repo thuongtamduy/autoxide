@@ -8,6 +8,7 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 The `curl` examples send JSON with `--json '…'`, which needs curl 7.82 or newer (`curl --version`). With an
 older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 'Accept: application/json' -d '…'`.
 
+- [Building a web app](web-app.md): CORS, the TypeScript client, tokens and refreshing, permissions, `ETag`, errors, uploads, which endpoint for which task, a whole `api.ts`
 - [Showing posts and pictures on a website](website.md): public endpoints, `srcset` and WebP, ETag and 304
 - [Opening a shop: your first order from product to e-invoice](shop.md): connectors on, provider accounts, product, guest cart, MoMo, GHN, eSMS, SePay eInvoice
 - [Building a shop's home page from the API](storefront.md): placements and banners, collections, brand and contact details, cache
