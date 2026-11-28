@@ -25,6 +25,7 @@ mod distribution;
 mod dormant;
 mod endpoint;
 mod event;
+mod event_per_subscriber;
 mod event_stream;
 mod event_ws;
 mod filter_parse;

@@ -76,13 +76,22 @@ async fn paid(shop: &Shop, payment: &autoxide_ledger::api::Payment) {
     emit(shop, &PaymentSucceeded(event)).await;
 }
 
-/// Số event `ledger.*` chưa giao xong (bên nhận trả lỗi thì event nằm chờ thử lại).
+/// Số lần giao event `ledger.*` chưa xong: event chưa chia, cộng lần giao của bên nhận đã trả lỗi và đang chờ thử
+/// lại riêng (D-20261128-event-per-subscriber).
 async fn undelivered(shop: &Shop) -> i64 {
     let database = shop.database();
     let backend = database.read().get_database_backend();
-    let sql = "SELECT COUNT(*) AS n FROM ledger_events WHERE delivered_at IS NULL";
-    let row = database.read().query_one_raw(statement(backend, sql, [])).await.unwrap().unwrap();
-    row.try_get::<i64>("", "n").unwrap()
+    let mut total = 0;
+    for sql in [
+        "SELECT COUNT(*) AS n FROM ledger_events WHERE delivered_at IS NULL",
+        "SELECT COUNT(*) AS n FROM kernel_event_deliveries WHERE module = 'ledger' \
+         AND delivered_at IS NULL",
+    ] {
+        let row =
+            database.read().query_one_raw(statement(backend, sql, [])).await.unwrap().unwrap();
+        total += row.try_get::<i64>("", "n").unwrap();
+    }
+    total
 }
 
 /// Số event `orders.payment_recorded` mang `superseded: true` của khách mặc định.
@@ -334,8 +343,8 @@ async fn hoan_luot_cu_gap_409_thi_thu_lai() {
         // Lần thử lại (cho tới hạn ngay thay vì chờ backoff) hoàn lượt cũ đúng một lần.
         let database = shop.database();
         let backend = database.write().get_database_backend();
-        let due =
-            "UPDATE ledger_events SET next_attempt_at = occurred_at WHERE delivered_at IS NULL";
+        let due = "UPDATE kernel_event_deliveries SET next_attempt_at = created_at \
+                   WHERE delivered_at IS NULL";
         database.write().execute_raw(statement(backend, due, [])).await.unwrap();
         drain(shop).await;
         assert_eq!(

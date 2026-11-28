@@ -61,11 +61,14 @@ pub struct ModuleBacklog {
     pub jobs_oldest_pending_seconds: u64,
     /// Jobs in the dead-letter queue (`failed_at` has a value).
     pub jobs_dead: u64,
-    /// Events not yet delivered and not permanently failed.
+    /// Events not yet delivered and not permanently failed, plus per-subscriber retries of this module's events
+    /// still waiting.
     pub events_pending: u64,
-    /// Age (seconds) of the oldest undelivered event: `now - occurred_at`; 0 when there is none.
+    /// Age (seconds) of the oldest undelivered event (`now - occurred_at`) or waiting retry (`now - created_at`);
+    /// 0 when there is none.
     pub events_oldest_pending_seconds: u64,
-    /// Permanently failed events (`failed_at` has a value).
+    /// Permanently failed events (`failed_at` has a value), plus per-subscriber retries of this module's events
+    /// in the dead-letter queue.
     pub events_dead: u64,
 }
 
@@ -119,6 +122,21 @@ pub async fn backlog(
             found.events_dead =
                 count(database, &table, Expr::col(Alias::new("failed_at")).is_not_null().into())
                     .await?;
+            // Bên nhận còn phải nhận lại (D-20261128-event-per-subscriber): mỗi dòng thử lại là một lần giao còn chờ,
+            // hay đã vào dead-letter, của event do module này phát.
+            let retries = crate::event::deliveries::TABLE;
+            let open = crate::event::deliveries::open_condition(module);
+            let waiting = open.clone().add(Expr::col(Alias::new("failed_at")).is_null());
+            found.events_pending += count(database, retries, waiting.clone()).await?;
+            let oldest_retry = oldest(database, retries, "created_at", waiting, now).await?;
+            found.events_oldest_pending_seconds =
+                std::cmp::max(found.events_oldest_pending_seconds, oldest_retry);
+            found.events_dead += count(
+                database,
+                retries,
+                open.add(Expr::col(Alias::new("failed_at")).is_not_null()),
+            )
+            .await?;
         }
         modules.push(found);
     }

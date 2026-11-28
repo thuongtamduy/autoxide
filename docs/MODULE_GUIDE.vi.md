@@ -385,6 +385,10 @@ Khai event trong `src/events.rs` và trả từ `Module::events`. Dữ liệu d�
 `{"before": …, "after": …}` (bỏ phần không có) và không bao giờ chứa secret. Module
 `audit` ghi mọi event; module khác đăng ký nhận qua `Module::subscriptions` và phải chịu
 được việc nhận lại cùng một event.
+Mỗi module nhận event một cách riêng: handler của bạn trả lỗi, panic hay chạy quá 50 giây thì
+các module sau bạn vẫn nhận event, và chỉ module của bạn được thử lại (cách nhau 2, 4, 8… giây,
+tối đa một giờ; sau 10 lần thì lần giao đó vào dead-letter, trừ `privacy::USER_DELETED` được thử
+lại mỗi giờ tới khi xong). Nhiều đăng ký của cùng một module cho cùng event được thử lại cùng nhau.
 Event về dữ liệu của một đơn vị trong cây tổ chức mang đơn vị đó ở `org_id` — ngay đầu payload
 hoặc trong `after` / `before` (ảnh chụp dòng có cột `org_id` là đủ). Bên nhận đọc bằng
 `Delivered::org_id()`: luật tự động hoá của một nhánh chỉ chạy với event của nhánh đó, nên event
