@@ -33,6 +33,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(list_scim_groups))
         .routes(routes!(list_scim_group_mappings, create_scim_group_mapping))
         .routes(routes!(delete_scim_group_mapping))
+        .routes(routes!(approve_scim_group_member))
 }
 
 /// A SCIM token of the tenant, without its secret.
@@ -289,9 +290,13 @@ pub(crate) struct CreatedScimGroupMappingResponse {
     mapping: ScimGroupMappingResponse,
     /// Members of the group whose roles were brought in line with the rule: they hold the role at
     /// the unit now — through this rule, or because they already had it (by hand, or from another
-    /// group). Members of a group without rules may have been added by anyone holding a SCIM token:
-    /// check this list.
+    /// group).
     granted_user_ids: Vec<Uuid>,
+    /// Members waiting for approval: the SCIM token that added them to the group (its creator, as of
+    /// now) could not give this role, so the rule does not give it to them — e.g. members added by a
+    /// low-rights token before the group had rules. Approve each one you vouch for with
+    /// `POST /api/v1/auth/scim/groups/{group_id}/members/{user_id}/approve`.
+    waiting_user_ids: Vec<Uuid>,
     /// Members who could not be given the role (e.g. the plan's staff limit is reached), with the
     /// error code. The rule stays; they get the role on the next sync that succeeds for them.
     failed: Vec<ScimSyncFailure>,
@@ -305,6 +310,32 @@ pub(crate) struct ScimSyncFailure {
     code: String,
     /// What went wrong, in English.
     message: String,
+}
+
+impl From<(Uuid, Error)> for ScimSyncFailure {
+    fn from((user_id, error): (Uuid, Error)) -> Self {
+        // Lỗi nội bộ không lộ chi tiết ra ngoài; lỗi đầy đủ đã ghi log ở `ScimService::sync_in`.
+        let message = if error.kind() == autoxide_kernel::error::ErrorKind::Internal {
+            "Internal error.".to_owned()
+        } else {
+            error.message()
+        };
+        ScimSyncFailure { user_id, code: error.code().to_owned(), message }
+    }
+}
+
+/// A group member just approved.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ApprovedScimMemberResponse {
+    group_id: Uuid,
+    user_id: Uuid,
+    /// You: the group's rules now judge this member by your rights.
+    approved_by: Uuid,
+    /// `true` when the member's roles were brought in line with the group's rules; `false` when that
+    /// failed (see `failure`). The approval stays; the next sync that succeeds gives the roles.
+    synced: bool,
+    /// Why the member's roles could not be updated, e.g. the plan's staff limit.
+    failure: Option<ScimSyncFailure>,
 }
 
 /// A new mapping rule.
@@ -381,10 +412,10 @@ async fn list_scim_group_mappings(
 ///
 /// Requires `auth.scim.manage`, and you must be able to give that role at that unit yourself (the
 /// unit is in your scope, you hold every permission of the role; `admin` only at the root). Every
-/// current member of the group gets the role at once, and the response lists them
-/// (`granted_user_ids`): anyone holding a SCIM token may have added members to a group before it had
-/// rules, so look at the group's members first. Later members get the role when they join, if
-/// the SCIM token's creator can give it.
+/// current member of the group gets the role at once if the SCIM token that added them could give it
+/// too (`granted_user_ids`); the others wait for approval (`waiting_user_ids`), so a low-rights token
+/// cannot add people to a group with no rules and have an administrator's rule raise them later.
+/// Later members get the role when they join, if the SCIM token's creator can give it.
 #[utoipa::path(
     post,
     path = "/scim/group-mappings",
@@ -393,12 +424,12 @@ async fn list_scim_group_mappings(
     security(("bearer" = [])),
     request_body = CreateScimGroupMappingRequest,
     responses(
-        (status = 201, description = "The rule was created and applied to the group's members: those who hold the role now are in `granted_user_ids`, those who could not be given it (e.g. the plan's staff limit) are in `failed`.", body = Data<CreatedScimGroupMappingResponse>),
+        (status = 201, description = "The rule was created and applied to the group's members: those who hold the role now are in `granted_user_ids`, those waiting for approval in `waiting_user_ids`, those who could not be given it (e.g. the plan's staff limit) in `failed`.", body = Data<CreatedScimGroupMappingResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or the role has permissions you do not have as widely as it would cover at the unit (code `auth.role_beyond_you`; `errors` names the role).", body = Problem),
         (status = 404, description = "No SCIM group has this id; code `auth.scim_group_not_found`.", body = Problem),
         (status = 409, description = "The same rule exists (code `auth.scim_mapping_taken`).", body = Problem),
-        (status = 422, description = "The unit or role is unknown, out of your scope, or the role has permissions you do not have; see `errors`.", body = Problem),
+        (status = 422, description = "The unit or role is unknown or out of your scope; see `errors`.", body = Problem),
     )
 )]
 async fn create_scim_group_mapping(
@@ -413,22 +444,11 @@ async fn create_scim_group_mapping(
         .create_mapping(&tenant, &principal, input.group_id, input.org_id, input.role_id)
         .await?;
     let location = format!("/auth/scim/group-mappings/{}", row.id);
-    let failed = report
-        .failed
-        .into_iter()
-        .map(|(user_id, error)| {
-            // Lỗi nội bộ không lộ chi tiết ra ngoài; lỗi đầy đủ đã ghi log ở `ScimService::sync_in`.
-            let message = if error.kind() == autoxide_kernel::error::ErrorKind::Internal {
-                "Internal error.".to_owned()
-            } else {
-                error.message()
-            };
-            ScimSyncFailure { user_id, code: error.code().to_owned(), message }
-        })
-        .collect();
+    let failed = report.failed.into_iter().map(ScimSyncFailure::from).collect();
     let body = CreatedScimGroupMappingResponse {
         mapping: row.into(),
         granted_user_ids: report.synced,
+        waiting_user_ids: report.waiting,
         failed,
     };
     Ok(Created::new(location, body))
@@ -463,4 +483,49 @@ async fn delete_scim_group_mapping(
     principal.require(&SCIM_MANAGE)?;
     state.scim.delete_mapping(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Approve a member of a SCIM group.
+///
+/// Requires `auth.scim.manage`, and you must be able to give every role the group's rules give
+/// (`auth.role_beyond_you` otherwise). A group's rules give their roles only to members whose SCIM
+/// token (its creator, as of now) could give them; the others wait (`waiting_user_ids` when a rule is
+/// created). Approving makes you the one the rules judge this member by, then gives the roles at once.
+/// If the account is raised above the token that created it, its passwords, sessions, API keys and
+/// other ways in are revoked first. Safe to repeat.
+#[utoipa::path(
+    post,
+    path = "/scim/groups/{id}/members/{user_id}/approve",
+    extensions(("x-permissions" = json!(["auth.scim.manage"]))),
+    operation_id = "approve_scim_group_member",
+    security(("bearer" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Id of the SCIM group."),
+        ("user_id" = Uuid, Path, description = "Id of the member."),
+    ),
+    responses(
+        (status = 200, description = "The member is approved; `synced` says whether the roles were given.", body = Data<ApprovedScimMemberResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.scim.manage` (code `permission_denied`), or a rule of the group gives a role you cannot give (code `auth.role_beyond_you`).", body = Problem),
+        (status = 404, description = "No SCIM group has this id (code `auth.scim_group_not_found`), or the user is not a member of it (code `auth.scim_member_not_found`).", body = Problem),
+    )
+)]
+async fn approve_scim_group_member(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path((group_id, user_id)): Path<(Uuid, Uuid)>,
+) -> Result<Data<ApprovedScimMemberResponse>, Error> {
+    principal.require(&SCIM_MANAGE)?;
+    let report = state.scim.approve_member(&tenant, &principal, group_id, user_id).await?;
+    let failure = report.failed.into_iter().next().map(ScimSyncFailure::from);
+    Ok(Data {
+        data: ApprovedScimMemberResponse {
+            group_id,
+            user_id,
+            approved_by: principal.user_id(),
+            synced: failure.is_none(),
+            failure,
+        },
+    })
 }

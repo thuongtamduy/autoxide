@@ -256,6 +256,7 @@
   "text:A SCIM token was revoked; the identity provider using it is refused from now on.": "Một token SCIM bị thu hồi; hệ thống danh tính dùng nó bị từ chối từ nay.",
   "auth.scim_group_not_found": "Không có nhóm SCIM `{id}`.",
   "auth.scim_mapping_not_found": "Không có luật ánh xạ nhóm SCIM `{id}`.",
+  "auth.scim_member_not_found": "Người dùng `{user_id}` không phải thành viên của nhóm SCIM `{group_id}`.",
   "auth.scim_mapping_taken": "Nhóm này đã cấp role này ở nút này rồi.",
   "auth.role_beyond_you": "Role `{role_id}` ở nút `{org_id}` có permission mà bạn không có (với token SCIM: mà người tạo token hiện không có), hoặc có rộng hơn bạn; bạn không cấp hay gỡ nó theo cách này được. Hãy nhờ người có đủ mọi permission của role đó ở nút đó.",
   "auth.permission_beyond_you": "Bạn không thêm được permission `{permission}` cho role (hay nới rộng, bỏ cấm, bỏ đi, thu hẹp hay cấm nó): chính bạn không có nó rộng như vậy. Hãy nhờ người có permission đó.",

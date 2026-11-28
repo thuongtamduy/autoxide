@@ -81,7 +81,7 @@ events! {
     SCIM_TOKEN_CREATED, ScimTokenCreated, "auth.scim_token_created", "A SCIM token was created for the tenant's identity provider (`after`: id, name, prefix; never the token).";
     SCIM_TOKEN_REVOKED, ScimTokenRevoked, "auth.scim_token_revoked", "A SCIM token was revoked; the identity provider using it is refused from now on.";
     SCIM_GROUP_CREATED, ScimGroupCreated, "auth.scim_group_created", "The identity provider created a SCIM group (`after`: id, name, member ids).";
-    SCIM_GROUP_UPDATED, ScimGroupUpdated, "auth.scim_group_updated", "The identity provider renamed a SCIM group or changed its members (`after`: name, `added`, `removed` user ids).";
+    SCIM_GROUP_UPDATED, ScimGroupUpdated, "auth.scim_group_updated", "The identity provider renamed a SCIM group or changed its members (`after`: name, `added`, `removed` user ids), or an administrator approved a waiting member (`after`: `member`, `added_by`, `approved`).";
     SCIM_GROUP_DELETED, ScimGroupDeleted, "auth.scim_group_deleted", "The identity provider deleted a SCIM group; its mapping rules went with it.";
     SCIM_GROUP_MAPPED, ScimGroupMapped, "auth.scim_group_mapped", "A rule now gives the members of a SCIM group a role at a unit (`after`: rule id, group, unit, role).";
     SCIM_GROUP_UNMAPPED, ScimGroupUnmapped, "auth.scim_group_unmapped", "A rule from a SCIM group to a role at a unit was removed (`before`: rule id, group, unit, role).";

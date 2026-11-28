@@ -382,10 +382,21 @@ impl ScimService {
         &self,
         caller: &ScimCaller,
     ) -> Result<autoxide_kernel::access::Principal, ScimError> {
-        let tenant = &caller.tenant;
-        Ok(match self.roles.user_principal(tenant, caller.created_by).await? {
-            // Người tạo còn hoạt động, là nhân sự và CÒN `auth.scim.manage`: mất quyền quản lý SCIM
-            // thì token của họ không cấp, giữ hay gỡ được gì (`creator_status = missing_permission`).
+        Ok(self.authority_of(&caller.tenant, Some(caller.created_by)).await?)
+    }
+
+    /// Quyền của người `user_id` khi chịu trách nhiệm cho dữ liệu SCIM (tạo token, đưa người vào nhóm, tạo liên
+    /// kết): quyền **lúc này** khi còn hoạt động, là nhân sự và CÒN `auth.scim.manage`; còn lại — kể cả không biết
+    /// ai (`None`, dòng trước m0049) — không cấp, giữ hay gỡ được gì (`creator_status = missing_permission`).
+    pub(crate) async fn authority_of(
+        &self,
+        tenant: &TenantContext,
+        user_id: Option<Uuid>,
+    ) -> Result<autoxide_kernel::access::Principal, autoxide_kernel::error::Error> {
+        let nobody =
+            |id: Uuid| autoxide_kernel::access::Principal::new(id, []).in_tenant(tenant.id());
+        let Some(user_id) = user_id else { return Ok(nobody(Uuid::nil())) };
+        Ok(match self.roles.user_principal(tenant, user_id).await? {
             Some((user, principal))
                 if user.is_active()
                     && user.realm == Realm::Staff
@@ -393,8 +404,7 @@ impl ScimService {
             {
                 principal
             }
-            _ => autoxide_kernel::access::Principal::new(caller.created_by, [])
-                .in_tenant(tenant.id()),
+            _ => nobody(user_id),
         })
     }
 
@@ -596,6 +606,12 @@ impl ScimService {
             external_key: input.external_id.as_ref().map(|external| external.to_lowercase()),
             given_name: input.given_name.clone(),
             family_name: input.family_name.clone(),
+            // Người chịu trách nhiệm cho liên kết (P16, D-20261128-scim-owners): người tạo token tạo hay nhận về
+            // liên kết; đổi email vừa thu hồi mọi cách vào cũ ở trên nên người đổi thành người chịu trách nhiệm.
+            created_by: match &link_before {
+                Some(link) if !email_changed => link.created_by,
+                _ => Some(caller.created_by),
+            },
             created_at: link_before.as_ref().map_or(now, |link| link.created_at),
             updated_at: now,
         };

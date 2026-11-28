@@ -204,10 +204,10 @@ async fn get_user_memberships(
     responses(
         (status = 200, description = "The user's memberships after the change.", body = Data<Vec<MembershipResponse>>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or a membership taken away has a role you could not give, or that bans a permission you do not have (code `auth.role_beyond_you`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.roles.manage` (code `permission_denied`), or a membership given has a role with permissions you do not have as widely, or a membership taken away has a role you could not give or that bans a permission you do not have (code `auth.role_beyond_you`; for a role given, `errors` names it).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "The change would leave no active admin; code `auth.last_admin`.", body = Problem),
-        (status = 422, description = "A unit or role is unknown, outside your scope, listed twice, or a role has permissions you do not have; see `errors`.", body = Problem),
+        (status = 422, description = "A unit or role is unknown, outside your scope, or listed twice; see `errors`. Checked before the 403 for a role beyond you.", body = Problem),
     )
 )]
 async fn replace_user_memberships(

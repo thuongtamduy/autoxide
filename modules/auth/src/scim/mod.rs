@@ -28,6 +28,9 @@ mod groups;
 #[cfg(test)]
 mod groups_tests;
 mod mappings;
+mod owners;
+#[cfg(test)]
+mod owners_tests;
 pub(crate) mod patch;
 #[cfg(test)]
 mod sync_limit_tests;

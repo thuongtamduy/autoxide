@@ -152,9 +152,9 @@ impl ScimService {
         let problems =
             crate::role::grant_problems(&transaction, tenant, principal, "", org_id, &roles)
                 .await?;
-        if !problems.is_empty() {
+        if let Err(error) = crate::role::refuse_grants(problems) {
             transaction.rollback().await?;
-            return Err(Error::validation(problems));
+            return Err(error);
         }
         let row = mapping::Model {
             tenant_id: tenant.id().as_uuid(),
@@ -187,12 +187,28 @@ impl ScimService {
         tracing::info!(mapping_id = %row.id, "SCIM group mapping created");
         // Luật đã commit: đồng bộ mọi thành viên, người lỗi không chặn người sau; ai đã nhận role và
         // ai lỗi đều trả về (và ghi log) — không im lặng để lại thành viên chưa đồng bộ.
-        let members = members(tenant, group_id).await?;
+        let rows = member::Entity::find()
+            .filter(member::Column::GroupId.eq(group_id))
+            .scoped(tenant)
+            .all(tenant.database().write())
+            .await?;
+        let members: BTreeSet<Uuid> = rows.iter().map(|row| row.user_id).collect();
         let mut report = self.sync_in(tenant, Actor::from(principal), principal, &members).await;
         // Chỉ người thật sự giữ role ở nút sau khi đồng bộ (không gồm tài khoản vừa bị xoá hay không
         // phải nhân sự mà lần đồng bộ bỏ qua). Đọc qua kết nối ghi: ngay sau commit, replica có thể trễ.
         let holders = holders_of(tenant, org_id, role_id, &report.synced).await?;
         report.synced.retain(|user_id| holders.contains(user_id));
+        // Thành viên mà người đưa vào không cấp được role này: chờ duyệt (D-20261128-scim-owners) — trả về để người
+        // đặt luật xem và duyệt (`POST …/scim/groups/{id}/members/{user_id}/approve`).
+        let mut owners = super::owners::Owners::new(self, tenant);
+        for entry in &rows {
+            if !holders.contains(&entry.user_id)
+                && !owners.can_give(entry.added_by, (org_id, role_id)).await?
+            {
+                report.waiting.push(entry.user_id);
+                tracing::info!(user_id = %entry.user_id, %group_id, "SCIM group member waits for approval");
+            }
+        }
         Ok((row, report))
     }
 

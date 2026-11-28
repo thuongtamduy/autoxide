@@ -136,7 +136,9 @@ async fn applied_guardrails(
 /// tenant). The tenant must be below this one in the customer tree. Takes effect for that tenant
 /// and every tenant below it, for every role including administrators, within 30 seconds on every
 /// server. Guardrails set by several tenants above all apply: a tenant cannot widen what a tenant
-/// above it allowed.
+/// above it allowed. Widening a guardrail does not bring back a ban the tenant lifted while the
+/// permission was outside it: anyone there could lift such a ban (it gave nobody anything), so
+/// check that tenant's roles for bans you want back before widening.
 #[utoipa::path(
     put,
     path = "/guardrails/{tenant_id}",

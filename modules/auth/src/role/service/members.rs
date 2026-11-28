@@ -383,9 +383,9 @@ impl RoleService {
             problems
                 .extend(grant_problems(&transaction, tenant, actor, &field, *org_id, roles).await?);
         }
-        if !problems.is_empty() {
+        if let Err(error) = refuse_grants(problems) {
             transaction.rollback().await?;
-            return Err(Error::validation(problems));
+            return Err(error);
         }
         // Membership bị bỏ (nút, role) cũng phải là thứ người gán gỡ được — kể cả permission cấm của role
         // (D-20261126-no-self-grant); đọc dưới khoá dòng người dùng ở trên.

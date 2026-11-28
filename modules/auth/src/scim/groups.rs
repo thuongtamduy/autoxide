@@ -506,6 +506,8 @@ impl ScimService {
                 id: Set(Uuid::now_v7()),
                 group_id: Set(row.id),
                 user_id: Set(*user_id),
+                // Luật của nhóm chỉ cấp cho thành viên mà người này cấp được role (D-20261128-scim-owners).
+                added_by: Set(Some(caller.created_by)),
                 created_at: Set(now),
             }
             .insert(transaction)

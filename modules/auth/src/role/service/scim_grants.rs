@@ -14,6 +14,9 @@ impl RoleService {
     /// `authority`: người chịu trách nhiệm cho lần đổi này — người tạo token SCIM (tính lúc dùng
     /// token) hay người đổi luật ánh xạ. Chỉ thêm / gỡ (nút, role) mà `authority` cấp được
     /// (`grantable`, D-20261125-scim-grant-cover); phần còn lại giữ nguyên, ghi log.
+    ///
+    /// `waiting`: (nút, role) do nhóm cấp nhưng thành viên còn chờ duyệt (D-20261128-scim-owners) — không cấp, và
+    /// dòng SCIM đã cấp trước đó cho cặp này không bị gỡ.
     pub(crate) async fn sync_scim_grants(
         &self,
         tenant: &TenantContext,
@@ -21,6 +24,7 @@ impl RoleService {
         authority: &Principal,
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
+        waiting: &BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
         // Kết nối GHI: chạy ngay sau commit nhóm / luật (read replica có thể trễ).
         let read = tenant.database().write();
@@ -48,7 +52,7 @@ impl RoleService {
             .filter(|row| held.contains(&row.user_role_id))
             .map(|row| (row.org_id, row.role_id))
             .collect();
-        let mut will_hold = manual;
+        let mut will_hold = manual || live.iter().any(|pair| waiting.contains(pair));
         for pair in &wanted {
             if will_hold {
                 break;
@@ -56,14 +60,15 @@ impl RoleService {
             will_hold =
                 live.contains(pair) || grantable(read, tenant, authority, *pair, true).await?;
         }
-        for pair in live.iter().filter(|pair| !wanted.contains(pair)) {
+        for pair in live.iter().filter(|pair| !wanted.contains(pair) && !waiting.contains(pair)) {
             if will_hold {
                 break;
             }
             will_hold = !grantable(read, tenant, authority, *pair, false).await?;
         }
         let change = async {
-            let changed = self.write_scim_grants(tenant, actor, authority, user_id, wanted).await;
+            let changed =
+                self.write_scim_grants(tenant, actor, authority, user_id, wanted, waiting).await;
             changed.map(|changed| (changed, changed))
         };
         self.with_member_limit(tenant, user_id, will_hold, change).await
@@ -76,6 +81,7 @@ impl RoleService {
         authority: &Principal,
         user_id: Uuid,
         wanted: BTreeSet<(Uuid, Uuid)>,
+        waiting: &BTreeSet<(Uuid, Uuid)>,
     ) -> Result<bool, Error> {
         let root = root_of(tenant.id()).as_uuid();
         let transaction = tenant.database().begin_write().await?;
@@ -121,7 +127,10 @@ impl RoleService {
         let remove: Vec<&grant::Model> = live
             .iter()
             .copied()
-            .filter(|row| !wanted.contains(&(row.org_id, row.role_id)))
+            .filter(|row| {
+                let pair = (row.org_id, row.role_id);
+                !wanted.contains(&pair) && !waiting.contains(&pair)
+            })
             .collect();
         if add.is_empty() && remove.is_empty() && stale.is_empty() {
             transaction.rollback().await?;

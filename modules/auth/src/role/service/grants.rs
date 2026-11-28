@@ -77,15 +77,43 @@ pub(crate) async fn grant_problems<C: ConnectionTrait>(
             problems.push(
                 FieldError::new(
                     format!("{field}role_ids"),
-                    "more_than_you_have",
+                    MORE_THAN_YOU_HAVE,
                     "role `{role}` has permissions you do not have, or has them more widely \
                      than you do; you cannot give it",
                 )
-                .with_param("role", &row.name),
+                .with_param("role", &row.name)
+                // Cho [`refuse_grants`] dựng lỗi 403, và cho máy biết đúng role nào ở nút nào.
+                .with_param("role_id", row.id)
+                .with_param("org_id", org_id),
             );
         }
     }
     Ok(problems)
+}
+
+/// Mã của ô lỗi "role vượt quyền người gán" trong [`grant_problems`].
+pub(crate) const MORE_THAN_YOU_HAVE: &str = "more_than_you_have";
+
+/// Kết quả của [`grant_problems`] cho đường tạo (membership, lời mời, luật nhóm SCIM, role mặc định OIDC): còn lỗi
+/// đầu vào (nút / role không có, ngoài phạm vi…) thì 422 với các lỗi đó; chỉ còn role vượt quyền người gán thì 403
+/// `auth.role_beyond_you` — cùng mã với gỡ vượt quyền và `PUT /users/{id}/roles`, ô lỗi giữ trong `errors`
+/// (P16 (iii), D-20261128-grant-refusal-forbidden). Không vượt quyền khi đầu vào sai: lỗi đầu vào báo trước.
+pub(crate) fn refuse_grants(problems: Vec<FieldError>) -> Result<(), Error> {
+    let (beyond, input): (Vec<_>, Vec<_>) =
+        problems.into_iter().partition(|problem| problem.code == MORE_THAN_YOU_HAVE);
+    if !input.is_empty() {
+        return Err(Error::validation(input));
+    }
+    let Some(first) = beyond.first() else { return Ok(()) };
+    let param = |name: &str| {
+        first.params().find(|(key, _)| *key == name).map(|(_, value)| value.to_owned())
+    };
+    let mut error =
+        role_beyond_you(param("org_id").unwrap_or_default(), param("role_id").unwrap_or_default());
+    for field in beyond {
+        error = error.with_field(field);
+    }
+    Err(error)
 }
 
 /// Chỗ kiểm chung cho mọi đường đổi membership mà người làm không trực tiếp chọn từng role (nhóm
@@ -181,7 +209,7 @@ fn lifts_ban(actor: &Principal, root: OrgId, permission: &str) -> bool {
         || actor_covers(actor, root, &[root], permission, Scope::Tenant)
 }
 
-pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {
+pub(crate) fn role_beyond_you(org_id: impl ToString, role_id: impl ToString) -> Error {
     Error::forbidden(
         "auth.role_beyond_you",
         "Role `{role_id}` at unit `{org_id}` has permissions that you do not have (for a SCIM \

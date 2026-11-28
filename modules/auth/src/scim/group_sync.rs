@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use super::entity::{mapping, member};
 use super::error::ScimError;
+use super::owners::Owners;
 use super::{ScimCaller, ScimService};
 
 /// Nhiều thành viên "chờ" nhất được đồng bộ lại sau một lần ghi nhóm: nhóm có hàng nghìn người chờ
@@ -52,7 +53,8 @@ impl ScimService {
         named: &BTreeSet<Uuid>,
     ) -> Result<(), ScimError> {
         let authority = self.authority(caller).await?;
-        let pending = pending_members(&caller.tenant, group_id, &authority).await?;
+        let mut owners = Owners::new(self, &caller.tenant);
+        let pending = pending_members(&mut owners, &caller.tenant, group_id, &authority).await?;
         let (first, rest): (Vec<Uuid>, Vec<Uuid>) =
             pending.into_iter().partition(|user_id| named.contains(user_id));
         let pending: BTreeSet<Uuid> = first.into_iter().chain(rest).take(PENDING_MAX).collect();
@@ -101,10 +103,16 @@ impl ScimService {
         users: &BTreeSet<Uuid>,
     ) -> SyncReport {
         let mut report = SyncReport::default();
+        let mut owners = Owners::new(self, tenant);
         for user_id in users {
+            let owners = &mut owners;
             let synced = async {
-                let wanted = wanted_grants(tenant, *user_id).await?;
-                self.roles.sync_scim_grants(tenant, actor, authority, *user_id, wanted).await
+                let wanted = self.wanted_grants(owners, tenant, *user_id).await?;
+                let (id, give, waiting) = (*user_id, &wanted.give, &wanted.waiting);
+                self.guard_link_raise(owners, tenant, actor, authority, id, give).await?;
+                self.roles
+                    .sync_scim_grants(tenant, actor, authority, id, wanted.give, waiting)
+                    .await
             };
             match synced.await {
                 Ok(_) => report.synced.push(*user_id),
@@ -123,15 +131,20 @@ impl ScimService {
 #[derive(Debug, Default)]
 pub(crate) struct SyncReport {
     pub synced: Vec<Uuid>,
+    /// Thành viên chờ duyệt: người đưa họ vào nhóm không cấp được role của luật (D-20261128-scim-owners). Chỉ
+    /// `create_mapping` điền.
+    pub waiting: Vec<Uuid>,
     pub failed: Vec<(Uuid, autoxide_kernel::error::Error)>,
 }
 
 /// Thành viên của nhóm `group_id` còn thiếu một (nút, role) mà luật của nhóm cấp VÀ `authority`
-/// cấp được — lần đồng bộ trước của họ lỗi (vượt hạn mức…). Role `authority` không cấp được không
+/// cấp được VÀ người đưa họ vào cấp được (không thì họ chờ duyệt, D-20261128-scim-owners) — lần đồng bộ trước
+/// của họ lỗi (vượt hạn mức…). Role `authority` không cấp được không
 /// làm ai "chờ" đối với nó: không thì người chỉ thiếu role đó bị chọn lại mãi, chiếm hết
 /// [`PENDING_MAX`] chỗ, người sau không bao giờ được đồng bộ. Mỗi luật một câu; đọc qua kết nối ghi
 /// (ngay sau commit, read replica có thể trễ).
 async fn pending_members(
+    owners: &mut Owners<'_>,
     tenant: &TenantContext,
     group_id: Uuid,
     authority: &Principal,
@@ -170,31 +183,11 @@ async fn pending_members(
             .scoped(tenant)
             .all(connection)
             .await?;
-        pending.extend(missing.into_iter().map(|row| row.user_id));
+        for row in missing {
+            if owners.can_give(row.added_by, pair).await? {
+                pending.insert(row.user_id);
+            }
+        }
     }
     Ok(pending)
-}
-
-/// (Nút, role) người `user_id` phải giữ theo các nhóm của họ và luật ánh xạ.
-async fn wanted_grants(
-    tenant: &TenantContext,
-    user_id: Uuid,
-) -> Result<BTreeSet<(Uuid, Uuid)>, autoxide_kernel::error::Error> {
-    // Kết nối GHI: đọc ngay sau commit nhóm / luật, read replica có thể trễ — thấy người đã bị gỡ
-    // khỏi nhóm vẫn còn thì không gỡ role (D-20261125-scim-sync-report).
-    let read = tenant.database().write();
-    let groups = Query::select()
-        .column(member::Column::GroupId)
-        .from(member::Entity)
-        .and_where(Expr::col(member::Column::TenantId).eq(tenant.id().as_uuid()))
-        .and_where(Expr::col(member::Column::UserId).eq(user_id))
-        .to_owned();
-    Ok(mapping::Entity::find()
-        .filter(Expr::col((mapping::Entity, mapping::Column::GroupId)).in_subquery(groups))
-        .scoped(tenant)
-        .all(read)
-        .await?
-        .into_iter()
-        .map(|row| (row.org_id, row.role_id))
-        .collect())
 }

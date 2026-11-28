@@ -638,7 +638,7 @@ async fn list_oidc_providers(
     responses(
         (status = 201, description = "The provider was added.", body = Data<ProviderResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.oidc.manage` (code `permission_denied`), or the request used an API key (code `auth.session_required`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.oidc.manage` (code `permission_denied`), the request used an API key (code `auth.session_required`), or the default role has permissions you do not have as widely as it would cover (code `auth.role_beyond_you`; `errors` names `default_role_id`).", body = Problem),
         (status = 409, description = "Another provider has this slug; code `auth.oidc_slug_taken`.", body = Problem),
         (status = 422, description = "A value is invalid, e.g. an issuer on a private network; see `errors`.", body = Problem),
     )
@@ -699,7 +699,7 @@ async fn get_oidc_provider(
     responses(
         (status = 200, description = "The changed provider.", body = Data<ProviderResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.oidc.manage` (code `permission_denied`), or the request used an API key (code `auth.session_required`).", body = Problem),
+        (status = 403, description = "Missing permission `auth.oidc.manage` (code `permission_denied`), the request used an API key (code `auth.session_required`), or the default role has permissions you do not have as widely as it would cover (code `auth.role_beyond_you`; `errors` names `default_role_id`).", body = Problem),
         (status = 404, description = "No provider has this id; code `auth.oidc_provider_not_found`.", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
     )

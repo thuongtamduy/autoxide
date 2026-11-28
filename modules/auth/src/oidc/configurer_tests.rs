@@ -185,7 +185,8 @@ async fn sua_nha_cung_cap_co_role_mac_dinh_phai_trao_duoc_role_do() {
             .send()
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY, "{}", response.json());
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{}", response.json());
+        assert_eq!(response.json()["code"], "auth.role_beyond_you", "{}", response.json());
         assert_eq!(
             response.json()["errors"][0]["code"],
             "more_than_you_have",
