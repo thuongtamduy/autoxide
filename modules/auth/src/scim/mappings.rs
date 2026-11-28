@@ -152,9 +152,9 @@ impl ScimService {
         let problems =
             crate::role::grant_problems(&transaction, tenant, principal, "", org_id, &roles)
                 .await?;
-        if !problems.is_empty() {
+        if let Err(error) = crate::role::refuse_grants(problems) {
             transaction.rollback().await?;
-            return Err(Error::validation(problems));
+            return Err(error);
         }
         let row = mapping::Model {
             tenant_id: tenant.id().as_uuid(),
@@ -193,6 +193,12 @@ impl ScimService {
         // phải nhân sự mà lần đồng bộ bỏ qua). Đọc qua kết nối ghi: ngay sau commit, replica có thể trễ.
         let holders = holders_of(tenant, org_id, role_id, &report.synced).await?;
         report.synced.retain(|user_id| holders.contains(user_id));
+        // Thành viên mà người đưa vào không cấp được role này: chờ duyệt (D-20261128-scim-owners) — chỉ giữ người chờ
+        // ĐÚNG luật này và chưa giữ role, để người đặt luật xem và duyệt
+        // (`POST …/scim/groups/{id}/members/{user_id}/approve`).
+        report.waiting.retain(|(user_id, pairs)| {
+            pairs.contains(&(org_id, role_id)) && !holders.contains(user_id)
+        });
         Ok((row, report))
     }
 

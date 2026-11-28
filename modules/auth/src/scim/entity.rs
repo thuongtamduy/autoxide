@@ -48,6 +48,8 @@ pub(crate) mod scim_user {
         pub external_key: Option<String>,
         pub given_name: Option<String>,
         pub family_name: Option<String>,
+        /// Người tạo token SCIM đã tạo hay nhận về liên kết này (NULL: dòng trước m0049, không biết).
+        pub created_by: Option<Uuid>,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
     }
@@ -104,6 +106,8 @@ pub(crate) mod member {
         pub id: Uuid,
         pub group_id: Uuid,
         pub user_id: Uuid,
+        /// Người tạo token SCIM đã đưa người này vào nhóm, hay người đã duyệt (NULL: dòng trước m0049).
+        pub added_by: Option<Uuid>,
         pub created_at: Timestamp,
     }
 

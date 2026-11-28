@@ -887,7 +887,8 @@ fn oidc(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "create_oidc_provider",
             "Add a sign-in provider to this tenant; register the application at the provider \
-             first. The client secret is stored encrypted and never shown again.",
+             first. The client secret is stored encrypted and never shown again. A default role \
+             must be one you could give yourself (`auth.role_beyond_you`).",
             move |tenant: TenantContext, principal: Principal, input: ProviderRequest| {
                 let state = create.clone();
                 async move {
@@ -904,7 +905,8 @@ fn oidc(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "update_oidc_provider",
             "Change a sign-in provider of this tenant (name, issuer, client, redirect pages, \
-             allowed email domains, sign-up, default role, enabled).",
+             allowed email domains, sign-up, default role, enabled). Its default role must be one \
+             you could give yourself (`auth.role_beyond_you`).",
             move |tenant: TenantContext, principal: Principal, input: UpdateOidcProviderInput| {
                 let state = update.clone();
                 async move {
@@ -971,7 +973,8 @@ fn invitations(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "create_invitation",
             "Invite someone by email to work at an organization unit with given roles; the mail \
-             goes out shortly and the link can be used once.",
+             goes out shortly and the link can be used once. You can only invite with roles whose \
+             permissions you have as widely (`auth.role_beyond_you`).",
             move |tenant: TenantContext, principal: Principal, input: CreateInvitationInput| {
                 let state = create.clone();
                 async move {
@@ -1073,8 +1076,9 @@ fn memberships(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "set_memberships",
             "Replace every organization unit a user works in and the roles there. You can only \
-             give or take away roles whose permissions you have, in units you work in, and only \
-             take away a role whose banned permissions you all have (`auth.role_beyond_you`).",
+             give or take away roles whose permissions you have as widely, in units you work in, \
+             and only take away a role whose banned permissions you all have; otherwise the call \
+             is refused with `auth.role_beyond_you` (its `errors` name a role you tried to give).",
             move |tenant: TenantContext, principal: Principal, input: SetMembershipsInput| {
                 let state = set.clone();
                 async move {

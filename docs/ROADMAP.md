@@ -710,11 +710,12 @@ thật (P7).
         — chặn (PT-9, D-20261126-no-self-grant): gán role và sửa role theo "chỉ cấp cái mình có", kể cả cho chính mình
   - [x] Luật cấp quyền (i): `require_covers` (xoá / khoá / đổi email / nhận về tài khoản) so cả phạm vi như
         `require_grantable` (D-20261128-ban-lift-scope)
-  - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi):
+  - [x] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi):
         (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403; (iv) hạ quyền người khác bằng cách
         thu hẹp permission của role họ giữ không qua luật "gỡ được" như gỡ role (sửa role chỉ chặn thêm / nới / bỏ cấm)
         — (iv) xong: sửa role mà bỏ, thu hẹp hay cấm thêm permission phải có permission đó đủ rộng
-        (D-20261128-role-narrow-rule); còn (iii)
+        (D-20261128-role-narrow-rule); (iii) xong: cấp vượt quyền ở cả bốn đường (membership, lời mời, luật nhóm SCIM,
+        role mặc định OIDC) trả 403 `auth.role_beyond_you` như gỡ (D-20261128-grant-refusal-forbidden)
   - [x] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
         luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked). Xong: `Principal::bounded_by`
         (D-20261128-bound-keeps-scope)
@@ -727,17 +728,19 @@ thật (P7).
         bằng đọc code, D-20261128-ban-lift-scope) — cần kernel cho biết lý do cấm (`outside_guardrail`) hay đưa rào vào
         `grantable`. Xong: `Principal::outside_guardrail` của kernel, `lifts_ban` coi
         permission ngoài rào là bỏ cấm không mở thêm gì (D-20261128-ban-lift-guardrail)
-  - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
+  - [x] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho
-        thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau
+        thành viên mà người đưa vào cấp được role, còn lại chờ duyệt — cần migration, để sau. Xong: `added_by`,
+        `waiting_user_ids`, `POST …/scim/groups/{id}/members/{user_id}/approve` (D-20261128-scim-owners)
   - [x] Hạn mức số nhân sự: hai lần đổi role thật cho cùng một người chạy đồng thời có thể làm lệch chỗ (dùng chung
         mã giữ chỗ `auth.member:<id>`; có từ trước) — khoá dòng người dùng quanh giữ chỗ → đổi → xác nhận, hay job
         đối soát số nhân sự với `auth_user_role` (D-20261125-scim-sync-report) — đối chiếu với role thật tới khi ổn
         định, test đồng thời hai database (D-20261128-member-slot-settle)
-  - [ ] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
+  - [x] SCIM: khi đồng bộ đưa một tài khoản lên role cao hơn người đã tạo liên kết SCIM của nó (token quyền thấp tạo
         tài khoản, token của admin cấp role cao), thu hồi mọi cách vào cũ như khi đổi email — cần ghi người tạo liên kết
-        ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7)
+        ở `auth_scim_users` (migration) (D-20261125-scim-sync-report mục 7). Xong: `created_by`, thu hồi trước lần cấp
+        (D-20261128-scim-owners)
   - [x] `automations`: luật chạy bằng quyền hiện tại của `run_as` — luật tạm dừng khi tài khoản bị cắt cửa vào
         (event `auth.access_revoked`) và không có hơn quyền lúc tạo (D-20261126-automation-owner-revoked)
 

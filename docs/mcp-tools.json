@@ -935,7 +935,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Invite someone by email to work at an organization unit with given roles; the mail goes out shortly and the link can be used once.",
+      "description": "Invite someone by email to work at an organization unit with given roles; the mail goes out shortly and the link can be used once. You can only invite with roles whose permissions you have as widely (`auth.role_beyond_you`).",
       "input_schema": {
         "additionalProperties": false,
         "description": "A new invitation.",
@@ -996,7 +996,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Add a sign-in provider to this tenant; register the application at the provider first. The client secret is stored encrypted and never shown again.",
+      "description": "Add a sign-in provider to this tenant; register the application at the provider first. The client secret is stored encrypted and never shown again. A default role must be one you could give yourself (`auth.role_beyond_you`).",
       "input_schema": {
         "additionalProperties": false,
         "description": "A new sign-in provider. `realm` is `staff` (default) or `customer`.",
@@ -2033,7 +2033,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Replace every organization unit a user works in and the roles there. You can only give or take away roles whose permissions you have, in units you work in, and only take away a role whose banned permissions you all have (`auth.role_beyond_you`).",
+      "description": "Replace every organization unit a user works in and the roles there. You can only give or take away roles whose permissions you have as widely, in units you work in, and only take away a role whose banned permissions you all have; otherwise the call is refused with `auth.role_beyond_you` (its `errors` name a role you tried to give).",
       "input_schema": {
         "additionalProperties": false,
         "description": "The units a user should work in, with the roles there.",
@@ -2133,7 +2133,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Change a sign-in provider of this tenant (name, issuer, client, redirect pages, allowed email domains, sign-up, default role, enabled).",
+      "description": "Change a sign-in provider of this tenant (name, issuer, client, redirect pages, allowed email domains, sign-up, default role, enabled). Its default role must be one you could give yourself (`auth.role_beyond_you`).",
       "input_schema": {
         "additionalProperties": false,
         "description": "Changes to a sign-in provider; fields left out stay as they are, `null` clears.",

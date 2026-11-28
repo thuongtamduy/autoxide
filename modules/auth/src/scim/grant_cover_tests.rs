@@ -394,9 +394,9 @@ async fn token_cua_nguoi_tao_bi_khoa_hay_bi_xoa() {
 #[tokio::test]
 async fn them_thanh_vien_dong_thoi_voi_dat_luat_khong_de_lai_thanh_vien_cho() {
     // Khoá dòng nhóm ở cả hai phía: lần thêm thành viên và lần đặt luật nối đuôi nhau. Sau cả hai,
-    // người được token quyền thấp đưa vào hoặc không ở trong nhóm, hoặc đã nhận role qua luật của
-    // admin và có tên trong `granted_user_ids` — không có thành viên "chờ" (ở nhóm có luật mà không
-    // có role) để lần đồng bộ sau biến thành admin.
+    // người được token quyền thấp đưa vào hoặc không ở trong nhóm (luật đặt trước, lần thêm bị 403),
+    // hoặc ở trong nhóm và chờ duyệt (`waiting_user_ids`, D-20261128-scim-owners) — không bao giờ
+    // thành admin, kể cả ở lần đồng bộ sau của token admin.
     TestDatabase::run(async |test| {
         let (app, services, admin, admin_token) = setup(test).await;
         let (_, low_token) = sync_operator(&app, &services, "it@example.com").await;
@@ -421,9 +421,19 @@ async fn them_thanh_vien_dong_thoi_voi_dat_luat_khong_de_lai_thanh_vien_cho() {
             if !in_group {
                 assert_forbidden(patched.0, &patched.1);
             }
-            assert_eq!(is_admin(&services, &stranger).await, in_group, "vòng {round}");
+            assert!(!is_admin(&services, &stranger).await, "vòng {round}");
             let granted = mapped.2["data"]["granted_user_ids"].as_array().unwrap();
-            assert_eq!(granted.contains(&json!(stranger)), in_group, "vòng {round}: {}", mapped.2);
+            assert!(!granted.contains(&json!(stranger)), "vòng {round}: {}", mapped.2);
+            let waiting = mapped.2["data"]["waiting_user_ids"].as_array().unwrap();
+            assert_eq!(waiting.contains(&json!(stranger)), in_group, "vòng {round}: {}", mapped.2);
+            if in_group {
+                // Token admin gửi lại thành viên nhóm: người chờ vẫn chờ (chỉ duyệt mới cấp).
+                let again = patch(
+                    json!([{"op": "add", "path": "members", "value": [{"value": stranger}]}]),
+                );
+                scim(&app, "PATCH", &path, &admin_token, Some(again)).await;
+                assert!(!is_admin(&services, &stranger).await, "vòng {round}: sau lần gửi lại");
+            }
         }
     })
     .await
@@ -434,8 +444,9 @@ async fn them_thanh_vien_dong_thoi_voi_dat_luat_khong_de_lai_thanh_vien_cho() {
 async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
     // Ép đúng thứ tự xen kẽ: một transaction đóng vai `update_group` của token quyền thấp (khoá dòng
     // nhóm, thấy nhóm chưa có luật, ghi thành viên X) và CHƯA commit; trong lúc đó admin đặt luật
-    // "nhóm → admin". Đặt luật phải chờ khoá nhóm, rồi thấy X và cấp cho X (có tên trong
-    // `granted_user_ids`). Không chờ thì luật commit trước, không thấy X, X thành thành viên chờ.
+    // "nhóm → admin". Đặt luật phải chờ khoá nhóm, rồi thấy X. Người đưa X vào (token quyền thấp)
+    // không cấp được `admin`, nên X chờ duyệt (`waiting_user_ids`, D-20261128-scim-owners), không
+    // thành admin.
     use sea_orm::{ActiveModelTrait as _, EntityTrait as _, Set};
     TestDatabase::run(async |test| {
         let (app, services, admin, admin_token) = setup(test).await;
@@ -446,6 +457,7 @@ async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
         let group_id = uuid::Uuid::parse_str(group["id"].as_str().unwrap()).unwrap();
         let stranger = scim_user(&app, &low_token, "stranger@example.com").await;
         let stranger_id = uuid::Uuid::parse_str(&stranger).unwrap();
+        let low = services.users.find_by_email(tenant, "it@example.com").await.unwrap().unwrap().id;
 
         // Đọc mọi thứ cần trước khi giữ transaction ghi (SQLite một kết nối ghi).
         let admin_role = admin_role(&app, &admin).await;
@@ -464,6 +476,7 @@ async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
             id: Set(uuid::Uuid::now_v7()),
             group_id: Set(group_id),
             user_id: Set(stranger_id),
+            added_by: Set(Some(low)),
             created_at: Set(autoxide_kernel::time::Timestamp::now()),
         }
         .insert(&transaction)
@@ -489,8 +502,9 @@ async fn dat_luat_cho_khoa_nhom_cua_lan_ghi_thanh_vien() {
         );
         let (status, _, mapped) = mapped;
         assert_eq!(status, StatusCode::CREATED, "{mapped}");
-        assert_eq!(mapped["data"]["granted_user_ids"], json!([stranger]), "{mapped}");
-        assert!(is_admin(&services, &stranger).await);
+        assert_eq!(mapped["data"]["granted_user_ids"], json!([]), "{mapped}");
+        assert_eq!(mapped["data"]["waiting_user_ids"], json!([stranger]), "{mapped}");
+        assert!(!is_admin(&services, &stranger).await);
     })
     .await
     .unwrap();

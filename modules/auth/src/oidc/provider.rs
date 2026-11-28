@@ -326,9 +326,7 @@ impl ProviderService {
             ));
         }
         problems.extend(self.check_defaults(tenant, principal, &row).await?);
-        if !problems.is_empty() {
-            return Err(Error::validation(problems));
-        }
+        crate::role::refuse_grants(problems)?;
         row.client_secret = self.seal(tenant, id, secret.trim()).await?;
         let transaction = tenant.database().begin_write().await?;
         let row =
@@ -412,9 +410,7 @@ impl ProviderService {
             }
             row.client_secret = self.seal(tenant, id, secret.trim()).await?;
         }
-        if !problems.is_empty() {
-            return Err(Error::validation(problems));
-        }
+        crate::role::refuse_grants(problems)?;
         row.updated_at = now();
         let transaction = tenant.database().begin_write().await?;
         // Chỉ các cột đổi được; khoá chính, `slug`, `kind`, `realm`, `created_at` giữ nguyên.
@@ -509,25 +505,22 @@ impl ProviderService {
         // chỉ đường. Tên ô (`default_role_ids`) giữ nguyên — đã có trong bản phát hành.
         let mut checked = Vec::with_capacity(problems.len());
         for problem in problems {
-            if problem.code != "more_than_you_have" {
+            if problem.code != crate::role::MORE_THAN_YOU_HAVE {
                 checked.push(problem);
                 continue;
             }
-            // Tên role đã có trong tham số của lỗi gốc (`grant_problems`), không đọc lại.
-            let name = problem
-                .params()
-                .find(|(key, _)| *key == "role")
-                .map_or_else(|| role.to_string(), |(_, value)| value.to_owned());
-            checked.push(
-                FieldError::new(
-                    problem.field,
-                    "more_than_you_have",
-                    "role `{role}` has permissions you do not have, or has them more widely than \
-                     you do; ask someone who can give this role to save the provider, or remove \
-                     the default role",
-                )
-                .with_param("role", name),
+            // Giữ mọi tham số của lỗi gốc (`role`, `role_id`, `org_id` — `refuse_grants` đọc hai cái sau).
+            let mut field = FieldError::new(
+                problem.field.clone(),
+                crate::role::MORE_THAN_YOU_HAVE,
+                "role `{role}` has permissions you do not have, or has them more widely than you \
+                 do; ask someone who can give this role to save the provider, or remove the \
+                 default role",
             );
+            for (key, value) in problem.params() {
+                field = field.with_param(key.to_owned(), value);
+            }
+            checked.push(field);
         }
         Ok(checked)
     }

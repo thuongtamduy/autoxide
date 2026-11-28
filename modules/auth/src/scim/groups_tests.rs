@@ -169,7 +169,8 @@ async fn luat_anh_xa_khong_dung_de_tu_nang_quyen() {
         let root = services.tenant.id().as_uuid();
         let body = json!({"group_id": group["id"], "org_id": root, "role_id": admin_role});
         let (status, _, refused) = call(&app, "POST", "/scim/group-mappings", Some(&ada_token), Some(body)).await;
-        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
+        assert_eq!(refused["code"], "auth.role_beyond_you", "{refused}");
         assert_eq!(refused["errors"][0]["code"], "more_than_you_have", "{refused}");
         // Nhóm không có thì 404.
         let body = json!({"group_id": uuid::Uuid::now_v7(), "org_id": root, "role_id": admin_role});

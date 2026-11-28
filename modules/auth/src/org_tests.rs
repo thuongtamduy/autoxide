@@ -243,6 +243,8 @@ async fn gan_membership_bi_chan_khi_vuot_quyen() {
             .set_memberships(tenant, &manager, ann, vec![(tree.b.as_uuid(), vec![reader.id])])
             .await
             .unwrap_err();
+        // Vượt quyền là 403 `auth.role_beyond_you` như khi gỡ (P16 (iii)); ô lỗi vẫn trong `errors`.
+        assert_eq!(error.code(), "auth.role_beyond_you", "{error:?}");
         assert_eq!(codes(&error), ["more_than_you_have".to_owned()].into_iter().collect());
         assert!(services.roles.memberships(tenant, ann).await.unwrap().is_empty(), "không đổi gì");
     })

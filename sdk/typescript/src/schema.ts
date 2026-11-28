@@ -447,6 +447,20 @@ export type ApproveSupportMacroRequest = {
   review_due_on?: string | null;
 };
 
+/** A group member just approved. */
+export type ApprovedScimMemberResponse = {
+  /** You: the group's rules now judge this member by your rights. */
+  approved_by: string;
+  failure?: ScimSyncFailure | null;
+  group_id: string;
+  /**
+   * `true` when the member's roles were brought in line with the group's rules; `false` when that
+   * failed (see `failure`). The approval stays; the next sync that succeeds gives the roles.
+   */
+  synced: boolean;
+  user_id: string;
+};
+
 /** Who answers a conversation. */
 export type AssignConversationRequest = {
   /** The colleague to assign; `null` to leave it to the whole team. */
@@ -5589,10 +5603,16 @@ export type CreatedScimGroupMappingResponse = ScimGroupMappingResponse & {
   /**
    * Members of the group whose roles were brought in line with the rule: they hold the role at
    * the unit now — through this rule, or because they already had it (by hand, or from another
-   * group). Members of a group without rules may have been added by anyone holding a SCIM token:
-   * check this list.
+   * group).
    */
   granted_user_ids: string[];
+  /**
+   * Members waiting for approval: the SCIM token that added them to the group (its creator, as of
+   * now) could not give this role, so the rule does not give it to them — e.g. members added by a
+   * low-rights token before the group had rules. Approve each one you vouch for with
+   * `POST /api/v1/auth/scim/groups/{group_id}/members/{user_id}/approve`.
+   */
+  waiting_user_ids: string[];
 };
 
 /** A SCIM token just created: the only time its secret is shown. */
@@ -6087,6 +6107,23 @@ export type Data_ApprovalRequest = {
     summary: string;
     /** Where to look at it and decide. */
     url: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ApprovedScimMemberResponse = {
+  /** A group member just approved. */
+  data: {
+    /** You: the group's rules now judge this member by your rights. */
+    approved_by: string;
+    failure?: ScimSyncFailure | null;
+    group_id: string;
+    /**
+     * `true` when the member's roles were brought in line with the group's rules; `false` when that
+     * failed (see `failure`). The approval stays; the next sync that succeeds gives the roles.
+     */
+    synced: boolean;
+    user_id: string;
   };
 };
 
@@ -8433,10 +8470,16 @@ export type Data_CreatedScimGroupMappingResponse = {
     /**
      * Members of the group whose roles were brought in line with the rule: they hold the role at
      * the unit now — through this rule, or because they already had it (by hand, or from another
-     * group). Members of a group without rules may have been added by anyone holding a SCIM token:
-     * check this list.
+     * group).
      */
     granted_user_ids: string[];
+    /**
+     * Members waiting for approval: the SCIM token that added them to the group (its creator, as of
+     * now) could not give this role, so the rule does not give it to them — e.g. members added by a
+     * low-rights token before the group had rules. Approve each one you vouch for with
+     * `POST /api/v1/auth/scim/groups/{group_id}/members/{user_id}/approve`.
+     */
+    waiting_user_ids: string[];
   };
 };
 
@@ -36053,6 +36096,19 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/groups/{id}/members/{user_id}/approve": {
+    /** Approve a member of a SCIM group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
+      responses: {
+        200: Data_ApprovedScimMemberResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

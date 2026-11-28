@@ -215,9 +215,7 @@ impl Invitations {
                 crate::role::grant_problems(read, tenant, actor, "", org_id, &roles).await?,
             );
         }
-        if !problems.is_empty() {
-            return Err(Error::validation(problems));
-        }
+        crate::role::refuse_grants(problems)?;
         let now = now();
         let row = entity::ActiveModel {
             tenant_id: Set(tenant.id().as_uuid()),
@@ -943,6 +941,7 @@ mod tests {
                 .create(tenant, Some(&inviter), invite("c@example.com", powerful), Language::En)
                 .await
                 .unwrap_err();
+            assert_eq!(refused.code(), "auth.role_beyond_you");
             assert_eq!(refused.fields()[0].code, "more_than_you_have");
 
             // Email đã có tài khoản: phải đăng nhập đúng tài khoản đó.
@@ -1036,6 +1035,7 @@ mod tests {
                     .create(tenant, Some(&actor), at_branch(email, everywhere), Language::En)
                     .await
                     .unwrap_err();
+                assert_eq!(refused.code(), "auth.role_beyond_you", "{email}");
                 assert_eq!(refused.fields()[0].code, "more_than_you_have", "{email}");
             }
             invitations

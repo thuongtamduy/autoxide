@@ -170,8 +170,8 @@ async fn list_invitations(
     responses(
         (status = 201, description = "The invitation; its mail is on its way.", body = Data<InvitationResponse>, headers(("Location" = String, description = "Address of the invitation."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission (`permission_denied`), or the unit is outside your scope (`org_out_of_scope`).", body = Problem),
-        (status = 422, description = "The email is invalid, a role does not exist, or a role has permissions you lack; see `errors`.", body = Problem),
+        (status = 403, description = "Missing permission (`permission_denied`), the unit is outside your scope (`org_out_of_scope`), or a role you would give has permissions you do not have as widely as it would cover (code `auth.role_beyond_you`; `errors` names the role).", body = Problem),
+        (status = 422, description = "The email is invalid or a role does not exist; see `errors`.", body = Problem),
     )
 )]
 async fn create_invitation(
