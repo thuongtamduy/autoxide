@@ -20,7 +20,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, Site, TenantContext, TenantId, root_of};
 use sea_orm::sea_query::{Expr, ExprTrait};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 use crate::entity::product;
@@ -29,23 +29,28 @@ use crate::service::CatalogService;
 /// Job hằng ngày kiểm lại người bán của mọi sàn (mọi database).
 pub(crate) const SELLER_KYC_SWEEP: &str = "catalog.seller_kyc_sweep";
 
-/// (sản phẩm, nút bán) của hàng `active` thuộc nút khác gốc của khách, đọc qua `connection` người gọi đưa (đã lọc
-/// theo khách).
-pub(crate) async fn on_sale<C: ConnectionTrait>(
+/// Số sản phẩm đọc mỗi lượt: một sàn lớn không bị nạp hết vào bộ nhớ. Test dùng trang nhỏ để đi qua nhiều trang.
+const PAGE: u64 = if cfg!(test) { 2 } else { 500 };
+
+/// Một trang (sản phẩm, nút bán) của hàng `active` thuộc nút khác gốc của khách, theo ID tăng dần sau `after`, đọc
+/// qua `connection` người gọi đưa (đã lọc theo khách).
+async fn on_sale_page<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
+    after: Option<Uuid>,
 ) -> Result<Vec<(Uuid, Uuid)>, Error> {
     let root = root_of(tenant.id()).as_uuid();
-    Ok(product::Entity::find()
+    let mut select = product::Entity::find()
         .select_only()
         .column(product::Column::Id)
         .column(product::Column::OrgId)
         .filter(product::Column::Status.eq("active"))
         .filter(product::Column::OrgId.ne(root))
-        .scoped(tenant)
-        .into_tuple()
-        .all(connection)
-        .await?)
+        .scoped(tenant);
+    if let Some(after) = after {
+        select = select.filter(product::Column::Id.gt(after));
+    }
+    Ok(select.order_by_asc(product::Column::Id).limit(PAGE).into_tuple().all(connection).await?)
 }
 
 /// Mã lỗi nghĩa là "người bán này không được bán" (khác lỗi tạm thời như database). `site_not_found`: nút không
@@ -58,57 +63,80 @@ fn refused(error: &Error) -> bool {
 }
 
 impl CatalogService {
-    /// Kiểm lại người bán của hàng đang bán `on_sale` ((sản phẩm, nút bán) — trong nhánh `within`, hay cả khách khi
-    /// `None`) và dừng hàng của người bán không còn qua được cổng định danh. Khách không phải sàn: không làm gì. Trả
-    /// số sản phẩm đã dừng.
-    pub(crate) async fn pause_unverified_sellers(
+    /// Kiểm lại người bán có hàng `active` (trong nhánh `within`, hay cả khách khi `None`) và dừng hàng của người bán
+    /// không còn qua được cổng định danh. Khách không phải sàn: không đọc gì. Đọc theo trang qua `connection` (đã lọc
+    /// theo khách); mỗi người bán chỉ hỏi cổng một lần. Trả số sản phẩm đã dừng.
+    pub(crate) async fn pause_unverified_sellers<C: ConnectionTrait>(
         &self,
+        connection: &C,
         tenant: &TenantContext,
         within: Option<OrgId>,
-        on_sale: Vec<(Uuid, Uuid)>,
     ) -> Result<u64, Error> {
-        if on_sale.is_empty() || !self.is_marketplace(tenant).await? {
+        if !self.is_marketplace(tenant).await? {
             return Ok(0);
         }
-        let mut by_seller: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::new();
-        for (id, org) in on_sale {
-            by_seller.entry(org).or_default().push(id);
-        }
-        let mut paused = 0;
-        for (seller, products) in by_seller {
-            let org = OrgId::from_uuid(seller);
-            if let Some(node) = within {
-                // Chỉ người bán trong nhánh của nút vừa đổi định danh.
-                let inside = match Site::of(tenant, org).await {
-                    Ok(site) => site.lineage().contains(&node),
-                    Err(error) if refused(&error) => true,
-                    Err(error) => return Err(error),
+        // Người bán đã xét: `Some(lý do)` khi phải dừng, `None` khi được bán hay ngoài nhánh.
+        let mut decided: BTreeMap<Uuid, Option<&'static str>> = BTreeMap::new();
+        let (mut after, mut paused) = (None, 0);
+        loop {
+            let page = on_sale_page(connection, tenant, after).await?;
+            let Some(&(last, _)) = page.last() else { break };
+            after = Some(last);
+            for (id, seller) in page {
+                let verdict = match decided.get(&seller) {
+                    Some(verdict) => *verdict,
+                    None => {
+                        let verdict = self.seller_verdict(tenant, seller, within).await?;
+                        decided.insert(seller, verdict);
+                        verdict
+                    }
                 };
-                if !inside {
-                    continue;
+                let Some(reason) = verdict else { continue };
+                if self.pause_as_system(tenant, id).await? {
+                    paused += 1;
+                    tracing::warn!(
+                        org_id = %seller,
+                        product_id = %id,
+                        reason,
+                        "catalog paused goods of a marketplace seller without a valid identity verification"
+                    );
                 }
-            }
-            match self.check_seller_identity(tenant, org).await {
-                Ok(()) => {}
-                Err(error) if refused(&error) => {
-                    let mut count = 0;
-                    for id in products {
-                        count += u64::from(self.pause_as_system(tenant, id).await?);
-                    }
-                    if count > 0 {
-                        tracing::warn!(
-                            org_id = %seller,
-                            paused = count,
-                            reason = error.code(),
-                            "catalog paused the goods of a marketplace seller without a valid identity verification"
-                        );
-                    }
-                    paused += count;
-                }
-                Err(error) => return Err(error),
             }
         }
         Ok(paused)
+    }
+
+    /// Hàng của người bán `seller` phải dừng không: `Some(mã lý do)` khi người bán (trong nhánh `within`) không qua
+    /// được cổng định danh; lỗi tạm thời trả ra để thử lại.
+    async fn seller_verdict(
+        &self,
+        tenant: &TenantContext,
+        seller: Uuid,
+        within: Option<OrgId>,
+    ) -> Result<Option<&'static str>, Error> {
+        let org = OrgId::from_uuid(seller);
+        if let Some(node) = within {
+            // Chỉ người bán trong nhánh của nút vừa đổi định danh.
+            let inside = match Site::of(tenant, org).await {
+                Ok(site) => site.lineage().contains(&node),
+                Err(error) if refused(&error) => true,
+                Err(error) => return Err(error),
+            };
+            if !inside {
+                return Ok(None);
+            }
+        }
+        match self.check_seller_identity(tenant, org).await {
+            Ok(()) => Ok(None),
+            Err(error) if error.code() == "compliance.kyc_required" => {
+                Ok(Some("compliance.kyc_required"))
+            }
+            Err(error) if error.code() == "catalog.seller_verification_unavailable" => {
+                Ok(Some("catalog.seller_verification_unavailable"))
+            }
+            Err(error) if error.code() == "site_not_found" => Ok(Some("site_not_found")),
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -118,28 +146,24 @@ pub(crate) struct SellerKycSweep(pub std::sync::Arc<CatalogService>);
 #[async_trait::async_trait]
 impl JobHandler for SellerKycSweep {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        // tenant-scope: việc nền quét mọi khách của database để tìm sàn có hàng của người bán; mỗi khách sau đó
-        // ghi qua `TenantContext` của chính nó
-        let rows: Vec<(Uuid, Uuid, Uuid)> = product::Entity::find()
+        // tenant-scope: việc nền tìm khách có hàng đang bán của nút khác gốc (chỉ ID khách, không nạp sản phẩm); mỗi
+        // khách sau đó đọc theo trang, lọc theo chính khách đó
+        let tenants: Vec<Uuid> = product::Entity::find()
             .select_only()
             .column(product::Column::TenantId)
-            .column(product::Column::Id)
-            .column(product::Column::OrgId)
+            .distinct()
             .filter(product::Column::Status.eq("active"))
             .filter(Expr::col(product::Column::OrgId).not_equals(product::Column::TenantId))
             .into_tuple()
             .all(job.database.read())
             .await?;
-        let mut tenants: BTreeMap<Uuid, Vec<(Uuid, Uuid)>> = BTreeMap::new();
-        for (tenant, id, org) in rows {
-            tenants.entry(tenant).or_default().push((id, org));
-        }
         // Lỗi của một khách không chặn việc kiểm các khách khác; job vẫn báo lỗi để chạy lại.
         let mut failed = None;
-        for (tenant, on_sale) in tenants {
+        for tenant in tenants {
             let result = async {
                 let context = self.0.databases.tenant(TenantId::from_uuid(tenant)).await?;
-                self.0.pause_unverified_sellers(&context, None, on_sale).await
+                // Khách không phải sàn: `pause_unverified_sellers` thôi ngay, không đọc sản phẩm.
+                self.0.pause_unverified_sellers(job.database.read(), &context, None).await
             }
             .await;
             if let Err(error) = result {

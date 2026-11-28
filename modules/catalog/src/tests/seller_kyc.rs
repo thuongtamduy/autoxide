@@ -178,9 +178,12 @@ async fn san_dung_hang_cua_nguoi_ban_khong_con_dinh_danh() {
             let (app, tree) = app_with(test, |builder| builder.provide(gate)).await;
             business_model(&app, model).await;
             let (seller, _) = create_product(&app, "boss", tree.a, "K-1", "Hàng người bán").await;
+            // Thêm hàng của người bán để việc đọc đi qua nhiều trang (trang 2 sản phẩm khi test).
+            let (second, _) = create_product(&app, "boss", tree.a, "K-3", "Hàng người bán 2").await;
+            let (other, _) = create_product(&app, "boss", tree.b, "K-4", "Hàng người bán khác").await;
             let root = autoxide_kernel::tenancy::root_of(DEFAULT_TENANT);
             let (own, _) = create_product(&app, "boss", root, "K-2", "Hàng của sàn").await;
-            for id in [&seller, &own] {
+            for id in [&seller, &second, &other, &own] {
                 let (status, sold) = publish(&app, id).await;
                 assert_eq!(status, StatusCode::OK, "{sold}");
             }
@@ -188,7 +191,9 @@ async fn san_dung_hang_cua_nguoi_ban_khong_con_dinh_danh() {
             let worker = app.modules().worker(16).unwrap().blocked_delay(std::time::Duration::ZERO);
             worker.run_once().await.unwrap();
             let expected = if model == "marketplace" { "inactive" } else { "active" };
-            assert_eq!(status_of(&app, &seller).await, expected, "{model}");
+            for id in [&seller, &second, &other] {
+                assert_eq!(status_of(&app, id).await, expected, "{model}");
+            }
             assert_eq!(status_of(&app, &own).await, "active", "{model}");
             let changes = || async {
                 use sea_orm::ConnectionTrait as _;
@@ -198,9 +203,9 @@ async fn san_dung_hang_cua_nguoi_ban_khong_con_dinh_danh() {
                 let statement = sea_orm::Statement::from_string(read.get_database_backend(), sql);
                 read.query_all_raw(statement).await.unwrap().len()
             };
-            // Mở bán hai lần, cộng một lần dừng trên sàn.
+            // Mở bán bốn lần, cộng ba lần dừng trên sàn.
             let before = changes().await;
-            assert_eq!(before, if model == "marketplace" { 3 } else { 2 }, "{model}");
+            assert_eq!(before, if model == "marketplace" { 7 } else { 4 }, "{model}");
             // Lượt quét sau (như event đến lại): không còn gì để đổi.
             worker.run_once().await.unwrap();
             assert_eq!(changes().await, before, "{model}");

@@ -166,14 +166,16 @@ impl EventHandler for CatalogService {
                 return Ok(());
             };
             let node = Some(autoxide_kernel::tenancy::OrgId::from_uuid(org));
-            let on_sale = crate::seller_pause::on_sale(database.read(), &event.tenant).await?;
-            return self.pause_unverified_sellers(&event.tenant, node, on_sale).await.map(|_| ());
+            // Khách không phải sàn: thôi ngay, không đọc sản phẩm.
+            return self
+                .pause_unverified_sellers(database.read(), &event.tenant, node)
+                .await
+                .map(|_| ());
         }
         if event.name == UNIT_MOVED || event.name == UNIT_STATUS_CHANGED {
             if event.name == UNIT_MOVED {
                 // Cửa hàng con chuyển sang dưới người bán chưa định danh: hàng của nó không còn được bán (LG-3b).
-                let on_sale = crate::seller_pause::on_sale(database.read(), &event.tenant).await?;
-                self.pause_unverified_sellers(&event.tenant, None, on_sale).await?;
+                self.pause_unverified_sellers(database.read(), &event.tenant, None).await?;
             }
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
             return self.queue_all(database.write(), &event.tenant).await;
