@@ -125,11 +125,18 @@ impl JobContext {
     /// Handles of `db` that read and write the module's tenant records of **every** tenant on the job's
     /// database, without the tenant filter — for a job of the whole database (cleanup schedules) sweeping
     /// expired rows. `reason` says why, in a few words; each use is counted in the metric
-    /// `kernel_all_tenant_queries{module}` like `ControlPlane::all_tenants`. A tenant job uses `tenant.db()`.
-    pub fn all_tenants(&self, reason: &'static str) -> crate::db::AllTenants<'_> {
+    /// `kernel_all_tenant_queries{module}` like `ControlPlane::all_tenants`. A job of one tenant gets an internal
+    /// error: it uses `tenant.db()`, so it never sees another tenant's rows on a shared database.
+    pub fn all_tenants(&self, reason: &'static str) -> Result<crate::db::AllTenants<'_>, Error> {
+        if self.tenant.is_some() {
+            return Err(Error::internal(format!(
+                "job `{}` belongs to one tenant: query through `tenant.db()`, not across every tenant",
+                self.kind
+            )));
+        }
         // Loại job là `<module>.<việc>`: phần đầu là module (tập nhỏ cố định, dùng làm nhãn số đo được).
         let module = self.kind.split('.').next().unwrap_or_default();
-        crate::db::AllTenants::counted(&self.database, module, reason)
+        Ok(crate::db::AllTenants::counted(&self.database, module, reason))
     }
 }
 

@@ -322,8 +322,10 @@ impl CommentsService {
     }
 }
 
-/// Câu `UPDATE` ghi mọi cột của bình luận `row` trừ khoá (cột không đổi được ghi lại đúng giá trị cũ), lọc theo
-/// `id`; bên gọi thêm điều kiện nếu cần.
+/// Câu `UPDATE` ghi các cột của bình luận `row` (cột không đổi được ghi lại đúng giá trị cũ), lọc theo `id`; bên gọi
+/// thêm điều kiện nếu cần. KHÔNG ghi khoá, `created_at` và hai cột đếm (`reply_count`, `report_count`): chúng chỉ đổi
+/// bằng `n = n + k` trong câu lệnh (`shift_counts`, báo cáo) mà không đổi `updated_at`, nên ghi lại giá trị đã đọc sẽ
+/// xoá mất phần một request khác vừa cộng.
 fn write_comment<'t>(
     transaction: &'t TenantTx,
     row: &comment::Model,
@@ -355,11 +357,8 @@ fn write_comment<'t>(
         .set(M::SEARCH_KEY, row.search_key.clone())
         .set(M::MATCH_KEY, row.match_key.clone())
         .set(M::BADGES, row.badges.clone())
-        .set(M::REPLY_COUNT, row.reply_count.clone())
-        .set(M::REPORT_COUNT, row.report_count.clone())
         .set(M::REPORTS_HELD_AT, row.reports_held_at.clone())
         .set(M::RESTRICTED_STATUS, row.restricted_status.clone())
-        .set(M::CREATED_AT, row.created_at.clone())
         .set(M::UPDATED_AT, row.updated_at.clone())
         .filter(M::ID.eq(row.id))
 }

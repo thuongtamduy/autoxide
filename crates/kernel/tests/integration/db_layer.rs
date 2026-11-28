@@ -873,3 +873,21 @@ fn tier_query(cursor: String) -> autoxide_kernel::pagination::NaturalOrderPageQu
         Some("asc".into()),
     )
 }
+
+// `JobContext::all_tenants`: chỉ job của cả database được handle mọi khách; job của một khách bị từ chối.
+#[tokio::test]
+async fn job_cua_mot_khach_khong_lay_duoc_handle_moi_khach() {
+    use autoxide_kernel::job::JobContext;
+    TestDatabase::run(async |test| {
+        let database = open(test).await;
+        let a = tenant(&database, 0xA);
+        let sweep = JobContext::for_database(database.clone(), "kernel.sweep", serde_json::json!({}), 1);
+        let all = sweep.all_tenants("test sweep").unwrap();
+        assert_eq!(all.read().find::<Line>().count().await.unwrap(), 0);
+        let own = JobContext::for_tenant(a, "kernel.own", serde_json::json!({}), 1);
+        let error = own.all_tenants("test sweep").map(|_| ()).unwrap_err();
+        assert_eq!(error.kind(), autoxide_kernel::error::ErrorKind::Internal);
+    })
+    .await
+    .unwrap();
+}

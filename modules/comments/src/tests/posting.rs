@@ -977,3 +977,32 @@ async fn markdown_luu_dinh_dang_dem_link_va_tat_duoc() {
     .await
     .unwrap();
 }
+
+/// Ghi bình luận từ bản đã đọc trước (sửa, xoá mềm) không xoá mất số trả lời một request khác vừa cộng: cột đếm chỉ
+/// đổi bằng `n = n + 1` và không đổi `updated_at`, nên lệnh ghi cả dòng không được chép giá trị đếm cũ đè lên.
+#[tokio::test]
+async fn ghi_ban_cu_khong_xoa_so_tra_loi_vua_cong() {
+    TestDatabase::run(async |test| {
+        let h = service(test, open_config()).await;
+        let client = visitor("203.0.113.9");
+        let root = as_guest(&h.service, &client, guest("Ada", "Câu hỏi")).await.unwrap().comment.row;
+        let stale = h.service.find(&h.tenant, root.id).await.unwrap();
+        assert_eq!(stale.reply_count, 0);
+        // Trong lúc đó có một trả lời được hiện: `reply_count` của gốc thành 1.
+        let mut reply = guest("Bea", "Trả lời");
+        reply.parent_id = Some(root.id);
+        as_guest(&h.service, &client, reply).await.unwrap();
+        // Ghi bản đã đọc (trước khi có trả lời) với một thay đổi khác.
+        let mut edited = stale.clone();
+        edited.email_verified = true;
+        let transaction = h.tenant.db().begin_write().await.unwrap();
+        let after =
+            crate::posting::authoring::update_if_unchanged(&transaction, edited, &stale).await.unwrap();
+        transaction.commit().await.unwrap();
+        assert!(after.email_verified);
+        assert_eq!(after.reply_count, 1);
+        assert_eq!(h.service.find(&h.tenant, root.id).await.unwrap().reply_count, 1);
+    })
+    .await
+    .unwrap();
+}

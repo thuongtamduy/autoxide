@@ -72,7 +72,7 @@ pub(crate) struct Cleanup {
 #[autoxide_kernel::async_trait]
 impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        let all = job.all_tenants("comments retention sweep");
+        let all = job.all_tenants("comments retention sweep")?;
         self.service.cleanup(&self.databases, &job.database, all, now()).await.map(|_| ())
     }
 }
