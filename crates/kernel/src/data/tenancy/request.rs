@@ -314,7 +314,10 @@ fn bind_origin(extensions: &Extensions, tenant: TenantContext) -> Result<TenantC
 /// The tenant a request that is not signed in names, by the `autoxide-tenant` header / domain / page origin:
 /// **not verified** — anyone can send any header. Good for choosing whose public data a public route shows;
 /// never for a budget, quota or policy that protects the tenant (those take [`SignedInTenant`]).
-async fn unverified_tenant(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantContext, Error> {
+async fn unverified_tenant(
+    registry: &DatabaseRegistry,
+    parts: &Parts,
+) -> Result<TenantContext, Error> {
     let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     match (hint.tenant(), hint.host()) {
         (Some(target), _) => lookup(registry, target).await,

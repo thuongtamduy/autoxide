@@ -235,9 +235,7 @@ impl Connection<'_> {
         super::guard::check(self.1, &statement)?;
         Ok(match self.0 {
             Inner::Read(connection) => ConnectionTrait::execute_raw(connection, statement).await,
-            Inner::Write(transaction) => {
-                ConnectionTrait::execute_raw(transaction, statement).await
-            }
+            Inner::Write(transaction) => ConnectionTrait::execute_raw(transaction, statement).await,
             Inner::Legacy(connection) => connection.raw_execute(statement).await,
         }
         .map_err(super::write::write_error)?

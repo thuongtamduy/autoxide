@@ -211,8 +211,7 @@ impl<A: Access, R: Record> Insert<'_, A, R> {
             return Ok(0);
         }
         let connection = self.tx.connection();
-        let changed =
-            connection.execute(connection.build(&self.statement)).await?;
+        let changed = connection.execute(connection.build(&self.statement)).await?;
         if self.guarded && changed < self.rows {
             // `DO UPDATE … WHERE tenant_id = <khách>` bỏ qua dòng nào thì dòng đó đụng dòng của khách khác: báo
             // lỗi (cả lô rollback cùng transaction), không lặng lẽ bỏ dòng.

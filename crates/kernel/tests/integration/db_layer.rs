@@ -8,7 +8,8 @@ use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::db::{
     Bounds, Cond, Expr, Queries as _, Record, TenantKey, all_tenants_for_tests,
-    is_unique_violation, max, register_control_plane_for_tests, register_tenant_tables_for_tests, sum,
+    is_unique_violation, max, register_control_plane_for_tests, register_tenant_tables_for_tests,
+    sum,
 };
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};

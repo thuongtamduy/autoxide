@@ -533,7 +533,8 @@ async fn cap_phat_khach_moi_voi_module_that() {
 
 // Khách chịu hạn mức của một người gọi đã đăng nhập vào `tenant` (hạn mức chỉ nhận khách của người đã xác thực).
 fn signed_in(tenant: TenantId) -> autoxide_kernel::tenancy::SignedInTenant {
-    let principal = autoxide_kernel::access::Principal::new(uuid::Uuid::nil(), Vec::<String>::new())
-        .in_tenant(tenant);
+    let principal =
+        autoxide_kernel::access::Principal::new(uuid::Uuid::nil(), Vec::<String>::new())
+            .in_tenant(tenant);
     autoxide_kernel::tenancy::SignedInTenant::of(&principal).expect("a member counts")
 }
