@@ -135,7 +135,9 @@ bước 8.**
 5. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này. `cargo xtask publish-check`
    (các crate vẫn đóng gói và build được như trên crates.io, xem "Đăng lên crates.io") không cần chạy tay: job
    "crates.io packaging (publish-check)" của CI chạy nó trên PR phát hành, song song với các job khác
-   (D-20261127-ci-runner-budget); đỏ thì sửa trước khi merge. Rồi
+   (D-20261127-ci-runner-budget; ~1,5 giờ). **Chờ job này xanh rồi mới merge PR phát hành**: auto-release.yml chỉ xem CI
+   của push vào `main`, không xem job này. Đỏ thì sửa trước khi merge. Muốn thử trước trên một nhánh: Actions → CI → Run
+   workflow, bật `publish-check`. Rồi
    chạy test nâng cấp: `cargo xtask upgrade-test` — bản phát hành trước (image Docker của nó; tải
    không được thì build từ tag, lâu) ghi dữ liệu, bản này đọc lại trên cùng database, cả SQLite lẫn
    Postgres (D-246). Cần Docker; đỏ thì không phát hành. Job `upgrade` của CI chạy cùng lệnh.

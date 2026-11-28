@@ -12,6 +12,11 @@ on:
   pull_request:
   # Chạy tay (Actions → Run workflow), vd sau khi đổi cài đặt của repo.
   workflow_dispatch:
+    inputs:
+      publish-check:
+        description: "Also run crates.io packaging (cargo xtask publish-check, ~1.5 h)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,10 +43,14 @@ jobs:
   # - pull request: nhánh gốc của PR (`base.sha`), như trước;
   # - push vào `main`: commit của lần CI xanh gần nhất trên `main` — không phải commit liền trước, để thay đổi của lần
   #   chạy bị huỷ (lần chờ bị thay bởi lần mới hơn) hay đỏ vẫn được tính. Không tìm được (chưa có lần xanh, commit đó không
-  #   còn là tổ tiên) thì chạy hết;
+  #   còn là tổ tiên) thì chạy hết. Chạy lại cả workflow của một commit ĐÃ xanh trên `main` thì mốc là chính HEAD: các job
+  #   theo mẫu bị bỏ qua (kết quả xanh của chúng đã có);
   # - chạy tay: chạy hết.
-  # Commit phát hành luôn đổi `Cargo.toml` và `Cargo.lock` nên mọi phần dưới đây chạy trên đúng commit được phát hành
-  # (auto-release.yml dùng lại CI xanh của commit đó). Gate (gate.yml) không thuộc job này: push `main` luôn chạy đủ.
+  # Push `main` và chạy tay LUÔN chạy test nâng cấp và dựng thử image (D-20261121-ci-batch-release-faster, chủ dự án quyết;
+  # image dựng bản release từ mọi mã Rust), song song với gate nên không làm lâu thêm; mẫu file chỉ áp cho pull request.
+  # Theo mẫu ở cả push `main`: MCP OAuth, luật cảnh báo, MSRV. Commit phát hành luôn đổi `Cargo.toml` và `Cargo.lock` nên MCP
+  # OAuth và MSRV chạy trên đúng commit được phát hành; luật cảnh báo chỉ chạy khi `deploy/prometheus` đổi (kết quả chỉ
+  # phụ thuộc thư mục đó). Gate (gate.yml) không thuộc job này: push `main` luôn chạy đủ.
   plan:
     name: plan
     if: ${{ !github.event.repository.private }}
@@ -71,6 +80,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          PUBLISH_CHECK: ${{ inputs.publish-check }}
         run: |
           base=""
           case "$EVENT" in
@@ -95,11 +105,29 @@ jobs:
             [ -z "$base" ] && { echo true; return; }
             if grep -E -q "$1" <<<"$changed"; then echo true; else echo false; fi
           }
+          # Chỉ pull request lọc theo mẫu; push `main` và chạy tay luôn chạy (D-20261121-ci-batch-release-faster).
+          pr_touches() {
+            if [ "$EVENT" = pull_request ]; then touches "$1"; else echo true; fi
+          }
+          # File Rust (trước hoặc sau thay đổi) khai bảng — `#[derive(Record)]` hay entity SeaORM — dù không nằm trong thư
+          # mục `entity`: đổi nó có thể đổi dạng dữ liệu đã lưu.
+          declares_records() {
+            [ -z "$base" ] && return 0
+            local file
+            while IFS= read -r file; do
+              case "$file" in *.rs) ;; *) continue ;; esac
+              { git show "HEAD:$file" 2>/dev/null; git show "$base:$file" 2>/dev/null; } |
+                grep -E -q 'derive\([^)]*\b(Record|DeriveEntityModel)\b' && return 0
+            done <<<"$changed"
+            return 1
+          }
+          upgrade="$(pr_touches '(^|/)migrations?(/|\.rs$)|(^|/)entity(/|\.rs$)|^crates/kernel/src/data/|^Cargo\.lock$|^xtask/src/upgrade\.rs$|^crates/app/tests/.*upgrade|^\.github/workflows/|(^|/)Dockerfile')"
+          if [ "$upgrade" = false ] && declares_records; then upgrade=true; fi
           {
             # Test nâng cấp (D-20261121-ci-batch-release-faster): thứ có thể đổi dạng dữ liệu đã lưu.
-            echo "upgrade=$(touches '(^|/)migrations?(/|\.rs$)|(^|/)entity(/|\.rs$)|^crates/kernel/src/data/|^Cargo\.lock$|^xtask/src/upgrade\.rs$|^crates/app/tests/.*upgrade|^\.github/workflows/|(^|/)Dockerfile')"
+            echo "upgrade=$upgrade"
             # Dựng thử image: thứ làm nên image.
-            echo "image=$(touches '^(Dockerfile|\.dockerignore|about\.toml|about\.hbs|deny\.toml|rust-toolchain\.toml|Cargo\.lock)$|^\.github/workflows/(release|ci)\.yml$')"
+            echo "image=$(pr_touches '^(Dockerfile|\.dockerignore|about\.toml|about\.hbs|deny\.toml|rust-toolchain\.toml|Cargo\.lock)$|^\.github/workflows/(release|ci)\.yml$')"
             # OAuth cho MCP bằng client MCP chính thức (D-20261127-mcp-sdk-ci-check).
             echo "mcp=$(touches '^modules/auth/|^crates/kernel/src/(http|mcp|security|data/|module)|^crates/app/|^scripts/mcp-oauth|^Cargo\.(lock|toml)$|^\.github/workflows/ci\.yml$')"
             # Luật cảnh báo Prometheus.
@@ -128,6 +156,8 @@ jobs:
               echo "No public Rust API changed and the version is unchanged ($after): semver check skipped."
             fi
           fi
+          # Chạy tay có thể bật riêng `publish-check` (thử job trên một nhánh mà không phải mở PR phát hành).
+          [ "$EVENT" = workflow_dispatch ] && [ "$PUBLISH_CHECK" = true ] && release=true
           echo "semver=$semver" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
@@ -388,8 +418,10 @@ jobs:
 
   # Đóng gói như crates.io (docs/RELEASING.md, "Đăng lên crates.io"; D-20261127-ci-runner-budget): `cargo xtask publish-check`
   # chạy `cargo package` cho mọi crate sẽ đăng rồi build từng gói từ bản đã đóng với phiên bản thư viện mới nhất hợp lệ.
-  # Chỉ trên PR PHÁT HÀNH (đổi `version`), song song với mọi job khác; trước đây chạy tay trên máy (~85 phút). Lâu như một
-  # lần build sạch (không dùng cache: `--exclude-lockfile` chọn thư viện mới nhất, khác `Cargo.lock`). Không đăng gì.
+  # Chỉ trên PR PHÁT HÀNH (đổi `version`) hay khi chạy tay với `publish-check` bật, song song với mọi job khác; trước đây
+  # chạy tay trên máy (~85 phút). auto-release.yml chỉ xem CI của push `main`, không xem job này: chờ nó xanh rồi mới
+  # merge PR phát hành (docs/RELEASING.md bước 5). Lâu như một lần build sạch (không dùng cache: `--exclude-lockfile` chọn
+  # thư viện mới nhất, khác `Cargo.lock`). Không đăng gì.
   publish-check:
     name: crates.io packaging (publish-check)
     needs: plan
@@ -421,7 +453,8 @@ jobs:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.
     name: upgrade from the last release (${{ matrix.database }})
-    # Chỉ khi thay đổi có thể đổi dạng dữ liệu đã lưu (job `plan`, D-20261121-ci-batch-release-faster).
+    # Pull request: chỉ khi thay đổi có thể đổi dạng dữ liệu đã lưu; push `main` và chạy tay: luôn (job `plan`,
+    # D-20261121-ci-batch-release-faster).
     needs: plan
     if: ${{ needs.plan.outputs.upgrade == 'true' }}
     runs-on: ubuntu-24.04
@@ -543,8 +576,8 @@ jobs:
 
   # MSRV (D-20261126-road-to-1-0, G8; docs/COMPATIBILITY.md, "Minimum supported Rust version"): biên dịch cả workspace
   # bằng đúng `rust-version` của Cargo.toml — thấp hơn toolchain ghim — để một tính năng ngôn ngữ mới không lọt vào mà
-  # không ai biết. Chỉ `cargo check` (không test): MSRV là lời hứa "biên dịch được". Pull request không chạm Rust thì bỏ
-  # qua như phần nặng của gate (`scripts/rust-changed.sh`); push main và chạy tay luôn chạy.
+  # không ai biết. Chỉ `cargo check` (không test): MSRV là lời hứa "biên dịch được". Thay đổi không chạm Rust thì bỏ
+  # qua như phần nặng của gate (`scripts/rust-changed.sh`, quyết ở job `plan`; push main so với lần CI xanh gần nhất).
   msrv:
     name: MSRV build (rust-version)
     needs: plan
@@ -615,8 +648,7 @@ jobs:
 
   # Dựng thử image (không push) khi pull request chạm thứ làm nên image (Dockerfile, about.*, toolchain, workflow phát hành):
   # `cargo auditable chef cook`, RUSTFLAGS, `cargo about` chạy lần đầu ở đây chứ không phải lúc phát hành. Kiểm thêm binary
-  # có danh sách crate nhúng (`.dep-v0`) và image có văn bản giấy phép bên thứ ba. Push main: khi các file đó đổi kể từ lần
-# CI xanh gần nhất trên main (job `plan`); chạy tay luôn dựng.
+  # có danh sách crate nhúng (`.dep-v0`) và image có văn bản giấy phép bên thứ ba. Push main và chạy tay luôn dựng (job `plan`).
   image-build:
     name: image builds (no push)
     needs: plan

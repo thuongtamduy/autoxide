@@ -9,8 +9,9 @@
 # changelog, quyết định…): khi đó biên dịch, clippy và test Rust chắc chắn cho cùng kết quả như ở <base>. Một file
 # không khớp là `true` — nghi ngờ thì chạy. Không có file nào đổi thì `false`.
 #
-# Dùng ở: gate.yml (pull request: job `build tests`, các shard test, `external module example` bỏ qua phần nặng) và
-# gate.sh (`--pr` và `--quick`: bỏ clippy). Push lên main, tag và chạy tay không gọi script này: luôn chạy đủ.
+# Dùng ở: gate.yml (pull request: job `build tests`, các shard test, `external module example` bỏ qua phần nặng),
+# gate.sh (`--pr` và `--quick`: bỏ clippy) và job `plan` của ci.yml (job MSRV; push lên main so với lần CI xanh gần nhất
+# trên main, D-20261127-ci-runner-budget). Gate của push lên main, tag và chạy tay không gọi script này: luôn chạy đủ.
 # Lý do chọn file nào bỏ qua được ghi ngay trong danh sách; cùng luật khớp viết lại ở `xtask/src/rust_free.rs` (test
 # so hai bản).
 set -euo pipefail

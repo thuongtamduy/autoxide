@@ -1,13 +1,14 @@
-//! `cargo xtask test-shards [--tests <file>] [--postgres-18]`: in matrix (JSON) các máy chạy test của CI — mỗi phần tử
-//! một shard `{"name", "part", "shard", "postgres"}` cho job `tests` của `.github/workflows/gate.yml`
+//! `cargo xtask test-shards [--tests <file> --filter <file>] [--postgres-18]`: in matrix (JSON) các máy chạy test của
+//! CI — mỗi phần tử một shard `{"name", "part", "shard", "postgres"}` cho job `tests` của `.github/workflows/gate.yml`
 //! (D-20261127-ci-runner-budget).
 //!
 //! - Không có `--tests`: gate đầy đủ (push lên main, tag, chạy tay) — cách chia cố định như trước: SQLite 4 phần,
 //!   Postgres 6 phần (D-20261121-ci-mold-shards).
-//! - `--tests <file>`: pull request — `<file>` là `cargo nextest list --message-format json` với filterset của PR
-//!   (`./gate.sh --pr --only build` ghi `tests.json` cạnh archive). Số phần của mỗi database tính theo chi phí ước
-//!   lượng của các test được chọn, tối đa bằng gate đầy đủ: PR chỉ chạm vài crate không chiếm 10 máy cho vài trăm test.
-//!   Không test nào được chọn thì matrix rỗng (`[]`): workflow bỏ qua job `tests`.
+//! - `--tests <file> --filter <file>`: pull request — `cargo nextest list --message-format json` với filterset của PR và
+//!   chính filterset đó (`./gate.sh --pr --only build` ghi `tests.json` và `filter` cạnh archive). Số phần của mỗi
+//!   database tính theo chi phí ước lượng của các test được chọn, tối đa bằng gate đầy đủ: PR chỉ chạm vài crate không
+//!   chiếm 10 máy cho vài trăm test. Matrix rỗng (`[]`, workflow bỏ qua job `tests`) chỉ khi filterset là `none()`;
+//!   JSON lạ hay không test nào khớp một filterset khác là lỗi (fail-closed).
 //!
 //! Chỉ đổi SỐ máy, không đổi test nào chạy: `--partition count:k/n` của nextest chia đúng tập test đã chọn thành n phần
 //! rời nhau, cộng lại đủ.
@@ -46,8 +47,18 @@ struct List {
 struct Suite {
     #[serde(rename = "package-name")]
     package: String,
-    #[serde(default)]
-    testcases: BTreeMap<String, Case>,
+    status: SuiteStatus,
+    // Không `#[serde(default)]`: chương trình đã liệt kê (`listed`) mà thiếu danh sách test là JSON lạ — báo lỗi, không
+    // coi là "không có test" (fail-closed: đếm sai thành 0 thì gate của PR xanh mà không chạy test nào).
+    testcases: Option<BTreeMap<String, Case>>,
+}
+
+/// Giá trị lạ (nextest đổi định dạng) là lỗi đọc JSON, không bị bỏ qua.
+#[derive(Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum SuiteStatus {
+    Listed,
+    Skipped,
 }
 
 #[derive(Deserialize)]
@@ -60,7 +71,14 @@ struct Case {
 
 #[derive(Deserialize)]
 struct FilterMatch {
-    status: String,
+    status: MatchStatus,
+}
+
+#[derive(Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum MatchStatus {
+    Matches,
+    Mismatch,
 }
 
 /// Số test được chọn: của `autoxide` và của mọi crate khác.
@@ -71,22 +89,44 @@ pub struct Selected {
 }
 
 /// Đếm test khớp filterset (không tính test `#[ignore]`: nextest không chạy chúng) trong JSON của `cargo nextest list`.
-pub fn count(list_json: &str) -> Result<Selected, String> {
+///
+/// `filter`: filterset đã dùng để liệt kê (file `filter` cạnh archive). Fail-closed: JSON không có test nào, hay không
+/// test nào khớp mà filterset không phải `none()`, là lỗi — matrix rỗng chỉ khi PR thật sự không chọn crate nào.
+pub fn count(list_json: &str, filter: &str) -> Result<Selected, String> {
     let list: List = serde_json::from_str(list_json).map_err(|error| {
         format!("not the JSON of `cargo nextest list --message-format json`: {error}")
     })?;
     let mut selected = Selected { app: 0, other: 0 };
-    for suite in list.suites.values() {
-        let matching = suite
-            .testcases
+    let mut listed = 0;
+    for (id, suite) in &list.suites {
+        let cases = match (&suite.status, &suite.testcases) {
+            (SuiteStatus::Listed, None) => {
+                return Err(format!("test binary {id} is listed but has no `testcases`"));
+            }
+            (_, None) => continue,
+            (_, Some(cases)) => cases,
+        };
+        listed += cases.len();
+        let matching = cases
             .values()
-            .filter(|case| !case.ignored && case.filter_match.status == "matches")
+            .filter(|case| !case.ignored && case.filter_match.status == MatchStatus::Matches)
             .count();
         if suite.package == APP_PACKAGE {
             selected.app += matching;
         } else {
             selected.other += matching;
         }
+    }
+    if listed == 0 {
+        return Err(
+            "the nextest list has no tests at all: refusing to plan zero test machines".to_owned()
+        );
+    }
+    if selected.app + selected.other == 0 && filter.trim() != "none()" {
+        return Err(format!(
+            "no listed test matches the filterset `{}`, which is not `none()`: refusing to plan zero test machines",
+            filter.trim()
+        ));
     }
     Ok(selected)
 }
@@ -183,23 +223,47 @@ mod tests {
         assert_eq!(matrix(Some(Selected { app: 0, other: 0 }), false), "[]");
     }
 
+    const LIST: &str = r#"{
+      "rust-build-meta": {}, "test-count": 4,
+      "rust-suites": {
+        "autoxide::integration": {"package-name": "autoxide", "status": "listed", "testcases": {
+          "a": {"kind": "test", "ignored": false, "filter-match": {"status": "matches"}},
+          "b": {"kind": "test", "ignored": true, "filter-match": {"status": "matches"}}
+        }},
+        "autoxide-kernel": {"package-name": "autoxide-kernel", "status": "listed", "testcases": {
+          "c": {"kind": "test", "ignored": false, "filter-match": {"status": "matches"}},
+          "d": {"kind": "test", "ignored": false, "filter-match": {"status": "mismatch", "reason": "expression"}}
+        }},
+        "autoxide-notes": {"package-name": "autoxide-notes", "status": "skipped"}
+      }
+    }"#;
+
     #[test]
     fn dem_dung_test_khop_bo_qua_test_ignore() {
-        let json = r#"{
-          "rust-build-meta": {}, "test-count": 4,
-          "rust-suites": {
-            "autoxide::integration": {"package-name": "autoxide", "testcases": {
-              "a": {"kind": "test", "ignored": false, "filter-match": {"status": "matches"}},
-              "b": {"kind": "test", "ignored": true, "filter-match": {"status": "matches"}}
-            }},
-            "autoxide-kernel": {"package-name": "autoxide-kernel", "testcases": {
-              "c": {"kind": "test", "ignored": false, "filter-match": {"status": "matches"}},
-              "d": {"kind": "test", "ignored": false, "filter-match": {"status": "mismatch", "reason": "expression"}}
-            }},
-            "autoxide-notes": {"package-name": "autoxide-notes", "status": "skipped"}
-          }
-        }"#;
-        assert_eq!(count(json).unwrap(), Selected { app: 1, other: 1 });
-        assert!(count("not json").is_err());
+        assert_eq!(count(LIST, "all()").unwrap(), Selected { app: 1, other: 1 });
+        assert!(count("not json", "all()").is_err());
+    }
+
+    #[test]
+    fn json_la_thi_bao_loi_khong_dem_thanh_0() {
+        // Trạng thái khớp lạ (nextest đổi định dạng).
+        let odd = LIST.replace(r#""status": "matches""#, r#""status": "selected""#);
+        assert!(count(&odd, "all()").is_err());
+        // Trạng thái chương trình lạ.
+        let odd = LIST.replace(r#""status": "skipped""#, r#""status": "omitted""#);
+        assert!(count(&odd, "all()").is_err());
+        // Chương trình đã liệt kê mà không có danh sách test.
+        let missing = r#"{"rust-suites": {"x": {"package-name": "x", "status": "listed"}}}"#;
+        assert!(count(missing, "all()").is_err());
+        // Không có test nào cả.
+        assert!(count(r#"{"rust-suites": {}}"#, "none()").is_err());
+    }
+
+    #[test]
+    fn khong_test_nao_khop_chi_hop_le_khi_filter_la_none() {
+        let none = LIST
+            .replace(r#""status": "matches""#, r#""status": "mismatch", "reason": "expression""#);
+        assert_eq!(count(&none, "none()\n").unwrap(), Selected { app: 0, other: 0 });
+        assert!(count(&none, "package(=autoxide-kernel)").is_err());
     }
 }

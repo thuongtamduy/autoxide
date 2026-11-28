@@ -270,7 +270,8 @@ jobs:
         if: always() && steps.changed.outputs.run == 'true'
       # Số máy chạy test (D-20261127-ci-runner-budget): gate đầy đủ chia cố định (SQLite 4, Postgres 6 mỗi bản); pull
       # request chia theo chi phí ước lượng của các test được chọn (`tests.json` do `gate.sh --pr --only build` ghi), tối
-      # đa như gate đầy đủ — PR chạm vài crate không giữ 10 máy. Không test nào được chọn thì `[]`: job `tests` bỏ qua.
+      # đa như gate đầy đủ — PR chạm vài crate không giữ 10 máy. `[]` (job `tests` bỏ qua) chỉ khi filterset là `none()`;
+      # JSON lạ hay 0 test khớp một filterset khác thì bước này đỏ (fail-closed).
       # Chỉ đổi số máy; `--partition count:k/n` của nextest vẫn chạy đủ mọi test đã chọn.
       - name: test shards
         id: shards
@@ -280,7 +281,7 @@ jobs:
           POSTGRES_18: ${{ inputs.postgres-18 }}
         run: |
           args=()
-          [ "$EVENT_NAME" = pull_request ] && args+=(--tests target/gate-archive/tests.json)
+          [ "$EVENT_NAME" = pull_request ] && args+=(--tests target/gate-archive/tests.json --filter target/gate-archive/filter)
           [ "$POSTGRES_18" = true ] && args+=(--postgres-18)
           matrix="$(cargo xtask test-shards "${args[@]}")"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
@@ -379,7 +380,11 @@ jobs:
           exit 1
       # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc (file `filter` trong
       # archive); push lên main và chạy tay: mọi test (D-20261118-ci-pr-affected-tests).
-      - run: >-
-          ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
-          --only ${{ matrix.target.part }} --archive target/gate-archive
-          --shard ${{ matrix.target.shard }}
+      - env:
+          PR_FLAG: ${{ github.event_name == 'pull_request' && '--pr' || '' }}
+          PART: ${{ matrix.target.part }}
+          SHARD: ${{ matrix.target.shard }}
+        run: |
+          flags=()
+          [ -n "$PR_FLAG" ] && flags+=("$PR_FLAG")
+          ./gate.sh "${flags[@]}" --only "$PART" --archive target/gate-archive --shard "$SHARD"
