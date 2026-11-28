@@ -15,12 +15,13 @@ use sea_orm::ConnectionTrait as _;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-const GRANTS: [&str; 5] = [
+const GRANTS: [&str; 6] = [
     "catalog.products.read",
     "catalog.products.write",
     "catalog.products.publish",
     "compliance.kyc.read",
     "compliance.kyc.submit",
+    "compliance.kyc.review",
 ];
 
 /// Hai người bán (`a`, `b`) dưới gốc của khách mặc định; `a` có một cửa hàng con `store` (sàn → người bán →
@@ -99,7 +100,7 @@ async fn publish(app: &TestApp, id: &str) -> (StatusCode, Value) {
 }
 
 /// Định danh nút `org` qua nhà cung cấp giả (đăng ký kinh doanh) tới khi hồ sơ `verified`.
-async fn verify_seller(app: &TestApp, verifier: &FakeIdentityVerifier, org: OrgId) {
+async fn verify_seller(app: &TestApp, verifier: &FakeIdentityVerifier, org: OrgId) -> String {
     let body = json!({"org_id": org.as_uuid(), "party_type": "organization"});
     let (status, opened) = call(app, "POST", "/compliance/kyc/profiles", Some(body)).await;
     assert!(status.is_success(), "{opened}");
@@ -110,7 +111,9 @@ async fn verify_seller(app: &TestApp, verifier: &FakeIdentityVerifier, org: OrgI
     assert_eq!(status, StatusCode::OK, "{session}");
     let attempt: Uuid = session["data"]["attempt_id"].as_str().unwrap().parse().unwrap();
     let reference = FakeIdentityVerifier::reference(attempt);
-    verifier.complete(&reference, true, "CONG TY TNHH NGUOI BAN", "0101234567");
+    // Mỗi người bán một mã số doanh nghiệp: cùng giấy tờ thì hồ sơ thứ hai phải chờ duyệt tay.
+    let document = org.as_uuid().simple().to_string();
+    verifier.complete(&reference, true, "CONG TY TNHH NGUOI BAN", &document);
     let (headers, body) = FakeIdentityVerifier::callback(&reference);
     let mut request = app.post("/api/v1/compliance/kyc/callbacks/fake").bytes(body);
     for (name, value) in &headers {
@@ -121,6 +124,7 @@ async fn verify_seller(app: &TestApp, verifier: &FakeIdentityVerifier, org: OrgI
     app.modules().worker(8).unwrap().blocked_delay(Duration::ZERO).run_once().await.unwrap();
     let (_, read) = call(app, "GET", &format!("/compliance/kyc/profiles/{profile}"), None).await;
     assert_eq!(read["data"]["status"], "verified", "{read}");
+    profile
 }
 
 /// Sàn: sản phẩm của người bán chưa định danh không mở bán được — qua REST lẫn tool MCP — với mã
@@ -183,6 +187,55 @@ async fn khong_phai_san_mo_ban_khong_can_dinh_danh() {
         let id = product(&app, sellers.a, "K-1").await;
         let (status, sold) = publish(&app, &id).await;
         assert_eq!(status, StatusCode::OK, "{sold}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Sàn: định danh của người bán bị thu hồi → `compliance.kyc_revoked` → `catalog` dừng hàng đang bán của người bán
+/// đó và cửa hàng con của họ (`inactive`); người bán khác và hàng của sàn không bị đụng (LG-3b).
+#[tokio::test]
+async fn thu_hoi_dinh_danh_thi_hang_cua_nguoi_ban_dung_ban() {
+    TestDatabase::run(async |test| {
+        let (app, sellers, verifier) = app(test, "marketplace").await;
+        let profile = verify_seller(&app, &verifier, sellers.a).await;
+        verify_seller(&app, &verifier, sellers.b).await;
+        let in_a = product(&app, sellers.a, "K-1").await;
+        let in_store = product(&app, sellers.store, "K-2").await;
+        let in_b = product(&app, sellers.b, "K-3").await;
+        let own = product(&app, root_of(DEFAULT_TENANT), "K-4").await;
+        for id in [&in_a, &in_store, &in_b, &own] {
+            let (status, sold) = publish(&app, id).await;
+            assert_eq!(status, StatusCode::OK, "{sold}");
+        }
+
+        let uri = format!("/compliance/kyc/profiles/{profile}/revoke");
+        let body = json!({"reason_code": "fraud_suspected"});
+        let (status, revoked) = call(&app, "POST", &uri, Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{revoked}");
+        // Event từ outbox của `compliance` tới bên nghe của `catalog`.
+        let dispatcher = app.modules().dispatcher().unwrap();
+        let worker = app.modules().worker(8).unwrap().blocked_delay(Duration::ZERO);
+        for _ in 0..10 {
+            let delivered = dispatcher.run_once().await.unwrap();
+            let ran = worker.run_once().await.unwrap();
+            if delivered == 0 && ran == 0 {
+                break;
+            }
+        }
+
+        let status_of = async |id: &str| {
+            let (_, read) = call(&app, "GET", &format!("/catalog/products/{id}"), None).await;
+            read["data"]["status"].clone()
+        };
+        assert_eq!(status_of(&in_a).await, "inactive");
+        assert_eq!(status_of(&in_store).await, "inactive");
+        assert_eq!(status_of(&in_b).await, "active");
+        assert_eq!(status_of(&own).await, "active");
+        // Mở bán lại: cổng vẫn chặn.
+        let (status, problem) = publish(&app, &in_a).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["code"], "compliance.kyc_required");
     })
     .await
     .unwrap();

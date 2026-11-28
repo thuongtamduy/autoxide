@@ -352,6 +352,8 @@ impl OrdersService {
             .unwrap_or(15);
         let actor = Actor::user(principal.user_id());
         let user = principal.user_id();
+        // Năm của số phiếu bảo hành theo ngày của người bán (#575 N4), trước transaction ghi.
+        let year = self.local_year(tenant, org, at).await?;
         let (database, outbox) = (tenant.database(), &self.outbox);
         let issue = issue.to_owned();
         database
@@ -359,7 +361,6 @@ impl OrdersService {
                 let issue = issue.clone();
                 async move {
                     let transaction = database.begin_write().await?;
-                    let year = at.date_utc().year();
                     let sequence = autoxide_kernel::numbering::next(
                         &transaction,
                         tenant.id(),

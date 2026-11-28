@@ -1031,8 +1031,7 @@ impl Probe for DeadlinesProbe {
                 .await;
             // tenant-scope: việc nền / kiểm tra quét mọi khách của database, chủ ý không lọc khách (rà soát bảo mật 2026-11)
             let overdue = subject_request::Entity::find()
-                .filter(subject_request::Column::Status.is_in(["received", "in_progress"]))
-                .filter(subject_request::Column::DueAt.lt(at))
+                .filter(crate::subject_requests::overdue_condition(at))
                 .all(database.read())
                 .await;
             match (late, overdue) {

@@ -100,6 +100,16 @@ pub(crate) mod kyc_profile {
         /// `document_hash` khi nhà cung cấp xác thực hồ sơ, trống ở trạng thái khác; unique theo
         /// khách — một giấy tờ chỉ xác thực tự động cho một hồ sơ (m0020).
         pub verified_document_hash: Option<String>,
+        /// Mục NĐ 248/2026 Điều 18 (m0024): ngày sinh `YYYY-MM-DD` (cá nhân).
+        pub birth_date: Option<String>,
+        /// Trụ sở / địa chỉ.
+        pub address: Option<String>,
+        /// Người đại diện (tổ chức, hộ kinh doanh).
+        pub representative_name: Option<String>,
+        /// Nước cấp giấy tờ (ISO 3166-1 hai chữ hoa).
+        pub document_country: Option<String>,
+        /// Hạn của giấy tờ `YYYY-MM-DD`.
+        pub document_expires_on: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -619,6 +629,8 @@ pub(crate) mod subject_request {
         pub created_by: Option<Uuid>,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
+        /// Hạn thực hiện (m0025, LG-4b); trống: yêu cầu cũ hay quy tắc không đặt hạn cho loại này.
+        pub fulfil_due_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

@@ -11,6 +11,8 @@
 //! - `orders.order_confirmed` (đã trả tiền) → phát quyền tải hàng số; `orders.order_cancelled`,
 //!   `orders.refund_completed` không gắn trả hàng → thu hồi (`digital.rs`). Phát theo khoá
 //!   (dòng đơn, file) và thu hồi chỉ đặt `revoked_at` khi chưa có: nhận lại không đổi gì thêm.
+//! - `compliance.kyc_expired` / `kyc_revoked` của một nút, `organizations.unit_moved` → sàn dừng hàng của
+//!   người bán không còn định danh (`seller_pause.rs`); chỉ đổi dòng còn `active`, nhận lại không đổi gì.
 
 use std::sync::Arc;
 
@@ -52,6 +54,8 @@ pub(crate) fn subscriptions(service: &Arc<CatalogService>) -> Vec<Subscription> 
         Subscription::optional(ORDERS_ORDER_CONFIRMED, service.clone()),
         Subscription::optional(ORDERS_ORDER_CANCELLED, service.clone()),
         Subscription::optional(ORDERS_REFUND_COMPLETED, service.clone()),
+        Subscription::optional(autoxide_compliance::api::KYC_EXPIRED, service.clone()),
+        Subscription::optional(autoxide_compliance::api::KYC_REVOKED, service.clone()),
     ]
 }
 
@@ -74,6 +78,8 @@ impl EventHandler for CatalogService {
         if let Some(user_id) = deleted_user(event) {
             return Self::forget_user(event, user_id).await;
         }
+        // Database của khách (đọc / ghi) cho các nhánh bên dưới.
+        let database = event.tenant.database();
         if event.name == INVENTORY_COST_CHANGED {
             let after = &event.payload["after"];
             let parsed = (|| {
@@ -98,8 +104,7 @@ impl EventHandler for CatalogService {
                 return Ok(());
             }
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
-            let write = event.tenant.database().write();
-            return self.queue_variants(write, &event.tenant, variants).await;
+            return self.queue_variants(database.write(), &event.tenant, variants).await;
         }
         if event.name == ORDERS_ORDER_COMPLETED {
             let Some((order, lines)) = crate::recommend::completed_order(&event.payload) else {
@@ -148,10 +153,32 @@ impl EventHandler for CatalogService {
                 .await
                 .map(|_| ());
         }
+        if event.name == autoxide_compliance::api::KYC_EXPIRED
+            || event.name == autoxide_compliance::api::KYC_REVOKED
+        {
+            // Chỉ hồ sơ của nút (người bán); hồ sơ người dùng, email… không gắn hàng.
+            if event.payload["subject_kind"] != "org" {
+                return Ok(());
+            }
+            let Some(org) = event.payload["subject_id"].as_str().and_then(|id| id.parse().ok())
+            else {
+                tracing::warn!(event_id = %event.id, event = %event.name, "KYC event without subject_id; ignored");
+                return Ok(());
+            };
+            let node = Some(autoxide_kernel::tenancy::OrgId::from_uuid(org));
+            // Khách không phải sàn: thôi ngay, không đọc sản phẩm.
+            return self
+                .pause_unverified_sellers(database.read(), &event.tenant, node)
+                .await
+                .map(|_| ());
+        }
         if event.name == UNIT_MOVED || event.name == UNIT_STATUS_CHANGED {
+            if event.name == UNIT_MOVED {
+                // Cửa hàng con chuyển sang dưới người bán chưa định danh: hàng của nó không còn được bán (LG-3b).
+                self.pause_unverified_sellers(database.read(), &event.tenant, None).await?;
+            }
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
-            let write = event.tenant.database().write();
-            return self.queue_all(write, &event.tenant).await;
+            return self.queue_all(database.write(), &event.tenant).await;
         }
         Ok(())
     }

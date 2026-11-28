@@ -21,7 +21,8 @@ thuế qua `autoxide_tax::api::TaxEngine`.
 | `vat.exempt` | không chịu thuế | ghi "không chịu thuế GTGT", không phải 0% |
 | `excise.beer` | thuế TTĐB 65%, rồi GTGT 10% trên giá đã có TTĐB | mẫu |
 
-Sàn có chức năng thanh toán khấu trừ thay cho hộ kinh doanh (NĐ 117/2025/NĐ-CP): hàng hoá 1% GTGT +
+Sàn có chức năng thanh toán khấu trừ thay cho hộ kinh doanh (NĐ 117/2025/NĐ-CP; NĐ 68/2026/NĐ-CP Điều 11 — tỉ lệ
+năm 2026 các nguồn không thống nhất, cần đối chiếu văn bản gốc): hàng hoá 1% GTGT +
 0,5% TNCN, dịch vụ 5% + 2%, sản xuất – vận tải 3% + 1,5%. Doanh nghiệp tự kê khai: không khấu trừ. Core hiện làm:
 tính số tiền (`POST /api/v1/tax/withholding`) và ghi sổ khi một lần quyết toán yêu cầu (`ledger`, bút toán
 `TaxWithheld`). Core **chưa** làm (cùng module sàn, sau 1.0): tự khấu trừ ở mỗi lần chi trả cho người bán là hộ kinh
@@ -82,7 +83,16 @@ hay số định danh cá nhân 12 số), chế độ thuế, ngành nghề, doa
 cấp trên gần nhất. Chế độ thuế quyết định loại hoá đơn: `vat_credit` → hoá đơn GTGT; `vat_direct`,
 `household` → hoá đơn bán hàng, không tách GTGT trên dòng; `exempt` → không thuế. Hộ kinh doanh có
 doanh thu từ 1 tỷ đ/năm phải dùng hoá đơn khởi tạo từ máy tính tiền (`TaxEngine::invoice_requirements`,
-NĐ 70/2025/NĐ-CP — cần đối chiếu lộ trình mới nhất).
+NĐ 70/2025/NĐ-CP và NĐ 68/2026/NĐ-CP — cần đối chiếu văn bản gốc).
+
+Hộ kinh doanh theo NĐ 68/2026/NĐ-CP (gói `vn` bản 4; cần đối chiếu văn bản gốc): doanh thu tới 500 triệu đ/năm
+không nộp GTGT, TNCN (quy tắc `household.tax_free_revenue`, tính một lần cho cả hộ), và dưới 500 triệu đ không bắt
+buộc hoá đơn điện tử (quy tắc `einvoice.not_required_below`, từ 05/3/2026). `TaxEngine::invoice_advice` đổi hồ sơ
+thuế và các quy tắc này thành việc cần làm cho một lần bán; `orders` làm theo: không tự lập hoá đơn điện tử khi
+không bắt buộc (người bán vẫn lập tay được), hoá đơn bán hàng cho người bán không theo phương pháp khấu trừ, hoá đơn
+máy tính tiền khi bán tại quầy mà luật buộc, còn lại theo mặc định của nó (tại quầy → máy tính tiền, nơi khác →
+`orders.invoice_kind`). Khoảng 500 triệu – 1 tỷ đ các nguồn khác nhau nên coi là bắt buộc; doanh thu chưa khai cũng
+vậy.
 
 ## Đọc dữ liệu
 

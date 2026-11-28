@@ -737,6 +737,9 @@ impl OrdersService {
             ),
             None => crate::api::FundsFlow::SelfCollect,
         };
+        // Năm của số đơn theo ngày của người bán (#575 N4): tính trước transaction ghi, cùng thời điểm.
+        let sold_at = now();
+        let year = self.local_year(tenant, OrgId::from_uuid(shift.org_id), sold_at).await?;
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -753,7 +756,7 @@ impl OrdersService {
                 if open.is_none() {
                     return Err(errors::shift_not_open());
                 }
-                let at = now();
+                let at = sold_at;
                 let inserted = pos_sale::Entity::insert(pos_sale::ActiveModel {
                     tenant_id: Set(tenant.id().as_uuid()),
                     shift_id: Set(shift.id),
@@ -769,7 +772,6 @@ impl OrdersService {
                 if !matches!(inserted, sea_orm::TryInsertResult::Inserted(rows) if rows > 0) {
                     return Ok(false);
                 }
-                let year = at.date_utc().year();
                 let sequence = autoxide_kernel::numbering::next(
                     &transaction,
                     tenant.id(),

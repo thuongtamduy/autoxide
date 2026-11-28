@@ -37,6 +37,7 @@ mod recommend;
 mod restrictions;
 mod rounding;
 mod rules_pack;
+mod seller_pause;
 mod service;
 mod similar;
 mod snapshots;
@@ -238,6 +239,10 @@ impl Module for CatalogModule {
                     from_images::DRAFT_FROM_IMAGES,
                     Arc::new(from_images::Drafter(service.clone())),
                 ),
+                JobRegistration::new(
+                    seller_pause::SELLER_KYC_SWEEP,
+                    Arc::new(seller_pause::SellerKycSweep(service.clone())),
+                ),
                 JobRegistration::new(transfers::CLEANUP, Arc::new(transfers::Cleanup(service))),
             ]
         })
@@ -255,6 +260,8 @@ impl Module for CatalogModule {
             Schedule::new(recommend::REFRESH_SALES, recommend::REFRESH_SALES, day),
             // File nhập / xuất giữ 7 ngày.
             Schedule::new(transfers::CLEANUP, transfers::CLEANUP, day),
+            // Sàn: người bán không còn định danh (khách vừa thành sàn, quy tắc bắt đầu áp dụng) → dừng hàng (LG-3b).
+            Schedule::new(seller_pause::SELLER_KYC_SWEEP, seller_pause::SELLER_KYC_SWEEP, day),
         ]
     }
 
