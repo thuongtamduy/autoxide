@@ -227,6 +227,12 @@ async fn bao_hanh_theo_serial_va_theo_dong_phieu_bao_hanh() {
             let row = write.query_one_raw(autoxide_kernel::database::statement(backend, sql, [])).await.unwrap().unwrap();
             let pending: i64 = row.try_get("", "n").unwrap();
             assert_eq!(pending, 0, "every redelivered event is handled");
+            // Bên nhận trả lỗi thì event vẫn được đánh dấu đã chia, lỗi nằm ở bảng giao của kernel
+            // (D-20261128-event-per-subscriber): kiểm cả ở đó.
+            let sql = "SELECT COUNT(*) AS n FROM kernel_event_deliveries WHERE delivered_at IS NULL";
+            let row = write.query_one_raw(autoxide_kernel::database::statement(backend, sql, [])).await.unwrap().unwrap();
+            let failed: i64 = row.try_get("", "n").unwrap();
+            assert_eq!(failed, 0, "no subscriber failed on a redelivered event");
         }
         let tech = Call::as_user(&shop, "tech_a");
         let (status, found) = tech.send("GET", "/warranties?serial=SN-002", None).await;
