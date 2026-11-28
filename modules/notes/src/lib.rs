@@ -60,16 +60,16 @@ impl Module for NotesModule {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         // `kernel::<…>()`: một cách lấy mọi handle của kernel; kiểu đích cho trình biên dịch biết lấy handle nào.
-        let service = Arc::new(NoteService::new(
-            context.kernel()?,
-            context.kernel()?,
-            context.kernel()?,
-        ));
+        let service =
+            Arc::new(NoteService::new(context.kernel()?, context.kernel()?, context.kernel()?));
         context.usage_counter(&service::NOTES_LIMIT, Arc::new(service::NoteCounter))?;
         // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>` / `Arc<dyn PersonalData>`…: bên nhận chỉ thấy trait.
         context.personal_data(service.clone())?;
         // Tài khoản bị xoá: xoá ghi chú của người đó.
-        context.subscribe(Subscription::new(autoxide_kernel::privacy::USER_DELETED, service.clone()))?;
+        context.subscribe(Subscription::new(
+            autoxide_kernel::privacy::USER_DELETED,
+            service.clone(),
+        ))?;
         context.routes(http::routes(service.clone()))?;
         context.tools(tools::all(&service))?;
         context.provide::<dyn api::Notes>(service)

@@ -54,9 +54,9 @@ pub use dormant::DormantContext;
 pub(crate) use dormant::installed;
 pub use later::Later;
 pub use manifest::{Manifest, MigrationsFn, UnstableManifest, UpgradesFn};
-pub use started::KernelHandle;
 pub use registry::{ModuleError, Modules};
 pub use selection::{DormantModule, InactiveModule, MODULES, Selection, SelectionError, Stability};
+pub use started::KernelHandle;
 
 /// What a module declares to the core.
 ///

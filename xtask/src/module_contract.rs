@@ -76,12 +76,14 @@ pub fn check(workspace: &Workspace) -> Result<Vec<Violation>, String> {
         let src = workspace.root.join(&package.dir).join("src");
         for file in rust_files(&src)? {
             // Module giả trong test dựng nhanh bằng hàm cũ được: luật chỉ áp cho mã chạy thật.
-            if file.rsplit('/').next().unwrap_or(&file).contains("test") || file.contains("/tests/") {
+            if file.rsplit('/').next().unwrap_or(&file).contains("test") || file.contains("/tests/")
+            {
                 continue;
             }
             let text = fs::read_to_string(workspace.root.join(&package.dir).join(&file))
                 .map_err(|error| format!("{file}: {error}"))?;
-            violations.extend(file_violations(&format!("{}/{file}", package.dir), &without_tests(&text)));
+            violations
+                .extend(file_violations(&format!("{}/{file}", package.dir), &without_tests(&text)));
         }
     }
     Ok(violations)
@@ -276,7 +278,9 @@ impl autoxide_kernel::module::Module for New {
 
     #[test]
     fn module_gia_trong_mo_dun_test_duoc_bo_qua() {
-        let text = format!("#[cfg(test)]\nmod tests;\n{LEGACY_MODULE}\n#[cfg(test)]\nmod tests {{\n{LEGACY_MODULE}}}\n");
+        let text = format!(
+            "#[cfg(test)]\nmod tests;\n{LEGACY_MODULE}\n#[cfg(test)]\nmod tests {{\n{LEGACY_MODULE}}}\n"
+        );
         let found = file_violations("modules/old/src/lib.rs", &without_tests(&text));
         let lines: Vec<&str> = found.iter().map(|violation| violation.location.as_str()).collect();
         assert_eq!(lines, ["modules/old/src/lib.rs:4", "modules/old/src/lib.rs:13"]);
