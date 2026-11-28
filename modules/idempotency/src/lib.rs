@@ -11,69 +11,41 @@ mod store;
 
 use std::sync::Arc;
 
+use autoxide_kernel::db::RecordInfo;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::idempotency::IdempotencyStore;
-use autoxide_kernel::job::{JobRegistration, Schedule};
-use autoxide_kernel::migration::prelude::MigrationTrait;
-use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::job::JobRegistration;
+use autoxide_kernel::module::{Manifest, Module, StartContext};
+use autoxide_kernel::tenancy::Relocation;
 
 /// Module `idempotency`, để binary đăng ký trong `crates/app/src/modules.rs`.
 pub fn module() -> impl Module {
-    IdempotencyModule::default()
+    IdempotencyModule
 }
 
-#[derive(Default)]
-struct IdempotencyModule {
-    /// Có sau `start`.
-    cleanup: Option<Arc<store::Cleanup>>,
-}
+struct IdempotencyModule;
 
+// Hợp đồng module (D-20261126-module-manifest): khai tĩnh trong `manifest`, đăng ký thứ cần service trong `start`.
 impl Module for IdempotencyModule {
-    fn name(&self) -> &'static str {
-        "idempotency"
-    }
-
-    // Core không chạy được nếu thiếu module này: `AUTOXIDE_MODULES` không tắt được nó (bước 70 P1).
-    fn essential(&self) -> bool {
-        true
-    }
-
-    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
-    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
-        use autoxide_kernel::tenancy::Relocation;
-        Relocation::new().ephemeral(&["idempotency_record"])
-    }
-
-    fn description(&self) -> &'static str {
-        "Storage of `Idempotency-Key` results, so retried writes run once."
-    }
-
-    // Module nền: không gói nào tắt được (bước 35, D-323).
-    fn always_enabled(&self) -> bool {
-        true
-    }
-
-    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        migration::all()
-    }
-
-    fn translations(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("vi", include_str!("../locales/vi.json"))]
+    fn manifest(&self) -> Manifest {
+        Manifest::new(
+            "idempotency",
+            "Storage of `Idempotency-Key` results, so retried writes run once.",
+        )
+        // Core không chạy được nếu thiếu module này: `AUTOXIDE_MODULES` không tắt được nó (bước 70 P1).
+        .essential()
+        // Module nền: không gói nào tắt được (bước 35, D-323).
+        .always_enabled()
+        .migrations(migration::all)
+        .records([RecordInfo::of::<entity::IdempotencyRecord>()])
+        .translation("vi", include_str!("../locales/vi.json"))
+        .schedules([store::cleanup_schedule()])
+        // Tách / gộp khách (bước 38, D-20261118-step38-relocation): key là dữ liệu tạm, không chép.
+        .relocation(Relocation::new().ephemeral(&["idempotency_record"]))
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        self.cleanup = Some(Arc::new(store::Cleanup));
+        context.job(JobRegistration::new(store::CLEANUP, Arc::new(store::Cleanup)))?;
         context.provide::<dyn IdempotencyStore>(Arc::new(store::Store))
-    }
-
-    fn jobs(&self) -> Vec<JobRegistration> {
-        match &self.cleanup {
-            Some(cleanup) => vec![JobRegistration::new(store::CLEANUP, cleanup.clone())],
-            None => Vec::new(),
-        }
-    }
-
-    fn schedules(&self) -> Vec<Schedule> {
-        vec![store::cleanup_schedule()]
     }
 }

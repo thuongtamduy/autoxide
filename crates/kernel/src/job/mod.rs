@@ -121,6 +121,26 @@ impl JobContext {
         self.id = id;
         self
     }
+
+    /// Handles of `db` that read and write tenant records of **every** tenant on [`database`](Self::database),
+    /// without the tenant filter: for a job of the whole database (a cleanup schedule) that sweeps rows of all
+    /// its tenants. A job of one tenant uses `tenant.db()` instead. `reason` says why, in a few words; each use
+    /// is counted in the metric `kernel_all_tenant_queries{module}` like
+    /// [`ControlPlane::all_tenants`](crate::db::ControlPlane::all_tenants).
+    ///
+    /// Calling it from a job of one tenant is a programming error: a debug build stops at once, a release build logs
+    /// a warning (D-20261128-job-all-tenants).
+    pub fn all_tenants(&self, reason: &'static str) -> crate::db::AllTenants<'_> {
+        // Job của một khách phải đi qua `tenant.db()`; dùng nhầm thì bắt sớm khi phát triển, bản chạy thật chỉ cảnh báo.
+        debug_assert!(self.tenant.is_none(), "a job of one tenant called JobContext::all_tenants");
+        if self.tenant.is_some() {
+            tracing::warn!(kind = %self.kind, reason, "a job of one tenant swept every tenant");
+        }
+        // Tên module là phần trước dấu chấm đầu tiên của loại job (`idempotency.cleanup` → `idempotency`); loại job
+        // được kiểm có tiền tố module lúc đăng ký, nên nhãn của số đo chỉ nhận tên module.
+        let module = module_of(&self.kind).unwrap_or_default();
+        crate::db::AllTenants::counted(&self.database, module, reason)
+    }
 }
 
 /// The runner of one job kind. Returning an error makes the job run again later (backoff).

@@ -19,12 +19,9 @@ wrapped-libraries 7 modules/compliance/Cargo.toml
 wrapped-libraries 7 modules/content/Cargo.toml
 wrapped-libraries 7 modules/conversations/Cargo.toml
 wrapped-libraries 7 modules/customers/Cargo.toml
-wrapped-libraries 1 modules/einvoice_sepay/Cargo.toml
-wrapped-libraries 1 modules/esms/Cargo.toml
 wrapped-libraries 7 modules/files/Cargo.toml
 wrapped-libraries 7 modules/forms/Cargo.toml
 wrapped-libraries 2 modules/ghn/Cargo.toml
-wrapped-libraries 3 modules/idempotency/Cargo.toml
 wrapped-libraries 7 modules/inventory/Cargo.toml
 wrapped-libraries 6 modules/invoices/Cargo.toml
 wrapped-libraries 7 modules/ledger/Cargo.toml
@@ -44,7 +41,6 @@ wrapped-libraries 7 modules/shipping/Cargo.toml
 wrapped-libraries 7 modules/support/Cargo.toml
 wrapped-libraries 6 modules/tax/Cargo.toml
 wrapped-libraries 7 modules/webhooks/Cargo.toml
-wrapped-libraries-dev 3 modules/idempotency/Cargo.toml
 raw-database 3 modules/ai/src/usage.rs
 raw-database 6 modules/analytics/src/ingest.rs
 raw-database 3 modules/analytics/src/privacy.rs
@@ -278,7 +274,6 @@ raw-database 9 modules/forms/src/submissions/exports.rs
 raw-database 13 modules/forms/src/submissions/inbox.rs
 raw-database 2 modules/forms/src/submissions/public.rs
 raw-database 3 modules/forms/src/work.rs
-raw-database 8 modules/idempotency/src/store.rs
 raw-database 4 modules/inventory/src/alerts/mod.rs
 raw-database 4 modules/inventory/src/alerts/notify.rs
 raw-database 2 modules/inventory/src/alerts/privacy.rs

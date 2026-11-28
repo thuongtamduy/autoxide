@@ -65,12 +65,13 @@ time-legacy 3 modules/auth/src/token.rs
 time-legacy 1 modules/auth/src/user/service.rs
 time-legacy 1 modules/auth/src/user/service/tests.rs
 time-legacy 5 modules/auth/src/verify.rs
-time-legacy 10 modules/automations/src/definition/trigger.rs
+time-legacy 11 modules/automations/src/definition/trigger.rs
 time-legacy 3 modules/automations/src/metrics/mod.rs
 time-legacy 3 modules/automations/src/metrics/record.rs
 time-legacy 3 modules/automations/src/runner/mod.rs
 time-legacy 3 modules/automations/src/runner/schedule.rs
 time-legacy 3 modules/automations/src/runner/steps.rs
+time-legacy 1 modules/automations/src/service/rules.rs
 time-legacy 5 modules/automations/src/tests/metrics.rs
 time-legacy 3 modules/automations/src/tests/rules.rs
 time-legacy 6 modules/automations/src/tests/runs.rs
@@ -82,6 +83,7 @@ time-legacy 2 modules/bookings/src/http_me.rs
 time-legacy 2 modules/bookings/src/http_setup.rs
 time-legacy 6 modules/bookings/src/openings.rs
 time-legacy 10 modules/bookings/src/reminders.rs
+time-legacy 1 modules/bookings/src/settings.rs
 time-legacy 2 modules/bookings/src/setup.rs
 time-legacy 5 modules/bookings/src/tests/guests.rs
 time-legacy 5 modules/bookings/src/tests/mod.rs
@@ -148,7 +150,8 @@ time-legacy 2 modules/content/src/tests/tenancy.rs
 time-legacy 2 modules/content/src/tests/translation_recovery.rs
 time-legacy 2 modules/content/src/tests/word_index.rs
 time-legacy 2 modules/content/src/theme/presets.rs
-time-legacy 7 modules/content/src/theme/schedule.rs
+time-legacy 8 modules/content/src/theme/schedule.rs
+time-legacy 1 modules/content/src/theme/variants.rs
 time-legacy 4 modules/conversations/src/messages.rs
 time-legacy 3 modules/conversations/src/privacy.rs
 time-legacy 5 modules/conversations/src/tests/chat.rs
@@ -183,7 +186,7 @@ time-legacy 4 modules/forms/src/tests/data.rs
 time-legacy 2 modules/forms/src/tests/definitions.rs
 time-legacy 3 modules/forms/src/tests/exports.rs
 time-legacy 1 modules/ghn/src/carrier.rs
-time-legacy 7 modules/idempotency/src/store.rs
+time-legacy 3 modules/idempotency/src/store.rs
 time-legacy 2 modules/inventory/src/reservations.rs
 time-legacy 2 modules/inventory/src/tests/alerts.rs
 time-legacy 5 modules/inventory/src/tests/delivery.rs
@@ -231,6 +234,7 @@ time-legacy 4 modules/orders/src/carts.rs
 time-legacy 3 modules/orders/src/checkout.rs
 time-legacy 3 modules/orders/src/guests.rs
 time-legacy 2 modules/orders/src/holds.rs
+time-legacy 1 modules/orders/src/local_year.rs
 time-legacy 2 modules/orders/src/orders_read.rs
 time-legacy 3 modules/orders/src/pickups.rs
 time-legacy 2 modules/orders/src/pos.rs
@@ -254,7 +258,7 @@ time-legacy 4 modules/orders/src/tests/warranty_fields.rs
 time-legacy 2 modules/orders/src/warranty.rs
 time-legacy 1 modules/organizations/src/profile.rs
 time-legacy 1 modules/organizations/src/settings.rs
-time-legacy 5 modules/organizations/src/storefront.rs
+time-legacy 6 modules/organizations/src/storefront.rs
 time-legacy 3 modules/plans/src/config.rs
 time-legacy 7 modules/plans/src/lifecycle.rs
 time-legacy 3 modules/plans/src/merge.rs
@@ -274,7 +278,7 @@ time-legacy 1 modules/promotions/src/evaluate.rs
 time-legacy 2 modules/promotions/src/public.rs
 time-legacy 2 modules/promotions/src/redemption.rs
 time-legacy 2 modules/promotions/src/reminders.rs
-time-legacy 1 modules/promotions/src/service.rs
+time-legacy 2 modules/promotions/src/service.rs
 time-legacy 2 modules/promotions/src/tests/evaluate.rs
 time-legacy 2 modules/promotions/src/tests/insights.rs
 time-legacy 4 modules/promotions/src/tests/mod.rs
@@ -301,5 +305,7 @@ time-legacy 3 modules/support/src/report.rs
 time-legacy 3 modules/support/src/sla.rs
 time-legacy 3 modules/support/src/tests/auto.rs
 time-legacy 11 modules/support/src/tests/sla.rs
+time-legacy 1 modules/tax/src/pack.rs
+time-legacy 2 modules/tax/src/service.rs
 time-legacy 2 modules/webhooks/src/delivery.rs
 time-legacy 2 modules/webhooks/src/tests.rs

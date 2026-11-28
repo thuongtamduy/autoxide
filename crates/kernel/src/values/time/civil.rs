@@ -213,7 +213,7 @@ impl DateTime {
     }
 
     /// The day of the week of the date.
-    pub fn weekday(self) -> Weekday {
+    pub fn day_of_week(self) -> Weekday {
         Weekday::from(self.0.weekday())
     }
 
@@ -258,7 +258,7 @@ mod tests {
         let at = Timestamp::from_utc(2026, 11, 28, 2, 30, 0).unwrap();
         let local = at.to_local(&vn);
         assert_eq!(local.to_string(), "2026-11-28T09:30:00");
-        assert_eq!(local.weekday(), Weekday::Saturday);
+        assert_eq!(local.day_of_week(), Weekday::Saturday);
         assert_eq!(local.time(), TimeOfDay::new(9, 30, 0).unwrap());
         assert_eq!(vn.to_timestamp(local), Some(at));
         assert_eq!(at.date_in(&vn), Date::new(2026, 11, 28).unwrap());

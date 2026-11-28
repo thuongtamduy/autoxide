@@ -705,6 +705,13 @@ async fn giu_cho_het_han_duoc_tra() {
             }
         }
         assert_eq!(used(&app, "demo.items").await, 2);
+        // Xác nhận chỗ đã bị trả: mã ổn định `limit_hold_missing` (auth bắt đúng mã này, kiểm độc lập #614);
+        // xác nhận lại chỗ đã xác nhận vẫn `Ok`.
+        let missing = handle.confirm(acme, &ITEMS, "demo.item:lost").await.unwrap_err();
+        assert_eq!(missing.code(), "limit_hold_missing", "{missing:?}");
+        let never = handle.confirm(acme, &ITEMS, "demo.item:never").await.unwrap_err();
+        assert_eq!(never.code(), "limit_hold_missing");
+        handle.confirm(acme, &ITEMS, "demo.item:kept").await.unwrap();
     })
     .await
     .unwrap();

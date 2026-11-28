@@ -180,8 +180,8 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       - [ ] Testkit bọc kiểu `http` (`StatusCode`, `Method`, `Request`) để test của module bỏ `axum` ở
             `[dev-dependencies]`; baseline `wrapped-libraries-dev` về rỗng. Đã có: `autoxide_testkit::http`
             (`StatusCode`, `Method`, `Client` cho bench), `status_code()`; `notes`, `esms`, `einvoice_sepay` bỏ `axum`
-            khỏi `[dev-dependencies]`; `examples/external-module` dùng `autoxide_testkit::http`. Còn: `idempotency`
-            (test tự dựng endpoint trả mã và header tuỳ ý — cần response thô của lớp HTTP, làm ở cụm 1);
+            khỏi `[dev-dependencies]`; `examples/external-module` dùng `autoxide_testkit::http`; `idempotency` (cụm 1:
+            handler giả viết bằng `#[endpoint]`, lỗi của kernel và `http::NoStore`). Còn:
             `http::Client::new(axum::Router)` và `TestApp::router()` lộ `axum` — đổi khi `autoxide_kernel::http::build`
             thôi trả `axum::Router`; `TestResponse::status()` / `headers()` / `body(Body)` và trường
             `McpClientError::status` (kiểu `http`) gắn `#[deprecated]` khi không test nào trong repo còn gọi, gỡ bản minor
@@ -197,6 +197,15 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
             `SignedDuration`/`zone`/`from_local`/`parse_clock` còn tới khi module cuối chuyển)
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
+      - [ ] Cụm 1 (D-20261128-library-layer-plan mục 7). Kernel thêm `http::NoStore<T>`, `JobContext::all_tenants`.
+            Xong: `idempotency`, `esms`, `einvoice_sepay`. Còn, chờ phần kernel: `sepay`, `momo` (trait `BankFeed` /
+            `PaymentGateway::verify_webhook` nhận `axum::http::HeaderMap` — cần kiểu `http::Headers` của kernel);
+            `mail`, `webhooks` (cộng trên cột `i32`: `Expr`/`adjust` chỉ có `i64`; `webhooks` thêm response 202,
+            `UpgradeContext::all_tenants` cho data upgrade, đọc trên kết nối ghi ngoài transaction); `ai` (server giả
+            của test cần header `retry-after` và trễ: `FakeProviderServer` chưa có); `audit` (doctor đọc snapshot mọi
+            khách mọi database, trait `RelocateTable` nhận `sea_orm::DatabaseTransaction`, `write_with_retry`,
+            `Timestamp::truncate(jiff::Unit)`); `files` (upload dạng stream + `Content-Type`, tải về dạng stream với
+            304/`ETag`, `BodyLimit::new(axum::http::Method)`, response 200-hay-201)
       - Cụm 2 (D-20261128-library-layer-plan mục 7): `address` xong (kèm `db::Find::page_by`, `http::PublicCache`,
         `autoxide_testkit::control_plane`); còn `comments`, `forms`, `media`
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên
@@ -701,6 +710,8 @@ thật (P7).
   - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi):
         (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403; (iv) hạ quyền người khác bằng cách
         thu hẹp permission của role họ giữ không qua luật "gỡ được" như gỡ role (sửa role chỉ chặn thêm / nới / bỏ cấm)
+        — (iv) xong: sửa role mà bỏ, thu hẹp hay cấm thêm permission phải có permission đó đủ rộng
+        (D-20261128-role-narrow-rule); còn (iii)
   - [x] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
         luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked). Xong: `Principal::bounded_by`
         (D-20261128-bound-keeps-scope)
@@ -709,9 +720,10 @@ thật (P7).
         giờ như xoá tài khoản (D-20261128-access-revoked-retry)
   - [x] Gỡ role có lệnh cấm đòi người gỡ `allows(p)` theo TÊN permission, bỏ qua phạm vi — nay đòi permission ở độ sâu
         `tenant`, không rào (D-20261128-ban-lift-scope)
-  - [ ] Khách có guardrail: role cấm một permission ngoài rào thì không ai trong khách gỡ được role đó (đã kiểm chứng
+  - [x] Khách có guardrail: role cấm một permission ngoài rào thì không ai trong khách gỡ được role đó (đã kiểm chứng
         bằng đọc code, D-20261128-ban-lift-scope) — cần kernel cho biết lý do cấm (`outside_guardrail`) hay đưa rào vào
-        `grantable`
+        `grantable`. Xong: `Principal::outside_guardrail` của kernel, `lifts_ban` coi
+        permission ngoài rào là bỏ cấm không mở thêm gì (D-20261128-ban-lift-guardrail)
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
         thì mọi thành viên nhận role (response tạo luật liệt kê ở `granted_user_ids`, hướng dẫn dặn xem trước —
         D-20261125-scim-grant-cover). Chặt hơn: ghi người đưa vào (`added_by`) ở thành viên nhóm và chỉ cấp cho

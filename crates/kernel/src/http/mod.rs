@@ -147,7 +147,7 @@ pub(crate) use oauth::admit_audience;
 pub use oauth::{AUTHORIZATION_SERVER_PATH, PROTECTED_RESOURCE_PATH};
 pub(crate) use openapi::untranslated_text;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
-pub use output::{Download, NoContent, PublicCache};
+pub use output::{Download, NoContent, NoStore, PublicCache};
 pub use problem::StandardErrorBody;
 pub use request_id::REQUEST_ID_HEADER;
 pub use security_headers::{API_CSP, DOCS_CSP};

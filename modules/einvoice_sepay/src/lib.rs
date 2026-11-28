@@ -34,11 +34,11 @@ mod tests;
 use std::sync::Arc;
 
 use autoxide_kernel::config::{ConfigReader, Invalid};
+use autoxide_kernel::connections::ConnectionProbe;
 use autoxide_kernel::einvoice::EInvoiceProvider;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::module::{Manifest, Module, Stability, StartContext};
 use autoxide_kernel::provider::ProviderAccounts;
-use autoxide_kernel::tenancy::TenantSetting;
 
 /// Kết nối của bộ nối (`<module>.connection.<loại>`).
 pub(crate) const CONNECTION: &str = "einvoice_sepay.connection.api";
@@ -53,25 +53,19 @@ pub fn module() -> impl Module {
     SepayEInvoiceModule::default()
 }
 
+// Hợp đồng module (D-20261126-module-manifest): khai tĩnh trong `manifest`, đăng ký thứ cần service trong `start`.
 impl Module for SepayEInvoiceModule {
-    fn name(&self) -> &'static str {
-        "einvoice_sepay"
-    }
-
-    fn description(&self) -> &'static str {
-        "Sends e-invoices to the Vietnamese tax authority through SePay eInvoice, with one SePay \
-         eInvoice account per tenant (experimental: written from the provider's public \
-         documentation; not yet verified against the live service)."
-    }
-
-    // Thử nghiệm (bước 70 P3): viết theo tài liệu công khai, chưa chạy với dịch vụ thật — chỉ chạy khi
-    // được bật rõ trong `AUTOXIDE_MODULES`.
-    fn stability(&self) -> autoxide_kernel::module::Stability {
-        autoxide_kernel::module::Stability::Experimental
-    }
-
-    fn tenant_settings(&self) -> Vec<TenantSetting> {
-        settings::all()
+    fn manifest(&self) -> Manifest {
+        Manifest::new(
+            "einvoice_sepay",
+            "Sends e-invoices to the Vietnamese tax authority through SePay eInvoice, with one SePay \
+             eInvoice account per tenant (experimental: written from the provider's public \
+             documentation; not yet verified against the live service).",
+        )
+        // Thử nghiệm (bước 70 P3): viết theo tài liệu công khai, chưa chạy với dịch vụ thật — chỉ chạy khi
+        // được bật rõ trong `AUTOXIDE_MODULES`.
+        .stability(Stability::Experimental)
+        .tenant_settings(settings::all())
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -82,10 +76,9 @@ impl Module for SepayEInvoiceModule {
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         // `require` trả `Arc<ProviderAccounts>`; bản thân `ProviderAccounts` clone rẻ (bọc `Arc`).
         let accounts: ProviderAccounts = (*context.require::<ProviderAccounts>()?).clone();
-        let client =
-            client::Client::new(accounts, context.connection_status(), self.config.clone())?;
+        let client = client::Client::new(accounts, context.kernel()?, self.config.clone())?;
         let provider = Arc::new(provider::SepayEInvoice::new(client));
-        context.connection_probe(provider.clone())?;
+        context.contribute::<dyn ConnectionProbe>(provider.clone())?;
         context.contribute::<dyn EInvoiceProvider>(provider)
     }
 }

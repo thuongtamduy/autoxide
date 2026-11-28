@@ -3,10 +3,13 @@
 //! any specific provider. A provider's adapter is its own module that publishes
 //! `context.provide::<dyn IdentityVerifier>(...)`. Tests use `FakeIdentityVerifier` from the testkit.
 //!
-//! Minimal storage (Personal Data Protection Law 91/2025): `compliance` stores the result, the reference code,
-//! the verified name, a hash plus the last 4 digits of the document number, and the seller items a marketplace must
-//! verify (Vietnam's Decree 248/2026 Article 18: date of birth, address, legal representative, issuing country and
-//! end date of the document); it stores no face images or biometric data.
+//! Data kept (Personal Data Protection Law 91/2025, collect only what is needed): `compliance` stores the result,
+//! the provider's reference code, the verified name, a hash plus the last 4 digits of the document number, and the
+//! seller items a marketplace must verify (Vietnam's Decree 248/2026 Article 18: date of birth, address, legal
+//! representative, issuing country and end date of the document). A provider check stores nothing the provider
+//! returns beyond that: no face images, liveness videos or biometric templates. A manual review keeps the IDs of
+//! the document files the subject uploaded (module `files`); those scans can show the photo printed on the
+//! document, and are personal data to protect and delete like any other upload.
 use crate::time::{Date, Timestamp};
 use uuid::Uuid;
 

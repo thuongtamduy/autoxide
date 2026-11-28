@@ -12,7 +12,6 @@ categories.workspace = true
 publish.workspace = true
 
 [dependencies]
-async-trait.workspace = true
 autoxide-kernel.workspace = true
 base64.workspace = true
 bytes.workspace = true

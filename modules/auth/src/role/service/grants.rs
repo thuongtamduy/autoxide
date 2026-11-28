@@ -173,9 +173,12 @@ pub(crate) async fn covers_all<C: ConnectionTrait>(
 
 /// `actor` bỏ được lệnh cấm `permission` không. Cấm có hiệu lực ở cả khách (thắng mọi role, mọi nút), nên
 /// bỏ cấm mở lại `permission` ở mọi nút người giữ có grant: người bỏ phải có nó ở độ sâu `tenant`, không bị
-/// rào — không chỉ có TÊN permission ở một nhánh (P16, D-20261128-ban-lift-scope).
+/// rào — không chỉ có TÊN permission ở một nhánh (P16, D-20261128-ban-lift-scope). Permission nằm ngoài rào của
+/// khách (guardrail, bước 54) thì không ai trong khách có được, bỏ cấm không mở thêm gì: ai gỡ được role cũng bỏ được
+/// cấm đó — không thì không ai trong khách gỡ được role ấy (D-20261128-ban-lift-guardrail).
 fn lifts_ban(actor: &Principal, root: OrgId, permission: &str) -> bool {
-    actor_covers(actor, root, &[root], permission, Scope::Tenant)
+    actor.outside_guardrail(permission)
+        || actor_covers(actor, root, &[root], permission, Scope::Tenant)
 }
 
 pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {
@@ -193,7 +196,9 @@ pub(crate) fn role_beyond_you(org_id: Uuid, role_id: Uuid) -> Error {
 /// PT-9 (D-20261126-no-self-grant): sửa luật của role có hiệu lực ngay với mọi người đang giữ role — kể cả người
 /// sửa. Permission được THÊM hay NỚI rộng (`before` → `after`) phải là thứ `actor` đang có, đủ rộng, ở nút gốc
 /// (role có thể được giữ ở bất kỳ nút nào); bỏ một permission cấm cũng là mở thêm quyền, cần `actor` có
-/// permission đó. Trả permission đầu tiên vượt quyền (`None`: được).
+/// permission đó. Ngược lại cũng vậy (P16 (iv), D-20261128-role-narrow-rule): BỎ hay THU HẸP một permission là gỡ
+/// nó khỏi mọi người giữ role, như gỡ role — người sửa phải bao được grant cũ ở gốc; THÊM cấm là gỡ permission đó ở
+/// cả khách — người sửa phải có nó ở độ sâu `tenant`, không rào. Trả permission đầu tiên vượt quyền (`None`: được).
 pub(crate) fn rules_beyond(
     actor: &Principal,
     root: OrgId,
@@ -213,6 +218,18 @@ pub(crate) fn rules_beyond(
             return Some(permission.clone());
         }
     }
+    for (permission, scope) in &before.grants {
+        let now = after.grants.iter().find(|(new, _)| new == permission).map(|(_, new)| *new);
+        let narrowed = now.is_none_or(|new| rank(new) < rank(*scope));
+        if narrowed && !actor_covers(actor, root, &[root], permission, *scope) {
+            return Some(permission.clone());
+        }
+    }
+    if let Some(banned) = after.denies.iter().find(|permission| {
+        !before.denies.contains(permission) && !lifts_ban(actor, root, permission)
+    }) {
+        return Some(banned.clone());
+    }
     before
         .denies
         .iter()
@@ -225,8 +242,9 @@ pub(crate) fn rules_beyond(
 pub(crate) fn permission_beyond_you(permission: &str) -> Error {
     Error::forbidden(
         "auth.permission_beyond_you",
-        "You cannot give a role permission `{permission}` (or give it more widely, or lift a ban \
-         on it): you do not have it that widely yourself. Ask someone who has it.",
+        "You cannot give a role permission `{permission}` (or give it more widely, lift a ban on \
+         it, take it away, narrow it or ban it): you do not have it that widely yourself. Ask \
+         someone who has it.",
     )
     .with_param("permission", permission)
 }
