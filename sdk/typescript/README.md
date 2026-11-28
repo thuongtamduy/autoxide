@@ -83,6 +83,15 @@ the new token. Requests that fail at the same time wait for **one** call: a refr
 refreshes with it end the session (`auth.refresh_token_reused`). If `refresh` throws, the request rejects with
 that error (sign the user in again). Other `401` codes are not refreshed.
 
+- `token` must be a function, as above: with a fixed string the client would resend the old token.
+- Call `/refresh` through a client without `refresh` (`auth` above): a client waiting for its own refresh never
+  finishes.
+- Store the new refresh token before `refresh` resolves. After a failed refresh the next expired request refreshes
+  again with the stored token; if the failure was a lost answer to a refresh the server did make, that token is
+  spent and the server answers `auth.refresh_token_reused`. Keep the tokens on a network error, `429` or `503`,
+  and sign the user in again on a `401` — the `api.ts` of
+  [`docs/guides/web-app.md`](../../docs/guides/web-app.md#11-the-whole-apits) does this, across tabs too.
+
 Building a web app (CORS, storing tokens, several tabs, errors, uploads, a whole `api.ts`):
 [`docs/guides/web-app.md`](../../docs/guides/web-app.md). Task-by-task guides with `curl` and SDK examples:
 [`docs/guides/`](../../docs/guides/).

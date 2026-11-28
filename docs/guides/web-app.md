@@ -91,6 +91,8 @@ const api = createClient({
   baseUrl: "https://api.example.com",
   token: () => access,
   // Called once for all the requests that got `auth.token_expired` together; they are then sent again.
+  // `token` is a function (the client reads the new token), and `/refresh` goes through `auth`, a client
+  // without `refresh`: a client waiting for its own refresh would never finish.
   refresh: async () => {
     if (!refreshToken) throw new Error("signed out");
     const next = await auth.post("/api/v1/auth/refresh", { body: { refresh_token: refreshToken } });
@@ -107,6 +109,18 @@ console.log(me.name);
 Other `401` codes do not refresh: `auth.session_ended` (signed out, password changed, session revoked),
 `auth.invalid_token`, `auth.missing_token`, and `auth.refresh_token_reused` or
 `auth.invalid_refresh_token` from `/refresh` itself. Then forget the tokens and show the sign-in page.
+
+Three rules for `refresh`:
+
+- `token` must be a **function** that reads the current token: with a fixed string the client would send the
+  old token again after refreshing, and get `401` again.
+- Call `/refresh` through a client **without** the `refresh` option (`auth` above): a client that waits for
+  its own refresh never finishes.
+- Store the new refresh token **before** `refresh` resolves. If a refresh fails, the next expired request
+  refreshes again with the stored token; when the failure was only a lost answer and the server did refresh,
+  that token is already spent and the server answers `auth.refresh_token_reused` (the session ends). So treat
+  a failed refresh as temporary unless it is a `401`, and send the user to sign in on a `401` — as `api.ts`
+  below does.
 
 **Sign out** with `POST /api/v1/auth/logout` and the refresh token (`204`). The session's access tokens
 stop working at once. Forget both tokens even if the call fails (no network): the session then ends by
@@ -136,11 +150,19 @@ if (me.mfa_required) {
 
 - Hiding a button is for comfort only: the server checks every request and answers `403`
   (`permission_denied`) when the permission is missing.
-- An account made by self-registration (`POST /api/v1/auth/register`, on when the server sets
+- An account made by self-registration (`POST /api/v1/auth/registrations`, on when the server sets
   `AUTOXIDE_AUTH_SELF_REGISTRATION=true`) has **no role and no permission** until an administrator gives it
   a role (`PUT /api/v1/auth/users/{id}/roles`, permission `auth.roles.manage`). Show such users a
   "waiting for access" screen instead of an empty admin.
 - Read `/auth/me` again after a role change; a new access token is not needed.
+- Some permissions have an `_own` twin limited to the user's own records: `content.write_own` and
+  `content.publish_own` allow the same actions as `content.write` and `content.publish`, but only on entries
+  the user created. Show the button when the user has either, and let the server's `403` decide for others'
+  entries.
+- `POST /api/v1/auth/registrations` always answers `202` with the same body for a valid request, whether or
+  not the email already has an account (the owner gets a notice by mail instead), so it never reveals who
+  is registered. Tell the user to check their mail, then sign in. (`POST /api/v1/auth/register`, which
+  answered `409 auth.email_taken`, is deprecated and will be removed on 2027-05-21.)
 
 ## 5. Change a record without overwriting someone else (ETag)
 
@@ -295,16 +317,18 @@ Public endpoints (`/api/v1/content/public/…`, `/api/v1/catalog/public/…`, `/
 no sign-in and return only what is published.
 
 - `locale` is **required** on most public reads — content lists, `resolve`, terms and the feed
-  (`/content/public/posts`, `/content/public/resolve`…), and every catalog read
-  (`/catalog/public/products`…): a call without it answers `422` (`validation_failed`, field `locale`).
-  The OpenAPI document marks it required per endpoint; `/content/public/site` and `/menus/public/{key}`
-  fall back to the default language.
+  (`/content/public/posts`, `/content/public/resolve`…), and the catalog's products, categories,
+  collections and search (`/catalog/public/products`…): a call without it answers `422`
+  (`validation_failed`, field `locale`). The OpenAPI document marks it required per endpoint; others, such
+  as the sitemaps, `/content/public/site` and `/menus/public/{key}`, do without it or fall back to the
+  default language.
 - Each module has its own list of languages: `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CATALOG_LOCALES`,
   `AUTOXIDE_MENUS_LOCALES` (`en,vi` by default; `AUTOXIDE_CONTENT_DEFAULT_LOCALE` and
   `AUTOXIDE_MENUS_DEFAULT_LOCALE` name the default). There is **no endpoint that lists them** yet: put the
   list in your app's configuration, next to the API address. A language that is not configured answers
-  `422` (content: `locale_not_supported`, whose `detail` names the allowed ones; catalog:
-  `catalog.unsupported_locale`).
+  `422`: content answers `validation_failed` with an entry in `errors[]` whose `code` is
+  `locale_not_supported` and whose `detail` names the allowed ones; the catalog answers the code
+  `catalog.unsupported_locale`.
 - `site` chooses the website (an organization unit) when your pages are not served on that website's own
   domain; on a domain bound to a unit, the domain chooses it. `GET /api/v1/organizations/public/site`
   answers which website a domain is (its `unit_id` is the value for `site`).
@@ -319,7 +343,7 @@ ones a web app needs most:
 | Task | Endpoint | Permission |
 | ---- | -------- | ---------- |
 | Sign in / second step / refresh / sign out | `POST /api/v1/auth/login`, `/login/mfa`, `/refresh`, `/logout` | — |
-| Create an account (when allowed) | `POST /api/v1/auth/register` | — |
+| Create an account (when allowed) | `POST /api/v1/auth/registrations` (always `202`) | — |
 | Forgot password | `POST /api/v1/auth/password-reset`, then `/password-reset/confirm` with the token from the mail | — |
 | Who am I, what may I do | `GET /api/v1/auth/me` | signed in |
 | Change my name, language, time zone | `PATCH /api/v1/auth/me` | signed in |
@@ -327,8 +351,8 @@ ones a web app needs most:
 | Users and their roles | `GET /api/v1/auth/users`, `PUT /api/v1/auth/users/{id}/roles` | `auth.users.read`, `auth.roles.manage` |
 | Roles | `GET`/`POST /api/v1/auth/roles` | `auth.roles.read`, `auth.roles.manage` |
 | Upload, list, publish pictures | `POST`/`GET /api/v1/media`, `PATCH /api/v1/media/{id}` | `media.write`, `media.read` |
-| List, create, edit posts and pages | `GET`/`POST /api/v1/content/entries`, `PATCH /api/v1/content/entries/{id}` | `content.read`, `content.write` |
-| Publish, take down | `POST /api/v1/content/entries/{id}/publish`, `/unpublish` | `content.publish` |
+| List, create, edit posts and pages | `GET`/`POST /api/v1/content/entries`, `PATCH /api/v1/content/entries/{id}` | `content.read`, `content.write` (or `content.write_own`: own entries only) |
+| Publish, take down | `POST /api/v1/content/entries/{id}/publish`, `/unpublish` | `content.publish` (or `content.publish_own`) |
 | Categories and tags | `GET`/`POST /api/v1/content/terms` | `content.read`, `content.manage` |
 | Website menus | `GET`/`POST /api/v1/menus`, `PUT /api/v1/menus/{id}`; public `GET /api/v1/menus/public/{key}` | `menus.read`, `menus.manage` |
 | Website: list, page by address, frame | `GET /api/v1/content/public/posts`, `/public/resolve`, `/public/site` | — |
@@ -403,8 +427,12 @@ async function refresh() {
     try {
       keep(await publicApi.post("/api/v1/auth/refresh", { body: { refresh_token: current } }));
     } catch (error) {
-      keep(undefined);
-      signedOutListener();
+      // Only a 401 means the refresh token is spent, expired or revoked. A network error, 429 or 503 is
+      // temporary: keep the tokens, so the user stays signed in and the next request tries again.
+      if (error instanceof AutoxideError && error.status === 401) {
+        keep(undefined);
+        signedOutListener();
+      }
       throw error;
     }
   });
@@ -427,14 +455,14 @@ export async function signInWithCode(mfaToken: string, code: string) {
   keep(await publicApi.post("/api/v1/auth/login/mfa", { body: { mfa_token: mfaToken, code } }));
 }
 
-/** After a reload: true when a stored refresh token still works. */
-export async function resume(): Promise<boolean> {
-  if (!storedRefresh()) return false;
+/** After a reload: `signed-in`, `signed-out` (show the sign-in page) or `unavailable` (offline or busy: retry later). */
+export async function resume(): Promise<"signed-in" | "signed-out" | "unavailable"> {
+  if (!storedRefresh()) return "signed-out";
   try {
     await refresh();
-    return true;
-  } catch {
-    return false;
+    return "signed-in";
+  } catch (error) {
+    return error instanceof AutoxideError && error.status === 401 ? "signed-out" : "unavailable";
   }
 }
 

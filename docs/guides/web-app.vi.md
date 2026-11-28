@@ -86,6 +86,8 @@ const api = createClient({
   baseUrl: "https://api.example.com",
   token: () => access,
   // Called once for all the requests that got `auth.token_expired` together; they are then sent again.
+  // `token` is a function (the client reads the new token), and `/refresh` goes through `auth`, a client
+  // without `refresh`: a client waiting for its own refresh would never finish.
   refresh: async () => {
     if (!refreshToken) throw new Error("signed out");
     const next = await auth.post("/api/v1/auth/refresh", { body: { refresh_token: refreshToken } });
@@ -102,6 +104,17 @@ console.log(me.name);
 Mã `401` khác không refresh: `auth.session_ended` (đã đăng xuất, đổi mật khẩu, phiên bị thu hồi),
 `auth.invalid_token`, `auth.missing_token`, và `auth.refresh_token_reused` hay `auth.invalid_refresh_token` do
 chính `/refresh` trả. Khi đó quên token và hiện trang đăng nhập.
+
+Ba luật cho `refresh`:
+
+- `token` phải là một **hàm** đọc token hiện tại: với chuỗi cố định, sau khi refresh client vẫn gửi token cũ và
+  lại nhận `401`.
+- Gọi `/refresh` qua một client **không** có tuỳ chọn `refresh` (`auth` ở trên): client chờ chính lần refresh của
+  nó sẽ không bao giờ xong.
+- Lưu refresh token mới **trước khi** `refresh` kết thúc. Nếu một lần refresh thất bại, request hết hạn kế tiếp
+  sẽ refresh lại bằng token đã lưu; nếu thất bại đó chỉ là mất câu trả lời trong khi máy chủ đã refresh, token đó
+  đã bị dùng và máy chủ trả `auth.refresh_token_reused` (phiên kết thúc). Vì vậy coi refresh thất bại là tạm thời
+  trừ khi nó là `401`, và đưa người dùng về trang đăng nhập khi gặp `401` — như `api.ts` bên dưới.
 
 **Đăng xuất** bằng `POST /api/v1/auth/logout` với refresh token (`204`). Access token của phiên ngừng dùng được
 ngay. Quên cả hai token kể cả khi lệnh gọi lỗi (mất mạng): phiên sẽ tự kết thúc khi refresh token hết hạn.
@@ -128,11 +141,18 @@ if (me.mfa_required) {
 ```
 
 - Ẩn nút chỉ để dễ dùng: máy chủ kiểm mọi request và trả `403` (`permission_denied`) khi thiếu permission.
-- Tài khoản tự đăng ký (`POST /api/v1/auth/register`, bật khi máy chủ đặt
+- Tài khoản tự đăng ký (`POST /api/v1/auth/registrations`, bật khi máy chủ đặt
   `AUTOXIDE_AUTH_SELF_REGISTRATION=true`) **không có role và permission nào** cho tới khi quản trị viên gán role
   (`PUT /api/v1/auth/users/{id}/roles`, permission `auth.roles.manage`). Với người dùng đó, hiện màn hình "đang
   chờ cấp quyền" thay vì trang quản trị trống.
 - Đọc lại `/auth/me` sau khi đổi role; không cần access token mới.
+- Một số permission có bản `_own` chỉ áp cho bản ghi của chính người dùng: `content.write_own` và
+  `content.publish_own` cho làm đúng việc của `content.write` và `content.publish`, nhưng chỉ với bài do người đó
+  tạo. Hiện nút khi người dùng có một trong hai, và để `403` của máy chủ quyết với bài của người khác.
+- `POST /api/v1/auth/registrations` luôn trả `202` với cùng một thân cho request hợp lệ, dù email đã có tài khoản
+  hay chưa (chủ email nhận thư báo thay vào đó), nên không bao giờ lộ ai đã đăng ký. Bảo người dùng xem thư, rồi
+  đăng nhập. (`POST /api/v1/auth/register`, từng trả `409 auth.email_taken`, đã deprecated và sẽ bị bỏ ngày
+  2027-05-21.)
 
 ## 5. Sửa bản ghi mà không ghi đè người khác (ETag)
 
@@ -281,15 +301,16 @@ Endpoint công khai (`/api/v1/content/public/…`, `/api/v1/catalog/public/…`,
 đăng nhập và chỉ trả nội dung đã đăng.
 
 - `locale` **bắt buộc** ở phần lớn endpoint đọc công khai — danh sách nội dung, `resolve`, chuyên mục và feed
-  (`/content/public/posts`, `/content/public/resolve`…), và mọi endpoint đọc của catalog
+  (`/content/public/posts`, `/content/public/resolve`…), và sản phẩm, danh mục, bộ sưu tập, tìm kiếm của catalog
   (`/catalog/public/products`…): gọi thiếu thì trả `422` (`validation_failed`, trường `locale`). Tài liệu
-  OpenAPI ghi rõ bắt buộc ở từng endpoint; `/content/public/site` và `/menus/public/{key}` dùng ngôn ngữ mặc
-  định khi thiếu.
+  OpenAPI ghi rõ bắt buộc ở từng endpoint; các endpoint khác, như sitemap, `/content/public/site` và
+  `/menus/public/{key}`, không cần hoặc dùng ngôn ngữ mặc định khi thiếu.
 - Mỗi module có danh sách ngôn ngữ riêng: `AUTOXIDE_CONTENT_LOCALES`, `AUTOXIDE_CATALOG_LOCALES`,
   `AUTOXIDE_MENUS_LOCALES` (mặc định `en,vi`; `AUTOXIDE_CONTENT_DEFAULT_LOCALE` và
   `AUTOXIDE_MENUS_DEFAULT_LOCALE` nêu ngôn ngữ mặc định). Hiện **chưa có endpoint liệt kê** các ngôn ngữ này: ghi
-  danh sách vào cấu hình của ứng dụng, cạnh địa chỉ API. Ngôn ngữ chưa cấu hình trả `422` (content:
-  `locale_not_supported`, có `detail` nêu các ngôn ngữ được nhận; catalog: `catalog.unsupported_locale`).
+  danh sách vào cấu hình của ứng dụng, cạnh địa chỉ API. Ngôn ngữ chưa cấu hình trả `422`: content trả
+  `validation_failed` với một mục trong `errors[]` có `code` là `locale_not_supported` và `detail` nêu các ngôn ngữ
+  được nhận; catalog trả mã `catalog.unsupported_locale`.
 - `site` chọn website (một đơn vị tổ chức) khi trang không chạy trên tên miền riêng của website đó; trên tên miền
   đã gắn với một đơn vị thì tên miền tự chọn. `GET /api/v1/organizations/public/site` cho biết tên miền là
   website nào (`unit_id` của nó là giá trị cho `site`).
@@ -304,7 +325,7 @@ web cần nhiều nhất:
 | Việc | Endpoint | Permission |
 | ---- | -------- | ---------- |
 | Đăng nhập / bước hai / refresh / đăng xuất | `POST /api/v1/auth/login`, `/login/mfa`, `/refresh`, `/logout` | — |
-| Tạo tài khoản (khi được phép) | `POST /api/v1/auth/register` | — |
+| Tạo tài khoản (khi được phép) | `POST /api/v1/auth/registrations` (luôn `202`) | — |
 | Quên mật khẩu | `POST /api/v1/auth/password-reset`, rồi `/password-reset/confirm` với token trong thư | — |
 | Tôi là ai, được làm gì | `GET /api/v1/auth/me` | đã đăng nhập |
 | Đổi tên, ngôn ngữ, múi giờ của tôi | `PATCH /api/v1/auth/me` | đã đăng nhập |
@@ -312,8 +333,8 @@ web cần nhiều nhất:
 | Người dùng và role của họ | `GET /api/v1/auth/users`, `PUT /api/v1/auth/users/{id}/roles` | `auth.users.read`, `auth.roles.manage` |
 | Role | `GET`/`POST /api/v1/auth/roles` | `auth.roles.read`, `auth.roles.manage` |
 | Tải lên, liệt kê, công khai ảnh | `POST`/`GET /api/v1/media`, `PATCH /api/v1/media/{id}` | `media.write`, `media.read` |
-| Liệt kê, tạo, sửa bài viết và trang | `GET`/`POST /api/v1/content/entries`, `PATCH /api/v1/content/entries/{id}` | `content.read`, `content.write` |
-| Đăng, gỡ bài | `POST /api/v1/content/entries/{id}/publish`, `/unpublish` | `content.publish` |
+| Liệt kê, tạo, sửa bài viết và trang | `GET`/`POST /api/v1/content/entries`, `PATCH /api/v1/content/entries/{id}` | `content.read`, `content.write` (hoặc `content.write_own`: chỉ bài của mình) |
+| Đăng, gỡ bài | `POST /api/v1/content/entries/{id}/publish`, `/unpublish` | `content.publish` (hoặc `content.publish_own`) |
 | Chuyên mục và thẻ | `GET`/`POST /api/v1/content/terms` | `content.read`, `content.manage` |
 | Menu của website | `GET`/`POST /api/v1/menus`, `PUT /api/v1/menus/{id}`; công khai `GET /api/v1/menus/public/{key}` | `menus.read`, `menus.manage` |
 | Website: danh sách, trang theo địa chỉ, khung trang | `GET /api/v1/content/public/posts`, `/public/resolve`, `/public/site` | — |
@@ -386,8 +407,12 @@ async function refresh() {
     try {
       keep(await publicApi.post("/api/v1/auth/refresh", { body: { refresh_token: current } }));
     } catch (error) {
-      keep(undefined);
-      signedOutListener();
+      // Only a 401 means the refresh token is spent, expired or revoked. A network error, 429 or 503 is
+      // temporary: keep the tokens, so the user stays signed in and the next request tries again.
+      if (error instanceof AutoxideError && error.status === 401) {
+        keep(undefined);
+        signedOutListener();
+      }
       throw error;
     }
   });
@@ -410,14 +435,14 @@ export async function signInWithCode(mfaToken: string, code: string) {
   keep(await publicApi.post("/api/v1/auth/login/mfa", { body: { mfa_token: mfaToken, code } }));
 }
 
-/** After a reload: true when a stored refresh token still works. */
-export async function resume(): Promise<boolean> {
-  if (!storedRefresh()) return false;
+/** After a reload: `signed-in`, `signed-out` (show the sign-in page) or `unavailable` (offline or busy: retry later). */
+export async function resume(): Promise<"signed-in" | "signed-out" | "unavailable"> {
+  if (!storedRefresh()) return "signed-out";
   try {
     await refresh();
-    return true;
-  } catch {
-    return false;
+    return "signed-in";
+  } catch (error) {
+    return error instanceof AutoxideError && error.status === 401 ? "signed-out" : "unavailable";
   }
 }
 

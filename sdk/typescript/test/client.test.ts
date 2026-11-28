@@ -11,13 +11,19 @@ interface Sent {
   url: string;
   method: string;
   headers: Record<string, string>;
+  body: unknown;
 }
 
 /** A fake `fetch` that answers from `reply` and records every request. */
 function fakeFetch(reply: (sent: Sent, index: number) => Response | Promise<Response>) {
   const sent: Sent[] = [];
   const fetch = (async (input: string, init: RequestInit) => {
-    const request: Sent = { url: input, method: String(init.method), headers: { ...(init.headers as Record<string, string>) } };
+    const request: Sent = {
+      url: input,
+      method: String(init.method),
+      headers: { ...(init.headers as Record<string, string>) },
+      body: init.body,
+    };
     sent.push(request);
     return reply(request, sent.length - 1);
   }) as unknown as typeof globalThis.fetch;
@@ -186,4 +192,55 @@ test("không có refresh thì auth.token_expired báo lỗi như cũ", async () 
   const api = createClient({ baseUrl: "https://api.test", fetch, token: "t" });
   await assert.rejects(api.get("/api/v1/auth/me"), (error: unknown) => error instanceof AutoxideError && error.status === 401);
   assert.equal(sent.length, 1);
+});
+
+test("refresh: sau một lần refresh thất bại, lần hết hạn sau vẫn refresh được", async () => {
+  let token = "old";
+  let refreshes = 0;
+  const { fetch } = fakeFetch((request) =>
+    request.headers.Authorization === "Bearer new" ? json(200, { data: { ok: true } }) : expired(),
+  );
+  const api = createClient({
+    baseUrl: "https://api.test",
+    fetch,
+    token: () => token,
+    refresh: async () => {
+      refreshes += 1;
+      if (refreshes === 1) throw new TypeError("network down");
+      token = "new";
+    },
+  });
+  await assert.rejects(api.get("/api/v1/auth/me"), /network down/);
+  assert.deepEqual(await api.get("/api/v1/auth/me"), { ok: true });
+  assert.equal(refreshes, 2);
+});
+
+test("refresh: thân Blob và FormData được gửi lại nguyên vẹn sau refresh", async () => {
+  let token = "old";
+  const { fetch, sent } = fakeFetch((request) =>
+    request.headers.Authorization === "Bearer new" ? json(201, { data: { id: "m1" } }) : expired(),
+  );
+  const api = createClient({
+    baseUrl: "https://api.test",
+    fetch,
+    token: () => token,
+    refresh: async () => {
+      token = "new";
+    },
+  });
+  const file = new Blob(["picture bytes"], { type: "image/png" });
+  await api.post("/api/v1/media", { query: { name: "a.png" }, body: file, idempotencyKey: "k1" });
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0]?.body, file);
+  assert.equal(sent[1]?.body, file);
+  assert.equal(await (sent[1]?.body as Blob).text(), "picture bytes");
+  assert.equal(sent[1]?.headers["Idempotency-Key"], "k1");
+
+  token = "old";
+  const form = new FormData();
+  form.set("field", "value");
+  await api.post("/api/v1/media", { query: { name: "b.png" }, body: form as never });
+  assert.equal(sent.length, 4);
+  assert.equal(sent[3]?.body, form);
+  assert.equal((sent[3]?.body as FormData).get("field"), "value");
 });

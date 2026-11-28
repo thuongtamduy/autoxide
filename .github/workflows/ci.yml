@@ -233,6 +233,10 @@ jobs:
         working-directory: sdk/typescript
         run: npm ci && npx tsc --noEmit
       # Hành vi chạy thật của client (ETag, refresh tự động): `node:test`, không thêm thư viện.
+      # Dự án dùng SDK có thể bật `exactOptionalPropertyTypes`: SDK là mã nguồn `.ts`, lỗi kiểu của nó hiện ở dự án họ.
+      - name: tsc --noEmit --exactOptionalPropertyTypes
+        working-directory: sdk/typescript
+        run: npx tsc --noEmit --exactOptionalPropertyTypes
       - name: SDK tests (node --test)
         working-directory: sdk/typescript
         run: npm test

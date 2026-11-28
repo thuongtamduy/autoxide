@@ -57,12 +57,12 @@ export type RequestOptions<P extends keyof paths, M extends Method> = {
   /** Makes a write safe to retry: a random UUID per logical operation (see docs/guides/retries.md). */
   idempotencyKey?: string;
   /** The `ETag` you have: an unchanged resource answers `{ notModified: true }`. */
-  ifNoneMatch?: string;
+  ifNoneMatch?: string | undefined;
   /**
    * The `ETag` you read, sent as `If-Match`: the change applies only if nobody changed the record since
-   * (otherwise `412 precondition_failed`). Get it with `requestWithHeaders`.
+   * (otherwise `412 precondition_failed`). Get it with `requestWithHeaders`. `undefined` sends nothing.
    */
-  ifMatch?: string;
+  ifMatch?: string | undefined;
 };
 
 /** An answer with its status and headers, from `requestWithHeaders`. */
@@ -88,7 +88,10 @@ export interface ClientOptions {
   fetch?: typeof fetch;
   /**
    * Gets a new access token when the server answers `401 auth.token_expired`, then the request is sent
-   * once more. Call `POST /api/v1/auth/refresh` here and store the new pair where `token` reads it.
+   * once more. Call `POST /api/v1/auth/refresh` here and store the new pair where `token` reads it, so
+   * `token` must be a function (a fixed string would send the old token again). Store the new refresh
+   * token before this resolves. Call `/refresh` through a client **without** this option: a client
+   * waiting for its own refresh would never finish.
    * Requests that fail together share one call: a refresh token works once, and two refreshes at the
    * same time would end the session (`auth.refresh_token_reused`). If it throws, the request rejects
    * with that error: sign the user in again. Only `auth.token_expired` triggers it.
@@ -183,7 +186,7 @@ export function createClient(options: ClientOptions): Client {
     if (request.ifNoneMatch) headers["If-None-Match"] = request.ifNoneMatch;
     if (request.ifMatch) headers["If-Match"] = request.ifMatch;
 
-    let body: BodyInit | undefined;
+    let body: BodyInit | null = null;
     const raw = request.body;
     if (raw instanceof Blob || typeof raw === "string" || raw instanceof FormData) {
       body = raw;

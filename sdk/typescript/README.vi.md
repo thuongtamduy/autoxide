@@ -83,6 +83,15 @@ Các request lỗi cùng lúc chờ **một** lần gọi chung: refresh token c
 làm kết thúc cả phiên (`auth.refresh_token_reused`). `refresh` ném lỗi thì request báo đúng lỗi đó (cho người dùng
 đăng nhập lại). Mã `401` khác không refresh.
 
+- `token` phải là hàm, như trên: với chuỗi cố định client sẽ gửi lại token cũ.
+- Gọi `/refresh` qua một client không có `refresh` (`auth` ở trên): client chờ chính lần refresh của nó sẽ không
+  bao giờ xong.
+- Lưu refresh token mới trước khi `refresh` kết thúc. Sau một lần refresh thất bại, request hết hạn kế tiếp sẽ
+  refresh lại bằng token đã lưu; nếu thất bại đó là mất câu trả lời của một lần refresh máy chủ đã làm, token đó đã
+  bị dùng và máy chủ trả `auth.refresh_token_reused`. Giữ token khi lỗi mạng, `429` hay `503`, và cho người dùng
+  đăng nhập lại khi gặp `401` — `api.ts` trong
+  [`docs/guides/web-app.vi.md`](../../docs/guides/web-app.vi.md#11-cả-file-apits) làm như vậy, kể cả giữa các tab.
+
 Dựng ứng dụng web (CORS, lưu token, nhiều tab, lỗi, tải ảnh, cả file `api.ts`):
 [`docs/guides/web-app.vi.md`](../../docs/guides/web-app.vi.md). Hướng dẫn theo tình huống, có ví dụ `curl` và SDK:
 [`docs/guides/`](../../docs/guides/).
