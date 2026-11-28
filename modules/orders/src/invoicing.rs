@@ -336,6 +336,33 @@ fn document_line(row: &line::Model, quantity: i64, currency: Currency) -> NewDoc
     document_line
 }
 
+/// Hoá đơn của một đơn theo lời khuyên của engine thuế (LG-7).
+#[derive(Debug, PartialEq, Eq)]
+enum InvoiceChoice {
+    /// Luật không buộc hoá đơn điện tử: không tự lập.
+    NotRequired,
+    /// Loại luật đặt, hay mặc định khi bán tại quầy.
+    Kind(String),
+    /// Người bán chọn: cài đặt `orders.invoice_kind`.
+    Configured,
+}
+
+/// `advice`: lời khuyên của engine thuế (`None`: chưa cài `tax` hay người bán chưa có hồ sơ thuế — như trước:
+/// bán tại quầy → hoá đơn máy tính tiền, còn lại theo cài đặt).
+fn invoice_choice(
+    advice: Option<autoxide_tax::api::InvoiceAdvice>,
+    at_counter: bool,
+) -> InvoiceChoice {
+    if advice.as_ref().is_some_and(|advice| !advice.einvoice_required) {
+        return InvoiceChoice::NotRequired;
+    }
+    match advice.and_then(|advice| advice.kind) {
+        Some(kind) => InvoiceChoice::Kind(kind),
+        None if at_counter => InvoiceChoice::Kind("cash_register_invoice".to_owned()),
+        None => InvoiceChoice::Configured,
+    }
+}
+
 impl OrdersService {
     /// `orders.invoice_timing` hiệu lực của đơn.
     pub(crate) async fn invoice_timing(
@@ -421,15 +448,33 @@ impl OrdersService {
         if document_lines.is_empty() {
             return Ok(None);
         }
-        let kind = if row.channel == "pos" {
-            "cash_register_invoice".to_owned()
-        } else {
-            self.setting(tenant, OrgId::from_uuid(row.org_id), &INVOICE_KIND)
+        // Loại hoá đơn theo dữ liệu thuế của người bán (LG-7, D-20261128-tax-pack-vn-decree-68): engine thuế nói
+        // có bắt buộc hoá đơn điện tử không và loại nào luật đặt; không có hồ sơ thuế thì như trước (bán tại quầy →
+        // hoá đơn máy tính tiền, còn lại theo `orders.invoice_kind`).
+        let org = OrgId::from_uuid(row.org_id);
+        let at_counter = row.channel == "pos";
+        let advice = match &self.sources.tax {
+            Some(engine) => {
+                let on =
+                    engine.tax_date(tenant, org, autoxide_kernel::time::Timestamp::now()).await?;
+                engine.invoice_advice(tenant, org, on, at_counter).await?
+            }
+            None => None,
+        };
+        let kind = match invoice_choice(advice, at_counter) {
+            InvoiceChoice::NotRequired => {
+                // Hộ kinh doanh dưới ngưỡng: luật không buộc hoá đơn điện tử; không tự lập (người bán vẫn lập tay).
+                tracing::info!(order_id = %id, "no e-invoice required for this seller; none issued automatically");
+                return Ok(None);
+            }
+            InvoiceChoice::Kind(kind) => kind,
+            InvoiceChoice::Configured => self
+                .setting(tenant, org, &INVOICE_KIND)
                 .await?
                 .as_ref()
                 .and_then(Value::as_str)
                 .unwrap_or("vat_invoice")
-                .to_owned()
+                .to_owned(),
         };
         let mut draft = NewDocument::new(
             OrgId::from_uuid(row.org_id),
@@ -799,5 +844,36 @@ fn buyer_of(row: &order::Model) -> Buyer {
             }
             buyer
         }
+    }
+}
+
+#[cfg(test)]
+mod choice_tests {
+    use super::{InvoiceChoice, invoice_choice};
+    use autoxide_tax::api::InvoiceAdvice;
+
+    /// Engine thuế quyết khi người bán có hồ sơ thuế (LG-7); không thì như trước theo kênh.
+    #[test]
+    fn loai_hoa_don_theo_loi_khuyen_cua_engine_thue() {
+        let advice = |required, kind: Option<&str>| {
+            Some(InvoiceAdvice::new(required, kind.map(str::to_owned), Vec::new()))
+        };
+        let kind = |name: &str| InvoiceChoice::Kind(name.to_owned());
+        // Hộ dưới ngưỡng NĐ 68/2026: không tự lập, kể cả tại quầy.
+        assert_eq!(invoice_choice(advice(false, None), true), InvoiceChoice::NotRequired);
+        // Hộ kinh doanh bán online: hoá đơn bán hàng, không phải hoá đơn GTGT.
+        assert_eq!(
+            invoice_choice(advice(true, Some("sales_invoice")), false),
+            kind("sales_invoice")
+        );
+        assert_eq!(
+            invoice_choice(advice(true, Some("cash_register_invoice")), true),
+            kind("cash_register_invoice")
+        );
+        // Người bán khấu trừ: tự chọn; tại quầy giữ mặc định máy tính tiền.
+        assert_eq!(invoice_choice(advice(true, None), false), InvoiceChoice::Configured);
+        assert_eq!(invoice_choice(advice(true, None), true), kind("cash_register_invoice"));
+        assert_eq!(invoice_choice(None, true), kind("cash_register_invoice"));
+        assert_eq!(invoice_choice(None, false), InvoiceChoice::Configured);
     }
 }

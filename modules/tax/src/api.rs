@@ -241,6 +241,30 @@ pub struct InvoiceRequirements {
     pub legal_basis: Option<String>,
 }
 
+/// Which invoice the seller issues for a sale, decided by the tax data of the seller's jurisdiction (see
+/// [`TaxEngine::invoice_advice`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[non_exhaustive]
+pub struct InvoiceAdvice {
+    /// `false` when the law does not make the seller issue e-invoices (Vietnam: a household business with revenue
+    /// under the threshold of rule `einvoice.not_required_below`); it may still issue them by hand. Unknown revenue
+    /// counts as required.
+    pub einvoice_required: bool,
+    /// The invoice kind the law sets, or `None` when the seller chooses: `cash_register_invoice` for a sale at the
+    /// counter when cash register invoices are required; `sales_invoice` for a seller outside the VAT credit
+    /// method (a VAT invoice would be wrong).
+    pub kind: Option<String>,
+    /// Legal basis of the rules that applied.
+    pub legal_basis: Vec<String>,
+}
+
+impl InvoiceAdvice {
+    /// Advice with these values (for an engine of another crate, or a fake engine in tests).
+    pub fn new(einvoice_required: bool, kind: Option<String>, legal_basis: Vec<String>) -> Self {
+        InvoiceAdvice { einvoice_required, kind, legal_basis }
+    }
+}
+
 /// Tax engine (published by the `tax` module).
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
@@ -284,6 +308,19 @@ pub trait TaxEngine: Send + Sync {
         _org: OrgId,
         _on: Date,
     ) -> Result<Option<String>, Error> {
+        Ok(None)
+    }
+    /// Invoice advice for a sale by seller `org` on date `on` (`at_counter`: a sale at the counter, such as a POS
+    /// sale). `None` when the seller has no tax profile — the caller keeps its own default then.
+    ///
+    /// The default implementation returns `None`; an engine with jurisdiction rules overrides it.
+    async fn invoice_advice(
+        &self,
+        _tenant: &TenantContext,
+        _org: OrgId,
+        _on: Date,
+        _at_counter: bool,
+    ) -> Result<Option<InvoiceAdvice>, Error> {
         Ok(None)
     }
     /// The tax date of instant `at` in tax jurisdiction `jurisdiction` (pack rule `tax_date.time_zone`), for a
