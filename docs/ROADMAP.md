@@ -104,11 +104,29 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Hai hạng hợp đồng: kernel tách lõi ổn định khỏi phần thử nghiệm (hoá đơn điện tử, ZNS, thoại, khối trang, phân tích,
       `bench_seed`… sau feature hay mô-đun `unstable`); module gắn nhãn hạng; `docs/COMPATIBILITY.md` (EN + VI) nói rõ hạng
       nào được cam kết gì
+      - [x] `docs/COMPATIBILITY.md` (EN + VI): ba hạng của Rust API và cam kết của từng hạng; hạng module đã có từ bước 70
+            (`Stability`, `docs/MODULES.md`)
+      - [ ] Feature `unstable` + đường `autoxide_kernel::unstable::…`, `bench_seed` sang testkit, semver-checks chạy feature
+            mặc định, luật `stable-signatures` (PR 6 của `docs/research/kernel-contract-1-0.md`)
 - [ ] Hợp đồng `Module` một cách làm cho mỗi việc: gom 49 hàm của trait và ~50 hàm đăng ký của `StartContext` thành một
       cách khai báo (manifest hay trait con theo nhóm), mỗi khái niệm một đường đăng ký; giữ đường cũ `#[deprecated]` tới khi
       mọi module đã chuyển; gỡ `TenantContext::legacy_default`
+      - [x] `Manifest` (builder, khái niệm thử nghiệm sau `Manifest::unstable`), đăng ký trong `start` (`subscribe`,
+            `routes`, `tools`, `job`, `task`, `check`, `prompt`, `mcp_resource`, `client_config`, `seed_tenant`,
+            `sample_data`, `sandbox_copy`), `StartContext::kernel::<H>()`; `notes` chuyển làm mẫu; luật
+            `module-contract-legacy` (baseline 38 module) và `module-contract-mixed`; gỡ `legacy_default`
+            (D-20261128-manifest-defaults)
+      - [ ] `contribute::<dyn Trait>` thay ~20 hàm đăng ký riêng của `StartContext` (`work_source`, `personal_data`…) và
+            `seed_tenant`/`sample_data`/`sandbox_copy`, hook của `relocation` — **làm trước khi chuyển cụm module đầu
+            tiên** (D-20261128-manifest-defaults)
+      - [ ] Chuyển 38 module theo cụm (PR 7–12); baseline rỗng thì gắn `#[deprecated]` cho hàm cũ và getter cũ của
+            `StartContext`, bản sau gỡ (D-20261127-transition-paths)
 - [ ] `#[non_exhaustive]` cho enum và struct công khai sẽ còn lớn thêm (kernel, testkit, `api` của module); mọi `#[deprecated]`
       viết tiếng Anh, nêu cái thay thế
+      - [x] Phần hợp đồng module: `Manifest` và `UnstableManifest` (không trường công khai, thêm trường không phá vỡ),
+            `KernelHandle` niêm phong, `#[non_exhaustive]` cho `Stability`, `SelectionError`, `InactiveModule`, `DormantModule`; `#[deprecated]`
+            tiếng Việt duy nhất (`legacy_default`) đã gỡ
+      - [ ] Phần còn lại cùng luật `exhaustive` (danh sách ngoại lệ) và `deprecated-note` (PR 6)
 - [ ] Tách `autoxide-host` (phần chỉ binary dùng) khỏi kernel; file trên 880 dòng tách theo trách nhiệm (phần đa khách
       ~21.700 dòng). Tách phần còn lại của kernel theo lớp: **sau 1.0** — đo 26/11/2026 chỉ rút 6–9% thời gian build lại, dưới
       ngưỡng 20% (D-20261126-kernel-crates; mặt tiền giữ đường dẫn nên tách sau không phá vỡ)
@@ -117,12 +135,13 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       tính hạn mức
 - [ ] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
       chéo lúc lưu, có cache
-- [ ] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
+- [x] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
       một event cho mọi bên đăng ký khớp tên theo thứ tự đăng ký và dừng ở bên đầu tiên trả lỗi (hay panic, hay cả lượt
       quá `DELIVERY_TIMEOUT`); cả event bị đánh dấu lỗi và thử lại với backoff từ bên đầu tiên — bên đã nhận rồi nhận lại
       (D-054), bên sau chưa nhận gì. Sau `MAX_ATTEMPTS` lần event thành hỏng hẳn (bên sau không bao giờ nhận), riêng
       `auth.user_deleted` thử lại mỗi giờ mãi mãi (D-149). Cân nhắc ghi trạng thái giao theo từng bên nhận (bảng con của
-      outbox hay cột theo module), để thử lại chỉ bên lỗi và bên khác không phải chờ
+      outbox hay cột theo module), để thử lại chỉ bên lỗi và bên khác không phải chờ. **Xong:** bảng
+      `kernel_event_deliveries` giữ lần giao của riêng bên lỗi, bên khác nhận ngay (D-20261128-event-per-subscriber)
 
 ### G2 — Không để thư viện níu chân (D-20261126-library-isolation)
 
@@ -346,11 +365,13 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
       (không còn lỗi hợp đồng mở); chỉ sửa lỗi trong thời gian này
 - [ ] Chạy thử vòng 1 bằng agent đóng vai người dùng (`docs/trials/rc-trial-r1/`, agent đóng vai, không phải người thật) —
       các mục dưới đây đều có mã UT-x trong báo cáo; xong hết thì chạy vòng 2 trên `1.0.0-rc.1`
-  - [ ] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
-        `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập
-    - [ ] UT-1 tiếp: xuất kho lỗi 4xx hiện chỉ `warn` — thêm cảnh báo / đối soát cho người vận hành; đối soát các đơn giao
+  - [x] UT-1 (chặn): giao hàng không ghi dòng `sale` vào kho — `on_hand` không giảm, reservation vẫn `confirmed`, đơn vẫn
+        `unfulfilled` sau `delivered`; có test chạy trên cả hai database; chạm tiền / kho nên qua kiểm độc lập (#589)
+    - [x] UT-1 tiếp: xuất kho lỗi 4xx hiện chỉ `warn` — thêm cảnh báo / đối soát cho người vận hành; đối soát các đơn giao
           trước bản sửa; `inventory`: chỗ giữ do nhân viên trả tay (`release_reason=manual`) rồi hàng vẫn giao hiện chỉ log
-          `debug` — đổi thành `warn` + metric
+          `debug` — đổi thành `warn` + metric (metric `inventory_order_event_unapplied_total`,
+          `inventory_delivery_after_manual_release_total`, luật cảnh báo `AutoxideStockNotIssued`, mục đối soát ở
+          `docs/INVENTORY.md`)
   - [ ] UT-2 (chặn): phân quyền khi quản lý API key qua MCP chưa đúng phạm vi (đã báo kín, công bố sau khi sửa); có test;
         chạm bảo mật nên qua kiểm độc lập
   - [ ] UT-3: đường chạy bằng binary không Docker cho người mới: README trỏ tới DEPLOY.md mục B, hai secret ở bước
@@ -683,12 +704,16 @@ thật (P7).
   - [ ] Bản ghi đã gắn `org_id` không có trong cây từ trước PT-8: vẫn hiện trong danh sách của người có quyền toàn
         khách nhưng mở / sửa / xoá theo ID bị 404 / 403 — cần lệnh báo cáo và dọn (gắn về nút gốc hay nút đúng).
         Thiết kế đã chọn, chưa làm: D-20261128-p17-design-left
-  - [ ] `orders.payment_currency_mismatch` bỏ qua kiểm khi `PosPayment.currencies` rỗng (chỉ REST điền) — thêm
+  - [x] `orders.payment_currency_mismatch` bỏ qua kiểm khi `PosPayment.currencies` rỗng (chỉ REST điền) — thêm
         đường gọi mới (tool MCP bán ở quầy) dễ quên; nên bắt buộc tiền tệ trong kiểu dữ liệu của service
-  - [ ] Bậc phí vận chuyển, cân nặng gửi GHN bão hoà về `i64::MAX` thay vì báo 422 — cần trần cân nặng / kích thước
-        ở đầu vào (như catalog 1e7 mm)
-  - [ ] Khoản thanh toán khác tiền tệ của đơn (`orders/src/payments.rs`, sau đối soát chấp nhận khoản nhận) nay vào
-        dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
+        (`PosPayment::new` nhận `Money`, trường riêng tư)
+  - [x] Bậc phí vận chuyển, cân nặng gửi GHN bão hoà về `i64::MAX` thay vì báo 422 — cần trần cân nặng / kích thước
+        ở đầu vào (như catalog 1e7 mm) — trần món 1e7 g / 1e7 mm, một lần giao 1e9 g (`shipping.load_too_large`,
+        `ghn.parcel_too_large`), phí bậc tràn → `money.overflow`
+  - [x] Khoản thanh toán khác tiền tệ của đơn (`orders/src/payments.rs`, sau đối soát chấp nhận khoản nhận) nay vào
+        dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành (mã
+        `orders.payment_received_currency_mismatch`, metric + luật cảnh báo `AutoxidePaymentCurrencyMismatch`, test,
+        mục "A payment in another currency" ở `docs/MONEY.md`)
   - [x] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
         (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`). Xong: đọc lời gọi
         nhiều dòng, chỗ điền / đối số mang tên địa chỉ, `.to_string()` (D-20261128-address-key-rule)

@@ -8,12 +8,14 @@
 //!    certainly exists - never "changed the data but forgot to notify", nor "notified but the data
 //!    did not change".
 //! 3. After the commit, the kernel's [`Dispatcher`] reads the event tables and delivers them to the
-//!    modules that subscribed (`Module::subscriptions`). When a receiver fails it is retried with
-//!    backoff; after [`MAX_ATTEMPTS`] attempts the event is marked failed and logged.
+//!    modules that subscribed (`Module::subscriptions`), one module after another. A failing module does not
+//!    hold up the others: it alone is retried with backoff, and after [`MAX_ATTEMPTS`] attempts its delivery
+//!    is marked failed and logged (D-20261128-event-per-subscriber).
 //!
 //! Delivery is **at-least-once**: a receiver must tolerate receiving the same event again
 //! (compared by `id`), because the server may shut down in the middle of delivery.
 
+pub(crate) mod deliveries;
 mod dispatcher;
 mod migration;
 mod outbox;
@@ -300,7 +302,8 @@ impl Delivered {
     }
 }
 
-/// An event receiver. When it returns an error the event is delivered again later.
+/// An event receiver. When it returns an error (or panics, or runs too long) the event is delivered again
+/// later to this module only; the other subscribing modules are not held up.
 //
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]

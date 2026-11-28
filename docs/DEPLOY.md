@@ -1234,7 +1234,7 @@ labelled by `database` and `module`:
 | `jobs_pending` | Jobs not done yet, scheduled ones included |
 | `jobs_oldest_pending_seconds` | How long the oldest job that is due has waited (0 when none) |
 | `jobs_dead` | Jobs in the dead-letter queue (`autoxide jobs failed`) |
-| `events_pending`, `events_oldest_pending_seconds`, `events_dead` | The same for events waiting to be delivered to subscribers |
+| `events_pending`, `events_oldest_pending_seconds`, `events_dead` | The same for events waiting to be delivered to subscribers, counting each subscribing module still to be retried |
 | `database_connections{pool,state}`, `database_connections_max{pool}` | Connections of the `read` and `write` pools, `in_use` or `idle`, and their maximum |
 
 The `database` label names the database (`main`, or the placement of a tenant with its own database);

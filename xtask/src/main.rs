@@ -72,6 +72,7 @@ mod library_layer;
 mod mcp_principal;
 mod metric_labels;
 mod migration_releases;
+mod module_contract;
 mod permission_first;
 mod publish;
 mod regen;
@@ -380,6 +381,14 @@ fn check() -> ExitCode {
             eprintln!("{warning}");
         }
         violations.extend(layer.violations);
+        // Hợp đồng module một đường (D-20261126-module-manifest): module còn khai bằng hàm cũ ở
+        // `module-contract-legacy.txt`, chỉ giảm.
+        let contract = module_contract::check(&workspace)?;
+        let contract = baseline::apply_file(&workspace.root, module_contract::BASELINE, contract)?;
+        for warning in &contract.warnings {
+            eprintln!("{warning}");
+        }
+        violations.extend(contract.violations);
         violations.extend(library_layer::check_private_paths(&workspace)?);
         violations.extend(library_layer::check_single_copies(&workspace.root)?);
         violations.extend(library_layer::check_strict(&workspace)?);

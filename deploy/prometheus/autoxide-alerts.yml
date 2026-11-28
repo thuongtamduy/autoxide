@@ -116,3 +116,22 @@ groups:
         annotations:
           summary: "More than 20 mails bounced for good in the last hour."
           action: "Check the sender domain (SPF, DKIM, DMARC) and the SMTP account; see docs/DEPLOY.md, Mail that bounces."
+      # Commerce signals that need a person: goods left without being taken from stock, money in the wrong currency.
+      - alert: AutoxideStockNotIssued
+        expr: |
+          # `sum(…)` drops every label so the three counters can be added; `or vector(0)` covers a counter not seen yet.
+          (sum(increase(inventory_delivery_unissued_total[1h])) or vector(0))
+            + (sum(increase(inventory_order_event_unapplied_total[1h])) or vector(0))
+            + (sum(increase(inventory_delivery_after_manual_release_total[1h])) or vector(0)) > 0
+        labels:
+          severity: warn
+        annotations:
+          summary: "An order event (a delivery, a confirmation, a return) could not be applied to stock in the last hour, or goods were delivered after staff released their reservation."
+          action: "Find the orders in the warning log lines of `inventory` (`order_id`, `code`), then reconcile each one; see docs/INVENTORY.md, Stock that did not leave with a delivery."
+      - alert: AutoxidePaymentCurrencyMismatch
+        expr: sum(increase(orders_payment_currency_mismatch_total[1h])) > 0
+        labels:
+          severity: warn
+        annotations:
+          summary: "A payment of an order was received in another currency than the order; it was not counted."
+          action: "Find the payment in the error log line (`payment_id`, `order_id`), refund it through the ledger, then have the buyer pay again or cancel the order; see docs/MONEY.md, A payment in another currency."

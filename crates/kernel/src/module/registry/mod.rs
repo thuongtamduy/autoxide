@@ -132,6 +132,13 @@ impl Modules {
                 problems.push(format!("module name `{reserved}` is reserved for the kernel"));
             }
         }
+        // Một khái niệm một đường: module có manifest mà còn cài hàm khai báo cũ thì hàm cũ âm thầm thắng manifest.
+        for module in &modules {
+            let old = super::started::static_overrides(module.as_ref());
+            if !old.is_empty() {
+                problems.push(super::started::mixed_message(module.name(), &old));
+            }
+        }
         let catalog = crate::module_catalog::ModuleCatalog::default();
         // Danh sách lý do (bước 51 P18): kiểm khai báo, giữ trong sổ cho kernel và module đọc.
         let mut reason_lists = Vec::new();
@@ -471,6 +478,8 @@ impl Modules {
             let name = module.name();
             let mut context = StartContext {
                 module: name,
+                declared: module.manifest().declared,
+                registered: super::started::Registered::default(),
                 database,
                 permissions: &self.permissions,
                 events: &self.events,
@@ -511,6 +520,12 @@ impl Modules {
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
+            // Module khai bằng manifest: thứ nó đăng ký trong `start` được trả qua các hàm "gọi sau start" của
+            // trait mà kernel đọc (`started.rs`). `Box::new(Placeholder)` chỉ giữ chỗ trong lúc đổi vỏ.
+            let registered = std::mem::take(&mut context.registered);
+            drop(context);
+            let inner = std::mem::replace(module, Box::new(super::started::Placeholder));
+            *module = super::started::Started::wrap(inner, registered).map_err(ModuleError)?;
         }
         let missing = blocks.missing_sources();
         if !missing.is_empty() {
