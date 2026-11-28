@@ -3,8 +3,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use autoxide_kernel::config::{LogConfig, LogFormat, LogLevel};
 use autoxide_testkit::{TestApp, TestDatabase};
+use tracing::level_filters::LevelFilter;
+
+use super::http::json_subscriber;
 
 /// Nơi ghi log vào bộ nhớ, để test đọc lại.
 #[derive(Clone, Default)]
@@ -34,8 +36,7 @@ async fn log_request_mang_tenant_id() {
     TestDatabase::run(async |test| {
         let app = TestApp::builder(test).build().await.unwrap();
         let buffer = LogBuffer::default();
-        let config = LogConfig::new(LogLevel::Info, LogFormat::Json);
-        let subscriber = autoxide_kernel::logging::subscriber(&config, buffer.clone(), Vec::new());
+        let subscriber = json_subscriber(LevelFilter::INFO, buffer.clone());
         // Xem giải thích ở `http.rs` (`logged`): giữ một bộ nhận rỗng sống suốt process.
         static KEEP_MANY: std::sync::OnceLock<tracing::Dispatch> = std::sync::OnceLock::new();
         KEEP_MANY

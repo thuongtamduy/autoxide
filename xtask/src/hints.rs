@@ -90,7 +90,7 @@ const FIXES: &[(&str, &str)] = &[
     ),
     (
         "layout",
-        "Move the crate to crates/kernel, crates/testkit, crates/app, modules/<name> or xtask.",
+        "Move the crate to crates/kernel, crates/host, crates/testkit, crates/app, modules/<name> or xtask.",
     ),
     ("license", "Add `license.workspace = true` to the crate's Cargo.toml."),
     (

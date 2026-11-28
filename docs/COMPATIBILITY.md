@@ -150,7 +150,7 @@ The public Rust API has three tiers (D-20261126-contract-tiers). Only the first 
 | ---- | ----- | ------- |
 | **Stable** | `autoxide_kernel::<module>`, `autoxide_testkit`, `autoxide::Autoxide`, `api` of core and official modules | Semantic Versioning from 1.0: breaks only in a major release, `#[deprecated]` for at least one minor release first |
 | **Experimental** | `autoxide_kernel::unstable::<module>`, behind the kernel Cargo feature `unstable` (off by default) | May change in any minor release; every change is in the changelog. A module that uses it turns the feature on, so it is plain what it relies on |
-| **Internal** | The `autoxide-host` crate: what only the `autoxide` binary uses (backup, transfer, logging setup, kernel routes…) | None: not a dependency of modules |
+| **Internal** | The `autoxide-host` crate: what only the `autoxide` binary uses (logging setup, the Prometheus exporter and `/metrics`, trace export; backup, transfer and the kernel routes join it once the kernel itself no longer calls them, D-20261128-host-crate) | None: modules may not depend on it |
 
 The experimental tier holds the contracts of provider connectors (`einvoice`, `zns`, `voice`, `sms`, `push`,
 `payment`), features whose shape is still settling (`blocks`, `analytics`, `report`, `automation`,

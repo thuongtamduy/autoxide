@@ -1,5 +1,6 @@
-//! Operations: logs, metrics, OpenTelemetry, `autoxide doctor`, `autoxide task`; the internal
-//! module `kernel` (`builtin`) with the installed-module registry and per-user flags.
+//! Operations: reading the caller's trace context, `autoxide doctor`, `autoxide task`; the internal
+//! module `kernel` (`builtin`) with the installed-module registry and per-user flags. Logs, the metrics
+//! exporter and trace export are the binary's (`autoxide-host`, D-20261128-host-crate).
 
 pub(crate) mod alerts;
 pub(crate) mod approvals;
@@ -16,8 +17,6 @@ pub(crate) mod filter_parse;
 pub mod find;
 pub mod list_exports;
 pub(crate) mod list_indexes;
-pub mod logging;
-pub mod metrics;
 pub(crate) mod module_catalog;
 pub(crate) mod my_permissions;
 pub(crate) mod navigation;
