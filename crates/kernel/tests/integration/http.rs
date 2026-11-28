@@ -468,7 +468,8 @@ async fn cors_chi_cho_origin_da_cau_hinh() {
         .unwrap();
     let response = send(api_with(&config).router, request).await;
     let exposed = response.headers()[header::ACCESS_CONTROL_EXPOSE_HEADERS].to_str().unwrap();
-    for name in ["etag", "location", "retry-after", "x-request-id"] {
+    for name in ["etag", "location", "retry-after", "ratelimit", "ratelimit-policy", "x-request-id"]
+    {
         assert!(exposed.contains(name), "{name} not in {exposed}");
     }
 }

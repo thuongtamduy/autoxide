@@ -146,6 +146,8 @@ pub(crate) fn layer(policy: &CorsPolicy) -> CorsLayer {
             header::CONTENT_RANGE,
             header::ACCEPT_RANGES,
             header::RETRY_AFTER,
+            super::rate_limit_headers::RATE_LIMIT,
+            super::rate_limit_headers::RATE_LIMIT_POLICY,
             header::LINK,
             HeaderName::from_static("deprecation"),
             HeaderName::from_static("sunset"),

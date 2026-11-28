@@ -70,11 +70,12 @@ impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
 
     /// Evaluates one request and also says what is left: the number of further requests accepted right now,
     /// and how long until the whole burst is back (for the `RateLimit` header).
-    fn check_state(&self, client: K, now: Instant) -> (Decision, u32, Duration) {
+    fn check_state(&self, client: K, now: Instant) -> (Decision, Option<(u32, Duration)>) {
         let Ok(mut clients) = self.clients.lock() else {
             // Khoá chỉ "hỏng" khi một thread panic lúc đang giữ nó; không chặn ai cả
-            // còn hơn chặn tất cả.
-            return (Decision::Allow, 0, Duration::ZERO);
+            // còn hơn chặn tất cả. Không biết còn bao nhiêu: `None`, không gửi header RateLimit
+            // (gửi `a=0` thì client làm đúng chuẩn tưởng đã hết hạn mức).
+            return (Decision::Allow, None);
         };
         if self.requests.fetch_add(1, Ordering::Relaxed).is_multiple_of(PRUNE_EVERY) {
             // Mốc đã lùi về quá khứ thì client như mới: bỏ đi cho bảng không phình.
@@ -84,7 +85,7 @@ impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
         let ahead = tat - now;
         if ahead > self.tolerance {
             let wait = ahead - self.tolerance;
-            return (Decision::Deny(wait), 0, wait);
+            return (Decision::Deny(wait), Some((0, wait)));
         }
         let next = tat + self.interval;
         clients.insert(client, next);
@@ -98,7 +99,7 @@ impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
             }
             None => 0,
         };
-        (Decision::Allow, available, ahead)
+        (Decision::Allow, Some((available, ahead)))
     }
 }
 
@@ -126,7 +127,7 @@ impl RateLimiter {
     }
 
     /// Evaluates one request from `client` at time `now`, with what is left (see `Gcra::check_state`).
-    fn check_state(&self, client: IpAddr, now: Instant) -> (Decision, u32, Duration) {
+    fn check_state(&self, client: IpAddr, now: Instant) -> (Decision, Option<(u32, Duration)>) {
         self.cells.check_state(client, now)
     }
 }
@@ -274,10 +275,12 @@ pub(super) async fn limit(
         return next.run(request).await;
     };
     match limiter.check_state(client, Instant::now()) {
-        (Decision::Allow, available, full) => {
+        (Decision::Allow, state) => {
             let mut response = next.run(request).await;
             // Bản nháp: tránh gửi ở 3xx (client có thể chần chừ không theo chuyển hướng).
-            if !response.status().is_redirection() {
+            if let Some((available, full)) = state
+                && !response.status().is_redirection()
+            {
                 let seconds = full.as_secs() + u64::from(full.subsec_nanos() > 0);
                 super::rate_limit_headers::append(
                     response.headers_mut(),
@@ -394,18 +397,18 @@ mod tests {
         let client = ip("203.0.113.9");
         assert_eq!(
             limiter.check_state(client, start),
-            (Decision::Allow, 2, Duration::from_secs(1))
+            (Decision::Allow, Some((2, Duration::from_secs(1))))
         );
         assert_eq!(
             limiter.check_state(client, start),
-            (Decision::Allow, 1, Duration::from_secs(2))
+            (Decision::Allow, Some((1, Duration::from_secs(2))))
         );
         assert_eq!(
             limiter.check_state(client, start),
-            (Decision::Allow, 0, Duration::from_secs(3))
+            (Decision::Allow, Some((0, Duration::from_secs(3))))
         );
         let wait = Duration::from_secs(1);
-        assert_eq!(limiter.check_state(client, start), (Decision::Deny(wait), 0, wait));
+        assert_eq!(limiter.check_state(client, start), (Decision::Deny(wait), Some((0, wait))));
         assert_eq!(limiter.policy, RateLimitPolicy { name: "address", quota: 3, window: 3 });
     }
 

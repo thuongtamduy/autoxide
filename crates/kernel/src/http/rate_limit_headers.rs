@@ -21,6 +21,9 @@ pub(crate) const RATE_LIMIT: HeaderName = HeaderName::from_static("ratelimit");
 
 /// The policy of a limit counted by GCRA in memory: `burst` requests, refilled one every
 /// `60 / per_minute` seconds, so the whole quota is back after `burst × 60 / per_minute` seconds.
+//
+// Báo thấp hơn thật một chút (trong `w` giây, từ lúc đầy, client gửi được tới `2 × burst − 1` vì hạn mức đầy lại
+// dần): an toàn cho client, và `q` / `w` nói đúng điều quan trọng — dồn được bao nhiêu, bao lâu thì đầy lại.
 pub(crate) fn gcra_policy(name: &'static str, limit: RateLimit) -> RateLimitPolicy {
     let burst = limit.burst.max(1);
     let per_minute = u64::from(limit.per_minute.max(1));
