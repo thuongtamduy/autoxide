@@ -569,7 +569,7 @@ impl ApiKeyService {
                 problems.push(FieldError::new(
                     field,
                     "unknown",
-                    "is not a permission of this system",
+                    "is not a permission of this system (list the valid ones with GET /api/v1/auth/permissions)",
                 ));
             } else if !creator.allows(permission) {
                 problems.push(FieldError::new(

@@ -30,7 +30,7 @@ docker run --rm -it -p 127.0.0.1:8080:8080 ghcr.io/thuongtamduy/autoxide:latest 
 ./autoxide demo
 ```
 
-Needs a release made after 0.19.0. [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) has the
+[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) has the
 downloads, keeping the demo data, and the next steps.
 
 ## Quickstart
@@ -79,8 +79,8 @@ The guides in [`docs/guides/`](docs/guides/README.md) write the same request sho
 
 To choose them yourself, add `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` and
 `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…` to `.env` before the first start. Next: connect an AI agent
-over MCP ([`docs/guides/mcp.md`](docs/guides/mcp.md#6-from-the-quickstart-to-a-working-agent)). The
-quickstart needs a release made after 0.16.0; for PostgreSQL, several servers and HTTPS, see
+over MCP ([`docs/guides/mcp.md`](docs/guides/mcp.md#6-from-the-quickstart-to-a-working-agent)). For
+PostgreSQL, several servers and HTTPS, see
 [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ### What the quickstart contains

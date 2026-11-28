@@ -617,7 +617,7 @@ impl RoleService {
                 problems.push(FieldError::new(
                     format!("permissions[{index}]"),
                     "unknown",
-                    "is not a permission of this system",
+                    "is not a permission of this system (list the valid ones with GET /api/v1/auth/permissions)",
                 ));
             }
         }
@@ -627,7 +627,7 @@ impl RoleService {
                 None => problems.push(FieldError::new(
                     format!("grants[{index}].permission"),
                     "unknown",
-                    "is not a permission of this system",
+                    "is not a permission of this system (list the valid ones with GET /api/v1/auth/permissions)",
                 )),
                 // Permission không theo nút chỉ cấp được cho cả khách (D-303 mục 3).
                 Some(known) if !known.is_scoped() && *scope != Scope::Tenant => {
@@ -659,7 +659,7 @@ impl RoleService {
                 problems.push(FieldError::new(
                     format!("denies[{index}]"),
                     "unknown",
-                    "is not a permission of this system",
+                    "is not a permission of this system (list the valid ones with GET /api/v1/auth/permissions)",
                 ));
             } else if input.permissions.contains(permission) || seen.contains(permission.as_str()) {
                 problems.push(

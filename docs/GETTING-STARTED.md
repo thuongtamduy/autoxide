@@ -35,6 +35,34 @@ or Microsoft certificate, so the system may warn the first time:
 Then open `http://127.0.0.1:8080/api/docs` for the API reference and sign in with the printed
 administrator account (`POST /api/v1/auth/login`).
 
+### Your first requests
+
+Sign in, keep the token, create a post and list the posts again (`jq` is only used to pick the token out; `--json`
+needs curl 7.82 or newer). Use the password the demo printed:
+
+```bash
+API=http://127.0.0.1:8080/api/v1
+TOKEN=$(curl -sS $API/auth/login --json '{"email":"admin@example.com","password":"<printed password>"}' | jq -r .data.access_token)
+
+curl -sS $API/content/entries -H "Authorization: Bearer $TOKEN" --json '{
+  "kind": "post",
+  "title": "Hello from Autoxide",
+  "body": {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"My first post."}]}]}
+}'
+
+curl -sS "$API/content/entries?kind=post" -H "Authorization: Bearer $TOKEN"
+```
+
+The new post is a draft (`status: draft`) and shows up in the list. Every endpoint, with its fields and the permission it
+needs, is in the API reference at `/api/docs`. The sample module `notes` (a teaching example for module authors) is
+not part of the release files or the Docker image: the website module here is `content`.
+
+### If the port is busy
+
+The demo checks the port before it prints anything. If `127.0.0.1:8080` is taken, it stops with an error that names the
+fix: `AUTOXIDE_HTTP_ADDRESS=127.0.0.1:8081 ./autoxide demo` (the variable name is exactly that; there is no
+`AUTOXIDE_PORT`). With Docker, publish another host port instead: `-p 127.0.0.1:8081:8080`.
+
 The demo always uses its own SQLite file in the demo folder: it ignores `DATABASE_URL` from your environment and `.env`, so it cannot touch a real database. `--database-url <url>` points it at another database on purpose.
 
 The demo also turns off outside services from your environment (SMTP mail, S3 file storage, OpenTelemetry, AI providers, provider modules): mail is written to files and uploads stay in the demo folder. `--keep-external-services` keeps them on purpose.

@@ -118,7 +118,7 @@ const DOCS_HTML: &str = concat!(
 
 use crate::access::Authenticator;
 use crate::config::{CorsOrigins, HttpConfig};
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 use crate::i18n::Translations;
 use crate::idempotency::IdempotencyStore;
 
@@ -473,6 +473,20 @@ pub fn build(
     );
     if config.api_docs {
         router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()).custom_html(DOCS_HTML));
+    } else {
+        // Trang tắt: trả lỗi Problem có `code` ổn định và nói rõ biến để bật, thay vì 404 trống (người mới
+        // gõ `/api/docs` rồi không biết vì sao). Cố ý không vào OpenAPI: đây không phải endpoint của API.
+        router = router.route(
+            DOCS_PATH,
+            axum::routing::get(|| async {
+                Error::new(
+                    ErrorKind::NotFound,
+                    "api_docs_disabled",
+                    "The interactive API reference is turned off. Set AUTOXIDE_HTTP_API_DOCS=true and restart \
+                     to turn it on; the OpenAPI document is always at /api/v1/openapi.json.",
+                )
+            }),
+        );
     }
 
     // REST và MCP xác thực qua bộ có giới hạn theo API key; lớp idempotency giữ bộ gốc (nó chỉ

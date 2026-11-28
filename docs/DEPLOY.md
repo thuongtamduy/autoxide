@@ -218,9 +218,24 @@ Restore only backups you made yourself.
 
 ## B. One binary with SQLite
 
-### 1. Build
+### 1. Get the binary
 
-Install Rust from [rustup.rs](https://rustup.rs) (the right version is picked from
+**Option 1: a ready-made binary from the release page.** Download the file for your machine from the
+[Releases page](https://github.com/thuongtamduy/autoxide/releases) (Linux: `autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz`
+or `…-aarch64-…`) together with `SHA256SUMS`, then check, unpack and install it (replace `X.Y.Z`; to also check the
+signature, see [VERIFYING.md](VERIFYING.md)):
+
+```bash
+sha256sum --check --ignore-missing SHA256SUMS      # must print OK for your file
+tar -xzf autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz
+sudo install -m 755 autoxide-X.Y.Z-x86_64-unknown-linux-gnu/autoxide /usr/local/bin/autoxide
+autoxide --version
+```
+
+If `autoxide --version` fails with `GLIBC_2.… not found`, your system is older than the build machine: use option 2
+or the Docker setup (C).
+
+**Option 2: build it yourself.** Install Rust from [rustup.rs](https://rustup.rs) (the right version is picked from
 `rust-toolchain.toml`) and a C compiler — SQLite and libwebp are compiled into the binary
 (on Debian or Ubuntu: `sudo apt install build-essential`) — then:
 
@@ -289,6 +304,10 @@ In another terminal:
 curl http://127.0.0.1:8080/health/ready
 curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # real data, no sign-in needed
 ```
+
+The interactive API reference at `/api/docs` is off by default (it answers 404 with a hint); add
+`AUTOXIDE_HTTP_API_DOCS=true` to `.env` and restart to turn it on. The raw contract is always at
+`/api/v1/openapi.json`.
 
 Another port or address: `AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000` in `.env` (the name is exactly that: there is no
 `AUTOXIDE_PORT`). A misspelled `AUTOXIDE_…` variable is ignored, but `autoxide config` and the start-up log now
@@ -392,7 +411,7 @@ sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'choose-a-long-pass
 printf 'DATABASE_URL=postgres://autoxide:choose-a-long-password@127.0.0.1:5432/autoxide\n' >> /var/lib/autoxide/.env
 ```
 
-Then B steps 3, 3b and 4 as written (`migrate up`, create the administrator, `serve`). If the server cannot connect,
+Add `AUTOXIDE_HTTP_API_DOCS=true` to `.env` too if you want the API reference page at `/api/docs`. Then B steps 3, 3b and 4 as written (`migrate up`, create the administrator, `serve`). If the server cannot connect,
 the error now says why (for example "connection refused" for a wrong port) next to the pool message; `autoxide
 doctor` checks the connection and says what to fix.
 

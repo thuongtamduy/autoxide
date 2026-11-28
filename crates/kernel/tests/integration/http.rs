@@ -308,6 +308,9 @@ async fn valid_json_tu_choi_dau_vao_sai_voi_ma_loi_rieng() {
     let response = send(app(), post_json("/api/v1/notes", r#"{}"#)).await;
     let missing = problem(response, 422, "invalid_body").await;
     assert!(missing.detail.contains("title"), "{missing:?}");
+    // Không lộ câu thô của serde/axum.
+    assert!(!missing.detail.contains("Failed to deserialize"), "{missing:?}");
+    assert!(missing.detail.contains("required field `title` is missing"), "{missing:?}");
 
     // Ký tự NUL trong thân hay trong URL: Postgres không lưu được, nên từ chối ở mọi database
     // bằng cùng một lỗi (D-157). `\\u0000` (dấu `\` rồi chữ) thì vẫn là chữ thường.
@@ -582,7 +585,9 @@ async fn tai_lieu_tu_gan_tag_ma_dinh_danh_va_loi_mac_dinh_cho_moi_endpoint() {
 #[tokio::test]
 async fn trang_xem_tai_lieu_chi_co_khi_duoc_bat() {
     // Mặc định tắt.
-    problem(send(app(), get("/api/docs")).await, 404, "not_found").await;
+    // Có `code` ổn định và nói rõ biến để bật.
+    let off = problem(send(app(), get("/api/docs")).await, 404, "api_docs_disabled").await;
+    assert!(off.detail.contains("AUTOXIDE_HTTP_API_DOCS=true"), "{off:?}");
 
     let mut config = default_config();
     config.api_docs = true;

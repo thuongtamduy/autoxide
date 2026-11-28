@@ -57,8 +57,17 @@ where
 /// at line 1 column 2") so the client knows what to fix.
 fn from_rejection(rejection: JsonRejection) -> Error {
     let detail = rejection.body_text();
+    // Lỗi dữ liệu (thiếu trường, sai kiểu, trường lạ): giữ `code` `invalid_body`, chỉ viết lại câu của serde
+    // cho người đọc API — nêu tên trường, bỏ câu "Failed to deserialize the JSON body into the target type".
+    if matches!(rejection, JsonRejection::JsonDataError(_)) {
+        return Error::new(
+            ErrorKind::Validation,
+            "invalid_body",
+            "The request body is invalid: {detail}",
+        )
+        .with_param("detail", readable_data_error(&detail));
+    }
     let (kind, code) = match rejection {
-        JsonRejection::JsonDataError(_) => (ErrorKind::Validation, "invalid_body"),
         JsonRejection::JsonSyntaxError(_) => (ErrorKind::BadRequest, "invalid_json"),
         JsonRejection::MissingJsonContentType(_) => {
             (ErrorKind::UnsupportedMediaType, "unsupported_media_type")
@@ -70,6 +79,25 @@ fn from_rejection(rejection: JsonRejection) -> Error {
         _ => (ErrorKind::BadRequest, "bad_request"),
     };
     Error::new(kind, code, "{detail}").with_param("detail", detail)
+}
+
+/// The sentence axum puts before serde's own description of a data error.
+const DATA_ERROR_PREFIX: &str = "Failed to deserialize the JSON body into the target type: ";
+
+/// Serde's description of a data error, in words an API caller can act on. A missing field is named
+/// ("the required field `password` is missing"); anything else keeps serde's text (it already names an unknown
+/// field and the fields expected, or the wrong type with its position).
+fn readable_data_error(raw: &str) -> String {
+    let text = raw.strip_prefix(DATA_ERROR_PREFIX).unwrap_or(raw);
+    let missing = text
+        .strip_prefix("missing field `")
+        .and_then(|rest| rest.split_once('`'))
+        .map(|(name, _)| name)
+        .filter(|name| !name.is_empty());
+    match missing {
+        Some(name) => format!("the required field `{name}` is missing."),
+        None => text.to_owned(),
+    }
 }
 
 /// The NUL character (U+0000): Postgres cannot store it in a text column (a 500 error), SQLite can - the
@@ -117,6 +145,16 @@ pub(crate) fn value_contains_nul(value: &serde_json::Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn loi_du_lieu_nen_ten_truong_thieu_khong_lo_cau_cua_serde() {
+        let raw = "Failed to deserialize the JSON body into the target type: missing field `password` at line 1 column 13";
+        assert_eq!(readable_data_error(raw), "the required field `password` is missing.");
+        let unknown = "Failed to deserialize the JSON body into the target type: unknown field `pasword`, expected `email` or `password` at line 1 column 9";
+        let text = readable_data_error(unknown);
+        assert!(text.starts_with("unknown field `pasword`"), "{text}");
+        assert!(!text.contains("Failed to deserialize"), "{text}");
+    }
 
     #[test]
     fn nhan_ra_nul_trong_json() {

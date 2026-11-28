@@ -30,7 +30,7 @@ docker run --rm -it -p 127.0.0.1:8080:8080 ghcr.io/thuongtamduy/autoxide:latest 
 ./autoxide demo
 ```
 
-Cần bản phát hành sau 0.19.0. [`docs/GETTING-STARTED.vi.md`](docs/GETTING-STARTED.vi.md) có đường tải về, cách
+[`docs/GETTING-STARTED.vi.md`](docs/GETTING-STARTED.vi.md) có đường tải về, cách
 giữ dữ liệu demo và các bước tiếp theo.
 
 ## Chạy nhanh
@@ -76,8 +76,8 @@ Các hướng dẫn trong [`docs/guides/`](docs/guides/README.vi.md) viết requ
 
 Muốn tự chọn thì thêm `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` và `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…`
 vào `.env` trước lần chạy đầu. Tiếp theo: nối một AI agent qua MCP
-([`docs/guides/mcp.vi.md`](docs/guides/mcp.vi.md#6-từ-chạy-nhanh-tới-một-agent-làm-việc-thật)). Chạy nhanh
-cần bản phát hành sau 0.16.0; với PostgreSQL, nhiều máy chủ và HTTPS, xem
+([`docs/guides/mcp.vi.md`](docs/guides/mcp.vi.md#6-từ-chạy-nhanh-tới-một-agent-làm-việc-thật)). Với
+PostgreSQL, nhiều máy chủ và HTTPS, xem
 [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md).
 
 ### Bản chạy nhanh có những gì

@@ -77,6 +77,20 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 Both commands must succeed. `sha256sum` prints `OK` for each file you downloaded.
 
+### What a successful `gh attestation verify` looks like
+
+In an interactive terminal it prints `✓ Verification succeeded!` followed by the attestation it matched. When its
+output is not a terminal (a script, CI, a pipe, some editor terminals) it can print **nothing at all**: the answer is the
+exit code. Success exits with `0`; any failure prints an error on stderr and exits with a non-zero code. To see the
+result either way:
+
+```sh
+gh attestation verify autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz --repo thuongtamduy/autoxide \
+  && echo "VERIFIED" || echo "FAILED: do not run this file"
+# or print the verified attestation as JSON, which is empty on failure:
+gh attestation verify autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz --repo thuongtamduy/autoxide --format json
+```
+
 ## The Linux binaries
 
 `autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` (64-bit Intel and AMD) and

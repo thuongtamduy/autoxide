@@ -34,6 +34,34 @@ Apple hay Microsoft, nên hệ điều hành có thể cảnh báo lần đầu:
 Rồi mở `http://127.0.0.1:8080/api/docs` xem tài liệu API và đăng nhập bằng tài khoản quản trị đã in
 (`POST /api/v1/auth/login`).
 
+### Các request đầu tiên
+
+Đăng nhập, giữ token, tạo một bài viết rồi liệt kê lại (`jq` chỉ để lấy token ra; `--json` cần curl 7.82 trở lên).
+Dùng mật khẩu demo đã in:
+
+```bash
+API=http://127.0.0.1:8080/api/v1
+TOKEN=$(curl -sS $API/auth/login --json '{"email":"admin@example.com","password":"<mật khẩu đã in>"}' | jq -r .data.access_token)
+
+curl -sS $API/content/entries -H "Authorization: Bearer $TOKEN" --json '{
+  "kind": "post",
+  "title": "Hello from Autoxide",
+  "body": {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"My first post."}]}]}
+}'
+
+curl -sS "$API/content/entries?kind=post" -H "Authorization: Bearer $TOKEN"
+```
+
+Bài mới là bản nháp (`status: draft`) và hiện trong danh sách. Mọi endpoint, kèm trường và permission cần có, nằm ở
+trang tra cứu API `/api/docs`. Module mẫu `notes` (ví dụ dạy cho người viết module) không có trong file phát hành hay
+image Docker: module cho website ở đây là `content`.
+
+### Khi cổng đang bận
+
+Demo kiểm cổng trước khi in bất cứ gì. Nếu `127.0.0.1:8080` đã bị chiếm, nó dừng với lỗi nêu cách sửa:
+`AUTOXIDE_HTTP_ADDRESS=127.0.0.1:8081 ./autoxide demo` (tên biến đúng là vậy; không có `AUTOXIDE_PORT`). Với Docker thì
+publish cổng khác của máy chủ: `-p 127.0.0.1:8081:8080`.
+
 Demo luôn dùng file SQLite riêng trong thư mục demo: nó bỏ qua `DATABASE_URL` trong môi trường và `.env`, nên không thể chạm vào database thật. `--database-url <url>` trỏ nó tới database khác khi bạn chủ ý.
 
 Demo cũng tắt các dịch vụ bên ngoài lấy từ môi trường (mail SMTP, kho file S3, OpenTelemetry, nhà cung cấp AI, module bộ nối): thư được ghi ra file và file tải lên nằm trong thư mục demo. `--keep-external-services` giữ chúng khi bạn chủ ý.

@@ -215,9 +215,23 @@ Chỉ khôi phục bản backup do chính bạn tạo.
 
 ## B. Một binary với SQLite
 
-### 1. Build
+### 1. Lấy binary
 
-Cài Rust từ [rustup.rs](https://rustup.rs) (đúng phiên bản được chọn theo
+**Cách 1: binary dựng sẵn từ trang Release.** Tải file đúng máy bạn từ
+[trang Releases](https://github.com/thuongtamduy/autoxide/releases) (Linux: `autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz`
+hoặc `…-aarch64-…`) cùng `SHA256SUMS`, rồi kiểm, giải nén và cài (thay `X.Y.Z`; muốn kiểm cả chữ ký, xem
+[VERIFYING.vi.md](VERIFYING.vi.md)):
+
+```bash
+sha256sum --check --ignore-missing SHA256SUMS      # phải in OK cho file của bạn
+tar -xzf autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz
+sudo install -m 755 autoxide-X.Y.Z-x86_64-unknown-linux-gnu/autoxide /usr/local/bin/autoxide
+autoxide --version
+```
+
+Nếu `autoxide --version` báo `GLIBC_2.… not found`, hệ thống của bạn cũ hơn máy dựng: dùng cách 2 hoặc bộ Docker (C).
+
+**Cách 2: tự build.** Cài Rust từ [rustup.rs](https://rustup.rs) (đúng phiên bản được chọn theo
 `rust-toolchain.toml`) và một trình biên dịch C — SQLite và libwebp được biên dịch vào binary
 (trên Debian hay Ubuntu: `sudo apt install build-essential`) — rồi:
 
@@ -284,6 +298,9 @@ sudo -u autoxide autoxide serve                      # nghe ở 127.0.0.1:8080
 curl http://127.0.0.1:8080/health/ready
 curl "http://127.0.0.1:8080/api/v1/address/provinces?limit=2"    # dữ liệu thật, không cần đăng nhập
 ```
+
+Trang tra cứu API tương tác ở `/api/docs` mặc định tắt (trả 404 kèm gợi ý); thêm `AUTOXIDE_HTTP_API_DOCS=true`
+vào `.env` rồi khởi động lại để bật. Hợp đồng thô luôn có ở `/api/v1/openapi.json`.
 
 Đổi cổng hay địa chỉ: `AUTOXIDE_HTTP_ADDRESS=0.0.0.0:9000` trong `.env` (tên đúng là vậy: không có
 `AUTOXIDE_PORT`). Biến `AUTOXIDE_…` gõ sai tên bị bỏ qua, nhưng `autoxide config` và log khởi động giờ nêu tên
@@ -384,7 +401,7 @@ sudo -u postgres psql -c "CREATE USER autoxide WITH PASSWORD 'chon-mat-khau-dai'
 printf 'DATABASE_URL=postgres://autoxide:chon-mat-khau-dai@127.0.0.1:5432/autoxide\n' >> /var/lib/autoxide/.env
 ```
 
-Rồi làm các bước 3, 3b và 4 của B như đã viết (`migrate up`, tạo quản trị viên, `serve`). Nếu máy chủ không kết nối
+Thêm cả `AUTOXIDE_HTTP_API_DOCS=true` vào `.env` nếu muốn trang tra cứu API ở `/api/docs`. Rồi làm các bước 3, 3b và 4 của B như đã viết (`migrate up`, tạo quản trị viên, `serve`). Nếu máy chủ không kết nối
 được, lỗi giờ nói lý do (ví dụ "connection refused" khi sai cổng) cạnh thông báo của pool; `autoxide doctor` kiểm
 kết nối và nói cần sửa gì.
 

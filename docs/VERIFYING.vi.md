@@ -75,6 +75,19 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 Cả hai lệnh phải thành công. `sha256sum` in `OK` cho từng file bạn đã tải.
 
+### `gh attestation verify` thành công trông thế nào
+
+Trong terminal tương tác, lệnh in `✓ Verification succeeded!` kèm attestation khớp. Khi đầu ra không phải terminal
+(script, CI, pipe, một số terminal của trình soạn thảo), lệnh có thể **không in gì cả**: câu trả lời là exit code.
+Thành công thoát với `0`; thất bại in lỗi ra stderr và thoát với mã khác 0. Để thấy kết quả trong mọi trường hợp:
+
+```sh
+gh attestation verify autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz --repo thuongtamduy/autoxide \
+  && echo "VERIFIED" || echo "FAILED: do not run this file"
+# hoặc in attestation đã xác minh dạng JSON (rỗng khi thất bại):
+gh attestation verify autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz --repo thuongtamduy/autoxide --format json
+```
+
 ## Binary Linux
 
 `autoxide-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` (Intel và AMD 64-bit) và
