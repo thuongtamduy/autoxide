@@ -221,7 +221,7 @@ impl Connection<'_> {
                 super::bounded::all_within(connection, statement, limit).await
             }
             Inner::Write(_) | Inner::Legacy(_) => {
-                Err(Error::internal("a time limit applies to reads on a read handle"))
+                Err(Error::internal("a time limit applies only to reads on a read handle of `db`"))
             }
         }
     }
@@ -343,19 +343,26 @@ where
 /// What a kernel function that reads or writes alongside a module accepts (`Outbox::record`, `SyncLog`,
 /// `Principal::require_at`, `OneTimeTokens`…): a handle of `db` ([`TenantTx`], [`TenantRead`]…), so the kernel's
 /// own statements join the module's transaction. These functions build their statements themselves and filter
-/// by tenant themselves; a handle never runs a statement a module built with a database library (that would skip
-/// the tenant filter).
+/// by tenant themselves: through `Executor`, a handle only runs the kernel's own statements. Pass a write
+/// transaction to a function that writes; a read handle refuses writes when the statement runs.
 ///
 /// Until every module has moved to `db`, the connections of the old path (`Database::read()`,
 /// `Database::begin_write()`) are accepted too; that part is not in the contract and goes away before 1.0.
-pub trait Executor: Sync {
+pub trait Executor: sealed_executor::Sealed + Sync {
     #[doc(hidden)]
     fn executor(&self) -> Connection<'_>;
 }
 
+mod sealed_executor {
+    // Niêm phong: chỉ kernel quyết kiểu nào là `Executor` (module ngoài không tự cài được).
+    pub trait Sealed {}
+    impl<C: sea_orm::ConnectionTrait> Sealed for C {}
+}
+
 // Mọi kết nối là `Executor`: kết nối SeaORM của module chưa chuyển, và — qua cầu `ConnectionTrait` ở dưới — handle
-// của `db`. Ngày gỡ cầu (D-20261128-library-layer-plan mục 5) thêm `impl Executor` riêng cho `Read` và `Tx` (trả
-// `Inner::Read` / `Inner::Write`); impl chung này ở lại tới khi module cuối cùng đã chuyển.
+// của `db`. Thứ tự khi gỡ cầu (D-20261128-library-layer-plan mục 5): xoá hai `impl ConnectionTrait` của `Read`/`Tx`
+// ở cuối file TRƯỚC, rồi mới thêm `impl Executor` + `impl Sealed` riêng cho chúng (trả `Inner::Read` /
+// `Inner::Write`) — còn cầu thì hai impl đó xung đột với impl chung. Impl chung ở lại tới khi module cuối đã chuyển.
 impl<C: ConnectionTrait> Executor for C {
     fn executor(&self) -> Connection<'_> {
         Connection(Inner::Legacy(self))
