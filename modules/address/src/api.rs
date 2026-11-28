@@ -3,15 +3,15 @@
 //! `context.require::<dyn AdministrativeUnits>()?` (registered AFTER `address`).
 
 use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::http::Schema;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 /// A fake administrative catalog for other modules' tests (feature `testing`).
 #[cfg(feature = "testing")]
 pub mod testing;
 
 /// A postal address in an administrative unit (Vietnam: province and commune, since 2025-07-01).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[non_exhaustive]
 pub struct Address {
     /// ISO 3166-1 alpha-2 country code.
@@ -33,7 +33,7 @@ pub struct Address {
 }
 
 /// An address to check: codes only; names are filled in.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[non_exhaustive]
 #[serde(deny_unknown_fields)]
 pub struct AddressInput {
@@ -64,7 +64,7 @@ impl AddressInput {
 }
 
 /// An administrative unit.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[non_exhaustive]
 pub struct AdministrativeUnit {
     #[schema(example = "01")]
@@ -88,7 +88,7 @@ pub struct AdministrativeUnit {
 /// Lookup of administrative units (published by the `address` module).
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 pub trait AdministrativeUnits: Send + Sync {
     /// Provinces of `country` in force on day `as_of` (`YYYY-MM-DD`; `None`: today), by code.
     async fn provinces(

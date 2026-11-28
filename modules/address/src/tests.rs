@@ -4,8 +4,8 @@
 use std::sync::Arc;
 
 use autoxide_kernel::pagination::{Order, PageRequest};
+use autoxide_testkit::http::StatusCode;
 use autoxide_testkit::{TestApp, TestDatabase};
-use axum::http::StatusCode;
 
 use crate::api::AddressInput;
 use crate::import::{Manifest, parse};
@@ -41,8 +41,10 @@ fn manifest(from: &str) -> Manifest {
 async fn app(test: &TestDatabase) -> (TestApp, Arc<AddressService>) {
     let app =
         TestApp::builder(test).module(crate::module()).user("ann", 1, &[]).build().await.unwrap();
+    let databases = app.modules().tenancy().unwrap();
     let service = Arc::new(AddressService {
-        databases: app.modules().tenancy().unwrap(),
+        control: autoxide_testkit::control_plane(databases.control(), "address"),
+        databases,
         outbox: autoxide_kernel::event::Outbox::standalone("address"),
     });
     (app, service)
@@ -146,7 +148,7 @@ async fn validate_bao_xa_khong_thuoc_tinh() {
         // Qua REST: 422 cùng lỗi.
         let body = serde_json::json!({"country": "VN", "province_code": "79", "commune_code": "00004", "line": "x"});
         let answer = app.post("/api/v1/address/validate").json(body).send().await.unwrap();
-        assert_eq!(answer.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(answer.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(answer.json()["errors"][0]["code"], "address.commune_not_in_province");
     })
     .await
@@ -159,16 +161,16 @@ async fn etag_tra_304() {
         let (app, service) = app(test).await;
         import(&service, FIRST, "2025-07-01").await;
         let first = app.get("/api/v1/address/provinces").send().await.unwrap();
-        assert_eq!(first.status(), StatusCode::OK);
-        let etag = first.headers().get("etag").unwrap().to_str().unwrap().to_owned();
-        assert_eq!(first.headers().get("cache-control").unwrap(), "public, max-age=86400");
+        assert_eq!(first.status_code(), StatusCode::OK);
+        let etag = first.header("etag").to_owned();
+        assert_eq!(first.header("cache-control"), "public, max-age=86400");
         let again = app
             .get("/api/v1/address/provinces")
             .header("if-none-match", &etag)
             .send()
             .await
             .unwrap();
-        assert_eq!(again.status(), StatusCode::NOT_MODIFIED);
+        assert_eq!(again.status_code(), StatusCode::NOT_MODIFIED);
         // Bộ mới: ETag đổi.
         import(&service, SECOND, "2026-01-01").await;
         let changed = app
@@ -177,7 +179,7 @@ async fn etag_tra_304() {
             .send()
             .await
             .unwrap();
-        assert_eq!(changed.status(), StatusCode::OK);
+        assert_eq!(changed.status_code(), StatusCode::OK);
     })
     .await
     .unwrap();
@@ -210,7 +212,7 @@ async fn walk(app: &TestApp, first: &str) -> Vec<String> {
     let mut uri = first.to_owned();
     loop {
         let answer = app.get(&uri).send().await.unwrap();
-        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+        assert_eq!(answer.status_code(), StatusCode::OK, "{}", answer.json());
         let body = answer.json();
         let page = body["data"].as_array().unwrap();
         assert!(page.len() <= 10);
@@ -246,7 +248,7 @@ async fn tinh_va_xa_phan_trang_theo_ma() {
         assert_eq!(communes, codes(&expected));
 
         let wrong = app.get("/api/v1/address/provinces?cursor=nope").send().await.unwrap();
-        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(wrong.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(wrong.json()["errors"][0]["field"], "cursor");
     })
     .await

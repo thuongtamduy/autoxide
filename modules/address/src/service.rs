@@ -3,39 +3,37 @@
 use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
 
-use autoxide_kernel::database::Database;
+use autoxide_kernel::db::{Cond, ControlPlane, Find, GlobalRead, Queries as _};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Outbox;
-use autoxide_kernel::pagination::{
-    NaturalOrderPageQuery, Page, PageRequest, SortValue, fetch_page, fetch_page_by,
-};
+use autoxide_kernel::pagination::{NaturalOrderPageQuery, Page, PageRequest};
 use autoxide_kernel::tenancy::DatabaseRegistry;
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::api::{Address, AddressInput, AdministrativeUnit};
-use crate::entity::{dataset, unit};
+use crate::entity::{Dataset, Unit};
 
 /// Quốc gia có danh mục (đặc tả 34: chỉ Việt Nam).
 pub(crate) const COUNTRIES: [&str; 1] = ["VN"];
 const LINE_MAX: usize = 300;
 
 pub(crate) struct AddressService {
+    /// Handle của database điều khiển: bảng của module là bảng mặt điều khiển.
+    pub control: ControlPlane,
+    /// Chỉ để lấy khách mặc định (nền tảng) cho event nhập dữ liệu.
     pub databases: DatabaseRegistry,
     pub outbox: Outbox,
 }
 
 impl AddressService {
-    pub(crate) fn control(&self) -> &Database {
-        self.databases.control()
-    }
-
     /// Bộ dữ liệu mới nhất của `country` (bản đang dùng), nếu đã nhập.
-    pub(crate) async fn latest(&self, country: &str) -> Result<Option<dataset::Model>, Error> {
-        Ok(dataset::Entity::find()
-            .filter(dataset::Column::Country.eq(country))
-            .order_by_desc(dataset::Column::ImportedAt)
-            .one(self.control().read())
-            .await?)
+    pub(crate) async fn latest(&self, country: &str) -> Result<Option<Dataset>, Error> {
+        self.control
+            .read()
+            .find::<Dataset>()
+            .filter(Dataset::COUNTRY.eq(country.to_owned()))
+            .order_desc(Dataset::IMPORTED_AT)
+            .one()
+            .await
     }
 
     /// Phiên bản dữ liệu của `country` cho `ETag`: đổi mỗi lần nhập bộ mới.
@@ -66,11 +64,13 @@ impl AddressService {
     ) -> Result<Page<AdministrativeUnit>, Error> {
         let country = self.country(country)?;
         let as_of = as_of_date(as_of)?;
-        let select = unit::Entity::find()
-            .filter(unit::Column::Country.eq(&country))
-            .filter(unit::Column::Level.eq(1))
+        let read = self.control.read();
+        let select = read
+            .find::<Unit>()
+            .filter(Unit::COUNTRY.eq(country))
+            .filter(Unit::LEVEL.eq(1))
             .filter(live(&as_of));
-        Ok(by_code(select, page, self.control().read()).await?.map(describe))
+        Ok(by_code(select, page).await?.map(describe))
     }
 
     /// Một trang xã của tỉnh `province`, theo mã; index `address_unit_parent_page_idx`.
@@ -83,23 +83,25 @@ impl AddressService {
     ) -> Result<Page<AdministrativeUnit>, Error> {
         let country = self.country(country)?;
         let as_of = as_of_date(as_of)?;
-        let read = self.control().read();
-        let found = unit::Entity::find()
-            .filter(unit::Column::Country.eq(&country))
-            .filter(unit::Column::Level.eq(1))
-            .filter(unit::Column::Code.eq(province))
+        let read = self.control.read();
+        let found = read
+            .find::<Unit>()
+            .filter(Unit::COUNTRY.eq(country.clone()))
+            .filter(Unit::LEVEL.eq(1))
+            .filter(Unit::CODE.eq(province.to_owned()))
             .filter(live(&as_of))
-            .one(read)
+            .exists()
             .await?;
-        if found.is_none() {
+        if !found {
             return Err(unit_not_found(province));
         }
-        let select = unit::Entity::find()
-            .filter(unit::Column::Country.eq(&country))
-            .filter(unit::Column::Level.eq(2))
-            .filter(unit::Column::ParentCode.eq(province))
+        let select = read
+            .find::<Unit>()
+            .filter(Unit::COUNTRY.eq(country))
+            .filter(Unit::LEVEL.eq(2))
+            .filter(Unit::PARENT_CODE.eq(Some(province.to_owned())))
             .filter(live(&as_of));
-        Ok(by_code(select, page, read).await?.map(describe))
+        Ok(by_code(select, page).await?.map(describe))
     }
 
     // Hợp đồng `AdministrativeUnits` (cho module khác) trả cả danh sách: gom các trang theo `next_cursor`.
@@ -138,24 +140,23 @@ impl AddressService {
     ) -> Result<Page<AdministrativeUnit>, Error> {
         let country = self.country(country)?;
         let today = as_of_date(None)?;
-        let mut select =
-            unit::Entity::find().filter(unit::Column::Country.eq(&country)).filter(live(&today));
+        let read = self.control.read();
+        let mut select = read.find::<Unit>().filter(Unit::COUNTRY.eq(country)).filter(live(&today));
         if let Some(q) = q.map(str::trim).filter(|q| !q.is_empty()) {
-            select = select.filter(autoxide_kernel::search::contains(unit::Column::NameFolded, q));
+            // Cột lưu dạng đã bỏ dấu: bỏ dấu cả chữ tìm để "ha noi" ra "Hà Nội".
+            select = select.filter(Unit::NAME_FOLDED.contains(&autoxide_kernel::search::fold(q)));
         }
         if let Some(province) = province {
             select = select.filter(
-                Condition::any()
-                    .add(unit::Column::ParentCode.eq(province))
-                    .add(unit::Column::Code.eq(province)),
+                Cond::any()
+                    .with(Unit::PARENT_CODE.eq(Some(province.to_owned())))
+                    .with(Unit::CODE.eq(province.to_owned())),
             );
         }
         if let Some(level) = level {
-            select = select.filter(unit::Column::Level.eq(level));
+            select = select.filter(Unit::LEVEL.eq(level));
         }
-        let page =
-            fetch_page(select, unit::Column::Id, |row| row.id, page, self.control().read()).await?;
-        Ok(page.map(describe))
+        Ok(select.page(Unit::ID, page).await?.map(describe))
     }
 
     /// Đơn vị `code` (còn hiệu lực hôm nay) kèm đơn vị cấp trên.
@@ -166,20 +167,22 @@ impl AddressService {
     ) -> Result<(AdministrativeUnit, Option<AdministrativeUnit>), Error> {
         let country = self.country(country)?;
         let today = as_of_date(None)?;
-        let read = self.control().read();
-        let found = unit::Entity::find()
-            .filter(unit::Column::Country.eq(&country))
-            .filter(unit::Column::Code.eq(code))
+        let read = self.control.read();
+        let found = read
+            .find::<Unit>()
+            .filter(Unit::COUNTRY.eq(country.clone()))
+            .filter(Unit::CODE.eq(code.to_owned()))
             .filter(live(&today))
-            .one(read)
+            .one()
             .await?
             .ok_or_else(|| unit_not_found(code))?;
         let parent = match &found.parent_code {
-            Some(parent) => unit::Entity::find()
-                .filter(unit::Column::Country.eq(&country))
-                .filter(unit::Column::Code.eq(parent))
+            Some(parent) => read
+                .find::<Unit>()
+                .filter(Unit::COUNTRY.eq(country))
+                .filter(Unit::CODE.eq(parent.clone()))
                 .filter(live(&today))
-                .one(read)
+                .one()
                 .await?
                 .map(describe),
             None => None,
@@ -221,11 +224,14 @@ impl AddressService {
             Err(_) => return Err(problems),
         };
         let codes = [input.province_code.trim().to_owned(), input.commune_code.trim().to_owned()];
-        let found: HashMap<String, unit::Model> = match unit::Entity::find()
-            .filter(unit::Column::Country.eq(&country))
-            .filter(unit::Column::Code.is_in(codes.clone()))
+        let found: HashMap<String, Unit> = match self
+            .control
+            .read()
+            .find::<Unit>()
+            .filter(Unit::COUNTRY.eq(country.clone()))
+            .filter(Unit::CODE.is_in(codes.clone()))
             .filter(live(&today))
-            .all(self.control().read())
+            .all()
             .await
         {
             Ok(rows) => rows.into_iter().map(|row| (row.code.clone(), row)).collect(),
@@ -290,7 +296,7 @@ impl AddressService {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl crate::api::AdministrativeUnits for AddressService {
     async fn provinces(
         &self,
@@ -316,26 +322,16 @@ impl crate::api::AdministrativeUnits for AddressService {
 
 // Trang theo mã đơn vị rồi id: mã chỉ trùng giữa các phiên bản của cùng đơn vị, mà `live` chỉ để lại một.
 async fn by_code(
-    select: sea_orm::Select<unit::Entity>,
+    select: Find<'_, GlobalRead<'_>, Unit>,
     page: &PageRequest,
-    read: &impl sea_orm::ConnectionTrait,
-) -> Result<Page<unit::Model>, Error> {
-    fetch_page_by(
-        select,
-        unit::Column::Code,
-        |row| SortValue::Text(row.code.clone()),
-        unit::Column::Id,
-        |row| row.id,
-        page,
-        read,
-    )
-    .await
+) -> Result<Page<Unit>, Error> {
+    select.page_by(Unit::CODE, |row| row.code.clone(), Unit::ID, page).await
 }
 
 /// Đơn vị còn hiệu lực ngày `as_of` (so chuỗi `YYYY-MM-DD`: đúng thứ tự, không lệch múi giờ).
-pub(crate) fn live(as_of: &str) -> Condition {
-    Condition::all().add(unit::Column::ValidFrom.lte(as_of)).add(
-        Condition::any().add(unit::Column::ValidTo.is_null()).add(unit::Column::ValidTo.gt(as_of)),
+pub(crate) fn live(as_of: &str) -> Cond<Unit> {
+    Cond::all().with(Unit::VALID_FROM.lte(as_of.to_owned())).with(
+        Cond::any().with(Unit::VALID_TO.is_null()).with(Unit::VALID_TO.gt(Some(as_of.to_owned()))),
     )
 }
 
@@ -356,7 +352,7 @@ pub(crate) fn as_of_date(raw: Option<&str>) -> Result<String, Error> {
     }
 }
 
-pub(crate) fn describe(row: unit::Model) -> AdministrativeUnit {
+pub(crate) fn describe(row: Unit) -> AdministrativeUnit {
     AdministrativeUnit {
         code: row.code,
         name: row.name,

@@ -95,6 +95,15 @@ pub fn all_tenants(
 ) -> autoxide_kernel::db::AllTenants<'_> {
     autoxide_kernel::db::all_tenants_for_tests(database)
 }
+
+/// The control-plane handle module `module` gets at start (`context.kernel::<ControlPlane>()`), for a test that
+/// builds the module's service by hand. Tests only.
+pub fn control_plane(
+    database: &autoxide_kernel::database::Database,
+    module: &'static str,
+) -> autoxide_kernel::db::ControlPlane {
+    autoxide_kernel::db::control_plane_for_tests(database, module)
+}
 pub use voice::{FAKE_RECORDING, FAKE_VOICE_PROVIDER, FakeVoiceProvider};
 
 use std::fmt;

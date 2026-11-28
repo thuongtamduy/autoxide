@@ -63,6 +63,67 @@ macro_rules! db_values {
 
 db_values!(bool, i16, i32, i64, String, Uuid, Timestamp, Date, serde_json::Value, Vec<u8>);
 
+/// A NOT NULL column type a list can be ordered by with `Find::page_by`: text, whole numbers, timestamps.
+/// `Option<…>` is not one — the two databases place `NULL` differently, so paging would repeat or skip rows.
+/// Sealed: only the kernel implements it.
+pub trait SortKey: DbValue + Clone + sort_key::Sealed {
+    #[doc(hidden)]
+    fn into_sort_value(self) -> crate::pagination::SortValue;
+    #[doc(hidden)]
+    fn from_sort_value(value: &crate::pagination::SortValue) -> Option<Self>;
+}
+
+mod sort_key {
+    pub trait Sealed {}
+}
+
+// `macro_rules!`: cùng một khối cho các kiểu số nguyên; con trỏ chở `i64`, đọc lại phải vừa kiểu của cột (giá
+// trị bị sửa tay ngoài khoảng thì con trỏ hỏng, không tới database).
+macro_rules! integer_sort_keys {
+    ($($ty:ty),*) => {$(
+        impl sort_key::Sealed for $ty {}
+        impl SortKey for $ty {
+            fn into_sort_value(self) -> crate::pagination::SortValue {
+                crate::pagination::SortValue::Integer(i64::from(self))
+            }
+            fn from_sort_value(value: &crate::pagination::SortValue) -> Option<Self> {
+                match value {
+                    crate::pagination::SortValue::Integer(number) => <$ty>::try_from(*number).ok(),
+                    _ => None,
+                }
+            }
+        }
+    )*};
+}
+
+integer_sort_keys!(i16, i32, i64);
+
+impl sort_key::Sealed for String {}
+impl SortKey for String {
+    fn into_sort_value(self) -> crate::pagination::SortValue {
+        crate::pagination::SortValue::Text(self)
+    }
+    fn from_sort_value(value: &crate::pagination::SortValue) -> Option<Self> {
+        match value {
+            crate::pagination::SortValue::Text(text) => Some(text.clone()),
+            _ => None,
+        }
+    }
+}
+
+impl sort_key::Sealed for Timestamp {}
+impl SortKey for Timestamp {
+    fn into_sort_value(self) -> crate::pagination::SortValue {
+        crate::pagination::SortValue::Time(self)
+    }
+    fn from_sort_value(value: &crate::pagination::SortValue) -> Option<Self> {
+        match value {
+            crate::pagination::SortValue::Time(time) => Some(*time),
+            _ => None,
+        }
+    }
+}
+
 /// The `tenant_id` column of a tenant table. It can be read and compared, never written by
 /// `update().set(…)`: the kernel sets it on insert from the tenant of the handle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

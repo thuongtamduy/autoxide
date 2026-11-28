@@ -185,6 +185,7 @@ impl Weekday {
     }
 }
 
+// Đường cũ (D-20261127-transition-paths): đổi từ `Date::weekday()` cũ; gỡ cùng hàm đó.
 impl From<jiff::civil::Weekday> for Weekday {
     fn from(value: jiff::civil::Weekday) -> Self {
         Weekday::from_number_from_monday(value.to_monday_one_offset()).unwrap_or(Weekday::Monday)
@@ -248,6 +249,7 @@ mod tests {
         assert!(TimeZone::get("Nowhere/City").is_none());
         assert_eq!(TimeZone::UTC.name(), "UTC");
         assert_eq!(TimeZone::get("UTC").unwrap().name(), "UTC");
+        assert_eq!(TimeZone::get("UTC").unwrap().name(), TimeZone::UTC.name());
     }
 
     #[test]

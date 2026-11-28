@@ -184,6 +184,11 @@ pub fn text_key_cursor(column: &str, key: &str) -> String {
         .encode()
 }
 
+/// The cursor of a page ordered by column `column` then ID (the db layer's `Find::page_by`).
+pub(crate) fn key_cursor(column: &str, value: SortValue, id: Uuid) -> String {
+    KeyCursor { column: column.to_owned(), value, id }.encode()
+}
+
 fn wrong_cursor() -> Error {
     Error::validation(vec![FieldError::new(
         "cursor",
@@ -241,6 +246,24 @@ impl PageRequest {
 
     pub fn order(&self) -> Order {
         self.order
+    }
+
+    /// The column value and ID after which the next page of a list ordered by `column` starts: `None` on the
+    /// first page; a cursor of another list or ordering, or whose value does not fit the column (`fits`), is a
+    /// 422 on `cursor` — a tampered value must not reach the database (Postgres fails comparing text with a
+    /// number, SQLite does not — D-149).
+    pub(crate) fn key_after(
+        &self,
+        column: &str,
+        fits: impl Fn(&SortValue) -> bool,
+    ) -> Result<Option<(SortValue, Uuid)>, Error> {
+        match &self.position {
+            None => Ok(None),
+            Some(Position::Key(cursor)) if cursor.column == column && fits(&cursor.value) => {
+                Ok(Some((cursor.value.clone(), cursor.id)))
+            }
+            Some(_) => Err(wrong_cursor()),
+        }
     }
 
     /// The key of a [`text_key_cursor`] for the ordering `column`: `None` on the first page; a cursor of another

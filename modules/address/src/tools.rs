@@ -4,12 +4,11 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::http::{Schema, Validate};
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::{NaturalOrderPageQuery, PageRequest};
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
-use utoipa::ToSchema;
-use validator::Validate;
 
 use crate::api::AddressInput;
 use crate::service::AddressService;
@@ -19,7 +18,7 @@ fn vn() -> String {
 }
 
 /// Which provinces.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProvincesInput {
     /// ISO country code; only `VN` for now. Defaults to `VN`.
@@ -38,7 +37,7 @@ pub(crate) struct ProvincesInput {
 }
 
 /// The communes of a province.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CommunesInput {
     #[serde(default = "vn")]
@@ -70,7 +69,7 @@ fn natural_page(
 }
 
 /// A search by name.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SearchInput {
     #[serde(default = "vn")]
@@ -91,7 +90,7 @@ pub(crate) struct SearchInput {
 }
 
 /// An address to check.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ValidateInput {
     #[serde(default = "vn")]
