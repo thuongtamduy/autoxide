@@ -6,6 +6,11 @@
 //! it. The statement behaves the same on SQLite and Postgres. If a process claims an event and then dies
 //! midway, the claim expires and another process delivers it again.
 //!
+//! Per subscriber (D-20261128-event-per-subscriber): one event is handed to every subscribing module in
+//! registration order, and a failing module does not stop the others. The event is then marked delivered; each
+//! module that failed (or was not reached in time) gets its own retry row in `kernel_event_deliveries` and is
+//! retried alone, with its own backoff and dead-letter.
+//!
 //! Multiple databases (step 33): each pass walks every assigned database (`DatabaseRegistry::databases`,
 //! filtered by `AUTOXIDE_WORKER_PLACEMENTS`); an event carries its tenant (`tenant_id`) and the subscriber
 //! gets that tenant's context in [`Delivered::tenant`].
@@ -22,28 +27,32 @@ use std::time::Duration;
 use tokio::sync::Notify;
 use uuid::Uuid;
 
+use super::deliveries::{self, Missed};
 use super::{Actor, Delivered, Subscription, table_name};
 use crate::database::Database;
 use crate::error::Error;
 use crate::tenancy::{DatabaseRegistry, PlacementId, TenantId, TenantStatus};
 
-/// The maximum number of delivery attempts for an event; beyond it the event is marked failed
-/// (`failed_at`), except account deletion events ([`USER_DELETED`](crate::privacy::USER_DELETED)), which
-/// retry forever.
+/// The maximum number of delivery attempts of an event to ONE subscribing module; beyond it that module's
+/// delivery goes to the dead-letter queue (`failed_at` of its `kernel_event_deliveries` row), except account
+/// deletion events ([`USER_DELETED`](crate::privacy::USER_DELETED)), which retry forever. Other modules are not
+/// affected.
 pub const MAX_ATTEMPTS: i32 = 10;
 /// The number of events processed per table in one pass.
 const BATCH: u64 = 100;
 /// A process holds the delivery of an event for at most this long.
 const CLAIM_SECONDS: i64 = 60;
-/// One delivery (all subscribers of one event) takes at most this long. It is shorter than the hold time,
-/// so no other process re-claims an event being delivered (D-158). A subscriber that needs longer should
-/// work in parts (continuing next time) or hand the work off to a job.
-const DELIVERY_TIMEOUT: Duration = Duration::from_secs(50);
+/// One fan-out (all subscribers of one event), and one retry, takes at most this long. It is shorter than the
+/// hold time, so no other process re-claims an event being delivered (D-158). A subscriber that needs longer
+/// should work in parts (continuing next time) or hand the work off to a job; subscribers not reached in time
+/// are retried on their own right after.
+pub(super) const DELIVERY_TIMEOUT: Duration = Duration::from_secs(50);
 /// With no new events, polls again after this long.
 const IDLE_POLL: Duration = Duration::from_secs(1);
 /// The maximum length of a stored error.
 const MAX_ERROR_LENGTH: usize = 2000;
-/// Keeps delivered events this long, then deletes them (the audit log already has its own copy).
+/// Keeps delivered events this long, then deletes them (the audit log already has its own copy); an event some
+/// subscriber still has to receive is kept until it does.
 const KEEP_DELIVERED: SignedDuration = SignedDuration::from_hours(24 * 7);
 /// Cleans up delivered events this often.
 const CLEANUP_EVERY: Duration = Duration::from_secs(3600);
@@ -105,21 +114,26 @@ impl Dispatcher {
             && snapshot.access == crate::entitlement::TenantAccess::Full)
     }
 
-    /// Delivers one pass of every pending event; returns the number of events processed (delivered or
-    /// rescheduled).
+    /// Delivers one pass of every pending event and every due per-subscriber retry; returns the number of
+    /// events and retries processed (delivered or rescheduled).
     pub async fn run_once(&self) -> Result<usize, Error> {
         let databases = self.databases.databases().await?;
         self.cleanup(&databases).await?;
         let mut handled = 0;
-        let tables: Vec<String> = self.modules.iter().map(|module| table_name(module)).collect();
+        let mut tables: Vec<String> =
+            self.modules.iter().map(|module| table_name(module)).collect();
+        tables.push(deliveries::TABLE.to_owned());
         for (placement, _, database) in &databases {
             // Một câu hỏi bảng nào có event chờ, rồi chỉ đọc các bảng đó: lượt rảnh là một câu mỗi database thay vì
-            // một câu mỗi module (PT nền, D-20261126-idle-polling).
+            // một câu mỗi module (PT nền, D-20261126-idle-polling). Bảng thử lại theo bên nhận cùng điều kiện "chờ".
             let busy = crate::data::busy::tables_with(database, &tables, &pending(now())).await?;
-            for (module, busy) in self.modules.iter().zip(busy) {
-                if busy {
+            for (module, busy) in self.modules.iter().zip(&busy) {
+                if *busy {
                     handled += self.run_table(*placement, database, module).await?;
                 }
+            }
+            if busy.last() == Some(&true) {
+                handled += self.run_retries(*placement, database).await?;
             }
         }
         Ok(handled)
@@ -153,8 +167,8 @@ impl Dispatcher {
         }
     }
 
-    /// Deletes events delivered more than [`KEEP_DELIVERED`] ago, once an hour. Permanently failed events
-    /// are kept for operators to inspect.
+    /// Deletes events delivered more than [`KEEP_DELIVERED`] ago, once an hour, except those a subscriber still
+    /// has to receive. Permanently failed events and retries are kept for operators to inspect.
     async fn cleanup(&self, databases: &[(PlacementId, String, Database)]) -> Result<(), Error> {
         {
             let mut last = self.last_cleanup.lock().map_err(|_| Error::internal("cleanup lock"))?;
@@ -166,12 +180,9 @@ impl Dispatcher {
         let before = now() - KEEP_DELIVERED;
         for (_, _, database) in databases {
             for module in &self.modules {
-                let mut delete = Query::delete();
-                delete
-                    .from_table(Alias::new(table_name(module)))
-                    .and_where(Expr::col(Alias::new("delivered_at")).lt(before));
-                database.write().execute(&delete).await?;
+                deliveries::cleanup(database, &table_name(module), module, before).await?;
             }
+            deliveries::cleanup_retries(database, before).await?;
         }
         Ok(())
     }
@@ -190,20 +201,7 @@ impl Dispatcher {
         let table = Alias::new(table_name(module));
         let mut select = Query::select();
         select
-            .columns([
-                "tenant_id",
-                "id",
-                "name",
-                "actor_user_id",
-                "actor_api_key_id",
-                "actor_kind",
-                "actor_access",
-                "actor_access_id",
-                "subject",
-                "payload",
-                "occurred_at",
-                "attempts",
-            ])
+            .columns(EVENT_COLUMNS)
             .from(table.clone())
             .cond_where(pending(now()))
             .order_by(Alias::new("id"), Order::Asc)
@@ -212,7 +210,6 @@ impl Dispatcher {
         let mut handled = 0;
         for row in rows {
             let id: Uuid = row.try_get("", "id")?;
-            let attempts: i32 = row.try_get("", "attempts")?;
             let event = match self.read_event(module, &row).await {
                 Ok(event) => event,
                 Err(error) => {
@@ -240,61 +237,186 @@ impl Dispatcher {
                 continue; // tiến trình khác vừa nhận việc giao event này
             }
             handled += 1;
-            match self.deliver(&event).await {
-                Ok(()) => mark_delivered(database, &table, event.id).await?,
-                Err(error) => mark_failed(database, &table, &event, attempts + 1, &error).await?,
+            let missed = self.fan_out(&event, DELIVERY_TIMEOUT).await;
+            deliveries::finish_fan_out(database, &table, module, &event, &missed).await?;
+        }
+        Ok(handled)
+    }
+
+    /// Delivers the due per-subscriber retries on `database` (placement `placement`): each row is one module that
+    /// still has to receive one event; only that module is called.
+    async fn run_retries(
+        &self,
+        placement: PlacementId,
+        database: &Database,
+    ) -> Result<usize, Error> {
+        let mut handled = 0;
+        for retry in deliveries::due(database, BATCH).await? {
+            if !claim(database, &deliveries::table(), retry.id, now()).await? {
+                continue; // tiến trình khác vừa nhận dòng này
+            }
+            handled += 1;
+            let Some(module) = self.modules.iter().copied().find(|module| *module == retry.module)
+            else {
+                // Module phát đang tắt (chế độ nghỉ) hay đã gỡ: bảng event của nó không thuộc bộ phát lúc này. Hoãn,
+                // không tính lần thử — bật lại thì giao tiếp; gỡ hẳn thì dòng nằm chờ, hiện ở số đo tồn đọng.
+                tracing::warn!(
+                    retry_id = %retry.id,
+                    module = %retry.module,
+                    "the module that emitted this event is not active; its retry waits an hour"
+                );
+                deliveries::postpone(database, retry.id, SignedDuration::from_hours(1)).await?;
+                continue;
+            };
+            let event = match self.load_event(database, module, retry.event_id).await {
+                Ok(Some(event)) => event,
+                Ok(None) => {
+                    let error = format!(
+                        "event {} is no longer in `{}`",
+                        retry.event_id,
+                        table_name(module)
+                    );
+                    deliveries::mark_dead(database, retry.id, &error).await?;
+                    continue;
+                }
+                Err(error) => {
+                    deliveries::mark_dead(database, retry.id, &describe(&error)).await?;
+                    continue;
+                }
+            };
+            if event.tenant.status() == TenantStatus::Moving {
+                deliveries::postpone(database, retry.id, SignedDuration::from_secs(30)).await?;
+                continue;
+            }
+            if event.tenant.placement() != placement {
+                let error =
+                    "the tenant's data moved to another placement; this retry is a left-over copy";
+                deliveries::mark_dead(database, retry.id, error).await?;
+                continue;
+            }
+            // Module nhận không còn đăng ký event này (đã gỡ, đang tắt): không còn gì để giao — như module tắt không
+            // nhận bù event lúc tắt (bước 70 P9).
+            let Some(subscriber) = self
+                .subscriptions
+                .iter()
+                .map(|(subscriber, _)| *subscriber)
+                .find(|subscriber| *subscriber == retry.subscriber)
+            else {
+                tracing::info!(
+                    event_id = %event.id,
+                    subscriber = %retry.subscriber,
+                    "the subscribing module is not installed any more; its event retry is dropped"
+                );
+                deliveries::mark_done(database, retry.id).await?;
+                continue;
+            };
+            let span = delivery_span(&event);
+            let outcome = tracing::Instrument::instrument(
+                tokio::time::timeout(DELIVERY_TIMEOUT, self.deliver_to(subscriber, &event)),
+                span,
+            )
+            .await;
+            match outcome {
+                Ok(Ok(())) => deliveries::mark_done(database, retry.id).await?,
+                Ok(Err(error)) => {
+                    deliveries::mark_failed(database, &retry, &event.name, &describe(&error))
+                        .await?;
+                }
+                Err(_) => {
+                    let error = timed_out(subscriber);
+                    deliveries::mark_failed(database, &retry, &event.name, &error).await?;
+                }
             }
         }
         Ok(handled)
     }
 
-    /// Delivers to every subscriber matching the event name, in order; stops at the first failing
-    /// subscriber. A subscriber that panics or runs longer than [`DELIVERY_TIMEOUT`] counts as one failed
-    /// attempt (retried with backoff) and does not kill the dispatcher of the whole process (D-158).
-    async fn deliver(&self, event: &Delivered) -> Result<(), Error> {
+    /// Reads event `id` of `module`; `None` when the row is gone.
+    async fn load_event(
+        &self,
+        database: &Database,
+        module: &'static str,
+        id: Uuid,
+    ) -> Result<Option<Delivered>, Error> {
+        let mut select = Query::select();
+        select
+            .columns(EVENT_COLUMNS)
+            .from(Alias::new(table_name(module)))
+            .and_where(Expr::col(Alias::new("id")).eq(id));
+        match database.write().query_one(&select).await? {
+            Some(row) => Ok(Some(self.read_event(module, &row).await?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Hands `event` to every subscribing module, in registration order, and returns the modules that still have
+    /// to receive it. A module that fails, panics or runs past the fan-out's [`DELIVERY_TIMEOUT`] is
+    /// [`Missed::Failed`]; modules not reached before that deadline are [`Missed::NotReached`]. Neither stops the
+    /// modules after it, nor kills the dispatcher of the whole process (D-158).
+    ///
+    /// A subscriber that hangs still makes the ones after it wait, up to the deadline; the one cut off by the
+    /// deadline counts one failed attempt even if it started late. `budget` is [`DELIVERY_TIMEOUT`] outside tests.
+    async fn fan_out(&self, event: &Delivered, budget: Duration) -> Vec<(&'static str, Missed)> {
         let all = async {
-            for (subscriber, subscription) in &self.subscriptions {
-                if !subscription.matches(&event.name) {
+            let deadline = tokio::time::Instant::now() + budget;
+            let mut missed = Vec::new();
+            for subscriber in self.subscribers_of(&event.name) {
+                let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+                if left.is_zero() {
+                    missed.push((subscriber, Missed::NotReached));
                     continue;
                 }
-                // Gói của khách không có module nhận: bỏ qua (coi như đã giao), không thử lại.
-                if !self.admits(subscriber, &event.tenant).await? {
-                    metrics::counter!("entitlement_denials_total", "kind" => "event").increment(1);
-                    continue;
-                }
-                let handled = AssertUnwindSafe(subscription.handler.handle(event)).catch_unwind();
-                match handled.await {
+                match tokio::time::timeout(left, self.deliver_to(subscriber, event)).await {
                     Ok(Ok(())) => {}
-                    Ok(Err(error)) => {
-                        return Err(Error::internal(format!(
-                            "module `{subscriber}`: {}",
-                            describe(&error)
-                        )));
-                    }
-                    Err(_) => {
-                        return Err(Error::internal(format!(
-                            "module `{subscriber}`: the event handler panicked"
-                        )));
-                    }
+                    Ok(Err(error)) => missed.push((subscriber, Missed::Failed(describe(&error)))),
+                    Err(_) => missed.push((subscriber, Missed::Failed(timed_out(subscriber)))),
                 }
             }
-            Ok(())
+            missed
         };
-        // Span của lượt giao mang khách của event (bước 39 B7, D-190).
-        let span = tracing::info_span!(
-            "event_delivery",
-            event_id = %event.id,
-            name = %event.name,
-            tenant_id = %event.tenant.id(),
-        );
-        let all = tracing::Instrument::instrument(all, span);
-        match tokio::time::timeout(DELIVERY_TIMEOUT, all).await {
-            Ok(outcome) => outcome,
-            Err(_) => Err(Error::internal(format!(
-                "delivery took longer than {} seconds",
-                DELIVERY_TIMEOUT.as_secs()
-            ))),
+        tracing::Instrument::instrument(all, delivery_span(event)).await
+    }
+
+    /// The modules subscribing to event `name`, each once, in registration order.
+    fn subscribers_of(&self, name: &str) -> Vec<&'static str> {
+        let mut found: Vec<&'static str> = Vec::new();
+        for (subscriber, subscription) in &self.subscriptions {
+            if subscription.matches(name) && !found.contains(subscriber) {
+                found.push(subscriber);
+            }
         }
+        found
+    }
+
+    /// Delivers `event` to the subscriptions of module `subscriber` that match it, in order; stops at the
+    /// first failing one (the module is retried as a whole; it tolerates receiving the event again, D-054).
+    async fn deliver_to(&self, subscriber: &'static str, event: &Delivered) -> Result<(), Error> {
+        // Gói của khách không có module nhận: bỏ qua (coi như đã giao), không thử lại.
+        if !self.admits(subscriber, &event.tenant).await? {
+            metrics::counter!("entitlement_denials_total", "kind" => "event").increment(1);
+            return Ok(());
+        }
+        for (module, subscription) in &self.subscriptions {
+            if *module != subscriber || !subscription.matches(&event.name) {
+                continue;
+            }
+            let handled = AssertUnwindSafe(subscription.handler.handle(event)).catch_unwind();
+            match handled.await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    return Err(Error::internal(format!(
+                        "module `{subscriber}`: {}",
+                        describe(&error)
+                    )));
+                }
+                Err(_) => {
+                    return Err(Error::internal(format!(
+                        "module `{subscriber}`: the event handler panicked"
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Reads one event row, with its tenant context.
@@ -381,7 +503,7 @@ async fn mark_unreadable(
     id: Uuid,
     error: &Error,
 ) -> Result<(), Error> {
-    let message: String = describe(error).chars().take(MAX_ERROR_LENGTH).collect();
+    let message = truncate(&describe(error));
     tracing::error!(event_id = %id, error = %message, "an event row cannot be read; it will not be delivered");
     let mut update = Query::update();
     update
@@ -394,74 +516,9 @@ async fn mark_unreadable(
     Ok(())
 }
 
-async fn mark_delivered(database: &Database, table: &Alias, id: Uuid) -> Result<(), Error> {
-    let mut update = Query::update();
-    update
-        .table(table.clone())
-        .value(Alias::new("delivered_at"), now())
-        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
-        .and_where(Expr::col(Alias::new("id")).eq(id));
-    database.write().execute(&update).await?;
-    metrics::counter!("events_delivered_total").increment(1);
-    Ok(())
-}
-
-/// Records a failed delivery: schedules the next attempt with backoff, or marks it permanently failed.
-async fn mark_failed(
-    database: &Database,
-    table: &Alias,
-    event: &Delivered,
-    attempts: i32,
-    error: &Error,
-) -> Result<(), Error> {
-    let now = now();
-    let message: String = describe(error).chars().take(MAX_ERROR_LENGTH).collect();
-    let mut update = Query::update();
-    update
-        .table(table.clone())
-        .value(Alias::new("attempts"), attempts)
-        .value(Alias::new("next_attempt_at"), now + backoff(attempts))
-        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
-        .value(Alias::new("last_error"), message.clone())
-        .and_where(Expr::col(Alias::new("id")).eq(event.id));
-    // Xoá dữ liệu của tài khoản đã xoá là nghĩa vụ, không phải việc phụ: không bỏ cuộc,
-    // cứ thử lại (tối đa mỗi giờ một lần) tới khi mọi module xong (D-149). Tài khoản đã
-    // mất nên người dùng không tự xin xoá lại được.
-    let never_give_up = event.name == crate::privacy::USER_DELETED;
-    if attempts >= MAX_ATTEMPTS && !never_give_up {
-        update.value(Alias::new("failed_at"), now);
-        tracing::error!(
-            event_id = %event.id,
-            event = %event.name,
-            attempts,
-            error = %message,
-            "event delivery failed for good; it will not be retried"
-        );
-        metrics::counter!("events_failed_total").increment(1);
-    } else if attempts >= MAX_ATTEMPTS {
-        tracing::error!(
-            event_id = %event.id,
-            event = %event.name,
-            attempts,
-            error = %message,
-            "erasing a deleted user's data keeps failing; it is retried every hour"
-        );
-    } else {
-        tracing::warn!(
-            event_id = %event.id,
-            event = %event.name,
-            attempts,
-            error = %message,
-            "event delivery failed; will retry"
-        );
-    }
-    database.write().execute(&update).await?;
-    Ok(())
-}
-
 /// The "pending delivery" condition: not delivered, not permanently failed, due for a retry, and not held
-/// by anyone.
-fn pending(now: Timestamp) -> Condition {
+/// by anyone. The same for event rows and per-subscriber retry rows.
+pub(super) fn pending(now: Timestamp) -> Condition {
     Condition::all()
         .add(Expr::col(Alias::new("delivered_at")).is_null())
         .add(Expr::col(Alias::new("failed_at")).is_null())
@@ -474,7 +531,7 @@ fn pending(now: Timestamp) -> Condition {
 }
 
 /// The wait before attempt number `attempts + 1`: 2, 4, 8... seconds, at most one hour.
-fn backoff(attempts: i32) -> SignedDuration {
+pub(super) fn backoff(attempts: i32) -> SignedDuration {
     let exponent = u32::try_from(attempts.clamp(1, 12)).unwrap_or(12);
     SignedDuration::from_secs(std::cmp::min(i64::from(2u32.pow(exponent)), 3600))
 }
@@ -488,6 +545,44 @@ fn describe(error: &Error) -> String {
     }
 }
 
+/// `text` cut to [`MAX_ERROR_LENGTH`] characters, for `last_error`.
+pub(super) fn truncate(text: &str) -> String {
+    text.chars().take(MAX_ERROR_LENGTH).collect()
+}
+
+/// The error of a subscriber that ran past the delivery time.
+fn timed_out(subscriber: &str) -> String {
+    format!(
+        "module `{subscriber}`: delivery took longer than {} seconds",
+        DELIVERY_TIMEOUT.as_secs()
+    )
+}
+
+/// The span of one delivery, carrying the event's tenant (step 39 B7, D-190).
+fn delivery_span(event: &Delivered) -> tracing::Span {
+    tracing::info_span!(
+        "event_delivery",
+        event_id = %event.id,
+        name = %event.name,
+        tenant_id = %event.tenant.id(),
+    )
+}
+
+/// The columns of an event row the dispatcher reads.
+const EVENT_COLUMNS: [&str; 11] = [
+    "tenant_id",
+    "id",
+    "name",
+    "actor_user_id",
+    "actor_api_key_id",
+    "actor_kind",
+    "actor_access",
+    "actor_access_id",
+    "subject",
+    "payload",
+    "occurred_at",
+];
+
 fn now() -> Timestamp {
     Timestamp::now()
 }
@@ -495,6 +590,63 @@ fn now() -> Timestamp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::config::{ConfigReader, ConfigSource, DatabaseConfig};
+    use crate::event::EventHandler;
+    use crate::tenancy::{TenancyConfig, TenantContext};
+    use autoxide_testkit::TestDatabase;
+
+    // Bên nhận chờ `wait` rồi nhận.
+    struct Sleeper(Duration);
+
+    #[async_trait::async_trait]
+    impl EventHandler for Sleeper {
+        async fn handle(&self, _event: &Delivered) -> Result<(), Error> {
+            tokio::time::sleep(self.0).await;
+            Ok(())
+        }
+    }
+
+    // Hết thời gian của lượt: bên đang chạy bị cắt (một lần lỗi), bên sau chưa tới lượt (`NotReached`, thử lại
+    // ngay không tính lần thử); bên trước đã nhận thì không có trong danh sách.
+    #[tokio::test]
+    async fn het_thoi_gian_luot_ben_sau_chua_toi_luot() {
+        TestDatabase::run(async |test| {
+            let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+            let mut reader = ConfigReader::new(&source);
+            let config = DatabaseConfig::read(&mut reader);
+            let config = reader.finish(config).unwrap().0;
+            let database = Database::connect(&config).await.unwrap();
+            let registry =
+                DatabaseRegistry::new(database.clone(), config, TenancyConfig::default());
+            let quick: Arc<dyn EventHandler> = Arc::new(Sleeper(Duration::ZERO));
+            let stuck: Arc<dyn EventHandler> = Arc::new(Sleeper(Duration::from_secs(30)));
+            let subscriptions = vec![
+                ("first", Subscription::new("notes.note_created", quick.clone())),
+                ("stuck", Subscription::new("notes.note_created", stuck)),
+                ("later", Subscription::new("notes.note_created", quick)),
+            ];
+            let dispatcher =
+                Dispatcher::new(registry, vec!["notes"], subscriptions, Arc::new(Notify::new()));
+            let event = Delivered::new(
+                TenantContext::default_on(database),
+                "notes",
+                "notes.note_created",
+                serde_json::json!({}),
+            );
+
+            let missed = dispatcher.fan_out(&event, Duration::from_millis(200)).await;
+            assert_eq!(missed.len(), 2, "{missed:?}");
+            assert_eq!(missed[0].0, "stuck");
+            assert!(
+                matches!(&missed[0].1, Missed::Failed(error) if error.contains("took longer")),
+                "{missed:?}"
+            );
+            assert_eq!(missed[1], ("later", Missed::NotReached));
+        })
+        .await
+        .unwrap();
+    }
 
     #[test]
     fn backoff_tang_dan_va_co_tran() {

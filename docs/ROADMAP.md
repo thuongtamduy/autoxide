@@ -117,12 +117,13 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       tính hạn mức
 - [ ] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
       chéo lúc lưu, có cache
-- [ ] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
+- [x] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
       một event cho mọi bên đăng ký khớp tên theo thứ tự đăng ký và dừng ở bên đầu tiên trả lỗi (hay panic, hay cả lượt
       quá `DELIVERY_TIMEOUT`); cả event bị đánh dấu lỗi và thử lại với backoff từ bên đầu tiên — bên đã nhận rồi nhận lại
       (D-054), bên sau chưa nhận gì. Sau `MAX_ATTEMPTS` lần event thành hỏng hẳn (bên sau không bao giờ nhận), riêng
       `auth.user_deleted` thử lại mỗi giờ mãi mãi (D-149). Cân nhắc ghi trạng thái giao theo từng bên nhận (bảng con của
-      outbox hay cột theo module), để thử lại chỉ bên lỗi và bên khác không phải chờ
+      outbox hay cột theo module), để thử lại chỉ bên lỗi và bên khác không phải chờ. **Xong:** bảng
+      `kernel_event_deliveries` giữ lần giao của riêng bên lỗi, bên khác nhận ngay (D-20261128-event-per-subscriber)
 
 ### G2 — Không để thư viện níu chân (D-20261126-library-isolation)
 

@@ -220,6 +220,15 @@ async fn nguoi_la_khac_he_thong() {
     .unwrap();
 }
 
+/// Cho mọi lần thử lại theo bên nhận tới hạn ngay (thay vì chờ backoff).
+async fn retries_due(setup: &Setup) {
+    let sql = "UPDATE kernel_event_deliveries SET next_attempt_at = created_at";
+    let backend = setup.database.write().get_database_backend();
+    setup.database.write().execute_raw(Statement::from_string(backend, sql)).await.unwrap();
+}
+
+/// Bên nhận lỗi: event vẫn được chia xong, chỉ bên đó thử lại với backoff; quá `MAX_ATTEMPTS` lần thì riêng
+/// dòng của bên đó vào dead-letter (D-20261128-event-per-subscriber).
 #[tokio::test]
 async fn ben_nhan_loi_thi_giao_lai_roi_danh_dau_hong() {
     TestDatabase::run(async |test| {
@@ -229,17 +238,17 @@ async fn ben_nhan_loi_thi_giao_lai_roi_danh_dau_hong() {
         record(&setup, "doomed").await;
         let dispatcher = setup.modules.dispatcher().unwrap();
 
-        for attempt in 1..=MAX_ATTEMPTS {
-            assert_eq!(dispatcher.run_once().await.unwrap(), 1, "attempt {attempt}");
+        // Lần chia đầu là lần thử thứ nhất.
+        assert_eq!(dispatcher.run_once().await.unwrap(), 1);
+        for attempt in 2..=MAX_ATTEMPTS {
             // Lần sau được hẹn trong tương lai: chưa tới giờ thì không giao.
             assert_eq!(dispatcher.run_once().await.unwrap(), 0);
-            // Cho thời gian trôi qua tới giờ thử lại.
-            let sql = "UPDATE notes_events SET next_attempt_at = occurred_at";
-            let backend = setup.database.write().get_database_backend();
-            setup.database.write().execute_raw(Statement::from_string(backend, sql)).await.unwrap();
+            retries_due(&setup).await;
+            assert_eq!(dispatcher.run_once().await.unwrap(), 1, "attempt {attempt}");
         }
 
         // Quá số lần thử: đánh dấu hỏng, không giao nữa.
+        retries_due(&setup).await;
         assert_eq!(dispatcher.run_once().await.unwrap(), 0);
         assert_eq!(recorder.seen.lock().unwrap().len(), MAX_ATTEMPTS as usize);
         let backend = setup.database.write().get_database_backend();
@@ -248,21 +257,36 @@ async fn ben_nhan_loi_thi_giao_lai_roi_danh_dau_hong() {
             .read()
             .query_one_raw(Statement::from_string(
                 backend,
-                "SELECT attempts, last_error FROM notes_events",
+                "SELECT subscriber, attempts, failed_at, last_error FROM kernel_event_deliveries",
             ))
             .await
             .unwrap()
             .unwrap();
+        assert_eq!(row.try_get::<String>("", "subscriber").unwrap(), "listener");
         assert_eq!(row.try_get::<i32>("", "attempts").unwrap(), MAX_ATTEMPTS);
+        assert!(row.try_get::<Option<Timestamp>>("", "failed_at").unwrap().is_some());
         let error: String = row.try_get("", "last_error").unwrap();
         assert!(error.contains("module `listener`"), "{error}");
         assert!(error.contains("the downstream system is down"), "{error}");
+        // Event đã chia xong: không nằm chờ ở outbox nữa.
+        let event = setup
+            .database
+            .read()
+            .query_one_raw(Statement::from_string(
+                backend,
+                "SELECT delivered_at, failed_at FROM notes_events",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(event.try_get::<Option<Timestamp>>("", "delivered_at").unwrap().is_some());
+        assert!(event.try_get::<Option<Timestamp>>("", "failed_at").unwrap().is_none());
     })
     .await
     .unwrap();
 }
 
-/// Event xoá tài khoản không bao giờ bị bỏ: quá số lần thử vẫn được giao lại (D-149).
+/// Event xoá tài khoản không bao giờ bị bỏ: quá số lần thử vẫn được giao lại (D-149), theo từng bên nhận.
 #[tokio::test]
 async fn event_xoa_tai_khoan_thu_lai_mai() {
     TestDatabase::run(async |test| {
@@ -278,15 +302,14 @@ async fn event_xoa_tai_khoan_thu_lai_mai() {
 
         for attempt in 1..=MAX_ATTEMPTS + 2 {
             assert_eq!(dispatcher.run_once().await.unwrap(), 1, "attempt {attempt}");
-            let sql = "UPDATE notes_events SET next_attempt_at = occurred_at";
-            setup.database.write().execute_raw(Statement::from_string(backend, sql)).await.unwrap();
+            retries_due(&setup).await;
         }
         let row = setup
             .database
             .read()
             .query_one_raw(Statement::from_string(
                 backend,
-                "SELECT attempts, failed_at FROM notes_events",
+                "SELECT attempts, failed_at FROM kernel_event_deliveries",
             ))
             .await
             .unwrap()
@@ -388,16 +411,27 @@ async fn ben_nhan_panic_hay_dong_hong_khong_chan_event_sau() {
             .read()
             .query_all_raw(Statement::from_string(
                 backend,
-                "SELECT subject, attempts, failed_at, last_error FROM notes_events ORDER BY id",
+                "SELECT subject, failed_at FROM notes_events ORDER BY id",
             ))
             .await
             .unwrap();
-        let bug = &rows[0];
-        assert_eq!(bug.try_get::<i32>("", "attempts").unwrap(), 1);
-        let error: String = bug.try_get("", "last_error").unwrap();
-        assert!(error.contains("panicked"), "{error}");
         let broken = &rows[1];
         assert!(broken.try_get::<Option<Timestamp>>("", "failed_at").unwrap().is_some());
+        // Bên nhận panic: một lần lỗi của riêng bên đó, chờ thử lại.
+        let bug = setup
+            .database
+            .read()
+            .query_one_raw(Statement::from_string(
+                backend,
+                "SELECT attempts, failed_at, last_error FROM kernel_event_deliveries",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(bug.try_get::<i32>("", "attempts").unwrap(), 1);
+        assert!(bug.try_get::<Option<Timestamp>>("", "failed_at").unwrap().is_none());
+        let error: String = bug.try_get("", "last_error").unwrap();
+        assert!(error.contains("panicked"), "{error}");
     })
     .await
     .unwrap();

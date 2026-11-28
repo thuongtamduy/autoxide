@@ -58,7 +58,14 @@ Dấu hiệu: cảnh báo `AutoxideJobsStuck`, `AutoxideEventsBacklog`, `Autoxid
 3. Nhiều khách: database đang migrate trả `503 tenant_maintenance` và việc của nó chờ; để `autoxide migrate up --all` chạy xong.
 4. Job đã bỏ cuộc: `autoxide jobs failed [--module <module>] [--limit <n>]` liệt kê chúng kèm lỗi cuối. Sửa nguyên nhân (mật
    khẩu SMTP sai, đối tác sập) **trước** `autoxide jobs retry <module> <id>`; job retry quá sớm chỉ lại thất bại.
-5. Vẫn trễ dù worker khoẻ: tăng `AUTOXIDE_JOBS_CONCURRENCY` hay chạy thêm worker process.
+5. Event đã bỏ cuộc: module cứ lỗi với một event thì được thử lại riêng, nên các module khác đã nhận event đó. Mỗi
+   dòng của `kernel_event_deliveries` có `failed_at` là một module (`subscriber`) chưa bao giờ nhận một event (`module`,
+   `event_id`), kèm `last_error`. Sửa nguyên nhân, rồi chạy
+   `UPDATE kernel_event_deliveries SET failed_at = NULL, attempts = 0 WHERE id = '<id>';` để chỉ thử lại module đó.
+   Dòng của `<module>_events` có `failed_at` là dòng không đọc được (payload hỏng, khách không còn).
+   Trước khi `autoxide rollback` về bản cũ hơn bảng `kernel_event_deliveries`, chờ `events_pending` về 0: lùi bản xoá
+   bảng đó, nên các lần thử lại đang chờ của từng module mất, và bản cũ thấy các event đó đã giao nên không gửi lại.
+6. Vẫn trễ dù worker khoẻ: tăng `AUTOXIDE_JOBS_CONCURRENCY` hay chạy thêm worker process.
 
 ## Lộ key
 

@@ -398,6 +398,11 @@ Declare events in `src/events.rs` and return them from `Module::events`. The pay
 `{"before": …, "after": …}` (omit what does not apply) and never contains secrets. The
 `audit` module records every event; other modules subscribe through
 `Module::subscriptions` and must accept receiving the same event twice.
+Each subscribing module gets the event on its own: when your handler returns an error, panics or
+runs past 50 seconds, the modules after yours still receive the event, and only your module is
+retried (2, 4, 8… seconds, at most an hour apart; after 10 attempts its delivery goes to the
+dead-letter queue, except `privacy::USER_DELETED`, which is retried every hour until it succeeds).
+Several subscriptions of one module to the same event are retried together.
 An event about data of one organization unit carries that unit as `org_id` - at the top of the
 payload or inside `after` / `before` (a row snapshot with its `org_id` column is enough).
 Receivers read it with `Delivered::org_id()`: an automation rule of a branch only starts for
