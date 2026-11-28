@@ -16,16 +16,15 @@ use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
-use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::entity::{dataset, unit};
+use crate::entity::{Dataset, Unit};
 use crate::events;
 use crate::service::AddressService;
 
@@ -185,10 +184,12 @@ impl AddressService {
         check_manifest(manifest)?;
         let provinces = rows.iter().filter(|row| row.level == 1).count();
         let communes = rows.len() - provinces;
-        let control = self.control();
-        if let Some(existing) = dataset::Entity::find()
-            .filter(dataset::Column::Sha256.eq(sha256))
-            .one(control.read())
+        let control = &self.control;
+        if let Some(existing) = control
+            .read()
+            .find::<Dataset>()
+            .filter(Dataset::SHA256.eq(sha256.to_owned()))
+            .one()
             .await?
         {
             return Ok(Imported {
@@ -203,31 +204,33 @@ impl AddressService {
         let country = manifest.country.as_str();
         let from = manifest.effective_from.as_str();
         let transaction = control.begin_write().await?;
-        let current: Vec<unit::Model> = unit::Entity::find()
-            .filter(unit::Column::Country.eq(country))
-            .filter(unit::Column::ValidTo.is_null())
-            .all(&transaction)
+        let current: Vec<Unit> = transaction
+            .find::<Unit>()
+            .filter(Unit::COUNTRY.eq(country.to_owned()))
+            .filter(Unit::VALID_TO.is_null())
+            .all()
             .await?;
-        let current: BTreeMap<&str, &unit::Model> =
+        let current: BTreeMap<&str, &Unit> =
             current.iter().map(|row| (row.code.as_str(), row)).collect();
         let wanted: BTreeMap<&str, &Row> =
             rows.iter().map(|row| (row.code.as_str(), row)).collect();
         let dataset_id = Uuid::now_v7();
-        dataset::ActiveModel {
-            id: Set(dataset_id),
-            country: Set(country.to_owned()),
-            effective_from: Set(from.to_owned()),
-            title: Set(manifest.title.trim().to_owned()),
-            source_url: Set(manifest.source_url.trim().to_owned()),
-            retrieved_on: Set(manifest.retrieved_on.clone()),
-            sha256: Set(sha256.to_owned()),
-            province_count: Set(i32::try_from(provinces).map_err(Error::internal)?),
-            commune_count: Set(i32::try_from(communes).map_err(Error::internal)?),
-            imported_at: Set(Timestamp::now()),
-        }
-        .insert(&transaction)
-        .await?;
-        let same = |old: &unit::Model, new: &Row| {
+        transaction
+            .insert(Dataset {
+                id: dataset_id,
+                country: country.to_owned(),
+                effective_from: from.to_owned(),
+                title: manifest.title.trim().to_owned(),
+                source_url: manifest.source_url.trim().to_owned(),
+                retrieved_on: manifest.retrieved_on.clone(),
+                sha256: sha256.to_owned(),
+                province_count: i32::try_from(provinces).map_err(Error::internal)?,
+                commune_count: i32::try_from(communes).map_err(Error::internal)?,
+                imported_at: Timestamp::now(),
+            })
+            .exec()
+            .await?;
+        let same = |old: &Unit, new: &Row| {
             old.name == new.name
                 && old.kind == new.kind
                 && old.parent_code == new.parent_code
@@ -236,10 +239,11 @@ impl AddressService {
         let mut closed = 0;
         for (code, old) in &current {
             if wanted.get(code).is_none_or(|new| !same(old, new)) {
-                unit::Entity::update_many()
-                    .col_expr(unit::Column::ValidTo, Expr::value(Some(from.to_owned())))
-                    .filter(unit::Column::Id.eq(old.id))
-                    .exec(&transaction)
+                transaction
+                    .update::<Unit>()
+                    .set(Unit::VALID_TO, Some(from.to_owned()))
+                    .filter(Unit::ID.eq(old.id))
+                    .exec()
                     .await?;
                 closed += 1;
             }
@@ -250,21 +254,22 @@ impl AddressService {
             if current.get(code).is_some_and(|old| same(old, new)) {
                 continue;
             }
-            unit::ActiveModel {
-                id: Set(Uuid::now_v7()),
-                country: Set(country.to_owned()),
-                level: Set(new.level),
-                code: Set(new.code.clone()),
-                name: Set(new.name.clone()),
-                name_folded: Set(autoxide_kernel::search::fold(&new.name)),
-                kind: Set(new.kind.clone()),
-                parent_code: Set(new.parent_code.clone()),
-                valid_from: Set(from.to_owned()),
-                valid_to: Set(None),
-                dataset_id: Set(dataset_id),
-            }
-            .insert(&transaction)
-            .await?;
+            transaction
+                .insert(Unit {
+                    id: Uuid::now_v7(),
+                    country: country.to_owned(),
+                    level: new.level,
+                    code: new.code.clone(),
+                    name: new.name.clone(),
+                    name_folded: autoxide_kernel::search::fold(&new.name),
+                    kind: new.kind.clone(),
+                    parent_code: new.parent_code.clone(),
+                    valid_from: from.to_owned(),
+                    valid_to: None,
+                    dataset_id,
+                })
+                .exec()
+                .await?;
             opened += 1;
         }
         let event = events::DatasetImported {
@@ -313,7 +318,7 @@ pub(crate) fn task(service: Arc<AddressService>) -> Task {
 
 struct ImportTask(Arc<AddressService>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl TaskRun for ImportTask {
     async fn run(&self, args: &TaskArgs) -> Result<String, Error> {
         let Some(path) = args.get("path") else {

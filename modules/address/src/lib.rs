@@ -17,89 +17,58 @@ mod tests;
 
 use std::sync::Arc;
 
+use autoxide_kernel::db::RecordInfo;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::EventInfo;
-use autoxide_kernel::mcp::Tool;
-use autoxide_kernel::migration::prelude::MigrationTrait;
-use autoxide_kernel::module::{Module, StartContext};
-use utoipa_axum::router::OpenApiRouter;
+use autoxide_kernel::module::{Manifest, Module, StartContext};
 
 use crate::service::AddressService;
 
 pub fn module() -> impl Module {
-    AddressModule::default()
+    AddressModule
 }
 
-#[derive(Default)]
-struct AddressModule {
-    service: Option<Arc<AddressService>>,
-}
+struct AddressModule;
 
+// Hợp đồng module (D-20261126-module-manifest): `manifest` khai mọi thứ tĩnh, `start` dựng service rồi đăng ký
+// những gì cần service (route, tool MCP, lệnh `autoxide task`, kiểm `autoxide doctor`, trait cho module khác).
 impl Module for AddressModule {
-    fn name(&self) -> &'static str {
-        "address"
-    }
-
-    fn description(&self) -> &'static str {
-        "Administrative units of Vietnam (provinces and communes after the 2025 merger) and \
-         address checks, shared by every tenant."
-    }
-
-    // Module nền: không gói nào tắt được (bước 35, D-323).
-    fn always_enabled(&self) -> bool {
-        true
-    }
-
-    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        migration::all()
-    }
-
-    fn control_plane_tables(&self) -> Vec<&'static str> {
-        vec!["address_dataset", "address_unit"]
-    }
-
-    fn events(&self) -> Vec<EventInfo> {
-        events::all()
-    }
-
-    fn translations(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("vi", include_str!("../locales/vi.json"))]
+    fn manifest(&self) -> Manifest {
+        Manifest::new(
+            "address",
+            "Administrative units of Vietnam (provinces and communes after the 2025 merger) and \
+             address checks, shared by every tenant.",
+        )
+        // Module nền: không gói nào tắt được (bước 35, D-323).
+        .always_enabled()
+        .migrations(migration::all)
+        .control_plane_tables(["address_dataset", "address_unit"])
+        .records([RecordInfo::of::<entity::Dataset>(), RecordInfo::of::<entity::Unit>()])
+        .events(events::all())
+        .translation("vi", include_str!("../locales/vi.json"))
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let service =
-            Arc::new(AddressService { databases: context.tenancy(), outbox: context.outbox()? });
-        self.service = Some(service.clone());
+        let service = Arc::new(AddressService {
+            control: context.kernel()?,
+            databases: context.kernel()?,
+            outbox: context.kernel()?,
+        });
+        context.routes(http::routes(service.clone()))?;
+        context.tools(tools::all(&service))?;
+        context.task(import::task(service.clone()))?;
+        context.check(autoxide_kernel::doctor::Check::new(
+            "administrative_units",
+            "An official list of administrative units (Vietnam) is imported, for checking addresses.",
+            Arc::new(Dataset(service.clone())),
+        ))?;
         context.provide::<dyn api::AdministrativeUnits>(service)
-    }
-
-    fn routes(&self) -> OpenApiRouter {
-        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
-    }
-
-    fn tools(&self) -> Vec<Tool> {
-        self.service.as_ref().map_or_else(Vec::new, tools::all)
-    }
-
-    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
-        self.service.clone().map_or_else(Vec::new, |service| vec![import::task(service)])
-    }
-
-    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![autoxide_kernel::doctor::Check::new(
-                "administrative_units",
-                "An official list of administrative units (Vietnam) is imported, for checking addresses.",
-                Arc::new(Dataset(service)),
-            )]
-        })
     }
 }
 
 /// `autoxide doctor`: bộ dữ liệu đang dùng (nguồn, ngày hiệu lực) hay chưa nhập.
 struct Dataset(Arc<AddressService>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl autoxide_kernel::doctor::Probe for Dataset {
     async fn probe(&self) -> autoxide_kernel::doctor::Finding {
         use autoxide_kernel::doctor::Finding;

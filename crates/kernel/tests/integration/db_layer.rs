@@ -702,3 +702,105 @@ async fn doc_co_tran_tren_bo_dung_cau() {
     .await
     .unwrap();
 }
+
+// Trang theo một cột khác id (`page_by`): thứ tự (cột, id), giá trị trùng không lặp không sót qua các trang, cả hai
+// chiều; con trỏ của cột khác hay giá trị sai kiểu là 422 trên `cursor`; dòng của khách khác không lộ.
+#[tokio::test]
+async fn trang_theo_cot_tu_nhien() {
+    use autoxide_kernel::pagination::NaturalOrderPageQuery;
+    TestDatabase::run(async |test| {
+        let database = open(test).await;
+        let (a, b) = (tenant(&database, 0xA), tenant(&database, 0xB));
+        let stock = [(0x3001, 3), (0x3002, 1), (0x3003, 3), (0x3004, 2), (0x3005, 3)];
+        let tx = a.db().begin_write().await.unwrap();
+        for (n, on_hand) in stock {
+            let row = Level {
+                id: id(n),
+                tenant_id: TenantKey::new(a.id()),
+                code: format!("P-{n:x}"),
+                on_hand,
+            };
+            tx.insert(row).exec().await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        let tx = b.db().begin_write().await.unwrap();
+        let row = Level {
+            id: id(0x3999),
+            tenant_id: TenantKey::new(b.id()),
+            code: "P-B".into(),
+            on_hand: 0,
+        };
+        tx.insert(row).exec().await.unwrap();
+        tx.commit().await.unwrap();
+
+        let read = a.db().read();
+        let walk = async |order: &str| {
+            let mut seen = Vec::new();
+            let mut cursor = None;
+            loop {
+                let query =
+                    NaturalOrderPageQuery::new(Some("2".into()), cursor, Some(order.into()));
+                let request = PageRequest::try_from(query).unwrap();
+                let page = read
+                    .find::<Level>()
+                    .page_by(Level::ON_HAND, |row| row.on_hand, Level::ID, &request)
+                    .await
+                    .unwrap();
+                assert!(page.data.len() <= 2);
+                seen.extend(page.data.iter().map(|row| row.id));
+                match page.pagination.next_cursor {
+                    Some(next) => cursor = Some(next),
+                    None => return seen,
+                }
+            }
+        };
+        let ascending = vec![id(0x3002), id(0x3004), id(0x3001), id(0x3003), id(0x3005)];
+        assert_eq!(walk("asc").await, ascending);
+        let mut descending = ascending.clone();
+        descending.reverse();
+        assert_eq!(walk("desc").await, descending);
+
+        // Có tổng ở trang đầu như `page`.
+        let counted = PageRequest::try_from(
+            NaturalOrderPageQuery::new(Some("2".into()), None, None).with_count(true),
+        )
+        .unwrap();
+        let first = read
+            .find::<Level>()
+            .page_by(Level::CODE, |row| row.code.clone(), Level::ID, &counted)
+            .await
+            .unwrap();
+        assert_eq!(first.pagination.total, Some(5));
+        let by_code = first.pagination.next_cursor.unwrap();
+
+        // Con trỏ của danh sách theo `code` dùng cho danh sách theo `on_hand`: 422 trên `cursor`.
+        let wrong =
+            PageRequest::try_from(NaturalOrderPageQuery::new(None, Some(by_code), None)).unwrap();
+        let error = read
+            .find::<Level>()
+            .page_by(Level::ON_HAND, |row| row.on_hand, Level::ID, &wrong)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "validation_failed");
+        // Con trỏ theo id (UUID) cho danh sách theo cột: cũng 422.
+        let id_cursor = PageRequest::first(2, Order::Asc).after(id(0x3001));
+        let error = read
+            .find::<Level>()
+            .page_by(Level::ON_HAND, |row| row.on_hand, Level::ID, &id_cursor)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "validation_failed");
+        // Đúng tên cột nhưng giá trị là chữ (con trỏ bị sửa): 422, không tới database.
+        let tampered = autoxide_kernel::pagination::text_key_cursor("on_hand", "x");
+        let tampered =
+            PageRequest::try_from(NaturalOrderPageQuery::new(None, Some(tampered), None)).unwrap();
+        let error = read
+            .find::<Level>()
+            .page_by(Level::ON_HAND, |row| row.on_hand, Level::ID, &tampered)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "validation_failed");
+    })
+    .await
+    .unwrap();
+}

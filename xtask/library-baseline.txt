@@ -7,7 +7,6 @@
 # - `raw-sql`: số chỗ gọi `.sql(` trong mã không phải test của file.
 # - `raw-database`: số chỗ gọi `.database()` (database thô, không lọc khách) trong mã không phải test của file.
 
-wrapped-libraries 6 modules/address/Cargo.toml
 wrapped-libraries 6 modules/ai/Cargo.toml
 wrapped-libraries 7 modules/analytics/Cargo.toml
 wrapped-libraries 7 modules/audit/Cargo.toml

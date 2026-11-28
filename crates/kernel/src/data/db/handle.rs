@@ -332,6 +332,14 @@ pub fn all_tenants_for_tests(database: &Database) -> AllTenants<'_> {
     AllTenants { database }
 }
 
+/// Only for tests: the control-plane handle module `module` gets at start, for a test that builds a service by
+/// hand. Turned on by `autoxide-testkit` (feature `testing`); never in an application.
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub fn control_plane_for_tests(database: &Database, module: &'static str) -> ControlPlane {
+    ControlPlane::new(database.clone(), module)
+}
+
 /// Whether the handle accepts records of `R` (always true where it compiles; the bound is the check).
 pub(crate) fn tenant_of_handle<H: Handle, R: Record>(handle: &H) -> Option<Uuid>
 where

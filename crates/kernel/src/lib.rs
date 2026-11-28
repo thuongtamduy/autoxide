@@ -56,6 +56,7 @@ pub use async_trait::async_trait;
 /// (`cargo xtask check` refuses `__private` in module code).
 #[doc(hidden)]
 pub mod __private {
+    pub use autoxide_macros::SerdeAttributes;
     pub use axum;
     pub use utoipa;
     pub use uuid::Uuid;

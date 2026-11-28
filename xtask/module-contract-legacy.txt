@@ -3,7 +3,6 @@
 # `security-baseline.txt`. Chỉ được giảm: chuyển xong một module sang `Module::manifest` thì xoá dòng của nó.
 # Không thêm dòng cho module mới. Danh sách rỗng thì gỡ các hàm cũ khỏi trait (trước 1.0).
 
-module-contract-legacy 11 modules/address/src/lib.rs
 module-contract-legacy 12 modules/ai/src/lib.rs
 module-contract-legacy 16 modules/analytics/src/lib.rs
 module-contract-legacy 14 modules/audit/src/lib.rs
@@ -44,7 +43,6 @@ module-contract-legacy 16 modules/webhooks/src/lib.rs
 
 # Chỗ gọi getter / hàm đăng ký cũ của `StartContext` (luật `start-context-legacy`, D-20261128-contribute): thay bằng
 # `context.kernel::<H>()` / `context.contribute::<dyn Trait>(…)`, rồi hạ số hay xoá dòng. Chỉ giảm.
-start-context-legacy 2 modules/address/src/lib.rs
 start-context-legacy 1 modules/ai/src/lib.rs
 start-context-legacy 4 modules/analytics/src/lib.rs
 start-context-legacy 2 modules/audit/src/lib.rs

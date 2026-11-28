@@ -10,9 +10,9 @@ use super::record::{
     Col, Cond, On, Record, Scope as _, Selection, SubOrigin, Subs, count, foreign_sub,
     global_check, global_refused, table, tenant_filter,
 };
-use super::value::{DbValue, FromRow, Row};
+use super::value::{DbValue, FromRow, Row, SortKey};
 use crate::error::Error;
-use crate::pagination::{Order, Page, PageRequest, Pagination};
+use crate::pagination::{Order, Page, PageRequest, Pagination, SortValue};
 
 /// Query entry points, on every handle (`use autoxide_kernel::db::Queries as _;`).
 pub trait Queries: Handle + Sized {
@@ -219,15 +219,7 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
         if let Some(error) = self.error {
             return Err(error);
         }
-        let total = if request.wants_total() {
-            let mut counted = self.statement.clone();
-            counted.clear_selects();
-            counted.expr(sea_query::Expr::cust("COUNT(*)"));
-            let rows = read_rows(self.handle, &counted, self.within, <(i64,)>::from_row).await?;
-            Some(rows.first().map_or(0, |(n,)| u64::try_from(*n).unwrap_or_default()))
-        } else {
-            None
-        };
+        let total = self.total(request).await?;
         let mut statement = self.statement;
         match (request.id_cursor()?, request.order()) {
             (None, _) => {}
@@ -254,6 +246,104 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
             data: rows,
             pagination: Pagination::new(request.limit(), next_cursor).with_total(total),
         })
+    }
+
+    /// One page ordered by the NOT NULL column `sort` first, then by the ID column `id` — for lists with a
+    /// natural order (position, name, code; `NaturalOrderPageQuery`) or a chosen sort column
+    /// (`SortChoicePageQuery`). `sort_of` reads the column's value from a row, for the next page's cursor. Same
+    /// keyset rules as [`page`](Self::page); a cursor of another list or sort column is a 422 on `cursor`. Needs
+    /// an index on the filter columns + `(sort, id)`. Text is ordered by the database's collation: SQLite and
+    /// Postgres may order names differently, but within one database paging neither repeats nor skips a row.
+    ///
+    /// A nullable column does not compile (`Option<T>` is not a [`SortKey`]):
+    ///
+    /// ```compile_fail,E0277
+    /// # use autoxide_kernel::db::{Queries as _, Record, TenantKey, TenantRead};
+    /// # use autoxide_kernel::pagination::PageRequest;
+    /// #[derive(Record)]
+    /// #[record(table = "kernel_doc_note", scope = tenant)]
+    /// struct Note { #[record(primary_key)] id: uuid::Uuid, tenant_id: TenantKey, title: Option<String> }
+    /// async fn list(read: &TenantRead<'_>, page: &PageRequest) {
+    ///     let _ = read.find::<Note>().page_by(Note::TITLE, |n| n.title.clone(), Note::ID, page).await;
+    /// }
+    /// ```
+    ///
+    /// Control (one token differs, it compiles):
+    ///
+    /// ```no_run
+    /// # use autoxide_kernel::db::{Queries as _, Record, TenantKey, TenantRead};
+    /// # use autoxide_kernel::pagination::PageRequest;
+    /// #[derive(Record)]
+    /// #[record(table = "kernel_doc_note", scope = tenant)]
+    /// struct Note { #[record(primary_key)] id: uuid::Uuid, tenant_id: TenantKey, title: String }
+    /// async fn list(read: &TenantRead<'_>, page: &PageRequest) {
+    ///     let _ = read.find::<Note>().page_by(Note::TITLE, |n| n.title.clone(), Note::ID, page).await;
+    /// }
+    /// ```
+    pub async fn page_by<T: SortKey>(
+        self,
+        sort: Col<R, T>,
+        sort_of: impl Fn(&R) -> T,
+        id: Col<R, Uuid>,
+        request: &PageRequest,
+    ) -> Result<Page<R>, Error>
+    where
+        R: HasId,
+    {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+        let total = self.total(request).await?;
+        let mut statement = self.statement;
+        let fits = |value: &SortValue| T::from_sort_value(value).is_some();
+        if let Some((value, after_id)) = request.key_after(sort.name(), fits)? {
+            let value = T::from_sort_value(&value).ok_or_else(|| {
+                Error::internal("page cursor value checked a moment ago no longer fits")
+            })?;
+            // `col >= v AND (col > v OR id > id0)` như `fetch_page_by`: cận trước cho database nhảy thẳng tới
+            // điểm trong index (cột lọc, col, id) thay vì quét từ đầu phần lọc.
+            let (bound, after, tie) = match request.order() {
+                Order::Asc => (sort.gte(value.clone()), sort.gt(value), id.gt(after_id)),
+                Order::Desc => (sort.lte(value.clone()), sort.lt(value), id.lt(after_id)),
+            };
+            statement.cond_where(bound.inner);
+            statement.cond_where(sea_query::Condition::any().add(after.inner).add(tie.inner));
+        }
+        let direction = match request.order() {
+            Order::Asc => sea_query::Order::Asc,
+            Order::Desc => sea_query::Order::Desc,
+        };
+        statement.order_by_expr(sort.sq(), direction.clone());
+        statement.order_by_expr(id.sq(), direction);
+        statement.limit(u64::from(request.limit()) + 1);
+        let mut rows = read_rows(self.handle, &statement, self.within, R::read).await?;
+        let limit = request.limit() as usize;
+        let has_more = rows.len() > limit;
+        rows.truncate(limit);
+        let next_cursor = match (has_more, rows.last()) {
+            (true, Some(row)) => Some(crate::pagination::key_cursor(
+                sort.name(),
+                sort_of(row).into_sort_value(),
+                row.id(),
+            )),
+            _ => None,
+        };
+        Ok(Page {
+            data: rows,
+            pagination: Pagination::new(request.limit(), next_cursor).with_total(total),
+        })
+    }
+
+    // `count=true`: tổng số dòng khớp bộ lọc, bằng một câu đếm riêng.
+    async fn total(&self, request: &PageRequest) -> Result<Option<u64>, Error> {
+        if !request.wants_total() {
+            return Ok(None);
+        }
+        let mut counted = self.statement.clone();
+        counted.clear_selects();
+        counted.expr(sea_query::Expr::cust("COUNT(*)"));
+        let rows = read_rows(self.handle, &counted, self.within, <(i64,)>::from_row).await?;
+        Ok(Some(rows.first().map_or(0, |(n,)| u64::try_from(*n).unwrap_or_default())))
     }
 }
 

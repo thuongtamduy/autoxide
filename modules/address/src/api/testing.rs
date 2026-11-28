@@ -77,7 +77,7 @@ impl FakeAdministrativeUnits {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl AdministrativeUnits for FakeAdministrativeUnits {
     async fn provinces(&self, _: &str, _: Option<&str>) -> Result<Vec<AdministrativeUnit>, Error> {
         Ok(self.provinces.clone())
