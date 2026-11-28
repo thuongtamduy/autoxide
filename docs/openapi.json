@@ -203040,7 +203040,7 @@
                 }
               }
             },
-            "description": "You may not receive an event you named (code `permission_denied`, naming the permission), or any of them."
+            "description": "You may not receive an event you named (code `permission_denied`, naming the permission), or any of them; or the page's `Origin` is neither listed in AUTOXIDE_HTTP_CORS_ORIGINS nor a verified domain of a tenant (code `kernel.ws_origin_not_allowed`)."
           },
           "404": {
             "content": {

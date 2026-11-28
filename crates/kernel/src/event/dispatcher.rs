@@ -28,8 +28,8 @@ use crate::error::Error;
 use crate::tenancy::{DatabaseRegistry, PlacementId, TenantId, TenantStatus};
 
 /// The maximum number of delivery attempts for an event; beyond it the event is marked failed
-/// (`failed_at`), except account deletion events ([`USER_DELETED`](crate::privacy::USER_DELETED)), which
-/// retry forever.
+/// (`failed_at`), except account deletion events ([`USER_DELETED`](crate::privacy::USER_DELETED)) and
+/// account access revocation events ([`ACCESS_REVOKED`](crate::accounts::ACCESS_REVOKED)), which retry forever.
 pub const MAX_ATTEMPTS: i32 = 10;
 /// The number of events processed per table in one pass.
 const BATCH: u64 = 100;
@@ -406,6 +406,9 @@ async fn mark_delivered(database: &Database, table: &Alias, id: Uuid) -> Result<
     Ok(())
 }
 
+/// Events whose delivery never gives up (retried at most hourly after [`MAX_ATTEMPTS`]).
+const NEVER_GIVE_UP: [&str; 2] = [crate::privacy::USER_DELETED, crate::accounts::ACCESS_REVOKED];
+
 /// Records a failed delivery: schedules the next attempt with backoff, or marks it permanently failed.
 async fn mark_failed(
     database: &Database,
@@ -426,8 +429,10 @@ async fn mark_failed(
         .and_where(Expr::col(Alias::new("id")).eq(event.id));
     // Xoá dữ liệu của tài khoản đã xoá là nghĩa vụ, không phải việc phụ: không bỏ cuộc,
     // cứ thử lại (tối đa mỗi giờ một lần) tới khi mọi module xong (D-149). Tài khoản đã
-    // mất nên người dùng không tự xin xoá lại được.
-    let never_give_up = event.name == crate::privacy::USER_DELETED;
+    // mất nên người dùng không tự xin xoá lại được. Cắt cửa vào tài khoản cũng vậy: bên nhận dừng thứ
+    // người lạ có thể đã dựng khi giữ tài khoản (luật tự động hoá), event bỏ cuộc thì không còn đường nào
+    // khác dừng chúng (D-20261128-access-revoked-retry).
+    let never_give_up = NEVER_GIVE_UP.contains(&event.name.as_str());
     if attempts >= MAX_ATTEMPTS && !never_give_up {
         update.value(Alias::new("failed_at"), now);
         tracing::error!(
@@ -444,7 +449,7 @@ async fn mark_failed(
             event = %event.name,
             attempts,
             error = %message,
-            "erasing a deleted user's data keeps failing; it is retried every hour"
+            "an event that must reach every subscriber keeps failing; it is retried every hour"
         );
     } else {
         tracing::warn!(

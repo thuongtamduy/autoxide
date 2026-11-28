@@ -29,6 +29,7 @@ use uuid::Uuid;
 
 mod any_of;
 mod authenticator;
+mod bound;
 mod decision;
 mod oauth;
 #[cfg(test)]

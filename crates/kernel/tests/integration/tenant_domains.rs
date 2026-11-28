@@ -831,3 +831,45 @@ async fn hai_khach_xac_minh_dong_thoi_chi_mot_ben_duoc() {
     .await
     .unwrap();
 }
+
+/// P16: nhánh "trùng unique index" (`check_on` → `lost_race`) được đi qua chắc chắn, không nhờ hai lượt tình cờ xen
+/// kẽ: lượt xác minh của `b` dừng giữa lúc tra DNS và lúc ghi, đúng lúc đó `a` thành `verified` (như lượt của `a` vừa
+/// ghi xong) — lượt ghi của `b` vấp unique index một phần trên `verified` và thành `failed` kèm lý do, không lỗi 500.
+#[tokio::test]
+async fn thua_cuoc_dua_o_lan_ghi_thanh_failed() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let mut claims = Vec::new();
+        for token in ["admin-a", "admin-b"] {
+            let (status, body) = add(&app, token, "lost.test").await;
+            assert_eq!(status, StatusCode::CREATED, "{body}");
+            claims.push(body["data"].clone());
+        }
+        let name = claims[0]["record"]["name"].as_str().unwrap().to_owned();
+        let value = claims[1]["record"]["value"].as_str().unwrap().to_owned();
+        app.dns().set_txt(&name, &[&value]);
+
+        let hold = app.dns().hold();
+        let b_id = claims[1]["id"].as_str().unwrap().to_owned();
+        let a_id: Uuid = claims[0]["id"].as_str().unwrap().parse().unwrap();
+        let a_wins = async {
+            // `b` đã qua bước "khách khác đã xác minh chưa" và đang tra DNS: `a` thắng đúng lúc này.
+            hold.started().await;
+            use sea_orm::sea_query::ExprTrait as _;
+            let win = Query::update()
+                .table(Alias::new("kernel_tenant_domains"))
+                .value(Alias::new("status"), "verified")
+                .and_where(Expr::col(Alias::new("id")).eq(a_id))
+                .to_owned();
+            app.database().write().execute(&win).await.unwrap();
+            hold.release();
+        };
+        let ((status, body), ()) = tokio::join!(verify(&app, "admin-b", &b_id), a_wins);
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["data"]["status"], "failed", "{body}");
+        assert!(body["data"]["check_error"].as_str().unwrap().contains("Another tenant"), "{body}");
+        assert_eq!(domain_of(&app, "lost.test").await["status"], "verified", "a keeps it");
+    })
+    .await
+    .unwrap();
+}

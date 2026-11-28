@@ -13,6 +13,28 @@ use autoxide_kernel::tenancy::{CHALLENGE_PREFIX, CHALLENGE_VALUE_PREFIX, DnsTxtL
 pub struct FakeDns {
     records: Arc<Mutex<HashMap<String, Vec<String>>>>,
     failing: Arc<Mutex<bool>>,
+    held: Arc<Mutex<Option<DnsHold>>>,
+}
+
+/// Lookups held by [`FakeDns::hold`]: each lookup waits until [`release`](Self::release). Lets a test act at the
+/// exact moment a domain check is between its DNS lookup and its write (e.g. another tenant verifies the
+/// same domain first). Clones share the hold.
+#[derive(Clone, Debug)]
+pub struct DnsHold {
+    started: Arc<tokio::sync::Notify>,
+    gate: Arc<tokio::sync::Semaphore>,
+}
+
+impl DnsHold {
+    /// Waits until a lookup has started (and is held). Returns at once if one already started.
+    pub async fn started(&self) {
+        self.started.notified().await;
+    }
+
+    /// Lets every held and later lookup go on.
+    pub fn release(&self) {
+        self.gate.add_permits(tokio::sync::Semaphore::MAX_PERMITS / 2);
+    }
 }
 
 impl std::fmt::Debug for FakeDns {
@@ -40,6 +62,16 @@ impl FakeDns {
         self.lock().remove(&key(name));
     }
 
+    /// Holds every lookup from now on until the returned [`DnsHold`] is released.
+    pub fn hold(&self) -> DnsHold {
+        let hold = DnsHold {
+            started: Arc::new(tokio::sync::Notify::new()),
+            gate: Arc::new(tokio::sync::Semaphore::new(0)),
+        };
+        *self.held.lock().unwrap_or_else(PoisonError::into_inner) = Some(hold.clone());
+        hold
+    }
+
     /// `true`: every lookup returns an error (as when the DNS server does not answer).
     pub fn fail(&self, failing: bool) {
         *self.failing.lock().unwrap_or_else(PoisonError::into_inner) = failing;
@@ -57,6 +89,13 @@ fn key(name: &str) -> String {
 #[async_trait::async_trait]
 impl DnsTxtLookup for FakeDns {
     async fn txt(&self, name: &str) -> Result<Vec<String>, Error> {
+        let held = self.held.lock().unwrap_or_else(PoisonError::into_inner).clone();
+        if let Some(hold) = held {
+            // `notify_one` giữ một "vé" khi chưa ai chờ: `started()` gọi sau vẫn thấy.
+            hold.started.notify_one();
+            // Semaphore chỉ đóng khi bị `close()` — ở đây không bao giờ: lỗi coi như đã thả.
+            let _ = hold.gate.acquire().await;
+        }
         if *self.failing.lock().unwrap_or_else(PoisonError::into_inner) {
             return Err(autoxide_kernel::tenancy::errors::tenant_domain_dns_failed(
                 "the fake DNS server is down",

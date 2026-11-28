@@ -609,28 +609,37 @@ thật (P7).
 - [ ] P16 — Nợ còn mở sau khi trả nợ bảo mật mức thấp của rà soát 2026-11 (#505, #508, #512;
       D-20261125-security-debt-followups):
   - [ ] Event mang `org_id` ở mọi module có dữ liệu theo đơn vị (hệ quả của L-8, danh sách trong
-        D-20261125-event-org): tới lúc đó luật tự động hoá của nút con không chạy với các event đó
-  - [ ] L-11: `return_url` của xác minh danh tính (`compliance`, `POST /api/v1/compliance/kyc`) chưa qua danh sách
-        địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính
-  - [ ] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
-        test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ
-  - [ ] Cache `domain_site` (theo `Host`, giới hạn 10 000 mục, D-20261125-tenant-cors) bị dội `Host` ngẫu nhiên
+        D-20261125-event-org): tới lúc đó luật tự động hoá của nút con không chạy với các event đó.
+        Đã bổ sung: `automations.run_failed`, `compliance.website_*`. Còn lại: danh sách trong D-20261125-event-org
+        trừ hai mục trên
+  - [x] L-11: `return_url` của xác minh danh tính (`compliance`, `POST /api/v1/compliance/kyc`) chưa qua danh sách
+        địa chỉ hợp lệ như thanh toán (P-5) — phát hiện khi sửa P-5, để cho lượt rà soát luồng xác minh danh tính.
+        Xong: kiểm chung ở kernel (`tenancy::check_return_url`), cấu hình `compliance.kyc.return_origins`
+        (D-20261128-return-url-kernel)
+  - [x] Test chắc chắn đi qua nhánh "trùng unique index" khi xác minh tên miền (`check_on` → `lost_race`): hiện chỉ
+        test đồng thời đi qua nhánh đó khi hai lượt tình cờ xen kẽ. Xong: `FakeDns::hold` của testkit giữ lượt tra
+        DNS, test `thua_cuoc_dua_o_lan_ghi_thanh_failed`
+  - [x] Cache `domain_site` (theo `Host`, giới hạn 10 000 mục, D-20261125-tenant-cors) bị dội `Host` ngẫu nhiên
         thì bị xoá sạch liên tục, tên miền thật phải đọc lại database mỗi lần — cần cách bỏ mục tốt hơn (LRU hay
-        ảnh chụp như CORS)
-  - [ ] `http/ws.rs` không kiểm `Origin` (mức thấp: xác thực bằng header `Authorization`, trình duyệt không gửi
-        được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP
-  - [ ] Test cho lượt đọc ảnh chụp tên miền verified bị treo quá `READ_TIMEOUT` (3 giây,
-        `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được
+        ảnh chụp như CORS). Xong: tra ảnh chụp tên miền đã xác minh của CORS, bỏ cache theo `Host`
+        (D-20261128-domain-site-snapshot)
+  - [x] `http/ws.rs` không kiểm `Origin` (mức thấp: xác thực bằng header `Authorization`, trình duyệt không gửi
+        được khi mở WebSocket) — kiểm cùng nguồn `OriginGrant` như MCP. Xong: 403 `kernel.ws_origin_not_allowed`
+  - [x] Test cho lượt đọc ảnh chụp tên miền verified bị treo quá `READ_TIMEOUT` (3 giây,
+        `tenancy::verified_domains`, D-20261125-tenant-cors): cần database giả treo được. Xong: lượt đọc thay được
+        bằng hàm giả (`known_with`), test `luot_doc_treo_qua_read_timeout_thanh_loi`
   - [x] Chủ dự án quyết: `PUT /api/v1/auth/users/{id}/roles` (`auth.roles.manage`) cho tự gán mọi role kể cả `admin`
         — chặn (PT-9, D-20261126-no-self-grant): gán role và sửa role theo "chỉ cấp cái mình có", kể cả cho chính mình
   - [ ] Các chỗ bất nhất còn lại của luật cấp quyền (chưa đổi hành vi): (i) `require_covers` (xoá / khoá / đổi
         email / nhận về tài khoản) so theo tên permission, bỏ qua phạm vi, còn `require_grantable` so cả phạm vi;
         (iii) cùng một luật ánh xạ: tạo vượt quyền trả 422, xoá vượt quyền trả 403; (iv) hạ quyền người khác bằng cách
         thu hẹp permission của role họ giữ không qua luật "gỡ được" như gỡ role (sửa role chỉ chặn thêm / nới / bỏ cấm)
-  - [ ] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
-        luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked)
-  - [ ] `automations`: event `auth.access_revoked` vào dead-letter thì luật không tạm dừng và không có đường dự phòng
-        (runner chỉ dừng lần chạy khi luật đã `paused`)
+  - [x] `automations`: `run_as_limit` chỉ giới hạn theo TÊN permission (`Principal::only` giữ phạm vi hiện tại của chủ
+        luật) — chụp cả phạm vi lúc tạo (D-20261126-automation-owner-revoked). Xong: `Principal::bounded_by`
+        (D-20261128-bound-keeps-scope)
+  - [x] `automations`: event `auth.access_revoked` vào dead-letter thì luật không tạm dừng và không có đường dự phòng
+        (runner chỉ dừng lần chạy khi luật đã `paused`). Xong: event này không bao giờ vào dead-letter, thử lại mỗi
+        giờ như xoá tài khoản (D-20261128-access-revoked-retry)
   - [ ] Gỡ role có lệnh cấm đòi người gỡ `allows(p)` theo TÊN permission, bỏ qua phạm vi; khách có guardrail: role cấm
         một permission ngoài rào thì có thể không ai trong khách gỡ được role đó (cần kiểm chứng)
   - [ ] Nhóm SCIM chưa có luật chứa "thành viên chờ": ai giữ token SCIM cũng đưa người vào được; admin đặt luật
@@ -665,22 +674,25 @@ thật (P7).
         sandbox nhận `role_id` không có mà vẫn 201 (kernel không biết role — nay chỉ không uỷ quyền, cần trait vai trò
         để báo 422 lúc tạo)
   - [ ] Bản ghi đã gắn `org_id` không có trong cây từ trước PT-8: vẫn hiện trong danh sách của người có quyền toàn
-        khách nhưng mở / sửa / xoá theo ID bị 404 / 403 — cần lệnh báo cáo và dọn (gắn về nút gốc hay nút đúng)
+        khách nhưng mở / sửa / xoá theo ID bị 404 / 403 — cần lệnh báo cáo và dọn (gắn về nút gốc hay nút đúng).
+        Thiết kế đã chọn, chưa làm: D-20261128-p17-design-left
   - [ ] `orders.payment_currency_mismatch` bỏ qua kiểm khi `PosPayment.currencies` rỗng (chỉ REST điền) — thêm
         đường gọi mới (tool MCP bán ở quầy) dễ quên; nên bắt buộc tiền tệ trong kiểu dữ liệu của service
   - [ ] Bậc phí vận chuyển, cân nặng gửi GHN bão hoà về `i64::MAX` thay vì báo 422 — cần trần cân nặng / kích thước
         ở đầu vào (như catalog 1e7 mm)
   - [ ] Khoản thanh toán khác tiền tệ của đơn (`orders/src/payments.rs`, sau đối soát chấp nhận khoản nhận) nay vào
         dead-letter — chưa có test, chưa có hướng dẫn xử lý cho người vận hành
-  - [ ] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
-        (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`)
+  - [x] Luật `address-key` của `cargo xtask check` chỉ bắt `format!("…ip:{…")` trên một dòng; khoá dựng cách khác
+        (`ip.to_string()`, nhiều dòng) lọt — cân nhắc kiểm theo kiểu (`IpAddr` vào `Throttle::hit`). Xong: đọc lời gọi
+        nhiều dòng, chỗ điền / đối số mang tên địa chỉ, `.to_string()` (D-20261128-address-key-rule)
   - [x] PT-7: theo NIST SP 800-63B-4 — mã sống tối đa 10 phút; lần sai liên tiếp đếm bền (client lạ khoá từ 90, mọi client từ
         100; quản trị viên mở khoá qua REST / MCP / CLI);
         trần chung là setting riêng thay cho 5×; số mã mỗi giờ theo cặp (số, client); client đã đăng nhập bằng số không
         bị trần "mọi client" khoá
         (D-20261126-otp-nist)
   - [ ] Mã đăng nhập SMS: token thiết bị có ký, cấp khi đăng nhập đúng, để nhận client quen thay cho địa chỉ (CGNAT di
-        động đổi địa chỉ) — cần đổi hợp đồng `PhoneCodes` của `auth` (D-20261126-otp-nist, rủi ro còn lại)
+        động đổi địa chỉ) — cần đổi hợp đồng `PhoneCodes` của `auth` (D-20261126-otp-nist, rủi ro còn lại).
+        Thiết kế đã chọn, chưa làm: D-20261128-p17-design-left
   - [x] PT-13, PT-14: lớp kiểm permission chung của kernel đọc `x-permissions` (403 trước validation / ETag / tra bản
         ghi), 18 `x-permissions` thiếu đã bổ sung, hai test e2e giữ (D-20261126-permission-gate)
   - [x] PT-16, PT-17: slug tự sinh tìm theo nhóm ứng viên `slug IN (…)` dùng unique index (content, catalog); bộ

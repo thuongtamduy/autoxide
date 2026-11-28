@@ -56,6 +56,7 @@ mod pins;
 mod placement_migrations;
 mod placement_storage;
 mod placements;
+mod principal_bound;
 mod public_paths;
 mod rate_limit_shared;
 mod reasons;
