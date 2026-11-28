@@ -97,6 +97,11 @@ pub fn count(list_json: &str, filter: &str) -> Result<Selected, String> {
         format!("not the JSON of `cargo nextest list --message-format json`: {error}")
     })?;
     let mut selected = Selected { app: 0, other: 0 };
+    // `none()`: PR chạm Rust mà không gán được crate nào (workflow, gate.sh, Dockerfile…). nextest khi đó đánh dấu mọi
+    // chương trình `skipped` với `testcases: {}` — không có gì để đếm, và đó đúng là trường hợp duy nhất được 0 máy.
+    if filter.trim() == "none()" {
+        return Ok(selected);
+    }
     let mut listed = 0;
     for (id, suite) in &list.suites {
         let cases = match (&suite.status, &suite.testcases) {
@@ -122,7 +127,7 @@ pub fn count(list_json: &str, filter: &str) -> Result<Selected, String> {
             "the nextest list has no tests at all: refusing to plan zero test machines".to_owned()
         );
     }
-    if selected.app + selected.other == 0 && filter.trim() != "none()" {
+    if selected.app + selected.other == 0 {
         return Err(format!(
             "no listed test matches the filterset `{}`, which is not `none()`: refusing to plan zero test machines",
             filter.trim()
@@ -255,8 +260,51 @@ mod tests {
         // Chương trình đã liệt kê mà không có danh sách test.
         let missing = r#"{"rust-suites": {"x": {"package-name": "x", "status": "listed"}}}"#;
         assert!(count(missing, "all()").is_err());
-        // Không có test nào cả.
-        assert!(count(r#"{"rust-suites": {}}"#, "none()").is_err());
+        // Không có test nào cả mà filterset không phải `none()`.
+        assert!(count(r#"{"rust-suites": {}}"#, "all()").is_err());
+    }
+
+    // Rút gọn từ đầu ra thật của `cargo nextest list --message-format json` (cargo-nextest 0.9.152, 2026-11-28, crate
+    // `xtask`), đường dẫn máy thay bằng `/work`.
+    const REAL_NONE: &str = r#"{
+      "rust-build-meta": {"target-directory": "/work/target", "base-output-directories": ["debug"]},
+      "test-count": 0,
+      "rust-suites": {
+        "xtask::bin/xtask": {
+          "package-name": "xtask", "binary-id": "xtask::bin/xtask", "binary-name": "xtask",
+          "package-id": "path+file:///work/xtask#0.20.0", "kind": "bin",
+          "binary-path": "/work/target/debug/xtask", "build-platform": "target", "cwd": "/work/xtask",
+          "status": "skipped", "testcases": {}
+        }
+      }
+    }"#;
+    const REAL_LISTED: &str = r#"{
+      "rust-build-meta": {"target-directory": "/work/target", "base-output-directories": ["debug"]},
+      "test-count": 1,
+      "rust-suites": {
+        "xtask::bin/xtask": {
+          "package-name": "xtask", "binary-id": "xtask::bin/xtask", "binary-name": "xtask",
+          "package-id": "path+file:///work/xtask#0.20.0", "kind": "bin",
+          "binary-path": "/work/target/debug/xtask", "build-platform": "target", "cwd": "/work/xtask",
+          "status": "listed",
+          "testcases": {
+            "address_keys::tests::khoa_theo_dia_chi_tho_bi_chan":
+              {"kind": "test", "ignored": false, "filter-match": {"status": "mismatch", "reason": "expression"}},
+            "rust_free::tests::script_va_ban_rust_cho_cung_ket_qua":
+              {"kind": "test", "ignored": false, "filter-match": {"status": "matches"}}
+          }
+        }
+      }
+    }"#;
+
+    #[test]
+    fn dau_ra_that_cua_nextest() {
+        assert_eq!(count(REAL_NONE, "none()\n").unwrap(), Selected { app: 0, other: 0 });
+        assert_eq!(matrix(Some(count(REAL_NONE, "none()\n").unwrap()), false), "[]");
+        assert_eq!(
+            count(REAL_LISTED, "package(=xtask) & test(/rust_free/)").unwrap(),
+            Selected { app: 0, other: 1 }
+        );
     }
 
     #[test]
@@ -265,5 +313,7 @@ mod tests {
             .replace(r#""status": "matches""#, r#""status": "mismatch", "reason": "expression""#);
         assert_eq!(count(&none, "none()\n").unwrap(), Selected { app: 0, other: 0 });
         assert!(count(&none, "package(=autoxide-kernel)").is_err());
+        // Mọi chương trình bị bỏ qua mà filterset không phải `none()`: lạ, báo lỗi.
+        assert!(count(REAL_NONE, "package(=xtask)").is_err());
     }
 }

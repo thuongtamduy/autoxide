@@ -39,6 +39,10 @@ PR chạm một module (module + `autoxide`) cần ~7 máy chứ không 10, PR c
 xanh của commit đó, D-20261121-auto-release); luật cảnh báo chỉ chạy khi `deploy/prometheus` đổi — kết quả chỉ phụ thuộc
 thư mục đó, đã kiểm ở lần đổi. D-300 không đổi.
 
+Check bắt buộc: ruleset của `main` (chủ dự án kiểm ngày 2026-11-28) không bật "Require status checks to pass" — chỉ "Require
+a pull request before merging" và "Block force pushes" — nên đổi số shard hay tên check của PR không làm PR treo; job gộp
+`gate (PostgreSQL …)` vẫn là tên ổn định nếu sau này bật.
+
 Đã cân nhắc:
 - Build archive chỉ các crate bị ảnh hưởng (`-p`): cargo hợp feature theo các crate được chọn, build lại sqlx, sea-orm…
   thành bộ thứ hai và mất cache (đã đo ở `xtask/src/affected.rs`); `autoxide` lại phụ thuộc mọi module. Loại.
