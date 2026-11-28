@@ -135,8 +135,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
       tính hạn mức. **Xong:** chốt chặn lúc chạy trên mọi câu của handle theo khách (bộ dựng, `sql`, cầu SeaORM), cả hai
       database; hạn mức chỉ nhận `SignedInTenant` (D-20261128-tenant-runtime-guard). Module còn đi đường cũ vào phạm vi
       chốt khi cụm của nó chuyển sang `db`
-- [ ] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
-      chéo lúc lưu, có cache
+- [x] Hợp nhất hai hệ cài đặt theo khách (cài đặt khách của kernel và cài đặt theo cây của `organizations`): một hệ, kiểm
+      chéo lúc lưu, có cache. **Xong:** `SettingSystem` của kernel — hai phạm vi, một cache, luật chéo `SettingRule` chạy
+      trong transaction sau khoá theo khách; `organizations` cắm kho giá trị vào (D-20261128-settings-one-system)
 - [x] Event: một module lỗi chặn các module nhận sau. `Dispatcher::deliver` (`crates/kernel/src/event/dispatcher.rs`) giao
       một event cho mọi bên đăng ký khớp tên theo thứ tự đăng ký và dừng ở bên đầu tiên trả lỗi (hay panic, hay cả lượt
       quá `DELIVERY_TIMEOUT`); cả event bị đánh dấu lỗi và thử lại với backoff từ bên đầu tiên — bên đã nhận rồi nhận lại
@@ -1730,12 +1731,15 @@ biến chung vẫn là mặc định. Mỗi PR một cụm.
 
 Chỗ trong core làm cấu hình theo khách khó (rút ra khi làm đợt này; mỗi mục là việc nên làm, chưa có quyết định):
 
-- [ ] Hai cơ chế cài đặt theo khách song song — cài đặt khách của kernel (`kernel.settings`) và cài đặt theo cây của
+- [x] Hai cơ chế cài đặt theo khách song song — cài đặt khách của kernel (`kernel.settings`) và cài đặt theo cây của
       `organizations` — chưa có quy tắc chọn: ghi quy tắc (vd cấu hình kỹ thuật ở kernel, chính sách nghiệp vụ theo
-      cây) hay gộp về một chỗ
-- [ ] Kernel chưa kiểm chéo giữa hai cài đặt lúc lưu (vd ngôn ngữ mặc định phải thuộc danh sách ngôn ngữ): hiện bỏ
-      qua lúc dùng thay vì từ chối lúc lưu
-- [ ] Cài đặt theo cây của `organizations` không có cache: mỗi lần đọc (đăng nhập, làm mới phiên…) là một truy vấn
+      cây) hay gộp về một chỗ. **Xong:** một hệ hai phạm vi, quy tắc chọn phạm vi ghi ở D-20261128-settings-one-system
+- [x] Kernel chưa kiểm chéo giữa hai cài đặt lúc lưu (vd ngôn ngữ mặc định phải thuộc danh sách ngôn ngữ): hiện bỏ
+      qua lúc dùng thay vì từ chối lúc lưu. **Xong:** `SettingRule`; `menus` và `content` khai luật ngôn ngữ
+- [x] Cài đặt theo cây của `organizations` không có cache: mỗi lần đọc (đăng nhập, làm mới phiên…) là một truy vấn.
+      **Xong:** đọc qua cache của `SettingSystem`
+- [ ] Chỗ đọc cài đặt theo cây chuyển từ `OrgDirectory::setting` sang `SettingSystem::effective` (theo cụm chuyển module),
+      rồi đánh dấu `OrgDirectory::setting` là đường cũ; lưu nhiều khoá một lần nếu agent cần đổi bộ ngôn ngữ trong một lệnh
 - [x] Khách của request trước khi xác thực lấy từ gợi ý chưa xác thực (`Autoxide-Tenant`, `Host`) qua cùng một hàm với
       khách đã xác thực: dễ dùng nhầm cho hạn mức hay chính sách (lỗi đã sửa ở D-20261126-tenant-rate-limit) — tách hai
       hàm rõ tên. **Xong:** `unverified_tenant` cho request chưa đăng nhập, kiểu `SignedInTenant` cho hạn mức

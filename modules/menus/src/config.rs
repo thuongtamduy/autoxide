@@ -80,7 +80,8 @@ pub(crate) const TENANT_LOCALES: autoxide_kernel::tenancy::TenantSetting =
         "menus.locales",
         "Languages this tenant's website menus may be written in, comma-separated BCP 47 codes \
          (e.g. `vi,en`), instead of the server's AUTOXIDE_MENUS_LOCALES. Menus already written in \
-         a language left out stay as they are.",
+         a language left out stay as they are. Must keep `menus.default_locale`, when set, in the \
+         list.",
     )
     .checked(|raw| tenant_locales(raw).map(|_| ()));
 
@@ -89,9 +90,10 @@ pub(crate) const TENANT_DEFAULT_LOCALE: autoxide_kernel::tenancy::TenantSetting 
     autoxide_kernel::tenancy::TenantSetting::new(
         "menus.default_locale",
         "Language of a menu when none is given, and of the menu served when one is missing in the \
-         language asked for, instead of the server's AUTOXIDE_MENUS_DEFAULT_LOCALE. When it is not \
-         one of the tenant's languages, the server's default is used if it is one of them, otherwise \
-         the first of them; `GET /api/v1/kernel/client-config` shows the language in use.",
+         language asked for, instead of the server's AUTOXIDE_MENUS_DEFAULT_LOCALE. Must be one of \
+         the tenant's languages (`menus.locales`, or the server's when unset), checked when saved; a \
+         value stored before that check which is not gives way to the server's default if it is one \
+         of them, otherwise the first; `GET /api/v1/kernel/client-config` shows the language in use.",
     )
     .checked(|raw| {
         canonical_locale(raw.trim()).map(|_| ()).ok_or_else(|| {
@@ -102,6 +104,32 @@ pub(crate) const TENANT_DEFAULT_LOCALE: autoxide_kernel::tenancy::TenantSetting 
             )
         })
     });
+
+/// Luật chéo lúc lưu: `menus.default_locale` đã đặt phải thuộc `menus.locales` (chưa đặt thì danh sách của máy chủ).
+/// Mặc định chưa đặt thì không kiểm — đổi bộ ngôn ngữ: bỏ mặc định, đổi danh sách, đặt lại mặc định.
+pub(crate) fn locales_fit(
+    view: &autoxide_kernel::tenancy::SettingsView<'_>,
+    server_locales: &[String],
+) -> Result<(), autoxide_kernel::error::FieldError> {
+    let Some(default) = view.text(TENANT_DEFAULT_LOCALE.name()).and_then(canonical_locale) else {
+        return Ok(());
+    };
+    let locales = match view.text(TENANT_LOCALES.name()).map(tenant_locales) {
+        Some(Ok(locales)) => locales,
+        _ => server_locales.to_vec(),
+    };
+    if locales.contains(&default) {
+        return Ok(());
+    }
+    Err(autoxide_kernel::error::FieldError::new(
+        "value",
+        "locale_not_listed",
+        "`menus.default_locale` ({default}) must be one of the menu languages ({locales}); change or \
+         remove `menus.default_locale` first",
+    )
+    .with_param("default", default)
+    .with_param("locales", locales.join(", ")))
+}
 
 /// Danh sách ngôn ngữ (`menus.locales`): ít nhất một mã, bỏ trùng, giữ thứ tự.
 pub(crate) fn tenant_locales(raw: &str) -> Result<Vec<String>, autoxide_kernel::error::FieldError> {

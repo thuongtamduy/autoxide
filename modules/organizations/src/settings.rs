@@ -6,7 +6,9 @@
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::tenancy::{OrgId, OrgSetting, OrgTree, ScopeExt, TenantContext, nearest};
+use autoxide_kernel::tenancy::{
+    OrgId, OrgSetting, OrgSettingStore, ScopeExt, SettingSystem, StoredOrgSetting, TenantContext,
+};
 use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -121,47 +123,34 @@ impl OrgService {
         self.resolve_settings(tenant, OrgId::from_uuid(unit_id), None).await
     }
 
-    /// Giá trị hiệu lực (một cài đặt `only`, hay mọi cài đặt) ở nút `org`: một câu đọc chuỗi tổ
-    /// tiên, một câu đọc mọi giá trị đã đặt trên chuỗi.
+    /// Giá trị hiệu lực (một cài đặt `only`, hay mọi cài đặt) ở nút `org`, qua hệ cài đặt của kernel (cache theo
+    /// khách: lần đọc trúng cache không chạy câu nào).
     pub(crate) async fn resolve_settings(
         &self,
         tenant: &TenantContext,
         org: OrgId,
         only: Option<&str>,
     ) -> Result<Vec<EffectiveSetting>, Error> {
-        let read = tenant.database().read();
-        let lineage = OrgTree::ancestors(read, tenant.id(), org).await?;
-        let mut select = setting::Entity::find()
-            .filter(setting::Column::OrgId.is_in(lineage.iter().map(OrgId::as_uuid)))
-            .scoped(tenant);
-        if let Some(key) = only {
-            select = select.filter(setting::Column::Key.eq(key));
-        }
-        let rows = select.all(read).await?;
-        let mut found = Vec::new();
-        for declared in
-            self.catalog.iter().filter(|declared| only.is_none_or(|key| key == declared.key()))
-        {
-            let values = rows.iter().filter(|row| row.key == declared.key()).filter_map(|row| {
-                Some((OrgId::from_uuid(row.org_id), serde_json::from_str(&row.value).ok()?))
-            });
-            let effective = match nearest(&lineage, values) {
-                Some((source, value)) => EffectiveSetting {
-                    key: declared.key().to_owned(),
-                    value: Some(value),
-                    source_unit_id: Some(source),
-                    inherited: source != org,
-                },
-                None => EffectiveSetting {
-                    key: declared.key().to_owned(),
-                    value: declared.default_value(),
-                    source_unit_id: None,
-                    inherited: true,
-                },
-            };
-            found.push(effective);
-        }
-        Ok(found)
+        let settings = self.setting_system()?;
+        let found = match only {
+            Some(key) => settings.effective(tenant, org, key).await?.into_iter().collect(),
+            None => settings.effective_all(tenant, org).await?,
+        };
+        Ok(found
+            .into_iter()
+            .map(|effective| EffectiveSetting {
+                key: effective.key,
+                value: effective.value,
+                source_unit_id: effective.source,
+                inherited: effective.inherited,
+            })
+            .collect())
+    }
+
+    fn setting_system(&self) -> Result<&SettingSystem, Error> {
+        self.settings.as_ref().ok_or_else(|| {
+            Error::internal("module `organizations` needs the kernel's settings system")
+        })
     }
 
     /// Đặt cài đặt `key` của nút `unit_id` thành `value` (cần `organizations.settings.write` phủ
@@ -188,6 +177,16 @@ impl OrgService {
         principal
             .require_write_at(&transaction, &SETTINGS_WRITE, OrgTarget::new(org, None))
             .await?;
+        // Luật chéo của kernel (vd lý do cần ảnh ⊆ lý do được phép): khoá theo khách rồi đọc giá trị trong
+        // transaction, nên hai lần lưu đồng thời không cùng lọt luật.
+        let system = self.setting_system()?;
+        if system.has_rules(key) {
+            system.lock(&transaction, tenant).await?;
+            let stored = stored(&transaction, tenant).await?;
+            system
+                .check_org_change(&transaction, tenant, org, key, checked.as_ref(), stored)
+                .await?;
+        }
         let before = setting::Entity::find_by_id((tenant.id().as_uuid(), unit_id, key.to_owned()))
             .scoped(tenant)
             .one(&transaction)
@@ -242,9 +241,35 @@ impl OrgService {
             )
             .await?;
         transaction.commit().await?;
+        system.changed(tenant.id());
         let effective = self.resolve_settings(tenant, org, Some(key)).await?;
         effective.into_iter().next().ok_or_else(|| setting_unknown(key))
     }
+}
+
+/// Kho giá trị theo nút cắm vào hệ cài đặt của kernel: mọi giá trị của một khách trong một câu.
+pub(crate) struct Store;
+
+#[async_trait::async_trait]
+impl OrgSettingStore for Store {
+    async fn stored(&self, tenant: &TenantContext) -> Result<Vec<StoredOrgSetting>, Error> {
+        stored(tenant.database().read(), tenant).await
+    }
+}
+
+// Mọi giá trị đã đặt của khách, đọc qua `connection` (kết nối đọc, hay transaction của lần lưu).
+async fn stored<C: sea_orm::ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+) -> Result<Vec<StoredOrgSetting>, Error> {
+    let rows = setting::Entity::find().scoped(tenant).all(connection).await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|row| {
+            let value = serde_json::from_str(&row.value).ok()?;
+            Some(StoredOrgSetting::new(OrgId::from_uuid(row.org_id), row.key, value))
+        })
+        .collect())
 }
 
 pub(crate) fn setting_unknown(key: &str) -> Error {

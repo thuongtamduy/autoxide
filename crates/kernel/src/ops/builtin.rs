@@ -945,6 +945,10 @@ impl Module for KernelModule {
         context.provide::<crate::tenancy::PlacementMigrationQueue>(Arc::new(
             crate::tenancy::PlacementMigrationQueue::new(runs),
         ))?;
+        // Một hệ cài đặt (D-20261128-settings-one-system): cùng dịch vụ, thêm phạm vi theo cây, cache và luật chéo.
+        context.provide::<crate::tenancy::SettingSystem>(Arc::new(
+            crate::tenancy::SettingSystem::new(settings.clone(), context.org_settings()),
+        ))?;
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<crate::template::TemplateEngine>(Arc::new(self.templates.clone()))?;

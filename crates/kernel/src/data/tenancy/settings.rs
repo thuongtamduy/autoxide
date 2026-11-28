@@ -559,6 +559,8 @@ pub(crate) struct SettingsService {
     cache: Mutex<HashMap<TenantId, (Instant, Stored)>>,
     /// What a link setting's host is checked against (filled once the domains service exists).
     links: OnceLock<LinkTrust>,
+    /// The per-node scope of the same system: store, cache, cross-checks (`system`).
+    tree: system::Tree,
 }
 
 /// Purpose (AAD) when encrypting a secret value. The row name is also in the AAD: a secret set under the old
@@ -590,6 +592,7 @@ impl SettingsService {
             ttl,
             cache: Mutex::default(),
             links: OnceLock::new(),
+            tree: system::Tree::default(),
         }
     }
 
@@ -622,6 +625,7 @@ impl SettingsService {
     /// Drops tenant `tenant`'s settings from the cache (after a set / remove on this server).
     fn forget(&self, tenant: TenantId) {
         self.cache.lock().unwrap_or_else(PoisonError::into_inner).remove(&tenant);
+        self.tree.forget(tenant);
     }
 
     /// One page of [`list`](Self::list), by name. The settings are declared in code by the modules (a fixed
@@ -748,6 +752,7 @@ impl SettingsService {
             updated_at: Set(now),
         };
         let transaction = tenant.database().begin_write().await?;
+        self.check_tenant_change(&transaction, tenant, &setting, Some(value)).await?;
         Entity::insert(row)
             .on_conflict(
                 OnConflict::columns([Column::TenantId, Column::Name])
@@ -815,6 +820,7 @@ impl SettingsService {
         connection_step_up(&setting, principal)?;
         let name = setting.name;
         let transaction = tenant.database().begin_write().await?;
+        self.check_tenant_change(&transaction, tenant, &setting, None).await?;
         let deleted = Entity::delete_many()
             .filter(Column::Name.is_in(std::iter::once(name).chain(setting.former_name)))
             .scoped(tenant)
@@ -1138,9 +1144,14 @@ pub(crate) fn routes(service: Arc<SettingsService>, registry: DatabaseRegistry) 
 }
 
 mod links;
+mod system;
 mod tools;
 pub(crate) use links::LinkTrust;
 pub use links::{DOMAIN_GROUP, LINK_GROUP, SiteLinks};
+pub use system::{
+    EffectiveOrgSetting, OrgSettingStore, SettingRule, SettingSystem, SettingsView,
+    StoredOrgSetting,
+};
 pub(crate) use tools::tools;
 
 /// The `kernel_tenant_settings` table (tenant level, has `tenant_id` from the start).

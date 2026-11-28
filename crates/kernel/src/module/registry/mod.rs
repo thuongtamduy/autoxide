@@ -242,8 +242,14 @@ impl Modules {
             ));
             declared_settings.extend(declared);
         }
+        // Một khoá chỉ ở một phạm vi của hệ cài đặt (D-20261128-settings-one-system): tên cấu hình cấp khách (cả tên
+        // cũ) không trùng khoá cài đặt theo cây.
+        let tenant_names: Vec<&'static str> = declared_settings
+            .iter()
+            .flat_map(|setting| std::iter::once(setting.name()).chain(setting.former_name()))
+            .collect();
         settings.fill(declared_settings);
-        let mut seen = Vec::new();
+        let mut seen = tenant_names;
         let mut declared_org_settings = Vec::new();
         for module in &modules {
             let declared = module.org_settings();
