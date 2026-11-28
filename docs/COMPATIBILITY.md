@@ -124,10 +124,20 @@ Rules, as in [Cargo's SemVer guide](https://doc.rust-lang.org/cargo/reference/se
   modules compile unchanged.
 - `cargo-semver-checks` compares these crates with the previous release on every pull request that
   touches them and on every release pull request; from 1.0 a break fails the check.
-- The libraries whose types appear in this API (`axum`, `sea-orm`, `utoipa`, `tokio`, `serde`… —
-  the table in [`docs/MODULE_GUIDE.md`](MODULE_GUIDE.md#stability-of-the-module-contract)) are part
-  of it: moving one of them to a new major version is a breaking change, so it waits for a major
-  release.
+- A new major version of a third-party library does **not** force a major release of Autoxide, and
+  does not force modules to change their code. Modules reach the database, HTTP, OpenAPI, input
+  checks, migrations and time through the kernel's own layers (`autoxide_kernel::db`, `http`,
+  `migration`, `time`…), and the stable public API of the kernel and the test kit carries no type of
+  the libraries under those layers (`sea-orm`, `sea-query`, `sqlx`, `axum`, `http`, `tower`, `utoipa`,
+  `validator`, `jiff`, `async-trait`). When one of them moves to a new major version, only the kernel
+  changes. Only the small set of *vocabulary* libraries (`serde`, `serde_json`, `uuid`, `tokio`,
+  `tracing`, `futures-core`, `bytes`) may appear in the contract; a new major version of one of those
+  (rare: `serde` 2) is the only library change that is a breaking change. The table is in
+  [`docs/MODULE_GUIDE.md`](MODULE_GUIDE.md#stability-of-the-module-contract).
+- Until 1.0, modules are being moved onto those layers and the old paths still exist; `cargo xtask
+  check` (and `check-module` for a module in its own repository) stops a module from depending
+  directly on a library the kernel wraps, except the modules still listed as waiting to move. 1.0 is
+  released only once every module has moved.
 - The minimum supported Rust version follows recent stable Rust (`rust-toolchain.toml`). Raising it
   happens only in a minor release, never in a patch release, and is listed in the changelog.
 
