@@ -195,6 +195,44 @@ Những thứ sau có thể đổi ở bất kỳ bản nào, kể cả bản pa
 - Bảng, cột và index của database (xem trên), thứ tự phần tử ở chỗ API không hứa thứ tự, và số đo
   hiệu năng.
 
+## Nền tảng được hỗ trợ
+
+Những thứ dự án build, test và sửa lỗi cho. Ngoài danh sách này Autoxide có thể vẫn chạy, nhưng CI không test và lỗi
+chỉ xảy ra ở đó có thể không được sửa. `autoxide doctor` báo bản database nó thấy (bước `database_version`) và cảnh
+báo khi bản đó ngoài danh sách; máy chủ vẫn khởi động.
+
+### Database
+
+| Database   | Được hỗ trợ                                           | CI test                                            |
+| ---------- | ----------------------------------------------------- | -------------------------------------------------- |
+| PostgreSQL | 16, 17, 18 — các bản major dự án PostgreSQL còn bảo trì, từ 16 trở lên | 16 ở mọi pull request; 16 và 18 trên `main` và trước mỗi bản phát hành |
+| SQLite     | 3.45 trở lên                                          | SQLite nhúng sẵn trong binary (3.54)               |
+
+- **Chính sách PostgreSQL.** Bản major mới của PostgreSQL được thêm ở một bản minor khi gate đầy đủ xanh trên nó; CI
+  khi đó test bản cũ nhất và bản mới nhất được hỗ trợ. Một bản major chỉ bị bỏ sau khi
+  [dự án PostgreSQL](https://www.postgresql.org/support/versioning/) ngừng bảo trì nó (PostgreSQL 16: tháng 11/2028),
+  báo trước trong changelog một bản minor; `doctor` cảnh báo từ ngày đó. Tự nâng PostgreSQL (`pg_upgrade`, dump rồi
+  restore) không cần Autoxide làm gì.
+- **SQLite.** Binary và image chính thức nhúng sẵn SQLite, nên bản SQLite không phụ thuộc hệ điều hành. Chỉ bản bạn tự
+  build nối với SQLite của hệ điều hành mới có thể cũ hơn; bản build đó không được test.
+- Dịch vụ PostgreSQL được quản lý (và proxy tương thích như PgBouncer ở chế độ session) chạy được khi nói giao thức
+  PostgreSQL của một bản major được hỗ trợ; sản phẩm chỉ giống PostgreSQL thì không được hỗ trợ.
+
+### Hệ điều hành và kiến trúc CPU
+
+| Sản phẩm                        | Nền tảng                                                                     |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| Image Docker                    | `linux/amd64`, `linux/arm64` (nền Debian 13, distroless)                     |
+| Binary Linux                    | `x86_64` và `aarch64` (`*-unknown-linux-gnu`), glibc 2.41 trở lên (Debian 13, Ubuntu 25.04 trở lên) |
+| Binary macOS                    | Apple silicon (`aarch64-apple-darwin`) và Intel (`x86_64-apple-darwin`), macOS 11 trở lên |
+| Binary Windows                  | `x86_64-pc-windows-msvc`, Windows 10 / Server 2016 trở lên; chưa ký số        |
+| Build từ mã nguồn               | mọi target mà [MSRV](#phiên-bản-rust-tối-thiểu-msrv) hỗ trợ ở Rust tier 1 hoặc 2 có `std` |
+
+- Máy chủ production: dùng image hoặc binary Linux. Binary macOS và Windows dành cho phát triển và dùng thử; CI phát
+  hành build chúng, nhưng bộ test chạy trên Linux.
+- Linux cũ hơn (glibc dưới 2.41) thì dùng image, hoặc build từ mã nguồn trên chính máy đó.
+- Một nền tảng chỉ bị bỏ ở một bản minor, báo trước trong changelog một bản minor.
+
 ## Build từ mã nguồn
 
 ### Phiên bản Rust tối thiểu (MSRV)

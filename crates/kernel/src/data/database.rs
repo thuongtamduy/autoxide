@@ -20,8 +20,9 @@ use std::time::Duration;
 
 use sea_orm::sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous};
 use sea_orm::{
-    AccessMode, ConnectOptions, DatabaseConnection, DatabaseTransaction, DbErr, IsolationLevel,
-    RuntimeErr, SqliteTransactionMode, TransactionOptions, TransactionTrait,
+    AccessMode, ConnectOptions, ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbErr,
+    IsolationLevel, RuntimeErr, SqliteTransactionMode, Statement, TransactionOptions,
+    TransactionTrait,
 };
 
 use crate::config::{DatabaseBackend, DatabaseConfig, DatabaseUrl};
@@ -225,6 +226,20 @@ impl Database {
     pub async fn ping(&self) -> Result<(), DbErr> {
         self.write.ping().await?;
         self.read.ping().await
+    }
+
+    /// The version of the database server, as the database reports it: PostgreSQL's `server_version_num`
+    /// (`160004` for 16.4) or SQLite's `sqlite_version()` (`3.54.1`). Used by `autoxide doctor` to compare with
+    /// the supported versions.
+    pub async fn server_version(&self) -> Result<String, DbErr> {
+        let sql = match self.backend {
+            DatabaseBackend::Postgres => "SELECT current_setting('server_version_num') AS version",
+            DatabaseBackend::Sqlite => "SELECT sqlite_version() AS version",
+        };
+        let backend = self.read.get_database_backend();
+        let row = self.read.query_one_raw(Statement::from_string(backend, sql)).await?;
+        let row = row.ok_or_else(|| DbErr::RecordNotFound("the database version".to_owned()))?;
+        row.try_get("", "version")
     }
 
     /// Closes both pools and waits for the connections to close fully. Call on graceful shutdown.
