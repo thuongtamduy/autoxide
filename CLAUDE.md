@@ -232,6 +232,7 @@ SDK, mục lục quyết định); gate trên máy kiểm sớm bằng `cargo xt
 | ---------------- | ------------------ | ------------------------------------------------------- |
 | `crates/kernel`  | `autoxide-kernel`  | Nền mọi module dựa vào; không phụ thuộc module nào      |
 | `crates/testkit` | `autoxide-testkit` | Đồ dùng cho test; chỉ được khai ở `[dev-dependencies]`  |
+| `crates/host`    | `autoxide-host`    | Phần chỉ binary dùng (log, số đo, trace); chỉ `autoxide` khai (D-20261128-host-crate) |
 | `crates/app`     | `autoxide`         | Binary; nơi duy nhất đăng ký module                     |
 | `modules/<tên>`  | `autoxide-<tên>`   | Mỗi module một crate                                    |
 | `xtask`          | `xtask`            | Công cụ cho người phát triển (`cargo xtask check`)      |

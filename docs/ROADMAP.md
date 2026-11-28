@@ -130,6 +130,13 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Tách `autoxide-host` (phần chỉ binary dùng) khỏi kernel; file trên 880 dòng tách theo trách nhiệm (phần đa khách
       ~21.700 dòng). Tách phần còn lại của kernel theo lớp: **sau 1.0** — đo 26/11/2026 chỉ rút 6–9% thời gian build lại, dưới
       ngưỡng 20% (D-20261126-kernel-crates; mặt tiền giữ đường dẫn nên tách sau không phá vỡ)
+      - [x] File trên 880 dòng của phần đa khách tách theo trách nhiệm, chỉ di chuyển code: `tenancy.rs` (mã lỗi →
+            `errors.rs`), `settings.rs` (REST, danh mục), `admin.rs` (REST/MCP, liệt kê), `domains.rs` (kiểm nền),
+            `exports.rs` (REST/MCP)
+      - [x] Crate `autoxide-host` (chỉ `autoxide` khai, gate `dependency` chặn): `logging`, bộ thu Prometheus + `/metrics`,
+            xuất trace; kernel bỏ bốn thư viện (D-20261128-host-crate)
+      - [ ] Phần còn bị chính kernel gọi (`backup`, `transfer`, route của kernel `builtin`/`module_catalog`/`user_flags`,
+            `Migrator`): trước hết cho `Modules` nhận module nội bộ từ ngoài, rồi chuyển (bảng chỗ gọi ở D-20261128-host-crate)
 - [ ] Cách ly khách khi chạy, không chỉ lint đọc mã nguồn: lớp kết nối gắn khách (hay row-level security tuỳ chọn trên
       Postgres) chặn truy vấn thiếu `tenant_id`; khách của request chưa xác thực không lấy từ gợi ý chưa kiểm cho việc
       tính hạn mức

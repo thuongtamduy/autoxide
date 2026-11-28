@@ -1,9 +1,9 @@
 //! Bật log và xuất trace cho tiến trình. Mọi lệnh chạm tới hệ thống gọi [`init`]
 //! ngay sau khi đọc cấu hình, TRƯỚC khi vào runtime tokio.
 
+use autoxide_host::logging;
+use autoxide_host::telemetry::TraceExport;
 use autoxide_kernel::config::Config;
-use autoxide_kernel::logging;
-use autoxide_kernel::telemetry::TraceExport;
 
 /// Tay nắm của phần observability đang chạy. Gọi [`shutdown`](Self::shutdown) trước
 /// khi tiến trình thoát (sau khi runtime tokio đã dừng).
