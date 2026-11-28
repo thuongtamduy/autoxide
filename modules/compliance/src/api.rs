@@ -372,6 +372,12 @@ pub trait ComplianceRules: Send + Sync {
 /// `subject_id`, `status`. Calling modules (e.g. `plans` with `Subject::Reference`) listen to continue.
 pub const KYC_VERIFIED: &str = "compliance.kyc_verified";
 pub const KYC_REJECTED: &str = "compliance.kyc_rejected";
+/// Event emitted when a verified identification reaches its end date (`expires_at`; the daily job) or is revoked by
+/// a reviewer: the payload has `profile_id`, `subject_kind`, `subject_id` (and `reason_code` when revoked). The gate
+/// already refuses an expired profile at the moment it is asked; modules that let a subject keep doing something
+/// (e.g. `catalog`: goods of a marketplace seller on sale) listen to stop it.
+pub const KYC_EXPIRED: &str = "compliance.kyc_expired";
+pub const KYC_REVOKED: &str = "compliance.kyc_revoked";
 
 /// Event emitted when a consent is withdrawn: the payload has `consent_id`, `purpose`, `scope`, `channel`.
 /// Modules that send marketing messages (e.g. `notifications`) listen to cancel pending messages.

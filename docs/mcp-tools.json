@@ -5428,7 +5428,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the requests of data subjects received by email, post, phone or from an authority, with their due date (`overdue` for those late).",
+      "description": "List the requests of data subjects received by email, post, phone or from an authority, with their deadlines to answer (`due_at`) and to carry out (`fulfil_due_at`); `overdue` for those late.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Records with a deadline.",

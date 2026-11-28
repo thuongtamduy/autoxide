@@ -172,7 +172,6 @@ pub(crate) fn category_slug_not_found(slug: &str) -> Error {
     .with_param("slug", slug)
 }
 
-/// Module cắm điều kiện mở bán (bước 46) từ chối: `reason` là mã của module đó, `detail` lời của nó.
 /// Sàn mà không có `KycGate` (module `compliance` tắt): không kiểm được định danh người bán nên không mở bán.
 pub(crate) fn seller_verification_unavailable() -> Error {
     Error::new(
@@ -184,6 +183,7 @@ pub(crate) fn seller_verification_unavailable() -> Error {
     )
 }
 
+/// Module cắm điều kiện mở bán (bước 46) từ chối: `reason` là mã của module đó, `detail` lời của nó.
 pub(crate) fn listing_denied(reason: &str, detail: &str) -> Error {
     Error::new(
         ErrorKind::Validation,

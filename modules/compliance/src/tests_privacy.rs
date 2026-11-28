@@ -26,7 +26,7 @@ const PRIVACY: &[&str] = &[
     "compliance.policies.manage",
 ];
 
-async fn app(test: &TestDatabase) -> TestApp {
+pub(crate) async fn app(test: &TestDatabase) -> TestApp {
     TestApp::builder(test)
         .user("admin", 1, PRIVACY)
         .user("alice", 2, &[])
@@ -42,7 +42,7 @@ async fn events(database: &Database, name: &str) -> usize {
     database.read().query_all_raw(Statement::from_string(backend, sql)).await.unwrap().len()
 }
 
-fn at(value: &serde_json::Value) -> Timestamp {
+pub(crate) fn at(value: &serde_json::Value) -> Timestamp {
     value.as_str().unwrap().parse().unwrap()
 }
 
@@ -384,6 +384,9 @@ async fn so_yeu_cau_chu_the_han_la_du_lieu_va_xoa_gia_tri() {
         assert_eq!(recorded["data"]["subject"], "ada@example.com");
         let due = at(&recorded["data"]["due_at"]) - at(&recorded["data"]["received_at"]);
         assert_eq!(due, SignedDuration::from_hours(72), "{recorded}");
+        // Hạn thực hiện (LG-4b): xoá 20 ngày (ngày thường) theo quy tắc `privacy.subject_requests`.
+        let fulfil = at(&recorded["data"]["fulfil_due_at"]) - at(&recorded["data"]["received_at"]);
+        assert_eq!(fulfil, SignedDuration::from_hours(24 * 20), "{recorded}");
 
         let id = recorded["data"]["id"].as_str().unwrap();
         let (status, done) =

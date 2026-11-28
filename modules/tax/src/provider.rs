@@ -49,6 +49,16 @@ impl TaxEngine for Provider {
         self.0.invoice_requirements(tenant, org, on).await
     }
 
+    async fn invoice_advice(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        on: Date,
+        at_counter: bool,
+    ) -> Result<Option<crate::api::InvoiceAdvice>, Error> {
+        self.0.invoice_advice(tenant, org, on, at_counter).await
+    }
+
     async fn tax_date(
         &self,
         tenant: &TenantContext,

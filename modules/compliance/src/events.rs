@@ -30,6 +30,7 @@ events! {
     KYC_REJECTED, KycRejected, "compliance.kyc_rejected", "An identity verification was refused (`profile_id`, `subject_kind`, `subject_id`, `status`, `reason_code`).";
     KYC_INFO_REQUESTED, KycInfoRequested, "compliance.kyc_info_requested", "More information was asked for a verification (`profile_id`, `subject_kind`, `subject_id`).";
     KYC_EXPIRED, KycExpired, "compliance.kyc_expired", "A verified identity reached its end date (`profile_id`, `subject_kind`, `subject_id`).";
+    KYC_DETAILS_RECORDED, KycDetailsRecorded, "compliance.kyc_details_recorded", "A reviewer recorded seller details of an identity profile (`profile_id`, `subject_kind`, `subject_id`, `fields` — names only, no values).";
     KYC_REVOKED, KycRevoked, "compliance.kyc_revoked", "A verified identity was revoked (`profile_id`, `subject_kind`, `subject_id`, `reason_code`).";
     DOCUMENT_VERSION_PUBLISHED, DocumentVersionPublished, "compliance.document_version_published", "A new version of a legal document was published (`document_id`, `kind`, `version`, `requires_reacceptance`).";
     DOCUMENT_ACCEPTED, DocumentAccepted, "compliance.document_accepted", "A legal document version was accepted (`document_id`, `version`, `subject_kind`, `subject_id`, `channel`).";
@@ -59,4 +60,33 @@ events! {
     TARGET_RESTORED, TargetRestored, "compliance.target_restored", "The target of a case may be shown again (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).";
     DISCLOSURE_RECORDED, DisclosureRecorded, "compliance.disclosure_recorded", "Information about a seller or user was given to a competent authority (`disclosure_id`, `case_id`, `subject`, `fields` — names only, no values).";
     RULES_IMPORTED, RulesImported, "compliance.rules_imported", "Legal rules were imported (`jurisdiction`, `rules`).";
+}
+
+#[cfg(test)]
+mod tests {
+    /// Tên event khai cho module khác ở `api` phải khớp tên `compliance` thật sự phát (một nguồn sự thật).
+    #[test]
+    fn ten_event_cong_bo_khop_ten_phat() {
+        let pairs = [
+            (crate::api::KYC_VERIFIED, <super::KycVerified as autoxide_kernel::event::Event>::NAME),
+            (crate::api::KYC_REJECTED, <super::KycRejected as autoxide_kernel::event::Event>::NAME),
+            (crate::api::KYC_EXPIRED, <super::KycExpired as autoxide_kernel::event::Event>::NAME),
+            (crate::api::KYC_REVOKED, <super::KycRevoked as autoxide_kernel::event::Event>::NAME),
+            (
+                crate::api::CONSENT_WITHDRAWN,
+                <super::ConsentWithdrawn as autoxide_kernel::event::Event>::NAME,
+            ),
+            (
+                crate::api::PHONE_VERIFIED,
+                <super::PhoneVerified as autoxide_kernel::event::Event>::NAME,
+            ),
+            (
+                crate::api::PHONE_REMOVED,
+                <super::PhoneRemoved as autoxide_kernel::event::Event>::NAME,
+            ),
+        ];
+        for (published, emitted) in pairs {
+            assert_eq!(published, emitted);
+        }
+    }
 }

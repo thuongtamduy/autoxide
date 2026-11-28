@@ -132,7 +132,7 @@ raw-database 9 modules/catalog/src/digital_access.rs
 raw-database 1 modules/catalog/src/facets.rs
 raw-database 5 modules/catalog/src/floors.rs
 raw-database 9 modules/catalog/src/from_images.rs
-raw-database 3 modules/catalog/src/listeners.rs
+raw-database 2 modules/catalog/src/listeners.rs
 raw-database 1 modules/catalog/src/media_alts.rs
 raw-database 9 modules/catalog/src/pricing.rs
 raw-database 4 modules/catalog/src/product_parts.rs
@@ -174,7 +174,7 @@ raw-database 4 modules/compliance/src/consents.rs
 raw-database 4 modules/compliance/src/disclosures.rs
 raw-database 14 modules/compliance/src/documents.rs
 raw-database 9 modules/compliance/src/incidents.rs
-raw-database 17 modules/compliance/src/kyc.rs
+raw-database 16 modules/compliance/src/kyc.rs
 raw-database 10 modules/compliance/src/legal.rs
 raw-database 1 modules/compliance/src/overview.rs
 raw-database 9 modules/compliance/src/privacy.rs

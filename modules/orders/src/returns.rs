@@ -292,6 +292,8 @@ impl OrdersService {
         }
         let checked = self.check_return(tenant, buyer, &row, &input).await?;
         let (deadline_at, now) = (checked.deadline_at, crate::service::now());
+        // Năm của số phiếu trả theo ngày của người bán (#575 N4), trước transaction ghi.
+        let year = self.local_year(tenant, OrgId::from_uuid(row.org_id), now).await?;
         let (database, outbox) = (tenant.database(), &self.outbox);
         let (input, policy_days) = (&input, checked.window_days);
         let problems = &checked.problems;
@@ -315,7 +317,6 @@ impl OrdersService {
                 }
                 let return_lines = plan.lines;
                 let id = Uuid::now_v7();
-                let year = now.date_utc().year();
                 let sequence =
                     numbering::next(&transaction, tenant.id(), &format!("orders.return:{year}"))
                         .await?;
