@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use super::{Grants, OrgTarget, Permission, Principal, Scope, org_out_of_scope};
+use super::{Grant, Grants, OrgTarget, Permission, Principal, Scope, org_out_of_scope};
 use crate::error::Error;
 use crate::tenancy::{OrgId, OrgTree, TenantId, root_of};
 
@@ -272,18 +272,14 @@ impl Principal {
         // Nhân sự nền tảng vào khách bằng `kernel.tenants.operate` giữ grant ở nút gốc của khách nền
         // tảng (`operating`); uỷ quyền và hỗ trợ dựng grant ở nút của khách đích — không trùng gốc nhà.
         let home_root = self.operator_from().map(root_of);
-        // `Principal::new` (độ sâu `tenant`, D-303 mục 3) đặt grant ở gốc của khách mặc định rồi `in_tenant` đổi khách mà
-        // không dời grant: grant đó nghĩa là "cả khách", không phải một nhánh. Gốc khách mặc định không bao giờ là nút
-        // nhánh của khách khác (ID nút là ID riêng của từng khách).
-        let legacy_root = root_of(crate::tenancy::DEFAULT_TENANT);
+        // Grant ở gốc khách mặc định của `Principal::new` đã được `in_tenant` dời sang gốc của khách đang vào, nên chỉ
+        // so với gốc của chính khách (D-20261128-in-tenant-moves-root).
         // Grant của permission không `scoped` ở nút nhánh vẫn có độ sâu `tenant` (D-303 mục 3), nên
         // phải xem nút của grant gốc (`grant_map`), không xem `grants()` (đã mở rộng ra cả khách).
         let at_root = match &self.grants {
             Grants::All => true,
             Grants::Only(map) => map.get(permission.name).is_some_and(|grants| {
-                grants.iter().any(|grant| {
-                    grant.org == root || grant.org == legacy_root || Some(grant.org) == home_root
-                })
+                grants.iter().any(|grant| grant.org == root || Some(grant.org) == home_root)
             }),
         };
         if at_root && self.fence().is_none() {
@@ -291,5 +287,119 @@ impl Principal {
         } else {
             Err(org_out_of_scope(root, permission))
         }
+    }
+}
+
+impl Principal {
+    // Phần của `in_tenant`: grant (và rào) ở nút gốc của khách cũ dời sang nút gốc của `tenant` — grant ở gốc khách
+    // nghĩa là "cả khách", không bao giờ là một nhánh của khách khác. Nhân sự nền tảng vào khách (`operating`) giữ
+    // grant ở gốc khách nhà (D-20261128-in-tenant-moves-root).
+    pub(super) fn move_root_grants(&mut self, tenant: TenantId) {
+        let (old, new) = (root_of(self.tenant), root_of(tenant));
+        if self.operator_from.is_some() || old == new {
+            return;
+        }
+        // `Arc` của bản đồ grant có thể dùng chung với bản sao khác của principal: dựng bản đồ mới thay vì sửa tại
+        // chỗ, và chỉ khi có grant ở gốc cũ.
+        if let Grants::Only(map) = &self.grants
+            && map.values().flatten().any(|grant| grant.org == old)
+        {
+            let moved = map
+                .iter()
+                .map(|(name, list)| {
+                    let mut grants: Vec<Grant> = Vec::with_capacity(list.len());
+                    for grant in list {
+                        let grant =
+                            if grant.org == old { Grant::new(new, grant.scope) } else { *grant };
+                        if !grants.contains(&grant) {
+                            grants.push(grant);
+                        }
+                    }
+                    (name.clone(), grants)
+                })
+                .collect();
+            self.grants = Grants::Only(Arc::new(moved));
+        }
+        if self.fence == Some(old) {
+            self.fence = Some(new);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MANAGE: Permission = Permission::new("kernel.settings.manage", "Manage settings.");
+
+    fn tenant(n: u128) -> TenantId {
+        TenantId::from_uuid(Uuid::from_u128(n))
+    }
+
+    #[test]
+    fn grant_o_goc_khach_mac_dinh_doi_sang_goc_khach_moi() {
+        let entered =
+            Principal::new(Uuid::from_u128(1), [MANAGE.name.to_owned()]).in_tenant(tenant(7));
+        assert!(entered.require_at_root(&MANAGE).is_ok());
+        let grants = &entered.grant_map().unwrap()[MANAGE.name];
+        assert_eq!(grants, &vec![Grant::new(root_of(tenant(7)), Scope::Tenant)]);
+        // Đổi khách lần nữa: grant theo gốc, không ở lại gốc cũ.
+        let again = entered.in_tenant(tenant(8));
+        assert_eq!(
+            again.grant_map().unwrap()[MANAGE.name],
+            vec![Grant::new(root_of(tenant(8)), Scope::Tenant)]
+        );
+        assert!(again.require_at_root(&MANAGE).is_ok());
+    }
+
+    #[test]
+    fn grant_o_nhanh_khong_tinh_la_goc() {
+        let branch = OrgId::from_uuid(Uuid::from_u128(0xB));
+        let member = Principal::with_grants(
+            Uuid::from_u128(1),
+            [(MANAGE.name.to_owned(), Grant::new(branch, Scope::Tenant))],
+        )
+        .in_tenant(tenant(7));
+        let refused = member.require_at_root(&MANAGE).unwrap_err();
+        assert_eq!(refused.code(), "org_out_of_scope");
+        assert_eq!(
+            member.grant_map().unwrap()[MANAGE.name],
+            vec![Grant::new(branch, Scope::Tenant)]
+        );
+    }
+
+    #[test]
+    fn nhan_su_vao_khach_giu_grant_o_goc_khach_nha() {
+        let staff = Principal::new(Uuid::from_u128(1), [MANAGE.name.to_owned()])
+            .in_tenant(tenant(9))
+            .operating(tenant(7));
+        assert!(staff.require_at_root(&MANAGE).is_ok(), "gốc khách nhà của nhân sự");
+        // `in_tenant` sau `operating` không dời grant của nhân sự sang khách đích.
+        let kept = staff.in_tenant(tenant(7));
+        assert_eq!(
+            kept.grant_map().unwrap()[MANAGE.name],
+            vec![Grant::new(root_of(tenant(9)), Scope::Tenant)]
+        );
+    }
+
+    #[test]
+    fn ly_do_ngoai_rao_chi_khi_khong_bi_role_cam() {
+        const READ: Permission = Permission::new("notes.read", "Read notes.");
+        const WRITE: Permission = Permission::new("notes.write", "Write notes.");
+        let catalog =
+            super::super::PermissionCatalog::new(vec![("notes", vec![READ, WRITE])]).unwrap();
+        let allowed: std::collections::BTreeSet<String> = [READ.name.to_owned()].into();
+        let admin = Principal::with_all_permissions(Uuid::from_u128(1))
+            .in_tenant(tenant(7))
+            .within(Some(&allowed), &catalog);
+        assert!(admin.outside_guardrail(WRITE.name));
+        assert!(!admin.outside_guardrail(READ.name));
+        // Role cấm thắng: lý do là `denied_by_role`, không phải ngoài rào.
+        let banned = Principal::with_all_permissions(Uuid::from_u128(1))
+            .in_tenant(tenant(7))
+            .without([WRITE.name.to_owned()], &catalog)
+            .within(Some(&allowed), &catalog);
+        assert!(banned.is_denied(WRITE.name));
+        assert!(!banned.outside_guardrail(WRITE.name));
     }
 }

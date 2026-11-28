@@ -70,7 +70,8 @@ impl WorkSource for Slow {
     }
 
     async fn count(&self, _: &TenantContext, _: &Principal, _: OrgTarget) -> Result<u64, Error> {
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        // Không bao giờ trả lời kịp: nguồn chỉ có thể bị bỏ vì quá trần.
+        tokio::time::sleep(Duration::from_secs(600)).await;
         Ok(1)
     }
 
@@ -81,7 +82,8 @@ impl WorkSource for Slow {
         _: OrgTarget,
         _: u16,
     ) -> Result<Vec<WorkItem>, Error> {
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        // Không bao giờ trả lời kịp: nguồn chỉ có thể bị bỏ vì quá trần.
+        tokio::time::sleep(Duration::from_secs(600)).await;
         Ok(Vec::new())
     }
 }
@@ -107,6 +109,9 @@ impl Module for Demo {
 async fn hop_viec_gom_sap_va_bo_nguon_cham() {
     TestDatabase::run(async |test| {
         let app = TestApp::builder(test)
+            // Trần ngắn hơn mặc định của testkit (60 s) để nguồn chậm bị bỏ; vẫn đủ rộng cho nguồn nhanh khi máy
+            // bận.
+            .setting("AUTOXIDE_SOURCE_TIMEOUT_MS", "5000")
             .user("reviewer", 1, &["demo.review", "demo.slow"])
             .user("nobody", 2, &[])
             .module(Demo)

@@ -61,7 +61,8 @@ impl SummaryMetric for Slow {
         _: &Principal,
         _: OrgTarget,
     ) -> Result<MetricValue, Error> {
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        // Không bao giờ trả lời kịp: nguồn chỉ có thể bị bỏ vì quá trần.
+        tokio::time::sleep(Duration::from_secs(600)).await;
         Ok(MetricValue::Count(1))
     }
 }
@@ -87,6 +88,9 @@ impl Module for Shop {
 async fn so_lieu_tom_tat_kem_dinh_nghia() {
     TestDatabase::run(async |test| {
         let app = TestApp::builder(test)
+            // Trần ngắn hơn mặc định của testkit (60 s) để nguồn chậm bị bỏ; vẫn đủ rộng cho nguồn nhanh khi máy
+            // bận.
+            .setting("AUTOXIDE_SOURCE_TIMEOUT_MS", "5000")
             .user("clerk", 1, &["shop.read"])
             .user("nobody", 2, &[])
             .module(Shop)
