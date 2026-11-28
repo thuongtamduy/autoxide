@@ -12,12 +12,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::moderation::{RestrictionChange, restriction};
 use autoxide_kernel::resource::{Resource, ResourceResolver};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::{EntityTrait, IntoActiveModel, Set};
+use autoxide_kernel::tenancy::TenantContext;
 use uuid::Uuid;
 
 use crate::entity::comment;
@@ -39,13 +39,16 @@ pub(crate) fn restricted() -> Error {
 /// Bộ tra `comments.comment` của sổ đối tượng.
 pub(crate) struct CommentResolver;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl ResourceResolver for CommentResolver {
     async fn resolve(&self, tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
         let Ok(id) = id.parse::<Uuid>() else { return Ok(None) };
-        let found = comment::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(tenant.database().read())
+        let found = tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::ID.eq(id))
+            .one()
             .await?
             .filter(|row| row.status != Status::Deleted.as_str());
         Ok(found.map(|row| {
@@ -78,7 +81,7 @@ impl ResourceResolver for CommentResolver {
 /// Bên nghe event ẩn / hiện của `compliance`.
 pub(crate) struct Listener(pub Arc<CommentsService>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EventHandler for Listener {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let Some((change, notice)) = restriction(event) else {
@@ -105,8 +108,9 @@ impl CommentsService {
         id: Uuid,
         restrict: bool,
     ) -> Result<(), Error> {
-        let transaction = tenant.database().begin_write().await?;
-        let Some(before) = comment::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
+        let transaction = tenant.db().begin_write().await?;
+        let Some(before) =
+            transaction.find::<comment::Model>().filter(comment::Model::ID.eq(id)).one().await?
         else {
             return Ok(());
         };
@@ -120,24 +124,24 @@ impl CommentsService {
             // Người kiểm duyệt không đổi được bình luận đang ẩn, nên nó vẫn là `rejected`.
             before.restricted_status.as_deref().and_then(Status::parse).unwrap_or(from)
         };
-        let mut row = before.clone().into_active_model();
-        row.status = Set(to.as_str().to_owned());
-        row.updated_at = Set(now());
+        let mut row = before.clone();
+        row.status = to.as_str().to_owned();
+        row.updated_at = now();
         if restrict {
-            row.restricted_status = Set(Some(from.as_str().to_owned()));
-            row.hold_reason = Set(Some("compliance".to_owned()));
+            row.restricted_status = Some(from.as_str().to_owned());
+            row.hold_reason = Some("compliance".to_owned());
         } else {
-            row.restricted_status = Set(None);
+            row.restricted_status = None;
             if to == Status::Published {
-                row.hold_reason = Set(None);
+                row.hold_reason = None;
             }
             if to == Status::Published && before.published_at.is_none() {
-                row.published_at = Set(Some(now()));
+                row.published_at = Some(now());
             }
         }
-        let after = update_if_unchanged(&transaction, tenant, row, &before).await?;
+        let after = update_if_unchanged(&transaction, row, &before).await?;
         if from != to {
-            shift_counts(&transaction, tenant, &after, Some(from), Some(to)).await?;
+            shift_counts(&transaction, &after, Some(from), Some(to)).await?;
         }
         let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
         self.outbox

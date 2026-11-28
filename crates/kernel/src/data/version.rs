@@ -47,6 +47,23 @@ impl<T: Serialize> IntoResponse for Tagged<T> {
     }
 }
 
+/// A `{"data": …}` result with an `ETag` header when the record has a version (`None`: no stored row yet, so
+/// nothing to send in `If-Match` but `*`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaybeTagged<T> {
+    pub version: Option<Timestamp>,
+    pub data: T,
+}
+
+impl<T: Serialize> IntoResponse for MaybeTagged<T> {
+    fn into_response(self) -> Response {
+        match self.version {
+            Some(version) => Tagged { version, data: self.data }.into_response(),
+            None => Data { data: self.data }.into_response(),
+        }
+    }
+}
+
 /// The `If-Match` header of the request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -165,6 +182,15 @@ pub fn changed_with<T: Serialize>(current: &T, version: Timestamp) -> Error {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn co_phien_ban_moi_kem_etag() {
+        let version = Timestamp::now();
+        let tagged = MaybeTagged { version: Some(version), data: 1 }.into_response();
+        assert_eq!(tagged.headers()[header::ETAG], etag(version).as_str());
+        let plain = MaybeTagged { version: None, data: 1 }.into_response();
+        assert!(plain.headers().get(header::ETAG).is_none());
+    }
 
     #[test]
     fn etag_doc_lai_dung_phien_ban() {

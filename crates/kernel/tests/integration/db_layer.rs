@@ -804,3 +804,72 @@ async fn trang_theo_cot_tu_nhien() {
     .await
     .unwrap();
 }
+
+// Trang theo tầng (`page_tiers`): mọi dòng của tầng đầu trước, dòng khớp cả hai tầng chỉ ra một lần, con trỏ đi qua
+// ranh giới tầng; trang theo một cột UUID khác `id` (`page_keyed`) như `page`.
+#[tokio::test]
+async fn trang_theo_tang_va_theo_khoa_khac() {
+    TestDatabase::run(async |test| {
+        let database = open(test).await;
+        let (a, _) = (tenant(&database, 0xA), tenant(&database, 0xB));
+        let codes =
+            [(0x4001, "apple pie"), (0x4002, "pineapple"), (0x4003, "apple"), (0x4004, "grape")];
+        let tx = a.db().begin_write().await.unwrap();
+        for (n, code) in codes {
+            let row = Level {
+                id: id(n),
+                tenant_id: TenantKey::new(a.id()),
+                code: code.into(),
+                on_hand: 1,
+            };
+            tx.insert(row).exec().await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        let read = a.db().read();
+        let tiers = [Level::CODE.starts_with("apple"), Level::CODE.contains("apple")];
+        let mut seen = Vec::new();
+        let mut request = PageRequest::first(2, Order::Asc).counted();
+        loop {
+            let page = read.find::<Level>().page_tiers(&tiers, Level::ID, &request).await.unwrap();
+            if seen.is_empty() {
+                assert_eq!(page.pagination.total, Some(3));
+            }
+            seen.extend(page.data.iter().map(|row| row.id));
+            let Some(cursor) = page.pagination.next_cursor else { break };
+            let query = tier_query(cursor);
+            request = PageRequest::try_from(query).unwrap();
+        }
+        assert_eq!(seen, vec![id(0x4001), id(0x4003), id(0x4002)]);
+
+        let keyed = read
+            .find::<Level>()
+            .filter(Level::CODE.contains("apple"))
+            .page_keyed(Level::ID, |row| row.id, &PageRequest::first(2, Order::Desc))
+            .await
+            .unwrap();
+        assert_eq!(
+            keyed.data.iter().map(|row| row.id).collect::<Vec<_>>(),
+            vec![id(0x4003), id(0x4002)]
+        );
+        let next = PageRequest::first(2, Order::Desc)
+            .after(keyed.pagination.next_cursor.unwrap().parse().unwrap());
+        let rest = read
+            .find::<Level>()
+            .filter(Level::CODE.contains("apple"))
+            .page_keyed(Level::ID, |row| row.id, &next)
+            .await
+            .unwrap();
+        assert_eq!(rest.data.iter().map(|row| row.id).collect::<Vec<_>>(), vec![id(0x4001)]);
+        assert_eq!(rest.pagination.next_cursor, None);
+    })
+    .await
+    .unwrap();
+}
+
+fn tier_query(cursor: String) -> autoxide_kernel::pagination::NaturalOrderPageQuery {
+    autoxide_kernel::pagination::NaturalOrderPageQuery::new(
+        Some("2".into()),
+        Some(cursor),
+        Some("asc".into()),
+    )
+}

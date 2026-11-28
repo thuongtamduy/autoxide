@@ -33,7 +33,7 @@ const PRODUCT: &str = "p-1";
 /// Bộ tra giả của `catalog.product`: ID bắt đầu bằng `p` là sản phẩm đang bán.
 struct Products;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl ResourceResolver for Products {
     async fn resolve(&self, _tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
         Ok(id.starts_with('p').then(|| Resource::new("Bếp từ").public(true)))
@@ -43,7 +43,7 @@ impl ResourceResolver for Products {
 /// `seller`: người có `catalog.manage` (bước 41 xét thêm nút tổ chức sở hữu sản phẩm).
 struct Sellers;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl BadgeResolver for Sellers {
     async fn badges(
         &self,
@@ -59,7 +59,7 @@ impl BadgeResolver for Sellers {
 #[derive(Default)]
 struct Buyers(Mutex<HashSet<Uuid>>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl BadgeResolver for Buyers {
     async fn badges(
         &self,
@@ -76,7 +76,7 @@ impl BadgeResolver for Buyers {
 #[derive(Default)]
 struct Verified(Mutex<HashSet<Uuid>>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl PostingVerifier for Verified {
     async fn is_verified(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
         Ok(self.0.lock().unwrap().contains(&user_id))

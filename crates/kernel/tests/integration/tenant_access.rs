@@ -56,6 +56,54 @@ impl Module for Demo {
     }
 }
 
+/// Module thử khai bằng manifest + `#[endpoint]`: `Routes::allowed_while_read_only` đánh dấu route như lớp cũ.
+struct Marked;
+
+/// Confirm something from a mail link (test).
+#[autoxide_kernel::http::endpoint(
+    post,
+    path = "/confirm",
+    signed_in,
+    responses((status = 204, description = "Confirmed."))
+)]
+async fn confirm(
+    _tenant: TenantContext,
+    _principal: Principal,
+) -> autoxide_kernel::http::NoContent {
+    autoxide_kernel::http::NoContent
+}
+
+/// Edit something (test).
+#[autoxide_kernel::http::endpoint(
+    post,
+    path = "/edit",
+    signed_in,
+    responses((status = 204, description = "Edited."))
+)]
+async fn edit(_tenant: TenantContext, _principal: Principal) -> autoxide_kernel::http::NoContent {
+    autoxide_kernel::http::NoContent
+}
+
+impl Module for Marked {
+    fn manifest(&self) -> autoxide_kernel::module::Manifest {
+        autoxide_kernel::module::Manifest::new(
+            "marked",
+            "Test module with a route allowed while read-only.",
+        )
+    }
+
+    fn start(
+        &mut self,
+        context: &mut autoxide_kernel::module::StartContext<'_>,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        context.routes(
+            autoxide_kernel::routes![confirm]
+                .allowed_while_read_only()
+                .merge(autoxide_kernel::routes![edit]),
+        )
+    }
+}
+
 const STAFF: [&str; 2] = ["kernel.domains.manage", "kernel.settings.manage"];
 
 async fn app(test: &TestDatabase) -> TestApp {
@@ -68,6 +116,7 @@ async fn app(test: &TestDatabase) -> TestApp {
         .user_in("acme", "acme", 2, &STAFF)
         .user_in("beta", "beta", 3, &STAFF)
         .module(Demo)
+        .module(Marked)
         .build()
         .await
         .unwrap()
@@ -125,6 +174,11 @@ async fn khach_chi_doc_doc_duoc_khong_ghi_duoc() {
         let setting = "/api/v1/kernel/settings/kernel.public_url";
         assert_eq!(code(&call(&app, "PUT", setting, "acme").await), read_only);
         assert_eq!(code(&call(&app, "POST", "/api/v1/demo/change", "acme").await), read_only);
+        assert_eq!(code(&call(&app, "POST", "/api/v1/marked/edit", "acme").await), read_only);
+        assert_eq!(
+            call(&app, "POST", "/api/v1/marked/confirm", "acme").await.0,
+            StatusCode::NO_CONTENT
+        );
         // Route đánh dấu (xuất dữ liệu) vẫn chạy; khách khác không bị ảnh hưởng.
         assert_eq!(
             call(&app, "POST", "/api/v1/demo/export", "acme").await.0,

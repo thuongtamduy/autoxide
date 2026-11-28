@@ -1,16 +1,13 @@
 //! Tạo, sửa, xoá bình luận; pipeline kiểm duyệt; chống spam; đọc luồng.
 
-use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::antispam::AntispamConfig;
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::error::ErrorKind;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_testkit::TestDatabase;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set,
-};
 
 use super::{
     KIND, POST, as_guest, counts, events, guest, member, open_config, page, signed, token, visitor,
@@ -128,7 +125,15 @@ async fn chong_spam_cung_mot_cau_tra_loi_token_hong_la_loi() {
         as_guest(&h.service, &client, guest("Ada", "Lần hai")).await.unwrap();
         let limited = as_guest(&h.service, &client, guest("Ada", "Lần ba")).await.unwrap();
         assert_eq!(limited.shown, Status::Pending);
-        assert_eq!(comment::Entity::find().count(h.database.read()).await.unwrap(), 2);
+        assert_eq!(
+            autoxide_testkit::all_tenants(&h.database)
+                .read()
+                .find::<comment::Model>()
+                .count()
+                .await
+                .unwrap(),
+            2
+        );
         assert_eq!(h.service.find(&h.tenant, held.comment.row.id).await.unwrap().status, "deleted");
 
         // Token thiếu, sai, của phạm vi khác.
@@ -213,7 +218,15 @@ async fn gui_lai_cung_token_ra_cung_binh_luan() {
         }
         ids.dedup();
         assert_eq!(ids.len(), 1, "every answer names the same comment");
-        assert_eq!(comment::Entity::find().count(h.database.read()).await.unwrap(), 2);
+        assert_eq!(
+            autoxide_testkit::all_tenants(&h.database)
+                .read()
+                .find::<comment::Model>()
+                .count()
+                .await
+                .unwrap(),
+            2
+        );
         assert_eq!(counts(&h.database, POST).await, (2, 0));
     })
     .await
@@ -478,9 +491,9 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
         assert_eq!(counts(&h.database, POST).await, (0, 1));
 
         // Hết thời hạn sửa (đẩy lúc tạo về quá khứ).
-        let mut row = h.service.find(&h.tenant, id).await.unwrap().into_active_model();
-        row.created_at = Set(crate::service::now() - SignedDuration::from_mins(16));
-        row.update(h.database.write()).await.unwrap();
+        let mut row = h.service.find(&h.tenant, id).await.unwrap();
+        row.created_at = crate::service::now() - autoxide_kernel::time::Duration::from_mins(16);
+        super::save(&h.tenant, &row).await;
         assert_eq!(
             h.service
                 .edit(&h.tenant, None, id, Some(&token), "Muộn", None)
@@ -546,7 +559,7 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
         let moderator = admin();
         let bob = member(&h.service, "Bob", &[]).await;
         let client = ClientInfo::default();
-        let until = crate::service::now() + SignedDuration::from_hours(1);
+        let until = crate::service::now() + autoxide_kernel::time::Duration::from_hours(1);
         let ban = h
             .service
             .ban(
@@ -635,14 +648,24 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
         assert_eq!(error.fields().len(), 3);
 
         // Hết hạn.
-        let mut row = ban::Entity::find_by_id(ban.id)
-            .one(h.database.read())
+        let mut row = autoxide_testkit::all_tenants(&h.database)
+            .read()
+            .find::<ban::Model>()
+            .filter(ban::Model::ID.eq(ban.id))
+            .one()
             .await
             .unwrap()
-            .unwrap()
-            .into_active_model();
-        row.until = Set(Some(crate::service::now() - SignedDuration::from_secs(1)));
-        row.update(h.database.write()).await.unwrap();
+            .unwrap();
+        row.until = Some(crate::service::now() - autoxide_kernel::time::Duration::from_secs(1));
+        let transaction = h.tenant.db().begin_write().await.unwrap();
+        transaction
+            .update::<ban::Model>()
+            .set(ban::Model::UNTIL, row.until)
+            .filter(ban::Model::ID.eq(row.id))
+            .exec()
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
         assert_eq!(
             h.service.post(&h.tenant, Some(&bob), &client, signed("Xin chào")).await.unwrap().shown,
             Status::Published
@@ -862,9 +885,13 @@ async fn tra_loi_dong_thoi_voi_xoa_han_luong() {
                 }
             }
             deleting.await.unwrap().unwrap();
-            let left = comment::Entity::find()
-                .filter(comment::Column::RootId.eq(root))
-                .count(h.database.read())
+            let left = h
+                .tenant
+                .db()
+                .read()
+                .find::<comment::Model>()
+                .filter(comment::Model::ROOT_ID.eq(root))
+                .count()
                 .await
                 .unwrap();
             assert_eq!(left, 0, "round {round}");

@@ -7,7 +7,6 @@
 use std::collections::HashSet;
 
 use autoxide_kernel::migration::prelude::*;
-use sea_orm::ConnectionTrait;
 
 pub(crate) struct Migration;
 
@@ -17,7 +16,7 @@ impl MigrationName for Migration {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Dùng chính hàm của module: đổi cách tính khoá về sau thì phải thêm migration tính lại

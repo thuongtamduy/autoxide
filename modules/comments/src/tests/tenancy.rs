@@ -1,7 +1,7 @@
 //! Hai khách trên cùng database (bước 33): cùng đích, cùng tên hiển thị không đụng nhau; mỗi khách
 //! chỉ thấy bình luận của mình; token trong link mail của khách kia mang khách của nó.
 
-use jiff::SignedDuration;
+use autoxide_kernel::time::Duration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -139,8 +139,11 @@ async fn hai_khach_cung_dich_cung_ten_khong_dung_nhau_token_mang_khach() {
         assert_eq!(h.service.unsubscribe(None, &tampered, false).await.unwrap(), 0);
         assert_eq!(h.service.unsubscribe(None, &stop, false).await.unwrap(), 1);
         // Dọn theo thời hạn chạy một lần cho database, theo từng khách.
-        let later = crate::service::now() + SignedDuration::from_hours(24 * 400);
-        h.service.cleanup(app.registry(), &h.database, later).await.unwrap();
+        let later = crate::service::now() + Duration::from_hours(24 * 400);
+        h.service
+            .cleanup(app.registry(), &h.database, autoxide_testkit::all_tenants(&h.database), later)
+            .await
+            .unwrap();
     })
     .await
     .unwrap();

@@ -121,6 +121,16 @@ impl JobContext {
         self.id = id;
         self
     }
+
+    /// Handles of `db` that read and write the module's tenant records of **every** tenant on the job's
+    /// database, without the tenant filter — for a job of the whole database (cleanup schedules) sweeping
+    /// expired rows. `reason` says why, in a few words; each use is counted in the metric
+    /// `kernel_all_tenant_queries{module}` like `ControlPlane::all_tenants`. A tenant job uses `tenant.db()`.
+    pub fn all_tenants(&self, reason: &'static str) -> crate::db::AllTenants<'_> {
+        // Loại job là `<module>.<việc>`: phần đầu là module (tập nhỏ cố định, dùng làm nhãn số đo được).
+        let module = self.kind.split('.').next().unwrap_or_default();
+        crate::db::AllTenants::counted(&self.database, module, reason)
+    }
 }
 
 /// The runner of one job kind. Returning an error makes the job run again later (backoff).

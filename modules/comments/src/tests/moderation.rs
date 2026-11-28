@@ -1,7 +1,8 @@
 //! Kiểm duyệt, báo cáo, mail báo trả lời, dữ liệu cá nhân, dọn theo thời hạn, event của module
 //! sở hữu đích.
 
-use jiff::SignedDuration;
+use autoxide_kernel::db::Queries as _;
+use autoxide_kernel::time::Duration;
 use std::sync::Arc;
 
 use autoxide_kernel::event::{Delivered, EventHandler};
@@ -9,7 +10,6 @@ use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::Order;
 use autoxide_kernel::privacy::{PersonalData, USER_DELETED};
 use autoxide_testkit::TestDatabase;
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, Set};
 use serde_json::json;
 
 use super::{
@@ -176,7 +176,7 @@ async fn duyet_xoa_han_hang_cho_va_event() {
             "permission_denied"
         );
 
-        let stale = posted.comment.row.updated_at - SignedDuration::from_secs(1);
+        let stale = posted.comment.row.updated_at - Duration::from_secs(1);
         assert_eq!(
             h.service
                 .set_status(&h.tenant, &moderator, id, Status::Published, Some(stale))
@@ -219,7 +219,15 @@ async fn duyet_xoa_han_hang_cho_va_event() {
         assert_eq!(counts(&h.database, POST).await, (2, 0));
         assert_eq!(h.service.hard_delete(&h.tenant, &moderator, id).await.unwrap(), 2);
         assert_eq!(counts(&h.database, POST).await, (0, 0));
-        assert_eq!(comment::Entity::find().count(h.database.read()).await.unwrap(), 0);
+        assert_eq!(
+            autoxide_testkit::all_tenants(&h.database)
+                .read()
+                .find::<comment::Model>()
+                .count()
+                .await
+                .unwrap(),
+            0
+        );
         assert_eq!(
             h.service.hard_delete(&h.tenant, &moderator, id).await.unwrap_err().code(),
             "comments.not_found"
@@ -323,7 +331,15 @@ async fn mail_bao_tra_loi() {
             .collect();
         assert_eq!(h.service.unsubscribe(None, "unknown", false).await.unwrap(), 0);
         assert_eq!(h.service.unsubscribe(None, &unsubscribe, false).await.unwrap(), 1);
-        assert_eq!(subscription::Entity::find().count(h.database.read()).await.unwrap(), 0);
+        assert_eq!(
+            autoxide_testkit::all_tenants(&h.database)
+                .read()
+                .find::<subscription::Model>()
+                .count()
+                .await
+                .unwrap(),
+            0
+        );
         let mut later = guest("Cid", "Muộn");
         later.parent_id = Some(root);
         let later = as_guest(&h.service, &client, later).await.unwrap().comment.row.id;
@@ -428,8 +444,12 @@ async fn du_lieu_ca_nhan() {
         let gone = h.service.find(&h.tenant, mine).await.unwrap();
         assert_eq!((gone.status.as_str(), gone.user_id, gone.body.as_str()), ("deleted", None, ""));
         assert!(
-            profile::Entity::find_by_id((h.tenant.id().as_uuid(), bob.user_id()))
-                .one(h.database.read())
+            h.tenant
+                .db()
+                .read()
+                .find::<profile::Model>()
+                .filter(profile::Model::USER_ID.eq(bob.user_id()))
+                .one()
                 .await
                 .unwrap()
                 .is_none()
@@ -474,36 +494,67 @@ async fn don_theo_thoi_han() {
         assert_eq!(counts(&h.database, POST).await, (1, 1));
 
         let now = crate::service::now();
-        let early = h.service.cleanup(&h.service.databases, &h.database, now).await.unwrap();
+        let early = h
+            .service
+            .cleanup(
+                &h.service.databases,
+                &h.database,
+                autoxide_testkit::all_tenants(&h.database),
+                now,
+            )
+            .await
+            .unwrap();
         assert_eq!((early.deleted, early.cleared, early.fingerprints), (0, 0, 0));
         // Cả hai từng hiện (rồi bị giữ lại / đánh spam): không bao giờ tự bị xoá.
         let shown_once = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 31))
+            .cleanup(
+                &h.service.databases,
+                &h.database,
+                autoxide_testkit::all_tenants(&h.database),
+                now + Duration::from_hours(24 * 31),
+            )
             .await
             .unwrap();
         assert_eq!((shown_once.deleted, shown_once.cleared), (0, 0));
         // Coi như chưa từng hiện (gốc có trả lời mà chưa từng hiện không xảy ra qua API; đặt
         // thẳng để thử nhánh xoá mềm).
         for id in [root, lonely] {
-            let mut row = h.service.find(&h.tenant, id).await.unwrap().into_active_model();
-            row.published_at = Set(None);
-            row.update(h.database.write()).await.unwrap();
+            let mut row = h.service.find(&h.tenant, id).await.unwrap();
+            row.published_at = None;
+            super::save(&h.tenant, &row).await;
         }
         let later = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 31))
+            .cleanup(
+                &h.service.databases,
+                &h.database,
+                autoxide_testkit::all_tenants(&h.database),
+                now + Duration::from_hours(24 * 31),
+            )
             .await
             .unwrap();
         assert_eq!((later.deleted, later.cleared), (1, 1));
         assert!(
-            comment::Entity::find_by_id(lonely).one(h.database.read()).await.unwrap().is_none()
+            autoxide_testkit::all_tenants(&h.database)
+                .read()
+                .find::<comment::Model>()
+                .filter(comment::Model::ID.eq(lonely))
+                .one()
+                .await
+                .unwrap()
+                .is_none()
         );
         assert_eq!(h.service.find(&h.tenant, root).await.unwrap().status, "deleted");
         assert_eq!(counts(&h.database, POST).await, (1, 0));
         let ips = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 91))
+            .cleanup(
+                &h.service.databases,
+                &h.database,
+                autoxide_testkit::all_tenants(&h.database),
+                now + Duration::from_hours(24 * 91),
+            )
             .await
             .unwrap();
         assert_eq!((ips.deleted, ips.cleared, ips.fingerprints), (0, 0, 1));
@@ -512,7 +563,8 @@ async fn don_theo_thoi_han() {
                 .cleanup(
                     &h.service.databases,
                     &h.database,
-                    now + SignedDuration::from_hours(24 * 91)
+                    autoxide_testkit::all_tenants(&h.database),
+                    now + Duration::from_hours(24 * 91)
                 )
                 .await
                 .unwrap(),
@@ -596,7 +648,7 @@ async fn event_cua_chu_dich_dong_va_an() {
             hidden: Some(false),
             closes_at: None,
         };
-        let stale = target.updated_at.unwrap() - SignedDuration::from_secs(1);
+        let stale = target.updated_at.unwrap() - Duration::from_secs(1);
         assert_eq!(
             h.service
                 .set_target(&h.tenant, &admin(), KIND, POST, change(), Some(stale))
@@ -613,7 +665,7 @@ async fn event_cua_chu_dich_dong_va_an() {
         assert!(reopened.is_open(crate::service::now()));
         assert_eq!(h.service.public_comment(&h.tenant, id).await.unwrap().row.id, id);
         // Tự đóng sau `closes_at`.
-        let past = Some(Some(crate::service::now() - SignedDuration::from_mins(1)));
+        let past = Some(Some(crate::service::now() - Duration::from_mins(1)));
         let auto = crate::posting::targets::TargetChange { closes_at: past, ..Default::default() };
         h.service.set_target(&h.tenant, &admin(), KIND, POST, auto, None).await.unwrap();
         assert_eq!(
@@ -681,12 +733,24 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
         let now = crate::service::now();
         let cleaned = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 31))
+            .cleanup(
+                &h.service.databases,
+                &h.database,
+                autoxide_testkit::all_tenants(&h.database),
+                now + Duration::from_hours(24 * 31),
+            )
             .await
             .unwrap();
         assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
         assert!(
-            comment::Entity::find_by_id(waiting).one(h.database.read()).await.unwrap().is_none()
+            autoxide_testkit::all_tenants(&h.database)
+                .read()
+                .find::<comment::Model>()
+                .filter(comment::Model::ID.eq(waiting))
+                .one()
+                .await
+                .unwrap()
+                .is_none()
         );
         let kept = h.service.find(&h.tenant, shown).await.unwrap();
         assert_eq!((kept.status.as_str(), kept.body.as_str()), ("pending", "Ý kiến cũ"));
@@ -702,7 +766,12 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
         assert_eq!(before.iter().filter(|r| r.reporter_key.starts_with("ip:")).count(), 2);
         let later = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 91))
+            .cleanup(
+                &h.service.databases,
+                &h.database,
+                autoxide_testkit::all_tenants(&h.database),
+                now + Duration::from_hours(24 * 91),
+            )
             .await
             .unwrap();
         assert_eq!(later.reporters, 2);
@@ -726,7 +795,8 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
                 .cleanup(
                     &h.service.databases,
                     &h.database,
-                    now + SignedDuration::from_hours(24 * 91)
+                    autoxide_testkit::all_tenants(&h.database),
+                    now + Duration::from_hours(24 * 91)
                 )
                 .await
                 .unwrap()
@@ -769,11 +839,27 @@ async fn duyet_trong_luc_don_thi_khong_xoa() {
         assert_eq!(counts(&h.database, POST).await, (1, 0));
 
         // Lần dọn sau (đọc mới): spam chưa từng hiện bị xoá, bình luận đã duyệt thì không.
-        let later = crate::service::now() + SignedDuration::from_hours(24 * 31);
-        let cleaned = h.service.cleanup(&h.service.databases, &h.database, later).await.unwrap();
+        let later = crate::service::now() + Duration::from_hours(24 * 31);
+        let cleaned = h
+            .service
+            .cleanup(
+                &h.service.databases,
+                &h.database,
+                autoxide_testkit::all_tenants(&h.database),
+                later,
+            )
+            .await
+            .unwrap();
         assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
         assert!(
-            comment::Entity::find_by_id(marked.id).one(h.database.read()).await.unwrap().is_none()
+            autoxide_testkit::all_tenants(&h.database)
+                .read()
+                .find::<comment::Model>()
+                .filter(comment::Model::ID.eq(marked.id))
+                .one()
+                .await
+                .unwrap()
+                .is_none()
         );
         assert_eq!(h.service.find(&h.tenant, approved.id).await.unwrap().status, "published");
         assert_eq!(counts(&h.database, POST).await, (1, 0));
@@ -842,7 +928,14 @@ async fn vu_viec_an_roi_hien_lai_binh_luan() {
         );
         listener.handle(&restrict).await.unwrap();
         listener.handle(&restrict).await.unwrap();
-        let row = comment::Entity::find_by_id(id).one(h.database.read()).await.unwrap().unwrap();
+        let row = autoxide_testkit::all_tenants(&h.database)
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::ID.eq(id))
+            .one()
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(
             (row.status.as_str(), row.restricted_status.as_deref()),
             ("rejected", Some("published"))
@@ -863,7 +956,14 @@ async fn vu_viec_an_roi_hien_lai_binh_luan() {
         );
         listener.handle(&restore).await.unwrap();
         listener.handle(&restore).await.unwrap();
-        let row = comment::Entity::find_by_id(id).one(h.database.read()).await.unwrap().unwrap();
+        let row = autoxide_testkit::all_tenants(&h.database)
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::ID.eq(id))
+            .one()
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!((row.status.as_str(), row.restricted_status), ("published", None));
         assert_eq!(counts(&h.database, POST).await, (1, 0));
     })
@@ -879,7 +979,7 @@ async fn an_dich_dong_thoi_voi_doi_han_khong_mat_lenh_an() {
         let h = service(test, open_config()).await;
         let client = visitor("203.0.113.14");
         as_guest(&h.service, &client, guest("Ada", "Mở đích")).await.unwrap();
-        let later = Some(Some(crate::service::now() + SignedDuration::from_hours(24 * 30)));
+        let later = Some(Some(crate::service::now() + Duration::from_hours(24 * 30)));
         for _ in 0..4 {
             let hide =
                 crate::posting::targets::TargetChange { hidden: Some(true), ..Default::default() };

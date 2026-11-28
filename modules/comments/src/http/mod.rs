@@ -15,11 +15,11 @@ mod views;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::http::Routes;
 use autoxide_kernel::pagination::{PageQuery, PageRequest};
+use autoxide_kernel::routes;
 use serde::Deserialize;
 use serde_json::Value;
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
 
 use crate::service::CommentsService;
 
@@ -27,31 +27,38 @@ use crate::service::CommentsService;
 pub(crate) use views::PublicComment;
 pub(crate) use views::{CommentDetail, TargetResponse};
 
-pub(crate) fn routes(service: Arc<CommentsService>) -> OpenApiRouter {
-    OpenApiRouter::new()
-        // Link trong thư vẫn dùng được khi khách chỉ đọc (xác nhận địa chỉ đã bắt đầu trước đó; rút
-        // lại đồng ý luôn phải làm được).
-        .routes(routes!(public::verify_email))
-        .routes(routes!(public::unsubscribe))
-        .layer(autoxide_kernel::tenancy::allowed_while_read_only())
-        .routes(routes!(public::get_settings))
-        .routes(routes!(public::list_thread))
-        .routes(routes!(public::create_comment))
-        .routes(routes!(public::get_public_comment, public::edit_comment))
-        .routes(routes!(public::list_replies))
-        .routes(routes!(public::delete_own_comment))
-        .routes(routes!(public::report_comment))
-        .routes(routes!(public::count_comments))
-        .routes(routes!(public::get_public_target))
-        .routes(routes!(public::get_profile, public::set_profile))
-        .routes(routes!(admin::list_comments))
-        .routes(routes!(admin::get_comment, admin::update_comment, admin::delete_comment))
-        .routes(routes!(admin::list_reports))
-        .routes(routes!(admin::list_bans, admin::create_ban))
-        .routes(routes!(admin::delete_ban))
-        .routes(routes!(admin::list_targets))
-        .routes(routes!(admin::get_target, admin::set_target))
-        .routes(routes!(admin::get_email_data, admin::delete_email_data))
+pub(crate) fn routes(service: Arc<CommentsService>) -> Routes {
+    // Link trong thư vẫn dùng được khi khách chỉ đọc (xác nhận địa chỉ đã bắt đầu trước đó; rút lại đồng ý luôn
+    // phải làm được).
+    routes![public::verify_email, public::unsubscribe]
+        .allowed_while_read_only()
+        .merge(routes![
+            public::get_settings,
+            public::list_thread,
+            public::create_comment,
+            public::get_public_comment,
+            public::edit_comment,
+            public::list_replies,
+            public::delete_own_comment,
+            public::report_comment,
+            public::count_comments,
+            public::get_public_target,
+            public::get_profile,
+            public::set_profile,
+            admin::list_comments,
+            admin::get_comment,
+            admin::update_comment,
+            admin::delete_comment,
+            admin::list_reports,
+            admin::list_bans,
+            admin::create_ban,
+            admin::delete_ban,
+            admin::list_targets,
+            admin::get_target,
+            admin::set_target,
+            admin::get_email_data,
+            admin::delete_email_data,
+        ])
         .with_state(service)
 }
 

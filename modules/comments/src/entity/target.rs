@@ -2,23 +2,20 @@
 //! `target_type`, `target_id`); dòng tạo khi có bình luận đầu tiên (hoặc khi quản trị viên đặt
 //! trạng thái).
 
+use autoxide_kernel::db::{Record, TenantKey};
 use autoxide_kernel::time::Timestamp;
-use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
-#[sea_orm::model]
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "comments_targets")]
-pub struct Model {
+#[derive(Record, Clone, Debug, PartialEq, Eq)]
+#[record(table = "comments_targets", scope = tenant)]
+pub(crate) struct Model {
     /// Khách sở hữu dòng (bước 33), cột đầu của khoá chính.
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub tenant_id: Uuid,
-    #[sea_orm(primary_key, auto_increment = false)]
+    pub tenant_id: TenantKey,
     pub target_type: String,
-    #[sea_orm(primary_key, auto_increment = false)]
     pub target_id: String,
     /// UUIDv7 cấp khi tạo (dòng cũ: cấp ở migration `m0012`), cho cursor của danh sách (D-270);
     /// unique trong khách (`comments_targets_uid_key`).
-    pub uid: Uuid,
+    pub uid: Option<Uuid>,
     /// `open` hoặc `closed`.
     pub state: String,
     /// Ẩn mọi bình luận khỏi phần công khai (vd đích đã bị xoá).
@@ -35,12 +32,4 @@ pub struct Model {
     pub pending_thread_count: i32,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-impl autoxide_kernel::tenancy::TenantScoped for Entity {
-    fn tenant_column() -> Self::Column {
-        Column::TenantId
-    }
 }

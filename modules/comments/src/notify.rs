@@ -16,7 +16,8 @@
 //!   (`autoxide_kernel::tenancy::link_token`, D-281): bấm link ở tên miền chính vẫn tới đúng khách.
 //! - Giới hạn số mail xác minh tới một địa chỉ mỗi ngày bằng `Throttle` (`posting.rs`).
 
-use jiff::SignedDuration;
+use autoxide_kernel::db::Queries as _;
+use autoxide_kernel::time::Duration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, ErrorKind};
@@ -24,10 +25,8 @@ use autoxide_kernel::event::{Delivered, Event, EventHandler};
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::resource::Resource;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext, link_token, resolve_link_token};
+use autoxide_kernel::tenancy::{TenantContext, link_token, resolve_link_token};
 use autoxide_kernel::tokens::Issued;
-use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use uuid::Uuid;
 
 use crate::entity::{comment, subscription};
@@ -77,7 +76,7 @@ fn target_name(resource: Option<&Resource>, language: Language) -> String {
 /// Bên nhận event `comments.comment_published`: mail báo trả lời.
 pub(crate) struct ReplyNotifier(pub Arc<CommentsService>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EventHandler for ReplyNotifier {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         if event.name != CommentPublished::NAME {
@@ -165,41 +164,39 @@ impl CommentsService {
             return Err(link_invalid());
         };
         let tenant = &resolved;
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         let Some(consumed) = self.tokens.consume(&transaction, tenant, VERIFY, raw).await? else {
             transaction.rollback().await?;
             return Err(link_invalid());
         };
         let id: Uuid = consumed.subject.parse().map_err(Error::internal)?;
         let email = consumed.data.unwrap_or_default();
-        let found = comment::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?;
+        let found =
+            transaction.find::<comment::Model>().filter(comment::Model::ID.eq(id)).one().await?;
         let Some(found) = found.filter(|row| row.author_email.as_deref() == Some(email.as_str()))
         else {
             // Bình luận đã bị xoá hay email đã bị xoá: token hết tác dụng.
             transaction.commit().await?;
             return Err(link_invalid());
         };
-        let mut row = found.into_active_model();
-        row.email_verified = Set(true);
-        comment::Entity::update(row).validate()?.scoped(tenant).exec(&transaction).await?;
-        let follow = subscription::ActiveModel {
-            id: Set(Uuid::now_v7()),
-            tenant_id: Set(tenant.id().as_uuid()),
-            comment_id: Set(id),
-            email: Set(email),
-            created_at: Set(now()),
+        let mut row = found;
+        row.email_verified = true;
+        crate::posting::authoring::save_comment(&transaction, &row).await?;
+        let follow = subscription::Model {
+            id: Uuid::now_v7(),
+            tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
+            comment_id: id,
+            email: email,
+            created_at: now(),
         };
-        subscription::Entity::insert(follow)
-            .on_conflict(
-                OnConflict::columns([
-                    subscription::Column::TenantId,
-                    subscription::Column::CommentId,
-                    subscription::Column::Email,
-                ])
-                .do_nothing()
-                .to_owned(),
-            )
-            .exec_without_returning(&transaction)
+        transaction
+            .insert(follow)
+            .on_conflict_do_nothing([
+                subscription::Model::TENANT_ID.key(),
+                subscription::Model::COMMENT_ID.key(),
+                subscription::Model::EMAIL.key(),
+            ])
+            .exec()
             .await?;
         transaction.commit().await?;
         tracing::info!(comment_id = %id, "reply mails confirmed");
@@ -220,29 +217,28 @@ impl CommentsService {
             return Ok(0);
         };
         let tenant = &resolved;
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         let Some(consumed) = self.tokens.consume(&transaction, tenant, UNSUBSCRIBE, raw).await?
         else {
             transaction.rollback().await?;
             return Ok(0);
         };
         let id: Uuid = consumed.subject.parse().map_err(Error::internal)?;
-        let Some(found) =
-            subscription::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
+        let Some(found) = transaction
+            .find::<subscription::Model>()
+            .filter(subscription::Model::ID.eq(id))
+            .one()
+            .await?
         else {
             transaction.commit().await?;
             return Ok(0);
         };
-        let delete = if all {
-            subscription::Entity::delete_many()
-                .scoped(tenant)
-                .filter(subscription::Column::Email.eq(found.email.as_str()))
+        let condition = if all {
+            subscription::Model::EMAIL.eq(found.email.clone())
         } else {
-            subscription::Entity::delete_many()
-                .scoped(tenant)
-                .filter(subscription::Column::Id.eq(id))
+            subscription::Model::ID.eq(id)
         };
-        let deleted = delete.exec(&transaction).await?.rows_affected;
+        let deleted = transaction.delete::<subscription::Model>().filter(condition).exec().await?;
         transaction.commit().await?;
         Ok(deleted)
     }
@@ -272,17 +268,22 @@ impl CommentsService {
         if Status::of(&reply) != Status::Published {
             return Ok(0);
         }
-        let followers = subscription::Entity::find()
-            .scoped(tenant)
-            .filter(subscription::Column::CommentId.eq(followed_id))
-            .all(tenant.database().read())
+        let followers = tenant
+            .db()
+            .read()
+            .find::<subscription::Model>()
+            .filter(subscription::Model::COMMENT_ID.eq(followed_id))
+            .all()
             .await?;
         if followers.is_empty() {
             return Ok(0);
         }
-        let followed = comment::Entity::find_by_id(followed_id)
-            .scoped(tenant)
-            .one(tenant.database().read())
+        let followed = tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::ID.eq(followed_id))
+            .one()
             .await?;
         let language = language(followed.as_ref().and_then(|row| row.locale.as_deref()));
         let resource = self.resource_of(tenant, &reply).await?;
@@ -297,17 +298,20 @@ impl CommentsService {
             if reply.author_email.as_deref() == Some(follower.email.as_str()) {
                 continue;
             }
+            // Một transaction ngắn cho mỗi token (không gọi mạng bên trong; gửi mail ở dưới, sau khi ghi).
+            let transaction = tenant.db().begin_write().await?;
             let issued = self
                 .tokens
                 .issue(
-                    tenant.database().write(),
+                    &transaction,
                     tenant,
                     UNSUBSCRIBE,
                     &follower.id.to_string(),
                     None,
-                    SignedDuration::from_hours(24 * UNSUBSCRIBE_DAYS),
+                    Duration::from_days(UNSUBSCRIBE_DAYS),
                 )
                 .await?;
+            transaction.commit().await?;
             let unsubscribe =
                 unsubscribe_url.replace("{token}", &link_token(tenant, &issued.token));
             let params = [

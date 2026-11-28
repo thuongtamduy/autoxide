@@ -9,8 +9,8 @@
 //!   thẻ cố định — không có đường nào cho HTML của người viết đi qua.
 
 use autoxide_kernel::error::FieldError;
+use autoxide_kernel::http::Schema;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 /// Giá trị `rel` của mọi link trong bình luận (Google khuyên `ugc` cho nội dung người dùng).
 pub(crate) const LINK_REL: &str = "nofollow ugc noopener";
@@ -247,7 +247,7 @@ fn push_plain(html: &mut String, text: &str, links: &mut usize) {
 
 /// How the body of a comment is written: `text` (plain text; addresses become links) or
 /// `markdown` (a small part of Markdown: bold, italics, links, quotes, code).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Format {
     #[default]

@@ -8,16 +8,14 @@
 //! `first_time` khi chưa có bình luận nào đang hiện) sẽ giữ một bình luận mới, thì về chờ duyệt.
 
 use autoxide_kernel::access::Principal;
+use autoxide_kernel::db::{Queries as _, TenantTx};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::secret::sha256;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Duration;
 use autoxide_kernel::time::Timestamp;
 use autoxide_kernel::tokens::OneTimeTokens;
-use jiff::SignedDuration;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
-};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -100,7 +98,7 @@ impl CommentsService {
         }
         let now = now();
         let minutes = i64::from(self.config.edit_minutes);
-        if minutes == 0 || before.created_at + SignedDuration::from_mins(minutes) < now {
+        if minutes == 0 || before.created_at + Duration::from_mins(minutes) < now {
             return Err(edit_window_passed());
         }
         let mut problems = Vec::new();
@@ -148,27 +146,27 @@ impl CommentsService {
         };
         let to = if hold.is_some() { Status::Pending } else { from };
 
-        let mut row = before.clone().into_active_model();
-        row.search_key = Set(autoxide_kernel::search::fold(&format!(
+        let mut row = before.clone();
+        row.search_key = autoxide_kernel::search::fold(&format!(
             "{body} {}",
             before.author_name.as_deref().unwrap_or_default()
-        )));
-        row.match_key = Set(autoxide_kernel::search::exact_key(&format!(
+        ));
+        row.match_key = autoxide_kernel::search::exact_key(&format!(
             "{body} {}",
             before.author_name.as_deref().unwrap_or_default()
-        )));
-        row.content_hash = Set(autoxide_kernel::antispam::content_hash(&body));
-        row.body = Set(body);
-        row.format = Set(format.as_str().to_owned());
-        row.edited_at = Set(Some(now));
-        row.updated_at = Set(now);
+        ));
+        row.content_hash = autoxide_kernel::antispam::content_hash(&body);
+        row.body = body;
+        row.format = format.as_str().to_owned();
+        row.edited_at = Some(now);
+        row.updated_at = now;
         if to != from {
-            row.status = Set(to.as_str().to_owned());
-            row.hold_reason = Set(hold);
+            row.status = to.as_str().to_owned();
+            row.hold_reason = hold;
         }
-        let transaction = tenant.database().begin_write().await?;
-        let after = update_if_unchanged(&transaction, tenant, row, &before).await?;
-        shift_counts(&transaction, tenant, &after, Some(from), Some(to)).await?;
+        let transaction = tenant.db().begin_write().await?;
+        let after = update_if_unchanged(&transaction, row, &before).await?;
+        shift_counts(&transaction, &after, Some(from), Some(to)).await?;
         let actor = principal.map_or_else(Actor::public, Actor::from);
         let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
         self.outbox
@@ -198,8 +196,13 @@ impl CommentsService {
         id: Uuid,
         edit_token: Option<&str>,
     ) -> Result<(), Error> {
-        let Some(before) =
-            comment::Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?
+        let Some(before) = tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::ID.eq(id))
+            .one()
+            .await?
         else {
             return Ok(());
         };
@@ -207,7 +210,7 @@ impl CommentsService {
         if Status::of(&before) == Status::Deleted {
             return Ok(());
         }
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         let actor = principal.map_or_else(Actor::public, Actor::from);
         soft_delete(
             &self.tokens,
@@ -229,9 +232,12 @@ impl CommentsService {
         principal: &Principal,
     ) -> Result<Option<Profile>, Error> {
         principal.require(&COMMENTS_POST)?;
-        Ok(profile::Entity::find_by_id((tenant.id().as_uuid(), principal.user_id()))
-            .scoped(tenant)
-            .one(tenant.database().read())
+        Ok(tenant
+            .db()
+            .read()
+            .find::<profile::Model>()
+            .filter(profile::Model::USER_ID.eq(principal.user_id()))
+            .one()
             .await?
             .map(|row| Profile {
                 user_id: row.user_id,
@@ -266,64 +272,120 @@ impl CommentsService {
         }
         let now = now();
         let key = text::name_key(&name);
-        let existing = profile::Entity::find_by_id((tenant.id().as_uuid(), principal.user_id()))
-            .scoped(tenant)
-            .one(tenant.database().read())
+        let transaction = tenant.db().begin_write().await?;
+        let existing = transaction
+            .find::<profile::Model>()
+            .filter(profile::Model::USER_ID.eq(principal.user_id()))
+            .one()
             .await?;
-        let saved = match existing {
-            Some(existing) => {
-                let mut row = existing.into_active_model();
-                row.display_name = Set(name);
-                row.name_key = Set(key);
-                row.updated_at = Set(now);
-                match profile::Entity::update(row).validate() {
-                    Ok(update) => update.scoped(tenant).exec(tenant.database().write()).await,
-                    Err(error) => Err(error),
-                }
-            }
-            None => {
-                profile::ActiveModel {
-                    tenant_id: Set(tenant.id().as_uuid()),
-                    user_id: Set(principal.user_id()),
-                    display_name: Set(name),
-                    name_key: Set(key),
-                    created_at: Set(now),
-                    updated_at: Set(now),
-                }
-                .insert(tenant.database().write())
+        let (row, is_new) = match existing {
+            Some(existing) => (
+                profile::Model { display_name: name, name_key: key, updated_at: now, ..existing },
+                false,
+            ),
+            None => (
+                profile::Model {
+                    tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
+                    user_id: principal.user_id(),
+                    display_name: name,
+                    name_key: key,
+                    created_at: now,
+                    updated_at: now,
+                },
+                true,
+            ),
+        };
+        let saved = if is_new {
+            transaction.insert(row.clone()).exec().await
+        } else {
+            transaction
+                .update::<profile::Model>()
+                .set(profile::Model::DISPLAY_NAME, row.display_name.clone())
+                .set(profile::Model::NAME_KEY, row.name_key.clone())
+                .set(profile::Model::UPDATED_AT, row.updated_at)
+                .filter(profile::Model::USER_ID.eq(row.user_id))
+                .exec()
                 .await
-            }
         };
         match saved {
-            Ok(row) => Ok(Profile {
-                user_id: row.user_id,
-                display_name: row.display_name,
-                updated_at: row.updated_at,
-            }),
+            Ok(_) => {
+                transaction.commit().await?;
+                Ok(Profile {
+                    user_id: row.user_id,
+                    display_name: row.display_name,
+                    updated_at: row.updated_at,
+                })
+            }
             Err(error) if is_unique_violation(&error) => Err(name_taken()),
-            Err(error) => Err(error.into()),
+            Err(error) => Err(error),
         }
     }
 }
 
-/// Ghi `row` khi bình luận còn đúng trạng thái và phiên bản của `before` (không thì 412: ai đó
-/// vừa đổi nó).
-pub(crate) async fn update_if_unchanged<C: ConnectionTrait>(
-    connection: &C,
-    tenant: &TenantContext,
-    row: comment::ActiveModel,
+/// Câu `UPDATE` ghi mọi cột của bình luận `row` trừ khoá (cột không đổi được ghi lại đúng giá trị cũ), lọc theo
+/// `id`; bên gọi thêm điều kiện nếu cần.
+fn write_comment<'t>(
+    transaction: &'t TenantTx,
+    row: &comment::Model,
+) -> autoxide_kernel::db::Update<'t, autoxide_kernel::db::InTenant, comment::Model> {
+    use comment::Model as M;
+    transaction
+        .update::<M>()
+        .set(M::TARGET_TYPE, row.target_type.clone())
+        .set(M::TARGET_ID, row.target_id.clone())
+        .set(M::ROOT_ID, row.root_id.clone())
+        .set(M::PARENT_ID, row.parent_id.clone())
+        .set(M::REPLY_TO_ID, row.reply_to_id.clone())
+        .set(M::DEPTH, row.depth.clone())
+        .set(M::AUTHOR_KIND, row.author_kind.clone())
+        .set(M::USER_ID, row.user_id.clone())
+        .set(M::AUTHOR_NAME, row.author_name.clone())
+        .set(M::AUTHOR_EMAIL, row.author_email.clone())
+        .set(M::EMAIL_VERIFIED, row.email_verified.clone())
+        .set(M::BODY, row.body.clone())
+        .set(M::FORMAT, row.format.clone())
+        .set(M::STATUS, row.status.clone())
+        .set(M::HOLD_REASON, row.hold_reason.clone())
+        .set(M::EDIT_TOKEN_HASH, row.edit_token_hash.clone())
+        .set(M::EDITED_AT, row.edited_at.clone())
+        .set(M::PUBLISHED_AT, row.published_at.clone())
+        .set(M::IP_FINGERPRINT, row.ip_fingerprint.clone())
+        .set(M::LOCALE, row.locale.clone())
+        .set(M::CONTENT_HASH, row.content_hash.clone())
+        .set(M::SEARCH_KEY, row.search_key.clone())
+        .set(M::MATCH_KEY, row.match_key.clone())
+        .set(M::BADGES, row.badges.clone())
+        .set(M::REPLY_COUNT, row.reply_count.clone())
+        .set(M::REPORT_COUNT, row.report_count.clone())
+        .set(M::REPORTS_HELD_AT, row.reports_held_at.clone())
+        .set(M::RESTRICTED_STATUS, row.restricted_status.clone())
+        .set(M::CREATED_AT, row.created_at.clone())
+        .set(M::UPDATED_AT, row.updated_at.clone())
+        .filter(M::ID.eq(row.id))
+}
+
+/// Ghi bình luận `row` (đã sửa) theo `id`.
+pub(crate) async fn save_comment(
+    transaction: &TenantTx,
+    row: &comment::Model,
+) -> Result<(), Error> {
+    write_comment(transaction, row).exec().await?;
+    Ok(())
+}
+
+/// Ghi `row` (bình luận sau khi sửa) khi bình luận còn đúng trạng thái và phiên bản của `before` (không thì
+/// 412: ai đó vừa đổi nó).
+pub(crate) async fn update_if_unchanged(
+    transaction: &TenantTx,
+    row: comment::Model,
     before: &comment::Model,
 ) -> Result<comment::Model, Error> {
-    let update = comment::Entity::update(row)
-        .validate()?
-        .scoped(tenant)
-        .filter(comment::Column::Status.eq(before.status.as_str()))
-        .filter(comment::Column::UpdatedAt.eq(before.updated_at));
-    match update.exec(connection).await {
-        Ok(after) => Ok(after),
-        Err(sea_orm::DbErr::RecordNotUpdated) => Err(autoxide_kernel::version::changed()),
-        Err(error) => Err(error.into()),
-    }
+    let updated = write_comment(transaction, &row)
+        .filter(comment::Model::STATUS.eq(before.status.clone()))
+        .filter(comment::Model::UPDATED_AT.eq(before.updated_at))
+        .returning()
+        .await?;
+    updated.into_iter().next().ok_or_else(autoxide_kernel::version::changed)
 }
 
 /// Ai xoá mềm, và xoá tới đâu.
@@ -340,38 +402,37 @@ pub(crate) enum Deletion {
 /// Xoá mềm `before` trong `connection`: bỏ chữ, tên, email, token sửa; giữ chỗ trong luồng; bỏ
 /// theo dõi trả lời và token của nó; số đếm. Event `comments.comment_deleted` (xoá bởi tác giả) ghi
 /// qua `outbox`; `None` chỉ khi module đang tắt (chế độ nghỉ, bước 70 P9 — chỉ xoá dữ liệu cá nhân).
-pub(crate) async fn soft_delete<C: ConnectionTrait>(
+pub(crate) async fn soft_delete(
     tokens: &OneTimeTokens,
     outbox: Option<&Outbox>,
-    connection: &C,
+    connection: &TenantTx,
     tenant: &TenantContext,
     before: &comment::Model,
     how: Deletion,
 ) -> Result<comment::Model, Error> {
     let now = now();
-    let mut row = before.clone().into_active_model();
-    row.status = Set(Status::Deleted.as_str().to_owned());
-    row.body = Set(String::new());
-    row.author_name = Set(None);
-    row.author_email = Set(None);
-    row.email_verified = Set(false);
-    row.edit_token_hash = Set(None);
-    row.hold_reason = Set(None);
-    row.search_key = Set(String::new());
-    row.match_key = Set(String::new());
-    row.content_hash = Set(autoxide_kernel::antispam::content_hash(""));
-    row.updated_at = Set(now);
+    let mut row = before.clone();
+    row.status = Status::Deleted.as_str().to_owned();
+    row.body = String::new();
+    row.author_name = None;
+    row.author_email = None;
+    row.email_verified = false;
+    row.edit_token_hash = None;
+    row.hold_reason = None;
+    row.search_key = String::new();
+    row.match_key = String::new();
+    row.content_hash = autoxide_kernel::antispam::content_hash("");
+    row.updated_at = now;
     if matches!(how, Deletion::Erased) {
-        row.user_id = Set(None);
-        row.ip_fingerprint = Set(None);
+        row.user_id = None;
+        row.ip_fingerprint = None;
     }
-    let after = update_if_unchanged(connection, tenant, row, before).await?;
-    shift_counts(connection, tenant, &after, Some(Status::of(before)), Some(Status::Deleted))
-        .await?;
-    subscription::Entity::delete_many()
-        .filter(subscription::Column::CommentId.eq(before.id))
-        .scoped(tenant)
-        .exec(connection)
+    let after = update_if_unchanged(connection, row, before).await?;
+    shift_counts(connection, &after, Some(Status::of(before)), Some(Status::Deleted)).await?;
+    connection
+        .delete::<subscription::Model>()
+        .filter(subscription::Model::COMMENT_ID.eq(before.id))
+        .exec()
         .await?;
     tokens.forget(connection, tenant, &before.id.to_string()).await?;
     if let (Deletion::ByAuthor(actor), Some(outbox)) = (how, outbox) {

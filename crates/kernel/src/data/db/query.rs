@@ -10,9 +10,12 @@ use super::record::{
     Col, Cond, On, Record, Scope as _, Selection, SubOrigin, Subs, count, foreign_sub,
     global_check, global_refused, table, tenant_filter,
 };
-use super::value::{DbValue, FromRow, Row, SortKey};
+use super::value::{DbValue, FromRow, Row, SortKey, UuidKey};
 use crate::error::Error;
 use crate::pagination::{Order, Page, PageRequest, Pagination, SortValue};
+
+/// The "column" name in the cursor of [`Find::page_tiers`] (the same as the old `fetch_page_tiers`).
+const TIER: &str = "tier";
 
 /// Query entry points, on every handle (`use autoxide_kernel::db::Queries as _;`).
 pub trait Queries: Handle + Sized {
@@ -216,6 +219,19 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
     where
         R: HasId,
     {
+        self.page_keyed(id, HasId::id, request).await
+    }
+
+    /// Like [`page`](Self::page), keyed by another UUIDv7 column than `id` (e.g. a table whose primary key is
+    /// composite and has a `uid` column for the cursor): `key_of` reads that column from a row. The column may be
+    /// declared nullable (`Option<Uuid>`, a column added to an existing table and filled by a migration) but must
+    /// be filled on every row: the two databases place `NULL` differently.
+    pub async fn page_keyed<K: UuidKey>(
+        self,
+        key: Col<R, K>,
+        key_of: impl Fn(&R) -> Uuid,
+        request: &PageRequest,
+    ) -> Result<Page<R>, Error> {
         if let Some(error) = self.error {
             return Err(error);
         }
@@ -224,24 +240,25 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
         match (request.id_cursor()?, request.order()) {
             (None, _) => {}
             (Some(cursor), Order::Asc) => {
-                statement.cond_where(id.gt(cursor).inner);
+                statement.cond_where(key.gt(K::from_uuid(cursor)).inner);
             }
             (Some(cursor), Order::Desc) => {
-                statement.cond_where(id.lt(cursor).inner);
+                statement.cond_where(key.lt(K::from_uuid(cursor)).inner);
             }
         }
         let direction = match request.order() {
             Order::Asc => sea_query::Order::Asc,
             Order::Desc => sea_query::Order::Desc,
         };
-        statement.order_by_expr(id.sq(), direction);
+        statement.order_by_expr(key.sq(), direction);
         // Lấy dư MỘT dòng để biết còn trang sau mà không cần câu đếm.
         statement.limit(u64::from(request.limit()) + 1);
         let mut rows = read_rows(self.handle, &statement, self.within, R::read).await?;
         let limit = request.limit() as usize;
         let has_more = rows.len() > limit;
         rows.truncate(limit);
-        let next_cursor = if has_more { rows.last().map(|row| row.id().to_string()) } else { None };
+        let next_cursor =
+            if has_more { rows.last().map(|row| key_of(row).to_string()) } else { None };
         Ok(Page {
             data: rows,
             pagination: Pagination::new(request.limit(), next_cursor).with_total(total),
@@ -330,6 +347,97 @@ impl<'h, H: Handle, R: Record> Find<'h, H, R> {
         };
         Ok(Page {
             data: rows,
+            pagination: Pagination::new(request.limit(), next_cursor).with_total(total),
+        })
+    }
+
+    /// Like [`page`](Self::page), but splits rows into ranked tiers: every row matching `tiers[0]` comes first,
+    /// then the rows matching `tiers[1]` (and no earlier tier)…; within a tier rows are ordered by ID. A row
+    /// matching no tier is left out. For search where "exact accent match ranks before accent-insensitive match"
+    /// (D-202): the rank depends on what the user typed, so it cannot be a column. Same cursor as the old
+    /// `fetch_page_tiers` (the tier and the last ID); a page runs at most `tiers.len()` queries.
+    pub async fn page_tiers(
+        mut self,
+        tiers: &[Cond<R>],
+        id: Col<R, Uuid>,
+        request: &PageRequest,
+    ) -> Result<Page<R>, Error>
+    where
+        R: HasId,
+    {
+        for tier in tiers {
+            self.check(&tier.subs);
+        }
+        if let Some(error) = self.error.take() {
+            return Err(error);
+        }
+        let in_range = |value: &SortValue| match value {
+            SortValue::Integer(tier) => usize::try_from(*tier).is_ok_and(|tier| tier < tiers.len()),
+            _ => false,
+        };
+        let (start, after) = match request.key_after(TIER, in_range)? {
+            None => (0, None),
+            Some((SortValue::Integer(tier), after)) => {
+                (usize::try_from(tier).unwrap_or_default(), Some(after))
+            }
+            Some(_) => {
+                return Err(Error::internal("tier cursor checked a moment ago no longer fits"));
+            }
+        };
+        let total = if request.wants_total() {
+            let mut counted = self.statement.clone();
+            counted.cond_where(
+                tiers
+                    .iter()
+                    .fold(sea_query::Condition::any(), |any, tier| any.add(tier.inner.clone())),
+            );
+            counted.clear_selects();
+            counted.expr(sea_query::Expr::cust("COUNT(*)"));
+            let rows = read_rows(self.handle, &counted, self.within, <(i64,)>::from_row).await?;
+            Some(rows.first().map_or(0, |(n,)| u64::try_from(*n).unwrap_or_default()))
+        } else {
+            None
+        };
+        let direction = match request.order() {
+            Order::Asc => sea_query::Order::Asc,
+            Order::Desc => sea_query::Order::Desc,
+        };
+        let wanted = request.limit() as usize + 1;
+        let mut rows: Vec<(usize, R)> = Vec::new();
+        for (index, tier) in tiers.iter().enumerate().skip(start) {
+            let mut condition = sea_query::Condition::all().add(tier.inner.clone());
+            for earlier in &tiers[..index] {
+                condition = condition.add(earlier.inner.clone().not());
+            }
+            let mut statement = self.statement.clone();
+            statement.cond_where(condition);
+            if let (true, Some(after)) = (index == start, after) {
+                let past = match request.order() {
+                    Order::Asc => id.gt(after),
+                    Order::Desc => id.lt(after),
+                };
+                statement.cond_where(past.inner);
+            }
+            statement.order_by_expr(id.sq(), direction.clone());
+            statement.limit((wanted - rows.len()) as u64);
+            let found = read_rows(self.handle, &statement, self.within, R::read).await?;
+            rows.extend(found.into_iter().map(|row| (index, row)));
+            if rows.len() >= wanted {
+                break;
+            }
+        }
+        let has_more = rows.len() >= wanted;
+        rows.truncate(request.limit() as usize);
+        let next_cursor = match (has_more, rows.last()) {
+            (true, Some((tier, row))) => Some(crate::pagination::key_cursor(
+                TIER,
+                SortValue::Integer(i64::try_from(*tier).unwrap_or_default()),
+                row.id(),
+            )),
+            _ => None,
+        };
+        Ok(Page {
+            data: rows.into_iter().map(|(_, row)| row).collect(),
             pagination: Pagination::new(request.limit(), next_cursor).with_total(total),
         })
     }

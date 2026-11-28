@@ -7,6 +7,7 @@
 //! `Removed` → đóng và ẩn. `comments` không viết cứng tên event của module nào. Số đếm nằm ở
 //! `comments_targets`, đếm theo lô tối đa 100 đích.
 
+use autoxide_kernel::db::{Cond, Queries as _};
 use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,8 +16,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::resource::{Resource, ResourceChange, ResourceEvent};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 use crate::entity::target;
@@ -164,10 +164,7 @@ impl CommentsService {
     ) -> Result<Target, Error> {
         self.check_target(kind, id)?;
         let row =
-            target::Entity::find_by_id((tenant.id().as_uuid(), kind.to_owned(), id.to_owned()))
-                .scoped(tenant)
-                .one(tenant.database().read())
-                .await?;
+            tenant.db().read().find::<target::Model>().filter(target_key(kind, id)).one().await?;
         Ok(row.map_or_else(|| Target::blank(kind, id), Target::from_row))
     }
 
@@ -193,34 +190,30 @@ impl CommentsService {
         page: &autoxide_kernel::pagination::PageRequest,
     ) -> Result<autoxide_kernel::pagination::Page<Target>, Error> {
         principal.require(&COMMENTS_READ)?;
-        let mut select = target::Entity::find().scoped(tenant);
+        let read = tenant.db().read();
+        let mut select = read.find::<target::Model>();
         if let Some(kind) = filter.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty()) {
-            select = select.filter(target::Column::TargetType.eq(kind));
+            select = select.filter(target::Model::TARGET_TYPE.eq(kind.to_owned()));
         }
         if let Some(state) = filter.state.as_deref() {
             // Cùng luật với `Target::is_open`: mở, không ẩn, chưa tới hạn tự đóng.
-            let open = sea_orm::Condition::all()
-                .add(target::Column::State.eq("open"))
-                .add(target::Column::Hidden.eq(false))
-                .add(
-                    sea_orm::Condition::any()
-                        .add(target::Column::ClosesAt.is_null())
-                        .add(target::Column::ClosesAt.gt(now())),
+            let open = Cond::all()
+                .with(target::Model::STATE.eq("open".to_owned()))
+                .with(target::Model::HIDDEN.eq(false))
+                .with(
+                    Cond::any()
+                        .with(target::Model::CLOSES_AT.is_null())
+                        .with(target::Model::CLOSES_AT.gt(Some(now()))),
                 );
-            select = select.filter(if state == "open" { open } else { open.not() });
+            select = select.filter(if state == "open" { open } else { !open });
         }
         if let Some(pending) = filter.pending {
-            let column = target::Column::PendingCount;
+            let column = target::Model::PENDING_COUNT;
             select = select.filter(if pending { column.gt(0) } else { column.eq(0) });
         }
-        let found = autoxide_kernel::pagination::fetch_page(
-            select,
-            target::Column::Uid,
-            |row| row.uid,
-            page,
-            tenant.database().read(),
-        )
-        .await?;
+        // Khoá chính là (khách, loại, mã): con trỏ theo `uid` (UUIDv7 cấp khi tạo, D-270).
+        let found =
+            select.page_keyed(target::Model::UID, |row| row.uid.unwrap_or_default(), page).await?;
         Ok(found.map(Target::from_row))
     }
 
@@ -274,11 +267,13 @@ impl CommentsService {
         for id in ids {
             self.check_target(kind, id)?;
         }
-        let found: HashMap<String, (i32, i32)> = target::Entity::find()
-            .scoped(tenant)
-            .filter(target::Column::TargetType.eq(kind))
-            .filter(target::Column::TargetId.is_in(ids.to_vec()))
-            .all(tenant.database().read())
+        let found: HashMap<String, (i32, i32)> = tenant
+            .db()
+            .read()
+            .find::<target::Model>()
+            .filter(target::Model::TARGET_TYPE.eq(kind.to_owned()))
+            .filter(target::Model::TARGET_ID.is_in(ids.to_vec()))
+            .all()
             .await?
             .into_iter()
             .map(|row| {
@@ -335,10 +330,9 @@ impl CommentsService {
         expected: Option<Timestamp>,
     ) -> Result<Target, Error> {
         let now = now();
-        let transaction = tenant.database().begin_write().await?;
-        let key = (tenant.id().as_uuid(), kind.to_owned(), id.to_owned());
+        let transaction = tenant.db().begin_write().await?;
         let existing =
-            target::Entity::find_by_id(key.clone()).scoped(tenant).one(&transaction).await?;
+            transaction.find::<target::Model>().filter(target_key(kind, id)).one().await?;
         // Chưa có dòng thì phiên bản đã đọc phải là "chưa có" (`If-Match: *` hay không gửi).
         if let Some(expected) = expected
             && existing.as_ref().is_none_or(|row| row.updated_at != expected)
@@ -351,19 +345,20 @@ impl CommentsService {
         // Khoá dòng đích rồi mới tính trạng thái mới (D-181): hai lần đổi cùng lúc (quản trị ẩn
         // đích, module chủ đổi hạn đóng) nối đuôi nhau trên Postgres — bên sau thấy `hidden` bên
         // trước vừa ghi, không ghi đè lệnh ẩn bằng giá trị cũ, không phát `TargetClosed` hai lần.
-        let before = autoxide_kernel::rows::lock_one(
-            &transaction,
-            target::Entity::find_by_id(key).scoped(tenant),
-        )
-        .await?
-        .ok_or_else(|| Error::internal("target row missing after insert"))?;
+        let before = transaction
+            .find::<target::Model>()
+            .for_update()
+            .filter(target_key(kind, id))
+            .one()
+            .await?
+            .ok_or_else(|| Error::internal("target row missing after insert"))?;
         // Phiên bản người gọi đã đọc: kiểm lại trên dòng đã khoá (bản đọc ở trên chưa khoá).
         if let (Some(expected), Some(_)) = (expected, &existing)
             && before.updated_at != expected
         {
             return Err(autoxide_kernel::version::changed());
         }
-        let mut row = before.clone().into_active_model();
+        let mut row = before.clone();
         let mut hidden = before.hidden;
         let mut state = before.state.clone();
         if let Some(value) = change.hidden {
@@ -376,14 +371,24 @@ impl CommentsService {
         if let Some(value) = change.state {
             state = value;
         }
-        row.state = Set(state);
-        row.hidden = Set(hidden);
+        row.state = state;
+        row.hidden = hidden;
         if let Some(closes_at) = change.closes_at {
-            row.closes_at = Set(closes_at);
+            row.closes_at = closes_at;
         }
-        row.updated_at = Set(now);
-        let after =
-            target::Entity::update(row).validate()?.scoped(tenant).exec(&transaction).await?;
+        row.updated_at = now;
+        let after = transaction
+            .update::<target::Model>()
+            .set(target::Model::STATE, row.state.clone())
+            .set(target::Model::HIDDEN, row.hidden)
+            .set(target::Model::CLOSES_AT, row.closes_at)
+            .set(target::Model::UPDATED_AT, row.updated_at)
+            .filter(target_key(kind, id))
+            .returning()
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| Error::internal("target row missing after update"))?;
         let (old, new) = (Target::from_row(before), Target::from_row(after));
         let snapshot = |target: &Target| {
             json!({
@@ -431,7 +436,7 @@ pub(crate) struct OwnerEvents {
     pub events: Vec<ResourceEvent>,
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EventHandler for OwnerEvents {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let Some(declared) = self.events.iter().find(|declared| declared.event == event.name)
@@ -469,4 +474,11 @@ impl EventHandler for OwnerEvents {
         );
         Ok(())
     }
+}
+
+/// Điều kiện "đúng đích (`kind`, `id`)": khoá chính (cùng khách — handle tự lọc).
+pub(crate) fn target_key(kind: &str, id: &str) -> Cond<target::Model> {
+    Cond::all()
+        .with(target::Model::TARGET_TYPE.eq(kind.to_owned()))
+        .with(target::Model::TARGET_ID.eq(id.to_owned()))
 }

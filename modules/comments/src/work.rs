@@ -2,11 +2,11 @@
 //! chối hay đánh dấu spam thì việc tự hết. Câu đếm dùng index `(tenant_id, status, id)`.
 
 use autoxide_kernel::access::{OrgTarget, Permission, Principal};
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::pagination::{Order, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::pagination::{Order, PageRequest};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::work::{Severity, WorkItem, WorkSource};
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
 use crate::entity::comment;
 use crate::permissions::COMMENTS_MODERATE;
@@ -14,7 +14,7 @@ use crate::permissions::COMMENTS_MODERATE;
 /// `comments.pending`: bình luận chờ duyệt.
 pub(crate) struct Pending;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl WorkSource for Pending {
     fn id(&self) -> &'static str {
         "comments.pending"
@@ -30,11 +30,14 @@ impl WorkSource for Pending {
         _: &Principal,
         _: OrgTarget,
     ) -> Result<u64, Error> {
-        Ok(comment::Entity::find()
-            .scoped(tenant)
-            .filter(comment::Column::Status.eq("pending"))
-            .count(tenant.database().read())
-            .await?)
+        let count = tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::STATUS.eq("pending".to_owned()))
+            .count()
+            .await?;
+        Ok(u64::try_from(count).unwrap_or_default())
     }
 
     async fn items(
@@ -46,12 +49,14 @@ impl WorkSource for Pending {
     ) -> Result<Vec<WorkItem>, Error> {
         // Cũ nhất trước: người viết chờ lâu nhất.
         let page = PageRequest::first(u32::from(limit), Order::Asc);
-        let select =
-            comment::Entity::find().scoped(tenant).filter(comment::Column::Status.eq("pending"));
-        let rows =
-            fetch_page(select, comment::Column::Id, |row| row.id, &page, tenant.database().read())
-                .await?
-                .data;
+        let rows = tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::STATUS.eq("pending".to_owned()))
+            .page(comment::Model::ID, &page)
+            .await?
+            .data;
         Ok(rows
             .into_iter()
             .map(|row| {
@@ -78,7 +83,7 @@ impl WorkSource for Pending {
 }
 
 /// Cùng câu đếm, làm số liệu tóm tắt (bước 51 P4).
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl autoxide_kernel::summary::SummaryMetric for Pending {
     fn info(&self) -> autoxide_kernel::summary::MetricInfo {
         autoxide_kernel::summary::MetricInfo::new(

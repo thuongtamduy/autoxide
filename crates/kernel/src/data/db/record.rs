@@ -376,34 +376,41 @@ impl<R: Record, T: DbValue> From<Col<R, T>> for Expr<R, T> {
 }
 
 // Phép toán trên số nguyên của cột (`a - b`, `-a`): cài các trait `std::ops` như cài toán tử trong TypeScript
-// không làm được — Rust cho định nghĩa `+`, `-` cho kiểu của mình.
-impl<R: Record> std::ops::Add for Expr<R, i64> {
-    type Output = Expr<R, i64>;
-    fn add(self, other: Self) -> Self {
-        Expr::join(self.inner.add(other.inner), self.subs, other.subs)
-    }
+// không làm được — Rust cho định nghĩa `+`, `-` cho kiểu của mình. `macro_rules!`: cùng một khối cho `i64` và `i32`
+// (cột đếm `INTEGER` đọc ra `i32`; Postgres không cho đọc `int4` thành `i64`).
+macro_rules! integer_ops {
+    ($($ty:ty),*) => {$(
+        impl<R: Record> std::ops::Add for Expr<R, $ty> {
+            type Output = Expr<R, $ty>;
+            fn add(self, other: Self) -> Self {
+                Expr::join(self.inner.add(other.inner), self.subs, other.subs)
+            }
+        }
+
+        impl<R: Record> std::ops::Sub for Expr<R, $ty> {
+            type Output = Expr<R, $ty>;
+            fn sub(self, other: Self) -> Self {
+                Expr::join(self.inner.sub(other.inner), self.subs, other.subs)
+            }
+        }
+
+        impl<R: Record> std::ops::Mul for Expr<R, $ty> {
+            type Output = Expr<R, $ty>;
+            fn mul(self, other: Self) -> Self {
+                Expr::join(self.inner.mul(other.inner), self.subs, other.subs)
+            }
+        }
+
+        impl<R: Record> std::ops::Neg for Expr<R, $ty> {
+            type Output = Expr<R, $ty>;
+            fn neg(self) -> Self {
+                Expr::join(sea_query::Expr::val(<$ty>::default()).sub(self.inner), self.subs, Vec::new())
+            }
+        }
+    )*};
 }
 
-impl<R: Record> std::ops::Sub for Expr<R, i64> {
-    type Output = Expr<R, i64>;
-    fn sub(self, other: Self) -> Self {
-        Expr::join(self.inner.sub(other.inner), self.subs, other.subs)
-    }
-}
-
-impl<R: Record> std::ops::Mul for Expr<R, i64> {
-    type Output = Expr<R, i64>;
-    fn mul(self, other: Self) -> Self {
-        Expr::join(self.inner.mul(other.inner), self.subs, other.subs)
-    }
-}
-
-impl<R: Record> std::ops::Neg for Expr<R, i64> {
-    type Output = Expr<R, i64>;
-    fn neg(self) -> Self {
-        Expr::join(sea_query::Expr::val(0_i64).sub(self.inner), self.subs, Vec::new())
-    }
-}
+integer_ops!(i64, i32);
 
 /// An aggregate over rows of `R`, for `select((…))` with `group_by`.
 pub struct Agg<R, T> {

@@ -42,7 +42,7 @@ fn parse(id: &str) -> Result<Uuid, Error> {
     id.parse().map_err(|_| comment_not_found(Uuid::nil()))
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl BulkAction for Moderate {
     fn info(&self) -> BulkInfo {
         BulkInfo::new(LIST, self.action, self.label)
@@ -71,7 +71,7 @@ impl BulkAction for Moderate {
 /// Xoá hẳn hàng loạt.
 pub(crate) struct Delete(Arc<CommentsService>);
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl BulkAction for Delete {
     fn info(&self) -> BulkInfo {
         BulkInfo::new(LIST, "delete", "Delete comments for good")

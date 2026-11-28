@@ -11,8 +11,8 @@ use autoxide_kernel::event::EventInfo;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::resource::{ResourceChange, ResourceEvent};
+use autoxide_testkit::http::{Method, StatusCode};
 use autoxide_testkit::{TestApp, TestDatabase, TestResponse, tool};
-use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
 
 use crate::testing::{Entries, FakeMailer};
@@ -95,7 +95,7 @@ async fn send(
     headers: &[(&str, &str)],
     body: Option<Value>,
 ) -> TestResponse {
-    let method = Method::from_bytes(method.as_bytes()).unwrap();
+    let method = Method::from_name(method).unwrap();
     let mut request = app.request(method, &format!("/api/v1{uri}"));
     if let Some(who) = who {
         request = request.token(who);
@@ -112,7 +112,7 @@ async fn send(
 async fn form_token(app: &TestApp) -> String {
     let issued =
         send(app, "GET", "/antispam/token?scope=comments:content.entry", None, &[], None).await;
-    assert_eq!(issued.status(), StatusCode::OK, "{}", issued.json());
+    assert_eq!(issued.status_code(), StatusCode::OK, "{}", issued.json());
     issued.json()["data"]["token"].as_str().unwrap().to_owned()
 }
 
@@ -137,7 +137,7 @@ async fn vong_doi_qua_http() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
         let settings = send(&app, "GET", "/comments/public/settings", None, &[], None).await;
-        assert_eq!(settings.status(), StatusCode::OK);
+        assert_eq!(settings.status_code(), StatusCode::OK);
         assert_eq!(settings.json()["data"]["reply_mails"], true);
         assert_eq!(settings.json()["data"]["guests_allowed"], true);
 
@@ -145,16 +145,16 @@ async fn vong_doi_qua_http() {
         let xss = "<script>alert(1)</script> <img src=x onerror=alert(1)> javascript:alert(1) https://ok.example";
         let token = form_token(&app).await;
         let held = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&token, "Ada", "ada@example.com", xss))).await;
-        assert_eq!(held.status(), StatusCode::CREATED, "{}", held.json());
+        assert_eq!(held.status_code(), StatusCode::CREATED, "{}", held.json());
         let id = held.json()["data"]["id"].as_str().unwrap().to_owned();
-        assert_eq!(held.header(header::LOCATION), format!("/api/v1/comments/public/comments/{id}"));
+        assert_eq!(held.header("location"), format!("/api/v1/comments/public/comments/{id}"));
         assert_eq!(held.json()["data"]["status"], "pending");
         for private in ["ada@example.com", "ip_fingerprint", "hold_reason", "moderation"] {
             assert!(!held.text().contains(private), "the answer shows `{private}`");
         }
         // Gửi lại cùng token: cùng bình luận.
         let again = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&token, "Ada", "ada@example.com", xss))).await;
-        assert_eq!((again.status(), again.json()["data"]["id"].as_str()), (StatusCode::CREATED, Some(id.as_str())));
+        assert_eq!((again.status_code(), again.json()["data"]["id"].as_str()), (StatusCode::CREATED, Some(id.as_str())));
         // Token sửa mới thay token cũ (máy chủ chỉ giữ bản băm).
         let edit_token = again.json()["data"]["edit_token"].as_str().unwrap().to_owned();
         assert_ne!(Some(edit_token.as_str()), held.json()["data"]["edit_token"].as_str());
@@ -164,50 +164,50 @@ async fn vong_doi_qua_http() {
         let mut trapped = comment(&form_token(&app).await, "Bot", "bot@example.com", "spam");
         trapped["trap"] = json!("http://spam.example");
         let trapped = send(&app, "POST", "/comments/public/comments", None, &[], Some(trapped)).await;
-        assert_eq!((trapped.status(), shape(&trapped), &trapped.json()["data"]["status"]), (held.status(), shape(&held), &held.json()["data"]["status"]));
-        assert_eq!(trapped.header(header::LOCATION).len(), held.header(header::LOCATION).len());
+        assert_eq!((trapped.status_code(), shape(&trapped), &trapped.json()["data"]["status"]), (held.status_code(), shape(&held), &held.json()["data"]["status"]));
+        assert_eq!(trapped.header("location").len(), held.header("location").len());
         let second = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&app).await, "Ada", "ada@example.com", "Lần hai"))).await;
-        assert_eq!(second.status(), StatusCode::CREATED);
+        assert_eq!(second.status_code(), StatusCode::CREATED);
         let third = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&app).await, "Ada", "ada@example.com", "Lần ba"))).await;
-        assert_eq!(third.status(), StatusCode::CREATED);
+        assert_eq!(third.status_code(), StatusCode::CREATED);
         let limited = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&app).await, "Ada", "ada@example.com", "Lần bốn"))).await;
-        assert_eq!((limited.status(), shape(&limited), &limited.json()["data"]["status"]), (held.status(), shape(&held), &held.json()["data"]["status"]));
+        assert_eq!((limited.status_code(), shape(&limited), &limited.json()["data"]["status"]), (held.status_code(), shape(&held), &held.json()["data"]["status"]));
 
         // Lỗi thật thì rõ ràng.
         let no_token = json!({"target_type": "content.entry", "target_id": "public-1", "author_name": "A", "body": "x"});
         let missing = send(&app, "POST", "/comments/public/comments", None, &[], Some(no_token)).await;
-        assert_eq!((missing.status(), missing.code().as_deref()), (StatusCode::BAD_REQUEST, Some("antispam.token_missing")));
+        assert_eq!((missing.status_code(), missing.code().as_deref()), (StatusCode::BAD_REQUEST, Some("antispam.token_missing")));
         let invalid = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&app).await, "", "nope", ""))).await;
-        assert_eq!(invalid.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(invalid.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(invalid.json()["errors"].as_array().unwrap().len(), 3);
         let unknown = send(&app, "POST", "/comments/public/comments", None, &[], Some(json!({"target_type": "forms.form", "target_id": "1", "author_name": "A", "body": "x", "form_token": "t"}))).await;
-        assert_eq!((unknown.status(), unknown.code().as_deref()), (StatusCode::NOT_FOUND, Some("comments.target_not_found")));
+        assert_eq!((unknown.status_code(), unknown.code().as_deref()), (StatusCode::NOT_FOUND, Some("comments.target_not_found")));
         let huge = comment("t", "A", "a@example.com", &"x".repeat(200_000));
-        assert_eq!(send(&app, "POST", "/comments/public/comments", None, &[], Some(huge)).await.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(send(&app, "POST", "/comments/public/comments", None, &[], Some(huge)).await.status_code(), StatusCode::PAYLOAD_TOO_LARGE);
 
         // Chưa duyệt: không có gì công khai.
         let thread_uri = "/comments/public/threads?target_type=content.entry&target_id=public-1";
         let empty = send(&app, "GET", thread_uri, None, &[], None).await;
         assert_eq!(empty.json()["data"], json!([]));
-        assert_eq!(send(&app, "GET", &format!("/comments/public/comments/{id}"), None, &[], None).await.status(), StatusCode::NOT_FOUND);
+        assert_eq!(send(&app, "GET", &format!("/comments/public/comments/{id}"), None, &[], None).await.status_code(), StatusCode::NOT_FOUND);
 
         // Hàng chờ và duyệt: `If-Match` bắt buộc.
         let queue = send(&app, "GET", "/comments?q=ok.example", Some("reader"), &[], None).await;
-        assert_eq!(queue.status(), StatusCode::OK, "{}", queue.json());
+        assert_eq!(queue.status_code(), StatusCode::OK, "{}", queue.json());
         assert_eq!(queue.json()["data"][0]["author_email"], "ada@example.com");
-        assert_eq!(send(&app, "GET", "/comments", None, &[], None).await.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(send(&app, "GET", "/comments", None, &[], None).await.status_code(), StatusCode::UNAUTHORIZED);
         let one = send(&app, "GET", &format!("/comments/{id}"), Some("reader"), &[], None).await;
-        let etag = one.header(header::ETAG).to_owned();
+        let etag = one.header("etag").to_owned();
         let approve = json!({"status": "published"});
-        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("admin"), &[], Some(approve.clone())).await.status(), StatusCode::PRECONDITION_REQUIRED);
-        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("reader"), &[("if-match", &etag)], Some(approve.clone())).await.status(), StatusCode::FORBIDDEN);
+        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("admin"), &[], Some(approve.clone())).await.status_code(), StatusCode::PRECONDITION_REQUIRED);
+        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("reader"), &[("if-match", &etag)], Some(approve.clone())).await.status_code(), StatusCode::FORBIDDEN);
         let approved = send(&app, "PATCH", &format!("/comments/{id}"), Some("admin"), &[("if-match", &etag)], Some(approve.clone())).await;
-        assert_eq!((approved.status(), approved.json()["data"]["status"].as_str()), (StatusCode::OK, Some("published")));
-        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("admin"), &[("if-match", &etag)], Some(json!({"status": "spam"}))).await.status(), StatusCode::PRECONDITION_FAILED);
+        assert_eq!((approved.status_code(), approved.json()["data"]["status"].as_str()), (StatusCode::OK, Some("published")));
+        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("admin"), &[("if-match", &etag)], Some(json!({"status": "spam"}))).await.status_code(), StatusCode::PRECONDITION_FAILED);
 
         // Công khai: HTML an toàn, không email / dấu vết IP.
         let thread = send(&app, "GET", thread_uri, None, &[], None).await;
-        assert_eq!(thread.status(), StatusCode::OK);
+        assert_eq!(thread.status_code(), StatusCode::OK);
         let html = thread.json()["data"][0]["body_html"].as_str().unwrap().to_owned();
         assert!(!html.contains("<script") && !html.contains("<img") && !html.contains("href=\"javascript"), "{html}");
         assert!(html.contains("<a href=\"https://ok.example\" rel=\"nofollow ugc noopener\">"), "{html}");
@@ -222,66 +222,66 @@ async fn vong_doi_qua_http() {
 
         // Sửa và xoá bằng token sửa; báo cáo.
         let edit = send(&app, "PATCH", &format!("/comments/public/comments/{id}"), None, &[], Some(json!({"body": "Đã sửa", "edit_token": edit_token}))).await;
-        assert_eq!((edit.status(), edit.json()["data"]["body"].as_str(), edit.json()["data"]["status"].as_str()), (StatusCode::OK, Some("Đã sửa"), Some("pending")));
+        assert_eq!((edit.status_code(), edit.json()["data"]["body"].as_str(), edit.json()["data"]["status"].as_str()), (StatusCode::OK, Some("Đã sửa"), Some("pending")));
         // Khách ở chế độ `pre`: bản sửa chờ duyệt lại.
-        let etag = send(&app, "GET", &format!("/comments/{id}"), Some("reader"), &[], None).await.header(header::ETAG).to_owned();
-        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("admin"), &[("if-match", &etag)], Some(approve.clone())).await.status(), StatusCode::OK);
+        let etag = send(&app, "GET", &format!("/comments/{id}"), Some("reader"), &[], None).await.header("etag").to_owned();
+        assert_eq!(send(&app, "PATCH", &format!("/comments/{id}"), Some("admin"), &[("if-match", &etag)], Some(approve.clone())).await.status_code(), StatusCode::OK);
         let wrong = send(&app, "PATCH", &format!("/comments/public/comments/{id}"), None, &[], Some(json!({"body": "x", "edit_token": "nope"}))).await;
-        assert_eq!((wrong.status(), wrong.code().as_deref()), (StatusCode::FORBIDDEN, Some("comments.not_author")));
+        assert_eq!((wrong.status_code(), wrong.code().as_deref()), (StatusCode::FORBIDDEN, Some("comments.not_author")));
         let report = send(&app, "POST", &format!("/comments/public/comments/{id}/reports"), None, &[], Some(json!({"reason": "abuse", "note": "rude"}))).await;
-        assert_eq!((report.status(), report.json()["data"]["received"].as_bool()), (StatusCode::OK, Some(true)));
+        assert_eq!((report.status_code(), report.json()["data"]["received"].as_bool()), (StatusCode::OK, Some(true)));
         let reports = send(&app, "GET", &format!("/comments/{id}/reports"), Some("reader"), &[], None).await;
         assert_eq!(reports.json()["data"][0]["reason"], "abuse");
 
         // Người dùng: tên hiển thị trước, lần đầu chờ duyệt.
         let body = json!({"target_type": "content.entry", "target_id": "public-1", "body": "Của thành viên"});
         let no_name = send(&app, "POST", "/comments/public/comments", Some("member"), &[], Some(body.clone())).await;
-        assert_eq!((no_name.status(), no_name.code().as_deref()), (StatusCode::CONFLICT, Some("comments.profile_required")));
+        assert_eq!((no_name.status_code(), no_name.code().as_deref()), (StatusCode::CONFLICT, Some("comments.profile_required")));
         let named = send(&app, "PUT", "/comments/profile", Some("member"), &[], Some(json!({"display_name": "Member One"}))).await;
-        assert_eq!((named.status(), named.json()["data"]["display_name"].as_str()), (StatusCode::OK, Some("Member One")));
-        assert_eq!(send(&app, "GET", "/comments/profile", Some("reader"), &[], None).await.status(), StatusCode::FORBIDDEN);
+        assert_eq!((named.status_code(), named.json()["data"]["display_name"].as_str()), (StatusCode::OK, Some("Member One")));
+        assert_eq!(send(&app, "GET", "/comments/profile", Some("reader"), &[], None).await.status_code(), StatusCode::FORBIDDEN);
         let mine = send(&app, "POST", "/comments/public/comments", Some("member"), &[], Some(body)).await;
-        assert_eq!((mine.status(), mine.json()["data"]["status"].as_str(), &mine.json()["data"]["edit_token"]), (StatusCode::CREATED, Some("pending"), &Value::Null));
+        assert_eq!((mine.status_code(), mine.json()["data"]["status"].as_str(), &mine.json()["data"]["edit_token"]), (StatusCode::CREATED, Some("pending"), &Value::Null));
         let mine = mine.json()["data"]["id"].as_str().unwrap().to_owned();
         let deleted = send(&app, "POST", &format!("/comments/public/comments/{mine}/delete"), Some("member"), &[], Some(json!({}))).await;
-        assert_eq!(deleted.status(), StatusCode::OK, "{}", deleted.json());
+        assert_eq!(deleted.status_code(), StatusCode::OK, "{}", deleted.json());
 
         // Cấm.
         let ban = send(&app, "POST", "/comments/bans", Some("admin"), &[], Some(json!({"kind": "email", "value": "bad@example.com", "reason": "Spam"}))).await;
-        assert_eq!(ban.status(), StatusCode::CREATED, "{}", ban.json());
+        assert_eq!(ban.status_code(), StatusCode::CREATED, "{}", ban.json());
         let ban_id = ban.json()["data"]["id"].as_str().unwrap().to_owned();
         let banned = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&app).await, "Bad", "bad@example.com", "hi"))).await;
-        assert_eq!((banned.status(), banned.code().as_deref()), (StatusCode::FORBIDDEN, Some("comments.banned")));
+        assert_eq!((banned.status_code(), banned.code().as_deref()), (StatusCode::FORBIDDEN, Some("comments.banned")));
         let bans = send(&app, "GET", "/comments/bans?active=true", Some("admin"), &[], None).await;
         assert_eq!(bans.json()["data"].as_array().unwrap().len(), 1);
-        assert_eq!(send(&app, "GET", "/comments/bans", Some("reader"), &[], None).await.status(), StatusCode::FORBIDDEN);
-        assert_eq!(send(&app, "DELETE", &format!("/comments/bans/{ban_id}"), Some("admin"), &[], None).await.status(), StatusCode::NO_CONTENT);
+        assert_eq!(send(&app, "GET", "/comments/bans", Some("reader"), &[], None).await.status_code(), StatusCode::FORBIDDEN);
+        assert_eq!(send(&app, "DELETE", &format!("/comments/bans/{ban_id}"), Some("admin"), &[], None).await.status_code(), StatusCode::NO_CONTENT);
 
         // Đóng đích.
         let closed = send(&app, "PUT", "/comments/targets/content.entry/public-1", Some("admin"), &[], Some(json!({"state": "closed"}))).await;
-        assert_eq!((closed.status(), closed.json()["data"]["state"].as_str()), (StatusCode::OK, Some("closed")));
+        assert_eq!((closed.status_code(), closed.json()["data"]["state"].as_str()), (StatusCode::OK, Some("closed")));
         let late = send(&app, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&app).await, "Cid", "cid@example.com", "Muộn"))).await;
-        assert_eq!((late.status(), late.code().as_deref()), (StatusCode::CONFLICT, Some("comments.target_closed")));
+        assert_eq!((late.status_code(), late.code().as_deref()), (StatusCode::CONFLICT, Some("comments.target_closed")));
         let admin_target = send(&app, "GET", "/comments/targets/content.entry/public-1", Some("reader"), &[], None).await;
-        assert!(!admin_target.header(header::ETAG).is_empty());
+        assert!(!admin_target.header("etag").is_empty());
         assert!(admin_target.json()["data"]["pending_count"].is_number());
 
         // Xác minh / huỷ theo dõi bằng token lạ.
         let bad = send(&app, "POST", "/comments/public/verify", None, &[], Some(json!({"token": "nope"}))).await;
-        assert_eq!((bad.status(), bad.code().as_deref()), (StatusCode::BAD_REQUEST, Some("comments.link_invalid")));
+        assert_eq!((bad.status_code(), bad.code().as_deref()), (StatusCode::BAD_REQUEST, Some("comments.link_invalid")));
         let stop = send(&app, "POST", "/comments/public/unsubscribe", None, &[], Some(json!({"token": "nope"}))).await;
         assert_eq!(stop.json()["data"]["unsubscribed"], true);
 
         // Xuất / xoá theo email; xoá hẳn.
         let data = send(&app, "GET", "/comments/data?email=ADA@example.com", Some("admin"), &[], None).await;
-        assert_eq!(data.status(), StatusCode::OK, "{}", data.json());
+        assert_eq!(data.status_code(), StatusCode::OK, "{}", data.json());
         assert_eq!(data.json()["data"]["comments"].as_array().unwrap().len(), 3);
-        assert_eq!(send(&app, "GET", "/comments/data?email=ada@example.com", Some("reader"), &[], None).await.status(), StatusCode::FORBIDDEN);
+        assert_eq!(send(&app, "GET", "/comments/data?email=ada@example.com", Some("reader"), &[], None).await.status_code(), StatusCode::FORBIDDEN);
         let erased = send(&app, "DELETE", "/comments/data?email=ada@example.com", Some("admin"), &[], None).await;
         assert_eq!(erased.json()["data"]["cleared"], 3);
         let purged = send(&app, "DELETE", &format!("/comments/{id}"), Some("admin"), &[], None).await;
         assert_eq!(purged.json()["data"]["deleted"], 1);
-        assert_eq!(send(&app, "GET", &format!("/comments/{id}"), Some("admin"), &[], None).await.status(), StatusCode::NOT_FOUND);
+        assert_eq!(send(&app, "GET", &format!("/comments/{id}"), Some("admin"), &[], None).await.status_code(), StatusCode::NOT_FOUND);
     })
     .await
     .unwrap();
@@ -380,7 +380,7 @@ async fn tool_mcp() {
             Some(json!({"display_name": "Quản trị"})),
         )
         .await;
-        assert_eq!(named.status(), StatusCode::OK, "{}", named.json());
+        assert_eq!(named.status_code(), StatusCode::OK, "{}", named.json());
         let (failed, answer) = call("comments.answer", json!({"id": id, "body": "Trả lời"})).await;
         assert!(!failed, "{answer}");
         assert_eq!(
@@ -401,7 +401,7 @@ async fn tool_mcp() {
         assert_eq!(listed.json()["data"], json!([]));
         let wrong =
             send(&app, "GET", "/comments?unanswered=maybe", Some("reader"), &[], None).await;
-        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(wrong.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
         let found = send(
             &app,
             "GET",
@@ -424,7 +424,7 @@ async fn tool_mcp() {
             None,
         )
         .await;
-        assert_eq!(too_long.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(too_long.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
         let (stale, _) =
             call("comments.moderate", json!({"id": id, "status": "spam", "version": version}))
                 .await;
@@ -464,18 +464,18 @@ async fn dich_kem_tieu_de_va_danh_sach_dich() {
             Some(comment(&token, "Ada", "ada@example.com", "Nice post")),
         )
         .await;
-        assert_eq!(held.status(), StatusCode::CREATED, "{}", held.json());
+        assert_eq!(held.status_code(), StatusCode::CREATED, "{}", held.json());
         let id = held.json()["data"]["id"].as_str().unwrap().to_owned();
 
         let queue = send(&app, "GET", "/comments", Some("reader"), &[], None).await;
-        assert_eq!(queue.status(), StatusCode::OK, "{}", queue.json());
+        assert_eq!(queue.status_code(), StatusCode::OK, "{}", queue.json());
         assert_eq!(queue.json()["data"][0]["target_title"], "Hello world");
         assert_eq!(queue.json()["data"][0]["target_url"], "/posts/public-1");
         let one = send(&app, "GET", &format!("/comments/{id}"), Some("reader"), &[], None).await;
         assert_eq!(one.json()["data"]["target_title"], "Hello world", "{}", one.json());
 
         let targets = send(&app, "GET", "/comments/targets", Some("reader"), &[], None).await;
-        assert_eq!(targets.status(), StatusCode::OK, "{}", targets.json());
+        assert_eq!(targets.status_code(), StatusCode::OK, "{}", targets.json());
         let first = &targets.json()["data"][0];
         assert_eq!(
             (first["target_id"].as_str(), first["pending_count"].as_i64()),
@@ -517,7 +517,7 @@ async fn dich_kem_tieu_de_va_danh_sach_dich() {
             Some(json!({"state": "closed"})),
         )
         .await;
-        assert_eq!(closed.status(), StatusCode::OK, "{}", closed.json());
+        assert_eq!(closed.status_code(), StatusCode::OK, "{}", closed.json());
         assert_eq!(
             count(
                 send(&app, "GET", "/comments/targets?state=closed", Some("reader"), &[], None)
@@ -542,7 +542,7 @@ async fn dich_kem_tieu_de_va_danh_sach_dich() {
         let wrong =
             send(&app, "GET", "/comments/targets?state=maybe&pending=1", Some("reader"), &[], None)
                 .await;
-        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(wrong.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(wrong.json()["errors"].as_array().unwrap().len(), 2, "{}", wrong.json());
         // Phần công khai không đổi hình dạng: không có `title`.
         let public =
@@ -592,28 +592,28 @@ async fn hai_khach_khong_ro_ri_token_mail_mang_khach() {
 
         // Người của khách A bình luận (người kiểm duyệt: hiện ngay), báo cáo, cấm.
         let named = send(&app, "PUT", "/comments/profile", Some("admin-a"), &[], Some(json!({"display_name": "Ada"}))).await;
-        assert_eq!(named.status(), StatusCode::OK, "{}", named.json());
+        assert_eq!(named.status_code(), StatusCode::OK, "{}", named.json());
         let body = json!({"target_type": "content.entry", "target_id": "public-1", "body": format!("Hello {marker}")});
         let posted = send(&app, "POST", "/comments/public/comments", Some("admin-a"), &[], Some(body)).await;
-        assert_eq!(posted.status(), StatusCode::CREATED, "{}", posted.json());
+        assert_eq!(posted.status_code(), StatusCode::CREATED, "{}", posted.json());
         assert_eq!(posted.json()["data"]["status"], "published");
         let comment_id = posted.json()["data"]["id"].as_str().unwrap().to_owned();
         let report = json!({"reason": "abuse", "note": marker});
         let reported = send(&app, "POST", &format!("/comments/public/comments/{comment_id}/reports"), Some("admin-a"), &[], Some(report)).await;
-        assert_eq!(reported.status(), StatusCode::OK, "{}", reported.json());
+        assert_eq!(reported.status_code(), StatusCode::OK, "{}", reported.json());
         let ban = json!({"kind": "email", "value": "bad@example.com", "reason": marker});
         let ban = send(&app, "POST", "/comments/bans", Some("admin-a"), &[], Some(ban)).await;
-        assert_eq!(ban.status(), StatusCode::CREATED, "{}", ban.json());
+        assert_eq!(ban.status_code(), StatusCode::CREATED, "{}", ban.json());
         let ban_id = ban.json()["data"]["id"].as_str().unwrap().to_owned();
 
         // Khách vãng lai ở website của khách A, xin mail báo trả lời.
         let issued = send(&app, "GET", "/antispam/token?scope=comments:content.entry", None, &in_a, None).await;
-        assert_eq!(issued.status(), StatusCode::OK, "{}", issued.json());
+        assert_eq!(issued.status_code(), StatusCode::OK, "{}", issued.json());
         let token = issued.json()["data"]["token"].as_str().unwrap().to_owned();
         let mut guest = comment(&token, "Guest", "guest@example.com", &format!("Question {marker}"));
         guest["notify_replies"] = json!(true);
         let held = send(&app, "POST", "/comments/public/comments", None, &in_a, Some(guest)).await;
-        assert_eq!(held.status(), StatusCode::CREATED, "{}", held.json());
+        assert_eq!(held.status_code(), StatusCode::CREATED, "{}", held.json());
         let guest_id = held.json()["data"]["id"].as_str().unwrap().to_owned();
         let mail = mailer.sent().into_iter().find(|mail| mail.to == "guest@example.com").unwrap();
         let start = mail.text.find("token=").unwrap() + "token=".len();
@@ -629,15 +629,15 @@ async fn hai_khach_khong_ro_ri_token_mail_mang_khach() {
             send(&app, "POST", "/comments/public/verify", None, &[], Some(json!({"token": token}))).await
         };
         let forged = verify(format!("t{b_id}.{raw}")).await;
-        assert_eq!((forged.status(), forged.code().as_deref()), (StatusCode::BAD_REQUEST, Some("comments.link_invalid")));
+        assert_eq!((forged.status_code(), forged.code().as_deref()), (StatusCode::BAD_REQUEST, Some("comments.link_invalid")));
         let verified = verify(link.clone()).await;
-        assert_eq!(verified.status(), StatusCode::OK, "{}", verified.json());
+        assert_eq!(verified.status_code(), StatusCode::OK, "{}", verified.json());
         let one = send(&app, "GET", &format!("/comments/{guest_id}"), Some("admin-a"), &[], None).await;
         assert_eq!(one.json()["data"]["email_verified"], true, "{}", one.json());
 
         // Người của khách B không thấy gì của khách A.
         let missing = send(&app, "GET", &format!("/comments/{comment_id}"), Some("admin-b"), &[], None).await;
-        assert_eq!(missing.status(), StatusCode::NOT_FOUND, "{}", missing.json());
+        assert_eq!(missing.status_code(), StatusCode::NOT_FOUND, "{}", missing.json());
         let seeded = [
             ("id", comment_id.clone()),
             ("id", guest_id),
@@ -666,7 +666,7 @@ async fn binh_luan_cho_duyet_vao_hop_viec() {
             Some(comment(&token, "Ada", "ada@example.com", "Hay quá")),
         )
         .await;
-        assert_eq!(held.status(), StatusCode::CREATED, "{}", held.json());
+        assert_eq!(held.status_code(), StatusCode::CREATED, "{}", held.json());
         let id = held.json()["data"]["id"].as_str().unwrap().to_owned();
 
         let work = app.get("/api/v1/kernel/work").token("admin").send().await.unwrap().json();
@@ -689,7 +689,7 @@ async fn binh_luan_cho_duyet_vao_hop_viec() {
         assert_eq!(reader["data"]["items"], json!([]), "chỉ người duyệt được thấy");
 
         let read = send(&app, "GET", &format!("/comments/{id}"), Some("admin"), &[], None).await;
-        let etag = read.header(header::ETAG).to_owned();
+        let etag = read.header("etag").to_owned();
         let approved = send(
             &app,
             "PATCH",
@@ -699,7 +699,7 @@ async fn binh_luan_cho_duyet_vao_hop_viec() {
             Some(json!({"status": "published"})),
         )
         .await;
-        assert_eq!(approved.status(), StatusCode::OK, "{}", approved.json());
+        assert_eq!(approved.status_code(), StatusCode::OK, "{}", approved.json());
         let work = app.get("/api/v1/kernel/work").token("admin").send().await.unwrap().json();
         assert_eq!(work["data"]["items"], json!([]), "duyệt rồi thì việc tự hết");
     })

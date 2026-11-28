@@ -1,13 +1,13 @@
 //! Chế độ nghỉ (bước 70 P9): `comments` có trong chương trình nhưng đang tắt vẫn góp phần vào bản xuất dữ
 //! liệu cá nhân và vẫn xoá dữ liệu của người đó khi tài khoản bị xoá — bảng của nó còn từ hồi module chạy.
 
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::module::Modules;
 use autoxide_kernel::privacy::USER_DELETED;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -51,18 +51,20 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
         let (app, tenant) = dormant_app(test).await;
         let user = Uuid::now_v7();
         let now = Timestamp::now();
-        crate::entity::profile::Model {
-            tenant_id: tenant.id().as_uuid(),
-            user_id: user,
-            display_name: "Ada".into(),
-            name_key: "ada".into(),
-            created_at: now,
-            updated_at: now,
-        }
-        .into_active_model()
-        .insert(app.database().write())
-        .await
-        .unwrap();
+        let transaction = tenant.db().begin_write().await.unwrap();
+        transaction
+            .insert(crate::entity::profile::Model {
+                tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
+                user_id: user,
+                display_name: "Ada".into(),
+                name_key: "ada".into(),
+                created_at: now,
+                updated_at: now,
+            })
+            .exec()
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
 
         let exported = app.modules().personal_data().export(&tenant, user).await.unwrap();
         assert_eq!(exported["comments"]["profile"]["display_name"], "Ada", "{exported:?}");
@@ -72,9 +74,12 @@ async fn module_tat_van_xuat_va_xoa_du_lieu_ca_nhan() {
         let privacy = crate::privacy::DormantPrivacy::new();
         privacy.handle(&deleted).await.unwrap();
         privacy.handle(&deleted).await.unwrap();
-        let left = crate::entity::profile::Entity::find_by_id((tenant.id().as_uuid(), user))
-            .scoped(&tenant)
-            .one(app.database().read())
+        let left = tenant
+            .db()
+            .read()
+            .find::<crate::entity::profile::Model>()
+            .filter(crate::entity::profile::Model::USER_ID.eq(user))
+            .one()
             .await
             .unwrap();
         assert!(left.is_none());

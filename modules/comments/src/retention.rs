@@ -16,18 +16,16 @@
 //! quét cả database.
 
 use autoxide_kernel::time::Timestamp;
-use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
 use autoxide_kernel::database::Database;
+use autoxide_kernel::db::{AllTenants, Queries as _, TenantKey};
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
-use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, TenantId};
 use autoxide_kernel::throttle::Throttle;
-use sea_orm::sea_query::Expr;
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -71,33 +69,40 @@ pub(crate) struct Cleanup {
     pub databases: DatabaseRegistry,
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        self.service.cleanup(&self.databases, &job.database, now()).await.map(|_| ())
+        let all = job.all_tenants("comments retention sweep");
+        self.service.cleanup(&self.databases, &job.database, all, now()).await.map(|_| ())
     }
 }
 
 impl CommentsService {
-    /// Dọn `database` theo thời hạn, coi `now` là bây giờ (test truyền thời điểm tương lai).
+    /// Dọn `database` theo thời hạn, coi `now` là bây giờ (test truyền thời điểm tương lai). `all`: handle
+    /// mọi khách của chính `database` (job của cả database, `JobContext::all_tenants`).
     pub(crate) async fn cleanup(
         &self,
         databases: &DatabaseRegistry,
         database: &Database,
+        all: AllTenants<'_>,
         now: Timestamp,
     ) -> Result<Cleaned, Error> {
         let mut cleaned = Cleaned::default();
-        let before = now - SignedDuration::from_hours(24 * (i64::from(self.config.retention_days)));
+        let before = now
+            - autoxide_kernel::time::Duration::from_hours(
+                24 * (i64::from(self.config.retention_days)),
+            );
         // Khách có bình luận trên database này: mọi bình luận có dòng đích (`ensure_target`), nên
         // đọc bảng đích — nhỏ, khoá chính có `tenant_id` đứng đầu.
-        let tenants: Vec<Uuid> = target::Entity::find()
-            .select_only()
-            .column(target::Column::TenantId)
-            .distinct()
-            .into_tuple()
-            .all(database.read())
+        let tenants: Vec<(TenantKey,)> = all
+            .read()
+            .find::<target::Model>()
+            .select((target::Model::TENANT_ID,))
+            .group_by(target::Model::TENANT_ID)
+            .all()
             .await?;
-        for id in tenants {
+        for (id,) in tenants {
+            let id = id.as_uuid();
             match databases.tenant(TenantId::from_uuid(id)).await {
                 Ok(tenant) => self.expire_tenant(&tenant, before, &mut cleaned).await?,
                 // Khách đã bị xoá khỏi sổ: dữ liệu còn lại do việc xoá khách lo, không đoán ở đây.
@@ -106,49 +111,58 @@ impl CommentsService {
                 }
             }
         }
-        let ip_before =
-            now - SignedDuration::from_hours(24 * (i64::from(self.config.ip_retention_days)));
-        let write = database.write();
-        // tenant-scope: job hạn lưu IP, chạy cho mọi khách trên database.
-        cleaned.fingerprints = comment::Entity::update_many()
-            .col_expr(comment::Column::IpFingerprint, Expr::value(Option::<String>::None))
-            .filter(comment::Column::IpFingerprint.is_not_null())
-            .filter(comment::Column::CreatedAt.lt(ip_before))
-            .exec(write)
-            .await?
-            .rows_affected;
+        let ip_before = now
+            - autoxide_kernel::time::Duration::from_hours(
+                24 * (i64::from(self.config.ip_retention_days)),
+            );
+        let write = all.begin_write().await?;
+        // Job hạn lưu IP, chạy cho mọi khách trên database (handle `all_tenants`).
+        cleaned.fingerprints = write
+            .update::<comment::Model>()
+            .set(comment::Model::IP_FINGERPRINT, None)
+            .filter(comment::Model::IP_FINGERPRINT.is_not_null())
+            .filter(comment::Model::CREATED_AT.lt(ip_before))
+            .exec()
+            .await?;
+        write.commit().await?;
         // Khoá người báo của khách (`ip:<dấu vết>`) cũng là dấu vết IP: quá hạn thì thành
         // `expired:<id báo cáo>` — vẫn duy nhất trong `(tenant_id, comment_id, reporter_key)`.
         loop {
-            // tenant-scope: job hạn lưu người báo cáo, mọi khách trên database.
-            let expired: Vec<Uuid> = report::Entity::find()
-                .select_only()
-                .column(report::Column::Id)
-                .filter(report::Column::ReporterKey.starts_with(GUEST_REPORTER))
-                .filter(report::Column::CreatedAt.lt(ip_before))
-                .order_by_asc(report::Column::Id)
+            // Job hạn lưu người báo cáo, mọi khách trên database; mỗi lô một transaction ngắn (SQLite chỉ
+            // một bên ghi một lúc: không giữ khoá suốt cả đợt quét).
+            let batch = all.begin_write().await?;
+            let expired: Vec<Uuid> = batch
+                .find::<report::Model>()
+                .filter(report::Model::REPORTER_KEY.starts_with(GUEST_REPORTER))
+                .filter(report::Model::CREATED_AT.lt(ip_before))
+                .order_asc(report::Model::ID)
                 .limit(BATCH)
-                .into_tuple()
-                .all(database.read())
-                .await?;
+                .all()
+                .await?
+                .into_iter()
+                .map(|row| row.id)
+                .collect();
             if expired.is_empty() {
+                batch.rollback().await?;
                 break;
             }
             for id in expired {
-                // tenant-scope: job hạn lưu; ID lấy từ câu quét ở trên.
-                cleaned.reporters += report::Entity::update_many()
-                    .col_expr(report::Column::ReporterKey, Expr::value(format!("expired:{id}")))
-                    .filter(report::Column::Id.eq(id))
-                    .filter(report::Column::ReporterKey.starts_with(GUEST_REPORTER))
-                    .exec(write)
-                    .await?
-                    .rows_affected;
+                cleaned.reporters += batch
+                    .update::<report::Model>()
+                    .set(report::Model::REPORTER_KEY, format!("expired:{id}"))
+                    .filter(report::Model::ID.eq(id))
+                    .filter(report::Model::REPORTER_KEY.starts_with(GUEST_REPORTER))
+                    .exec()
+                    .await?;
             }
+            batch.commit().await?;
         }
-        self.guard.purge_nonces(write, MODULE).await?;
-        self.tokens.purge(write, now).await?;
+        let write = all.begin_write().await?;
+        self.guard.purge_nonces(&write, MODULE).await?;
+        self.tokens.purge(&write, now).await?;
+        write.commit().await?;
         Throttle::new(MODULE, 1, Duration::from_secs(3600))?
-            .purge(database, now - SignedDuration::from_hours(24))
+            .purge(database, now - autoxide_kernel::time::Duration::from_hours(24))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -172,15 +186,17 @@ impl CommentsService {
         let mut after = Uuid::nil();
         let mut ids = Vec::new();
         loop {
-            let rows = comment::Entity::find()
-                .scoped(tenant)
-                .filter(comment::Column::Status.is_in(EXPIRING))
-                .filter(comment::Column::PublishedAt.is_null())
-                .filter(comment::Column::CreatedAt.lt(before))
-                .filter(comment::Column::Id.gt(after))
-                .order_by_asc(comment::Column::Id)
+            let rows = tenant
+                .db()
+                .read()
+                .find::<comment::Model>()
+                .filter(comment::Model::STATUS.is_in(EXPIRING.map(str::to_owned)))
+                .filter(comment::Model::PUBLISHED_AT.is_null())
+                .filter(comment::Model::CREATED_AT.lt(before))
+                .filter(comment::Model::ID.gt(after))
+                .order_asc(comment::Model::ID)
                 .limit(BATCH)
-                .all(tenant.database().read())
+                .all()
                 .await?;
             let Some(last) = rows.last() else { break };
             after = last.id;
@@ -200,15 +216,17 @@ impl CommentsService {
                 ),
                 after: None,
             };
+            let transaction = tenant.db().begin_write().await?;
             self.outbox
                 .record(
-                    tenant.database().write(),
+                    &transaction,
                     tenant,
                     Actor::system(),
                     None,
                     &events::CommentsExpired(change),
                 )
                 .await?;
+            transaction.commit().await?;
         }
         Ok(())
     }
@@ -225,13 +243,13 @@ impl CommentsService {
         if !EXPIRING.contains(&status.as_str()) || row.published_at.is_some() {
             return Ok(None);
         }
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         let others = if row.depth == 0 {
-            comment::Entity::find()
-                .scoped(tenant)
-                .filter(comment::Column::RootId.eq(row.id))
-                .filter(comment::Column::Id.ne(row.id))
-                .count(&transaction)
+            transaction
+                .find::<comment::Model>()
+                .filter(comment::Model::ROOT_ID.eq(row.id))
+                .filter(comment::Model::ID.ne(row.id))
+                .count()
                 .await?
         } else {
             0
@@ -257,29 +275,28 @@ impl CommentsService {
             }
         } else {
             // Xoá trước (khoá dòng, như mọi lệnh ghi: bình luận → gốc → đích), có điều kiện.
-            let removed = comment::Entity::delete_many()
-                .scoped(tenant)
-                .filter(comment::Column::Id.eq(row.id))
-                .filter(comment::Column::Status.eq(status.as_str()))
-                .filter(comment::Column::UpdatedAt.eq(row.updated_at))
-                .filter(comment::Column::PublishedAt.is_null())
-                .exec(&transaction)
-                .await?
-                .rows_affected;
+            let removed = transaction
+                .delete::<comment::Model>()
+                .filter(comment::Model::ID.eq(row.id))
+                .filter(comment::Model::STATUS.eq(status.as_str().to_owned()))
+                .filter(comment::Model::UPDATED_AT.eq(row.updated_at))
+                .filter(comment::Model::PUBLISHED_AT.is_null())
+                .exec()
+                .await?;
             if removed == 0 {
                 transaction.rollback().await?;
                 return Ok(None);
             }
-            shift_counts(&transaction, tenant, row, Some(status), None).await?;
-            report::Entity::delete_many()
-                .scoped(tenant)
-                .filter(report::Column::CommentId.eq(row.id))
-                .exec(&transaction)
+            shift_counts(&transaction, row, Some(status), None).await?;
+            transaction
+                .delete::<report::Model>()
+                .filter(report::Model::COMMENT_ID.eq(row.id))
+                .exec()
                 .await?;
-            subscription::Entity::delete_many()
-                .scoped(tenant)
-                .filter(subscription::Column::CommentId.eq(row.id))
-                .exec(&transaction)
+            transaction
+                .delete::<subscription::Model>()
+                .filter(subscription::Model::COMMENT_ID.eq(row.id))
+                .exec()
                 .await?;
             self.tokens.forget(&transaction, tenant, &row.id.to_string()).await?;
             Expired::Deleted

@@ -124,6 +124,31 @@ impl SortKey for Timestamp {
     }
 }
 
+/// The type of a UUIDv7 key column `Find::page_keyed` pages by: `Uuid`, or `Option<Uuid>` for a column that is
+/// nullable in the schema but filled on every row. Sealed.
+pub trait UuidKey: DbValue + uuid_key::Sealed {
+    #[doc(hidden)]
+    fn from_uuid(id: Uuid) -> Self;
+}
+
+mod uuid_key {
+    pub trait Sealed {}
+    impl Sealed for uuid::Uuid {}
+    impl Sealed for Option<uuid::Uuid> {}
+}
+
+impl UuidKey for Uuid {
+    fn from_uuid(id: Uuid) -> Self {
+        id
+    }
+}
+
+impl UuidKey for Option<Uuid> {
+    fn from_uuid(id: Uuid) -> Self {
+        Some(id)
+    }
+}
+
 /// The `tenant_id` column of a tenant table. It can be read and compared, never written by
 /// `update().set(…)`: the kernel sets it on insert from the tenant of the handle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

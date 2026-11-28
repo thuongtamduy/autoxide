@@ -22,12 +22,12 @@ use std::net::IpAddr;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::database::Database;
+use autoxide_kernel::db::{Queries as _, TenantKey};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::resource::{ResourceChange, ResourceEvent};
 use autoxide_kernel::tenancy::DEFAULT_TENANT;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Statement};
 
 use crate::config::{CommentsConfig, Mode};
 use crate::entity::{comment, target};
@@ -103,25 +103,30 @@ pub(super) fn open_config() -> CommentsConfig {
 /// (đang hiện, chờ duyệt) của đích. Kiểm luôn số câu hỏi (bình luận gốc) đã lưu khớp số đếm
 /// lại từ bảng — mọi đường đổi trạng thái trong các test đều đi qua đây (D-202).
 pub(super) async fn counts(database: &Database, id: &str) -> (i32, i32) {
-    let row =
-        target::Entity::find_by_id((DEFAULT_TENANT.as_uuid(), KIND.to_owned(), id.to_owned()))
-            .one(database.read())
-            .await
-            .unwrap()
-            .unwrap();
+    let all = autoxide_testkit::all_tenants(database);
+    let read = all.read();
+    let row = read
+        .find::<target::Model>()
+        .filter(target::Model::TENANT_ID.eq(TenantKey::new(DEFAULT_TENANT)))
+        .filter(crate::posting::targets::target_key(KIND, id))
+        .one()
+        .await
+        .unwrap()
+        .unwrap();
     let roots = |status: Status| {
-        comment::Entity::find()
-            .filter(comment::Column::TargetType.eq(KIND))
-            .filter(comment::Column::TargetId.eq(id))
-            .filter(comment::Column::Depth.eq(0))
-            .filter(comment::Column::Status.eq(status.as_str()))
-            .count(database.read())
+        read.find::<comment::Model>()
+            .filter(comment::Model::TENANT_ID.eq(TenantKey::new(DEFAULT_TENANT)))
+            .filter(comment::Model::TARGET_TYPE.eq(KIND.to_owned()))
+            .filter(comment::Model::TARGET_ID.eq(id.to_owned()))
+            .filter(comment::Model::DEPTH.eq(0))
+            .filter(comment::Model::STATUS.eq(status.as_str().to_owned()))
+            .count()
     };
     let stored = (row.published_thread_count, row.pending_thread_count);
     let counted = (roots(Status::Published).await.unwrap(), roots(Status::Pending).await.unwrap());
     assert_eq!(
         (i64::from(stored.0), i64::from(stored.1)),
-        (counted.0 as i64, counted.1 as i64),
+        counted,
         "stored question counts drift from the table"
     );
     (row.published_count, row.pending_count)
@@ -137,25 +142,21 @@ pub(super) fn content_events() -> Vec<ResourceEvent> {
 
 /// (tên, payload) của mọi event đã ghi, theo thứ tự.
 pub(super) async fn events(database: &Database) -> Vec<(String, String)> {
-    let backend = database.read().get_database_backend();
-    let rows = database
+    autoxide_testkit::all_tenants(database)
         .read()
-        .query_all_raw(Statement::from_string(
-            backend,
-            "SELECT name, payload FROM comments_events ORDER BY id",
-        ))
+        .sql("SELECT name, payload FROM comments_events ORDER BY id")
+        .all::<(String, String)>()
         .await
-        .unwrap();
-    rows.into_iter()
-        .map(|row| {
-            (
-                row.try_get::<String>("", "name").unwrap(),
-                row.try_get::<String>("", "payload").unwrap(),
-            )
-        })
-        .collect()
+        .unwrap()
 }
 
 pub(super) fn page(order: Order) -> PageRequest {
     PageRequest::first(50, order)
+}
+
+/// Ghi thẳng bình luận `row` đã sửa (test đặt trạng thái khó tạo qua API).
+pub(super) async fn save(tenant: &autoxide_kernel::tenancy::TenantContext, row: &comment::Model) {
+    let transaction = tenant.db().begin_write().await.unwrap();
+    crate::posting::authoring::save_comment(&transaction, row).await.unwrap();
+    transaction.commit().await.unwrap();
 }

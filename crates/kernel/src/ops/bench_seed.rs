@@ -161,6 +161,29 @@ where
     Ok(())
 }
 
+/// Like [`insert_all`], for records of the `db` layer, in the tenant of `db`: batched inserts (as many rows per
+/// statement as both databases allow for the record's columns, a transaction every so many rows).
+pub async fn insert_records<R>(db: &crate::db::TenantDb<'_>, rows: Vec<R>) -> Result<(), Error>
+where
+    R: crate::db::Record,
+    R::Scope: crate::db::AcceptedBy<crate::db::InTenant>,
+{
+    let per_statement = rows_per_statement(R::COLUMNS.len());
+    let mut rows = rows.into_iter().peekable();
+    while rows.peek().is_some() {
+        let transaction = db.begin_write().await?;
+        let mut written = 0;
+        while written < ROWS_PER_TRANSACTION && rows.peek().is_some() {
+            let take = per_statement.min(ROWS_PER_TRANSACTION - written);
+            let chunk: Vec<R> = rows.by_ref().take(take).collect();
+            written += chunk.len();
+            transaction.insert_many(chunk).exec().await?;
+        }
+        transaction.commit().await?;
+    }
+    Ok(())
+}
+
 /// Deterministic pseudo-random number generator (SplitMix64): the same seed gives the same dataset, so two
 /// measurements can be compared. Not for anything that needs secrecy.
 #[derive(Debug, Clone)]

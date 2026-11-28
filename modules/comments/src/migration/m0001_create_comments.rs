@@ -31,7 +31,7 @@ async fn index(
     manager.create_index(index.to_owned()).await
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager

@@ -6,17 +6,15 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::http::{
+    NoContent, Params, Path, Query, Schema, State, ValidJson, Validate, endpoint,
+};
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
-use autoxide_kernel::version::{IfMatch, Tagged};
-use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use autoxide_kernel::version::{IfMatch, MaybeTagged, Tagged};
 use serde::{Deserialize, Deserializer, Serialize};
-use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
-use validator::Validate;
 
 use super::views::{BanResponse, CommentDetail, ReportResponse, TargetResponse};
 use super::{choice, page_request};
@@ -25,7 +23,7 @@ use crate::posting::targets::{TargetChange, TargetFilter};
 use crate::service::{CommentsService, STATUSES, Status};
 
 /// Which comments to list.
-#[derive(Debug, Default, Deserialize, IntoParams)]
+#[derive(Debug, Default, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct QueueQuery {
     /// `pending` (the default: the moderation queue), `published`, `rejected`, `spam` or
@@ -72,12 +70,11 @@ impl QueueQuery {
 ///
 /// Requires `comments.read`. By default the comments waiting for approval, newest first; filter
 /// by status, target and text, or list unanswered questions (`status=published&unanswered=true`). Follow `pagination.next_cursor` with the same filters for more.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/",
-    extensions(("x-permissions" = json!(["comments.read"]))),
+    permission = "comments.read",
     operation_id = "list_comments",
-    security(("bearer" = [])),
     params(QueueQuery, PageQuery),
     responses(
         (status = 200, description = "One page of comments.", body = Page<CommentDetail>),
@@ -128,12 +125,11 @@ async fn with_targets(
 /// Get a comment with its moderation details.
 ///
 /// Requires `comments.read`. Any status; includes the author's email and network fingerprint.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/{id}",
-    extensions(("x-permissions" = json!(["comments.read"]))),
+    permission = "comments.read",
     operation_id = "get_comment",
-    security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
     responses(
         (status = 200, description = "The comment.", body = Data<CommentDetail>, headers(("ETag" = String, description = "Version; send it in `If-Match` to change the status."))),
@@ -156,7 +152,7 @@ pub(crate) async fn get_comment(
 }
 
 /// A moderation decision.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UpdateCommentRequest {
     /// `published` (approve, or restore), `rejected`, `spam`, or `pending` (hold again).
@@ -168,12 +164,11 @@ pub(crate) struct UpdateCommentRequest {
 /// Requires `comments.moderate`. `If-Match` is required. Approving sends reply mails to people
 /// following the comment answered (`comments.comment_published`). Every decision is recorded
 /// (`comments.comment_status_changed`, in the audit log).
-#[utoipa::path(
+#[endpoint(
     patch,
     path = "/{id}",
-    extensions(("x-permissions" = json!(["comments.moderate"]))),
+    permission = "comments.moderate",
     operation_id = "update_comment",
-    security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
     request_body = UpdateCommentRequest,
     responses(
@@ -201,7 +196,7 @@ pub(crate) async fn update_comment(
 }
 
 /// The answer to a delete for good.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentsPurged)]
 pub(crate) struct PurgedResponse {
     /// Comments deleted: the comment, and its replies when it starts a thread.
@@ -212,12 +207,11 @@ pub(crate) struct PurgedResponse {
 ///
 /// Requires `comments.moderate`. Deleting a top-level comment deletes its whole thread. Use it
 /// for takedown requests; the decision is recorded (`comments.comment_deleted`, `hard: true`).
-#[utoipa::path(
+#[endpoint(
     delete,
     path = "/{id}",
-    extensions(("x-permissions" = json!(["comments.moderate"]))),
+    permission = "comments.moderate",
     operation_id = "delete_comment",
-    security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
     responses(
         (status = 200, description = "How many comments were deleted.", body = Data<PurgedResponse>),
@@ -239,12 +233,11 @@ pub(crate) async fn delete_comment(
 /// List the reports of a comment.
 ///
 /// Requires `comments.read`. Newest first.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/{id}/reports",
-    extensions(("x-permissions" = json!(["comments.read"]))),
+    permission = "comments.read",
     operation_id = "list_comment_reports",
-    security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment."), PageQuery),
     responses(
         (status = 200, description = "One page of reports.", body = Page<ReportResponse>),
@@ -266,7 +259,7 @@ pub(crate) async fn list_reports(
 }
 
 /// Which bans to list.
-#[derive(Debug, Default, Deserialize, IntoParams)]
+#[derive(Debug, Default, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct BansQuery {
     /// `user`, `email` or `ip`.
@@ -279,12 +272,11 @@ pub(crate) struct BansQuery {
 /// List bans.
 ///
 /// Requires `comments.manage`. Newest first.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/bans",
-    extensions(("x-permissions" = json!(["comments.manage"]))),
+    permission = "comments.manage",
     operation_id = "list_comment_bans",
-    security(("bearer" = [])),
     params(BansQuery, PageQuery),
     responses(
         (status = 200, description = "One page of bans.", body = Page<BanResponse>),
@@ -322,7 +314,7 @@ pub(crate) async fn list_bans(
 }
 
 /// A new ban.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BanRequest {
     /// `user` (an account), `email` (an address) or `ip` (a network fingerprint).
@@ -339,12 +331,11 @@ pub(crate) struct BanRequest {
 ///
 /// Requires `comments.manage`. Their new comments (and changes) are refused with
 /// `comments.banned` until `until`. Recorded as `comments.ban_created` (without the value).
-#[utoipa::path(
+#[endpoint(
     post,
     path = "/bans",
-    extensions(("x-permissions" = json!(["comments.manage"]))),
+    permission = "comments.manage",
     operation_id = "create_comment_ban",
-    security(("bearer" = [])),
     request_body = BanRequest,
     responses(
         (status = 201, description = "Banned.", body = Data<BanResponse>),
@@ -377,12 +368,11 @@ pub(crate) async fn create_ban(
 /// Lift a ban.
 ///
 /// Requires `comments.manage`. Recorded as `comments.ban_deleted`.
-#[utoipa::path(
+#[endpoint(
     delete,
     path = "/bans/{id}",
-    extensions(("x-permissions" = json!(["comments.manage"]))),
+    permission = "comments.manage",
     operation_id = "delete_comment_ban",
-    security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the ban.")),
     responses(
         (status = 204, description = "Lifted."),
@@ -396,20 +386,19 @@ pub(crate) async fn delete_ban(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<StatusCode, Error> {
+) -> Result<NoContent, Error> {
     service.unban(&tenant, &principal, id).await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(NoContent)
 }
 
 /// Get the comment state of a target, with its pending count.
 ///
 /// Requires `comments.read`.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/targets/{target_type}/{target_id}",
-    extensions(("x-permissions" = json!(["comments.read"]))),
+    permission = "comments.read",
     operation_id = "get_comment_target",
-    security(("bearer" = [])),
     params(
         ("target_type" = String, Path, description = "Kind of the target, e.g. `content.entry`."),
         ("target_id" = String, Path, description = "Id of the target in its module."),
@@ -427,19 +416,14 @@ pub(crate) async fn get_target(
     tenant: TenantContext,
     principal: Principal,
     Path((kind, id)): Path<(String, String)>,
-) -> Result<axum::response::Response, Error> {
-    use axum::response::IntoResponse as _;
+) -> Result<MaybeTagged<TargetResponse>, Error> {
     let target = service.admin_target(&tenant, &principal, &kind, &id).await?;
-    Ok(match target.updated_at {
-        Some(version) => {
-            Tagged { version, data: TargetResponse::new(target, true) }.into_response()
-        }
-        None => Data { data: TargetResponse::new(target, true) }.into_response(),
-    })
+    // Đích chưa có dòng thì không có phiên bản: trả không kèm `ETag`.
+    Ok(MaybeTagged { version: target.updated_at, data: TargetResponse::new(target, true) })
 }
 
 /// Which comment targets to list.
-#[derive(Debug, Default, Deserialize, IntoParams)]
+#[derive(Debug, Default, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct TargetsQuery {
     /// Only targets of this kind, e.g. `content.entry`.
@@ -454,7 +438,7 @@ pub(crate) struct TargetsQuery {
 }
 
 /// State of a target's comments.
-#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum TargetStateParam {
     Open,
@@ -467,12 +451,11 @@ pub(crate) enum TargetStateParam {
 /// set, newest first, with its counts and — when public — its title and path. Filter by kind,
 /// state, or targets waiting for moderation (`pending=true`). Follow `pagination.next_cursor` with
 /// the same filters for more.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/targets",
-    extensions(("x-permissions" = json!(["comments.read"]))),
+    permission = "comments.read",
     operation_id = "list_comment_targets",
-    security(("bearer" = [])),
     params(TargetsQuery, PageQuery),
     responses(
         (status = 200, description = "One page of targets.", body = Page<TargetResponse>),
@@ -529,7 +512,7 @@ where
 }
 
 /// A new comment state for a target. Omitted fields stay as they are.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TargetRequest {
     /// `open` or `closed`.
@@ -546,12 +529,11 @@ pub(crate) struct TargetRequest {
 ///
 /// Requires `comments.manage`. `If-Match` is optional (send the `ETag` you read to make sure
 /// nobody changed it since). Recorded as `comments.target_opened` / `comments.target_closed`.
-#[utoipa::path(
+#[endpoint(
     put,
     path = "/targets/{target_type}/{target_id}",
-    extensions(("x-permissions" = json!(["comments.manage"]))),
+    permission = "comments.manage",
     operation_id = "set_comment_target",
-    security(("bearer" = [])),
     params(
         ("target_type" = String, Path, description = "Kind of the target, e.g. `content.entry`."),
         ("target_id" = String, Path, description = "Id of the target in its module."),
@@ -584,7 +566,7 @@ pub(crate) async fn set_target(
 }
 
 /// Whose data.
-#[derive(Debug, Deserialize, IntoParams)]
+#[derive(Debug, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct EmailQuery {
     /// The email address of the person (any case).
@@ -601,14 +583,14 @@ impl EmailQuery {
 }
 
 /// A followed comment.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct CommentFollow {
     pub comment_id: Uuid,
     pub created_at: Timestamp,
 }
 
 /// Everything the comments hold about one email address.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentsEmailData)]
 pub(crate) struct EmailDataResponse {
     /// The address, as matched (lower case).
@@ -622,7 +604,7 @@ pub(crate) struct EmailDataResponse {
 }
 
 /// The result of erasing an email address.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentsErasedResponse)]
 pub(crate) struct ErasedResponse {
     /// Comments cleared.
@@ -633,12 +615,11 @@ pub(crate) struct ErasedResponse {
 ///
 /// Requires `comments.export`. For a request of the person the data is about: every comment
 /// written with this address, the comments it follows, and bans of it.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/data",
-    extensions(("x-permissions" = json!(["comments.export"]))),
+    permission = "comments.export",
     operation_id = "export_comments_email_data",
-    security(("bearer" = [])),
     params(EmailQuery),
     responses(
         (status = 200, description = "The data.", body = Data<EmailDataResponse>),
@@ -675,12 +656,11 @@ pub(crate) async fn get_email_data(
 /// Requires `comments.export`. Every comment written with this address loses its text, name,
 /// email and network fingerprint (its place in the thread stays), and reply mails to it stop.
 /// Bans of the address are kept. Recorded as `comments.comments_erased`, without the address.
-#[utoipa::path(
+#[endpoint(
     delete,
     path = "/data",
-    extensions(("x-permissions" = json!(["comments.export"]))),
+    permission = "comments.export",
     operation_id = "erase_comments_email_data",
-    security(("bearer" = [])),
     params(EmailQuery),
     responses(
         (status = 200, description = "How many comments were cleared.", body = Data<ErasedResponse>),

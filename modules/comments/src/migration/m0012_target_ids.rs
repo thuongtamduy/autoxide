@@ -5,7 +5,6 @@
 //! nhất giữ không trùng.
 
 use autoxide_kernel::migration::prelude::*;
-use sea_orm::ConnectionTrait;
 
 pub(crate) struct Migration;
 
@@ -18,7 +17,7 @@ impl MigrationName for Migration {
 const TABLE: &str = "comments_targets";
 const INDEX: &str = "comments_targets_uid_key";
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager

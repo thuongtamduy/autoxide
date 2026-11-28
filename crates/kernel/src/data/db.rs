@@ -135,5 +135,5 @@ pub use record::{
     Updated, count, count_distinct, max, min, sum,
 };
 pub use sql::Sql;
-pub use value::{DbValue, FromRow, Row, Settable, SortKey, TenantKey, Value};
+pub use value::{DbValue, FromRow, Row, Settable, SortKey, TenantKey, UuidKey, Value};
 pub use write::{Bounds, Delete, Insert, UNIQUE_VIOLATION, Update, is_unique_violation};

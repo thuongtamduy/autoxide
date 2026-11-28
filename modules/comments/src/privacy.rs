@@ -11,13 +11,12 @@
 //! [`DormantPrivacy`]: cùng hàm, chỉ không ghi event `comments.comments_erased` (không ai phát event
 //! của module tắt).
 
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
-use sea_orm::sea_query::Expr;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -27,14 +26,14 @@ use crate::posting::authoring::{Deletion, soft_delete};
 use crate::service::{CommentsService, Status};
 use crate::text;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl PersonalData for CommentsService {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         export(tenant, user_id).await
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EventHandler for CommentsService {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         handle_deleted(event, &self.tokens, Some(&self.outbox)).await
@@ -53,14 +52,14 @@ impl DormantPrivacy {
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl PersonalData for DormantPrivacy {
     async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         export(tenant, user_id).await
     }
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl EventHandler for DormantPrivacy {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         handle_deleted(event, &self.tokens, None).await
@@ -82,20 +81,27 @@ async fn handle_deleted(
 
 /// Bình luận, hồ sơ và báo cáo của tài khoản `user_id`.
 async fn export(tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
-    let mut rows = comment::Entity::find()
-        .scoped(tenant)
-        .filter(comment::Column::UserId.eq(user_id))
-        .all(tenant.database().read())
+    let mut rows = tenant
+        .db()
+        .read()
+        .find::<comment::Model>()
+        .filter(comment::Model::USER_ID.eq(Some(user_id)))
+        .all()
         .await?;
     rows.sort_by_key(|row| row.id);
-    let profile = profile::Entity::find_by_id((tenant.id().as_uuid(), user_id))
-        .scoped(tenant)
-        .one(tenant.database().read())
+    let profile = tenant
+        .db()
+        .read()
+        .find::<profile::Model>()
+        .filter(profile::Model::USER_ID.eq(user_id))
+        .one()
         .await?;
-    let reports = report::Entity::find()
-        .scoped(tenant)
-        .filter(report::Column::ReporterUserId.eq(user_id))
-        .all(tenant.database().read())
+    let reports = tenant
+        .db()
+        .read()
+        .find::<report::Model>()
+        .filter(report::Model::REPORTER_USER_ID.eq(Some(user_id)))
+        .all()
         .await?;
     Ok(json!({
         "profile": profile.map(|row| json!({"display_name": row.display_name, "updated_at": row.updated_at})),
@@ -130,11 +136,11 @@ async fn forget_user(
     outbox: Option<&Outbox>,
     user_id: Uuid,
 ) -> Result<usize, Error> {
-    let transaction = tenant.database().begin_write().await?;
-    let rows = comment::Entity::find()
-        .scoped(tenant)
-        .filter(comment::Column::UserId.eq(user_id))
-        .all(&transaction)
+    let transaction = tenant.db().begin_write().await?;
+    let rows = transaction
+        .find::<comment::Model>()
+        .filter(comment::Model::USER_ID.eq(Some(user_id)))
+        .all()
         .await?;
     let mut ids = Vec::new();
     for row in &rows {
@@ -145,29 +151,30 @@ async fn forget_user(
         ids.push(row.id);
     }
     // Bình luận đã xoá từ trước vẫn còn `user_id`.
-    comment::Entity::update_many()
-        .scoped(tenant)
-        .col_expr(comment::Column::UserId, Expr::value(Option::<Uuid>::None))
-        .filter(comment::Column::UserId.eq(user_id))
-        .exec(&transaction)
+    transaction
+        .update::<comment::Model>()
+        .set(comment::Model::USER_ID, None)
+        .filter(comment::Model::USER_ID.eq(Some(user_id)))
+        .exec()
         .await?;
-    profile::Entity::delete_by_id((tenant.id().as_uuid(), user_id))
-        .scoped(tenant)
-        .exec(&transaction)
+    transaction
+        .delete::<profile::Model>()
+        .filter(profile::Model::USER_ID.eq(user_id))
+        .exec()
         .await?;
     // Báo cáo đã gửi giữ lại (người kiểm duyệt cần), nhưng không còn chỉ tới người đó.
-    let reports = report::Entity::find()
-        .scoped(tenant)
-        .filter(report::Column::ReporterUserId.eq(user_id))
-        .all(&transaction)
+    let reports = transaction
+        .find::<report::Model>()
+        .filter(report::Model::REPORTER_USER_ID.eq(Some(user_id)))
+        .all()
         .await?;
     for found in reports {
-        report::Entity::update_many()
-            .scoped(tenant)
-            .col_expr(report::Column::ReporterUserId, Expr::value(Option::<Uuid>::None))
-            .col_expr(report::Column::ReporterKey, Expr::value(format!("deleted:{}", found.id)))
-            .filter(report::Column::Id.eq(found.id))
-            .exec(&transaction)
+        transaction
+            .update::<report::Model>()
+            .set(report::Model::REPORTER_USER_ID, None)
+            .set(report::Model::REPORTER_KEY, format!("deleted:{}", found.id))
+            .filter(report::Model::ID.eq(found.id))
+            .exec()
             .await?;
     }
     if !ids.is_empty()

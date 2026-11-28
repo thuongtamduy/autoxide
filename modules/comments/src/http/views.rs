@@ -1,10 +1,10 @@
 //! Hình dạng trả về của module, dùng chung cho REST và tool MCP. Kiểu công khai (`PublicComment`…)
 //! KHÔNG BAO GIỜ có email, dấu vết IP, lý do giữ lại hay trạng thái thật của bình luận chưa hiện.
 //! Tên schema mang tiền tố `Comment…` để không trùng module khác (D-140).
+use autoxide_kernel::http::Schema;
+use autoxide_kernel::time::Duration;
 use autoxide_kernel::time::Timestamp;
-use jiff::SignedDuration;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 use autoxide_kernel::resource::Resource;
@@ -17,7 +17,7 @@ use crate::text::{self, Format};
 use crate::threads::ThreadRoot;
 
 /// Who wrote a comment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 #[schema(as = CommentAuthorKind)]
 pub(crate) enum AuthorKind {
@@ -28,7 +28,7 @@ pub(crate) enum AuthorKind {
 }
 
 /// The author of a comment, as shown to everyone.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentAuthor)]
 pub(crate) struct Author {
     pub kind: AuthorKind,
@@ -37,7 +37,7 @@ pub(crate) struct Author {
 }
 
 /// A comment, as shown to everyone.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct PublicComment {
     pub id: Uuid,
     pub target_type: String,
@@ -101,7 +101,7 @@ impl From<Comment> for PublicComment {
 }
 
 /// A top-level comment with its first replies.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct ThreadComment {
     #[serde(flatten)]
     pub comment: PublicComment,
@@ -120,7 +120,7 @@ impl From<ThreadRoot> for ThreadComment {
 }
 
 /// Whether a new comment is shown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 #[schema(as = CommentVisibility)]
 pub(crate) enum Visibility {
@@ -131,7 +131,7 @@ pub(crate) enum Visibility {
 }
 
 /// A comment just posted, for its author.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct PostedComment {
     #[serde(flatten)]
     pub comment: PublicComment,
@@ -145,9 +145,8 @@ pub(crate) struct PostedComment {
 
 impl PostedComment {
     pub(crate) fn new(posted: Posted, edit_minutes: u32) -> Self {
-        let editable_until = (edit_minutes > 0).then(|| {
-            posted.comment.row.created_at + SignedDuration::from_mins(i64::from(edit_minutes))
-        });
+        let editable_until = (edit_minutes > 0)
+            .then(|| posted.comment.row.created_at + Duration::from_mins(i64::from(edit_minutes)));
         PostedComment {
             status: if posted.shown == Status::Published {
                 Visibility::Published
@@ -162,7 +161,7 @@ impl PostedComment {
 }
 
 /// A comment just changed, for its author.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct EditedComment {
     #[serde(flatten)]
     pub comment: PublicComment,
@@ -184,7 +183,7 @@ impl From<Comment> for EditedComment {
 }
 
 /// A comment with everything moderators see.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct CommentDetail {
     pub id: Uuid,
     pub target_type: String,
@@ -275,7 +274,7 @@ impl From<Comment> for CommentDetail {
 }
 
 /// Whether a target takes comments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 #[schema(as = CommentTargetState)]
 pub(crate) enum TargetState {
@@ -286,7 +285,7 @@ pub(crate) enum TargetState {
 }
 
 /// A target's comment state and counts.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentTarget)]
 pub(crate) struct TargetResponse {
     pub target_type: String,
@@ -347,7 +346,7 @@ pub(crate) fn described(resource: Option<&Resource>) -> (Option<String>, Option<
 }
 
 /// A ban.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentBan)]
 pub(crate) struct BanResponse {
     pub id: Uuid,
@@ -380,7 +379,7 @@ impl From<ban::Model> for BanResponse {
 }
 
 /// A report of a comment.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentReport)]
 pub(crate) struct ReportResponse {
     pub id: Uuid,

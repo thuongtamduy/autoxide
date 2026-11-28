@@ -11,16 +11,15 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::http::{ClientInfo, ValidJson};
+use autoxide_kernel::http::{
+    ClientInfo, Params, Path, Query, Schema, State, ValidJson, Validate, endpoint,
+};
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use autoxide_kernel::version::Tagged;
-use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
-use validator::Validate;
 
 use super::page_request;
 use super::views::{EditedComment, PostedComment, PublicComment, TargetResponse, ThreadComment};
@@ -31,7 +30,7 @@ use crate::text::Format;
 use crate::threads::{REPLIES_MAX, oldest_first};
 
 /// What a website needs to know to show the comment box.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct CommentSettings {
     /// New comments are taken at all.
     pub enabled: bool,
@@ -64,10 +63,10 @@ pub(crate) struct CommentSettings {
 ///
 /// No sign-in needed. Limits and switches a website needs to show the comment box, for the
 /// tenant of the request (its own `comments.max_links` when it set one).
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/public/settings",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "get_comment_settings",
     security((), ("bearer" = [])),
     responses(
@@ -99,7 +98,7 @@ pub(crate) async fn get_settings(
 }
 
 /// Which thread.
-#[derive(Debug, Default, Deserialize, IntoParams)]
+#[derive(Debug, Default, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct ThreadQuery {
     /// Kind of the target, e.g. `content.entry`.
@@ -144,10 +143,10 @@ fn target_of(
 /// top-level comments, exact-accent matches first (questions and answers on a product use the
 /// same thread: a question is a top-level comment, answers are its replies). Follow
 /// `pagination.next_cursor` with the same parameters for more.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/public/threads",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "list_comment_thread",
     security((), ("bearer" = [])),
     params(ThreadQuery, PageQuery),
@@ -200,10 +199,10 @@ pub(crate) async fn list_thread(
 ///
 /// No sign-in needed. Only shown comments (and deleted top-level comments that still have
 /// replies).
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/public/comments/{id}",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "get_public_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -225,10 +224,10 @@ pub(crate) async fn get_public_comment(
 ///
 /// No sign-in needed. Shown replies of the thread the comment starts, oldest first
 /// (`order=desc`: newest first). Follow `pagination.next_cursor` for more.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/public/comments/{id}/replies",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "list_comment_replies",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the top-level comment."), PageQuery),
@@ -243,15 +242,16 @@ pub(crate) async fn list_replies(
     tenant: TenantContext,
     _principal: Option<Principal>,
     Path(id): Path<Uuid>,
-    Query(mut paging): Query<PageQuery>,
+    Query(paging): Query<PageQuery>,
 ) -> Result<Page<PublicComment>, Error> {
+    let mut paging = paging;
     paging.order = oldest_first(paging.order.as_deref());
     let page = page_request(paging, Vec::new())?;
     Ok(service.replies(&tenant, id, &page).await?.map(PublicComment::from))
 }
 
 /// A new comment.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateCommentRequest {
     /// Kind of the target, e.g. `content.entry`.
@@ -294,10 +294,10 @@ pub(crate) struct CreateCommentRequest {
 /// reported at once. The answer says `published` or `pending` (waiting for approval — held
 /// or dropped comments look the same). Guests get an `edit_token`, shown only here. Sending the
 /// same `form_token` again returns the same comment (with a new `edit_token`).
-#[utoipa::path(
+#[endpoint(
     post,
     path = "/public/comments",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "create_comment",
     security((), ("bearer" = [])),
     request_body = CreateCommentRequest,
@@ -343,7 +343,7 @@ pub(crate) async fn create_comment(
 }
 
 /// A change by the author.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct EditCommentRequest {
     /// The new text.
@@ -361,10 +361,10 @@ pub(crate) struct EditCommentRequest {
 /// waits for approval again (`status: pending`) when it now has suspect words or too many links,
 /// or when a new comment of the same author on the same target would wait (approval mode `pre`,
 /// or `first_time` without a shown comment).
-#[utoipa::path(
+#[endpoint(
     patch,
     path = "/public/comments/{id}",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "edit_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -399,7 +399,7 @@ pub(crate) async fn edit_comment(
 }
 
 /// Proof of authorship.
-#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Default, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DeleteOwnRequest {
     /// Guests: the `edit_token` received when posting. Signed-in authors send `{}`.
@@ -413,10 +413,10 @@ pub(crate) struct DeleteOwnRequest {
 /// stay. A body is used (not `DELETE`) because the token must not travel in the address. An id
 /// that does not exist (deleted for good, or a comment dropped by the anti-spam checks) also
 /// answers `200`, so the answer tells nothing about what happened to a comment.
-#[utoipa::path(
+#[endpoint(
     post,
     path = "/public/comments/{id}/delete",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "delete_own_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -439,14 +439,14 @@ pub(crate) async fn delete_own_comment(
 }
 
 /// The answer to a delete.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentDeleted)]
 pub(crate) struct DeletedResponse {
     pub deleted: bool,
 }
 
 /// A report.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReportRequest {
     reason: ReportReason,
@@ -455,7 +455,7 @@ pub(crate) struct ReportRequest {
 }
 
 /// The answer to a report.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentReported)]
 pub(crate) struct ReportedResponse {
     /// Always `true`: reporting twice, or too often, answers the same.
@@ -467,10 +467,10 @@ pub(crate) struct ReportedResponse {
 /// No sign-in needed. One report per person per comment (signed-in user, or network block for
 /// guests); reporting again answers the same. When `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`
 /// reports are reached the comment waits for a moderator again (once).
-#[utoipa::path(
+#[endpoint(
     post,
     path = "/public/comments/{id}/reports",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "report_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -496,7 +496,7 @@ pub(crate) async fn report_comment(
 }
 
 /// Which targets to count.
-#[derive(Debug, Default, Deserialize, IntoParams)]
+#[derive(Debug, Default, Deserialize, Params)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct CountsQuery {
     /// Kind of the targets, e.g. `content.entry`.
@@ -507,7 +507,7 @@ pub(crate) struct CountsQuery {
 }
 
 /// The comment count of a target.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct CommentCount {
     pub target_id: String,
     /// Shown comments (top-level and replies).
@@ -520,10 +520,10 @@ pub(crate) struct CommentCount {
 ///
 /// No sign-in needed. Shown comments (all, and top-level only) of up to 100 targets of one kind,
 /// in the order asked; unknown and hidden targets count 0.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/public/counts",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "count_comments",
     security((), ("bearer" = [])),
     params(CountsQuery),
@@ -570,10 +570,10 @@ pub(crate) async fn count_comments(
 /// Get the comment state of a target (public).
 ///
 /// No sign-in needed. Whether it takes comments now, when it closes, how many are shown.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/public/targets/{target_type}/{target_id}",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "get_public_comment_target",
     security((), ("bearer" = [])),
     params(
@@ -596,7 +596,7 @@ pub(crate) async fn get_public_target(
 }
 
 /// A token from a mail link.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 #[schema(as = CommentMailToken)]
 pub(crate) struct TokenRequest {
@@ -605,7 +605,7 @@ pub(crate) struct TokenRequest {
 }
 
 /// The answer to an address confirmation.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub(crate) struct VerifiedResponse {
     pub verified: bool,
 }
@@ -616,10 +616,10 @@ pub(crate) struct VerifiedResponse {
 /// so mail scanners opening the link change nothing). From then on, the address gets a mail
 /// when that comment receives a shown reply. The token tells the tenant: the call works on any
 /// host of the API, without `Autoxide-Tenant`.
-#[utoipa::path(
+#[endpoint(
     post,
     path = "/public/verify",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "verify_comment_email",
     security((), ("bearer" = [])),
     request_body = TokenRequest,
@@ -638,7 +638,7 @@ pub(crate) async fn verify_email(
 }
 
 /// Stop reply mails.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UnsubscribeRequest {
     /// The `token` of the link in a reply mail, exactly as received (it may contain a `.`).
@@ -649,7 +649,7 @@ pub(crate) struct UnsubscribeRequest {
 }
 
 /// The answer to an unsubscription.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentsUnsubscribed)]
 pub(crate) struct UnsubscribedResponse {
     /// Always `true`, even for an unknown or used token (nothing is revealed).
@@ -661,10 +661,10 @@ pub(crate) struct UnsubscribedResponse {
 /// The page at `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` sends the token of the link in a reply mail
 /// here. Takes effect at once. The token tells the tenant: the call works on any host of the
 /// API, without `Autoxide-Tenant`.
-#[utoipa::path(
+#[endpoint(
     post,
     path = "/public/unsubscribe",
-    extensions(("x-public" = json!(true))),
+    public,
     operation_id = "unsubscribe_comment_replies",
     security((), ("bearer" = [])),
     request_body = UnsubscribeRequest,
@@ -680,7 +680,7 @@ pub(crate) async fn unsubscribe(
 }
 
 /// The display name of a signed-in user.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 #[schema(as = CommentProfile)]
 pub(crate) struct ProfileResponse {
     /// `null` until chosen.
@@ -691,12 +691,11 @@ pub(crate) struct ProfileResponse {
 /// Get one's display name.
 ///
 /// Requires `comments.post`. The name shown on one's comments; `null` until chosen.
-#[utoipa::path(
+#[endpoint(
     get,
     path = "/profile",
-    extensions(("x-permissions" = json!(["comments.post"]))),
+    permission = "comments.post",
     operation_id = "get_comment_profile",
-    security(("bearer" = [])),
     responses(
         (status = 200, description = "The profile.", body = Data<ProfileResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -718,7 +717,7 @@ pub(crate) async fn get_profile(
 }
 
 /// A display name.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ProfileRequest {
     /// 1 to 50 characters; reserved names (`AUTOXIDE_COMMENTS_RESERVED_NAMES`) are for
@@ -730,12 +729,11 @@ pub(crate) struct ProfileRequest {
 ///
 /// Requires `comments.post`. Needed before commenting while signed in; shown on all one's
 /// comments, also the earlier ones.
-#[utoipa::path(
+#[endpoint(
     put,
     path = "/profile",
-    extensions(("x-permissions" = json!(["comments.post"]))),
+    permission = "comments.post",
     operation_id = "set_comment_profile",
-    security(("bearer" = [])),
     request_body = ProfileRequest,
     responses(
         (status = 200, description = "The profile.", body = Data<ProfileResponse>),

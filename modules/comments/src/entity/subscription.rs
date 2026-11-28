@@ -2,28 +2,20 @@
 //! lời. Token huỷ của từng mail nằm ở `comments_tokens` (mục đích `unsubscribe`, D-130 của
 //! `newsletter`: token riêng cho từng mail, chỉ lưu bản băm).
 
+use autoxide_kernel::db::{Record, TenantKey};
 use autoxide_kernel::time::Timestamp;
-use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
-#[sea_orm::model]
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "comments_reply_subscriptions")]
-pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+#[derive(Record, Clone, Debug, PartialEq, Eq)]
+#[record(table = "comments_reply_subscriptions", scope = tenant)]
+pub(crate) struct Model {
+    #[record(primary_key)]
     pub id: Uuid,
     /// Khách sở hữu dòng (bước 33).
-    pub tenant_id: Uuid,
+    pub tenant_id: TenantKey,
     /// Bình luận được theo dõi.
     pub comment_id: Uuid,
     /// Email đã xác minh (chữ thường).
     pub email: String,
     pub created_at: Timestamp,
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-impl autoxide_kernel::tenancy::TenantScoped for Entity {
-    fn tenant_column() -> Self::Column {
-        Column::TenantId
-    }
 }

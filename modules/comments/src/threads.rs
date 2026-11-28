@@ -6,16 +6,16 @@
 //! - Trả lời: cursor, cũ trước mặc định.
 //! - Đích bị ẩn (`hidden`) thì không có gì công khai.
 //! - Tìm (`q`, D-202): bình luận gốc có chữ hay tên khớp, không phân biệt hoa thường và dấu;
-//!   khớp ĐÚNG dấu xếp trước khớp không dấu (`fetch_page_tiers`), trong mỗi tầng theo `order`.
+//!   khớp ĐÚNG dấu xếp trước khớp không dấu (`Find::page_tiers`), trong mỗi tầng theo `order`.
 //!
 //! Trả lời đầu của mỗi bình luận gốc lấy bằng một câu truy vấn nhỏ có index `(root_id, status,
 //! id)` cho mỗi bình luận gốc có trả lời (tối đa 200 / trang); chưa đo thấy chậm.
 
+use autoxide_kernel::db::{Cond, Queries as _};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::pagination::{Page, PageRequest, Pagination, fetch_page, fetch_page_tiers};
+use autoxide_kernel::pagination::{Page, PageRequest, Pagination};
 use autoxide_kernel::search;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use autoxide_kernel::tenancy::TenantContext;
 use uuid::Uuid;
 
 use crate::entity::comment;
@@ -32,11 +32,11 @@ pub(crate) struct ThreadRoot {
 }
 
 /// Bình luận gốc được thấy công khai: đang hiện, hay đã xoá mà còn trả lời.
-fn visible_root() -> Condition {
-    Condition::any().add(comment::Column::Status.eq(Status::Published.as_str())).add(
-        Condition::all()
-            .add(comment::Column::Status.eq(Status::Deleted.as_str()))
-            .add(comment::Column::ReplyCount.gt(0)),
+fn visible_root() -> Cond<comment::Model> {
+    Cond::any().with(comment::Model::STATUS.eq(Status::Published.as_str().to_owned())).with(
+        Cond::all()
+            .with(comment::Model::STATUS.eq(Status::Deleted.as_str().to_owned()))
+            .with(comment::Model::REPLY_COUNT.gt(0)),
     )
 }
 
@@ -58,37 +58,22 @@ impl CommentsService {
                 Pagination::new(page.limit(), None).with_total(page.wants_total().then_some(0));
             return Ok(Page { data: Vec::new(), pagination });
         }
-        let select = comment::Entity::find()
-            .scoped(tenant)
-            .filter(comment::Column::TargetType.eq(kind))
-            .filter(comment::Column::TargetId.eq(id))
-            .filter(comment::Column::Depth.eq(0))
+        let read = tenant.db().read();
+        let select = read
+            .find::<comment::Model>()
+            .filter(comment::Model::TARGET_TYPE.eq(kind.to_owned()))
+            .filter(comment::Model::TARGET_ID.eq(id.to_owned()))
+            .filter(comment::Model::DEPTH.eq(0))
             .filter(visible_root());
         let Page { data: roots, pagination } = match search {
-            None => {
-                fetch_page(
-                    select,
-                    comment::Column::Id,
-                    |row| row.id,
-                    page,
-                    tenant.database().read(),
-                )
-                .await?
-            }
+            None => select.page(comment::Model::ID, page).await?,
             Some(text) => {
+                // Hai cột lưu sẵn dạng chữ thường (`exact_key` giữ dấu, `fold` bỏ dấu): so chuỗi tìm cùng dạng.
                 let tiers = [
-                    Condition::all().add(search::contains_exact(comment::Column::MatchKey, text)),
-                    Condition::all().add(search::contains(comment::Column::SearchKey, text)),
+                    comment::Model::MATCH_KEY.contains(&search::exact_key(text)),
+                    comment::Model::SEARCH_KEY.contains(&search::fold(text)),
                 ];
-                fetch_page_tiers(
-                    select,
-                    &tiers,
-                    comment::Column::Id,
-                    |row| row.id,
-                    page,
-                    tenant.database().read(),
-                )
-                .await?
+                select.page_tiers(&tiers, comment::Model::ID, page).await?
             }
         };
         let replies = replies.min(REPLIES_MAX);
@@ -96,14 +81,13 @@ impl CommentsService {
         let mut counts = Vec::new();
         for root in &roots {
             let found = if replies > 0 && root.reply_count > 0 {
-                comment::Entity::find()
-                    .scoped(tenant)
-                    .filter(comment::Column::RootId.eq(root.id))
-                    .filter(comment::Column::Depth.eq(1))
-                    .filter(comment::Column::Status.eq(Status::Published.as_str()))
-                    .order_by_asc(comment::Column::Id)
+                read.find::<comment::Model>()
+                    .filter(comment::Model::ROOT_ID.eq(root.id))
+                    .filter(comment::Model::DEPTH.eq(1))
+                    .filter(comment::Model::STATUS.eq(Status::Published.as_str().to_owned()))
+                    .order_asc(comment::Model::ID)
                     .limit(u64::from(replies))
-                    .all(tenant.database().read())
+                    .all()
                     .await?
             } else {
                 Vec::new()
@@ -132,14 +116,15 @@ impl CommentsService {
         page: &PageRequest,
     ) -> Result<Page<Comment>, Error> {
         let root = self.public_row(tenant, id).await?;
-        let select = comment::Entity::find()
-            .scoped(tenant)
-            .filter(comment::Column::RootId.eq(root.root_id))
-            .filter(comment::Column::Depth.eq(1))
-            .filter(comment::Column::Status.eq(Status::Published.as_str()));
-        let Page { data, pagination } =
-            fetch_page(select, comment::Column::Id, |row| row.id, page, tenant.database().read())
-                .await?;
+        let Page { data, pagination } = tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::ROOT_ID.eq(root.root_id))
+            .filter(comment::Model::DEPTH.eq(1))
+            .filter(comment::Model::STATUS.eq(Status::Published.as_str().to_owned()))
+            .page(comment::Model::ID, page)
+            .await?;
         Ok(Page { data: self.named(tenant, data).await?, pagination })
     }
 

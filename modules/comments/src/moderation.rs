@@ -6,15 +6,13 @@
 pub(crate) mod reports;
 
 use autoxide_kernel::access::Principal;
+use autoxide_kernel::db::Cond;
+use autoxide_kernel::db::Queries as _;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::pagination::{Page, PageRequest};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::time::Timestamp;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
-    QuerySelect, Set,
-};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -89,27 +87,28 @@ impl CommentsService {
     ) -> Result<Page<Comment>, Error> {
         principal.require(&COMMENTS_READ)?;
         let status = filter.status.unwrap_or(Status::Pending);
-        let mut select = comment::Entity::find()
-            .scoped(tenant)
-            .filter(comment::Column::Status.eq(status.as_str()));
+        let read = tenant.db().read();
+        let mut select = read
+            .find::<comment::Model>()
+            .filter(comment::Model::STATUS.eq(status.as_str().to_owned()));
         if let Some(kind) = filter.target_type.as_deref().filter(|kind| !kind.is_empty()) {
-            select = select.filter(comment::Column::TargetType.eq(kind));
+            select = select.filter(comment::Model::TARGET_TYPE.eq(kind.to_owned()));
         }
         if let Some(id) = filter.target_id.as_deref().filter(|id| !id.is_empty()) {
-            select = select.filter(comment::Column::TargetId.eq(id));
+            select = select.filter(comment::Model::TARGET_ID.eq(id.to_owned()));
         }
         if filter.unanswered {
             select = select
-                .filter(comment::Column::Depth.eq(0))
-                .filter(comment::Column::ReplyCount.eq(0));
+                .filter(comment::Model::DEPTH.eq(0))
+                .filter(comment::Model::REPLY_COUNT.eq(0));
         }
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
-            select = select
-                .filter(autoxide_kernel::search::contains(comment::Column::SearchKey, search));
+            // Cột lưu dạng `search::fold` (chữ thường, bỏ dấu): so chuỗi tìm cùng dạng.
+            select = select.filter(
+                comment::Model::SEARCH_KEY.contains(&autoxide_kernel::search::fold(search)),
+            );
         }
-        let Page { data, pagination } =
-            fetch_page(select, comment::Column::Id, |row| row.id, page, tenant.database().read())
-                .await?;
+        let Page { data, pagination } = select.page(comment::Model::ID, page).await?;
         Ok(Page { data: self.named(tenant, data).await?, pagination })
     }
 
@@ -157,22 +156,22 @@ impl CommentsService {
             return self.find_named(tenant, id).await;
         }
         let now = now();
-        let mut row = before.clone().into_active_model();
-        row.status = Set(to.as_str().to_owned());
-        row.updated_at = Set(now);
+        let mut row = before.clone();
+        row.status = to.as_str().to_owned();
+        row.updated_at = now;
         match to {
             Status::Published => {
-                row.hold_reason = Set(None);
+                row.hold_reason = None;
                 if before.published_at.is_none() {
-                    row.published_at = Set(Some(now));
+                    row.published_at = Some(now);
                 }
             }
-            Status::Pending => row.hold_reason = Set(Some("moderation".to_owned())),
+            Status::Pending => row.hold_reason = Some("moderation".to_owned()),
             _ => {}
         }
-        let transaction = tenant.database().begin_write().await?;
-        let after = update_if_unchanged(&transaction, tenant, row, &before).await?;
-        shift_counts(&transaction, tenant, &after, Some(from), Some(to)).await?;
+        let transaction = tenant.db().begin_write().await?;
+        let after = update_if_unchanged(&transaction, row, &before).await?;
+        shift_counts(&transaction, &after, Some(from), Some(to)).await?;
         let actor = Actor::from(principal);
         let subject = events::comment_subject(id);
         let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
@@ -210,37 +209,35 @@ impl CommentsService {
     ) -> Result<u64, Error> {
         principal.require(&COMMENTS_MODERATE)?;
         let row = self.find(tenant, id).await?;
-        let transaction = tenant.database().begin_write().await?;
+        let transaction = tenant.db().begin_write().await?;
         // Khoá (`FOR UPDATE` trên Postgres; SQLite chỉ một transaction ghi một lúc) rồi mới đọc
         // trạng thái để đổi số đếm — không đổi số đếm theo trạng thái cũ khi ai đó vừa duyệt /
         // giữ lại một bình luận trong luồng. Thứ tự khoá như mọi lệnh ghi khác (trả lời → gốc →
         // đích, xem `shift_counts`): trước các trả lời đang có, rồi bình luận gốc — trả lời mới
         // phải khoá gốc trước khi được lưu (`post`), nên sau bước này không còn trả lời mới nào
         // chen vào; cuối cùng đọc lại cả luồng (có cả trả lời vừa lưu trước khi gốc bị khoá).
-        let thread =
-            || comment::Entity::find().scoped(tenant).filter(comment::Column::RootId.eq(id));
+        let thread = || {
+            transaction.find::<comment::Model>().for_update().filter(comment::Model::ROOT_ID.eq(id))
+        };
         let rows = if row.depth == 0 {
-            thread()
-                .filter(comment::Column::Id.ne(id))
-                .order_by_asc(comment::Column::Id)
-                .lock_exclusive()
-                .all(&transaction)
-                .await?;
-            if comment::Entity::find_by_id(id)
-                .scoped(tenant)
-                .lock_exclusive()
-                .one(&transaction)
+            thread().filter(comment::Model::ID.ne(id)).order_asc(comment::Model::ID).all().await?;
+            if transaction
+                .find::<comment::Model>()
+                .for_update()
+                .filter(comment::Model::ID.eq(id))
+                .one()
                 .await?
                 .is_none()
             {
                 return Err(comment_not_found(id));
             }
-            thread().order_by_asc(comment::Column::Id).lock_exclusive().all(&transaction).await?
+            thread().order_asc(comment::Model::ID).all().await?
         } else {
-            comment::Entity::find_by_id(id)
-                .scoped(tenant)
-                .lock_exclusive()
-                .all(&transaction)
+            transaction
+                .find::<comment::Model>()
+                .for_update()
+                .filter(comment::Model::ID.eq(id))
+                .all()
                 .await?
         };
         if rows.is_empty() {
@@ -248,25 +245,24 @@ impl CommentsService {
         }
         let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
         for found in &rows {
-            shift_counts(&transaction, tenant, found, Some(Status::of(found)), None).await?;
+            shift_counts(&transaction, found, Some(Status::of(found)), None).await?;
             self.tokens.forget(&transaction, tenant, &found.id.to_string()).await?;
         }
-        report::Entity::delete_many()
-            .scoped(tenant)
-            .filter(report::Column::CommentId.is_in(ids.clone()))
-            .exec(&transaction)
+        transaction
+            .delete::<report::Model>()
+            .filter(report::Model::COMMENT_ID.is_in(ids.clone()))
+            .exec()
             .await?;
-        subscription::Entity::delete_many()
-            .scoped(tenant)
-            .filter(subscription::Column::CommentId.is_in(ids.clone()))
-            .exec(&transaction)
+        transaction
+            .delete::<subscription::Model>()
+            .filter(subscription::Model::COMMENT_ID.is_in(ids.clone()))
+            .exec()
             .await?;
-        let deleted = comment::Entity::delete_many()
-            .scoped(tenant)
-            .filter(comment::Column::Id.is_in(ids))
-            .exec(&transaction)
-            .await?
-            .rows_affected;
+        let deleted = transaction
+            .delete::<comment::Model>()
+            .filter(comment::Model::ID.is_in(ids))
+            .exec()
+            .await?;
         let change = Change {
             before: Some(summary(&row)),
             after: Some(json!({"hard": true, "count": deleted})),
@@ -294,18 +290,19 @@ impl CommentsService {
         page: &PageRequest,
     ) -> Result<Page<ban::Model>, Error> {
         principal.require(&COMMENTS_MANAGE)?;
-        let mut select = ban::Entity::find().scoped(tenant);
+        let read = tenant.db().read();
+        let mut select = read.find::<ban::Model>();
         if let Some(kind) = filter.kind.as_deref() {
-            select = select.filter(ban::Column::Kind.eq(kind));
+            select = select.filter(ban::Model::KIND.eq(kind.to_owned()));
         }
         if filter.active {
             select = select.filter(
-                sea_orm::Condition::any()
-                    .add(ban::Column::Until.is_null())
-                    .add(ban::Column::Until.gt(now())),
+                Cond::any()
+                    .with(ban::Model::UNTIL.is_null())
+                    .with(ban::Model::UNTIL.gt(Some(now()))),
             );
         }
-        fetch_page(select, ban::Column::Id, |row| row.id, page, tenant.database().read()).await
+        select.page(ban::Model::ID, page).await
     }
 
     /// Cấm một người bình luận. Cần `comments.manage`.
@@ -358,19 +355,18 @@ impl CommentsService {
         let Some(value) = value.filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
         };
-        let transaction = tenant.database().begin_write().await?;
-        let row = ban::ActiveModel {
-            id: Set(Uuid::now_v7()),
-            tenant_id: Set(tenant.id().as_uuid()),
-            kind: Set(input.kind),
-            value: Set(value),
-            reason: Set(reason),
-            until: Set(input.until),
-            created_by: Set(Some(principal.user_id())),
-            created_at: Set(now),
-        }
-        .insert(&transaction)
-        .await?;
+        let transaction = tenant.db().begin_write().await?;
+        let row = ban::Model {
+            id: Uuid::now_v7(),
+            tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
+            kind: input.kind,
+            value: value,
+            reason: reason,
+            until: input.until,
+            created_by: Some(principal.user_id()),
+            created_at: now,
+        };
+        transaction.insert(row.clone()).exec().await?;
         let change = Change { before: None, after: Some(ban_summary(&row)) };
         self.outbox
             .record(
@@ -393,13 +389,14 @@ impl CommentsService {
         id: Uuid,
     ) -> Result<(), Error> {
         principal.require(&COMMENTS_MANAGE)?;
-        let transaction = tenant.database().begin_write().await?;
-        let row = ban::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
+        let transaction = tenant.db().begin_write().await?;
+        let row = transaction
+            .find::<ban::Model>()
+            .filter(ban::Model::ID.eq(id))
+            .one()
             .await?
             .ok_or_else(|| ban_not_found(id))?;
-        ban::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
+        transaction.delete::<ban::Model>().filter(ban::Model::ID.eq(id)).exec().await?;
         let change = Change { before: Some(ban_summary(&row)), after: None };
         self.outbox
             .record(
@@ -423,22 +420,28 @@ impl CommentsService {
     ) -> Result<EmailData, Error> {
         principal.require(&COMMENTS_EXPORT)?;
         let email = checked_email(email)?;
-        let mut rows = comment::Entity::find()
-            .scoped(tenant)
-            .filter(comment::Column::AuthorEmail.eq(email.as_str()))
-            .all(tenant.database().read())
+        let mut rows = tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::AUTHOR_EMAIL.eq(Some(email.clone())))
+            .all()
             .await?;
         rows.sort_by_key(|row| row.id);
-        let subscriptions = subscription::Entity::find()
-            .scoped(tenant)
-            .filter(subscription::Column::Email.eq(email.as_str()))
-            .all(tenant.database().read())
+        let subscriptions = tenant
+            .db()
+            .read()
+            .find::<subscription::Model>()
+            .filter(subscription::Model::EMAIL.eq(email.as_str().to_owned()))
+            .all()
             .await?;
-        let bans = ban::Entity::find()
-            .scoped(tenant)
-            .filter(ban::Column::Kind.eq("email"))
-            .filter(ban::Column::Value.eq(email.as_str()))
-            .all(tenant.database().read())
+        let bans = tenant
+            .db()
+            .read()
+            .find::<ban::Model>()
+            .filter(ban::Model::KIND.eq("email".to_owned()))
+            .filter(ban::Model::VALUE.eq(email.as_str().to_owned()))
+            .all()
             .await?;
         Ok(EmailData { comments: self.named(tenant, rows).await?, subscriptions, bans })
     }
@@ -455,11 +458,11 @@ impl CommentsService {
     ) -> Result<u64, Error> {
         principal.require(&COMMENTS_EXPORT)?;
         let email = checked_email(email)?;
-        let transaction = tenant.database().begin_write().await?;
-        let rows = comment::Entity::find()
-            .scoped(tenant)
-            .filter(comment::Column::AuthorEmail.eq(email.as_str()))
-            .all(&transaction)
+        let transaction = tenant.db().begin_write().await?;
+        let rows = transaction
+            .find::<comment::Model>()
+            .filter(comment::Model::AUTHOR_EMAIL.eq(Some(email.clone())))
+            .all()
             .await?;
         let mut ids = Vec::new();
         for row in &rows {
@@ -474,12 +477,11 @@ impl CommentsService {
             .await?;
             ids.push(row.id);
         }
-        let follows = subscription::Entity::delete_many()
-            .scoped(tenant)
-            .filter(subscription::Column::Email.eq(email.as_str()))
-            .exec(&transaction)
-            .await?
-            .rows_affected;
+        let follows = transaction
+            .delete::<subscription::Model>()
+            .filter(subscription::Model::EMAIL.eq(email.as_str().to_owned()))
+            .exec()
+            .await?;
         if !ids.is_empty() || follows > 0 {
             let change = Change {
                 before: Some(

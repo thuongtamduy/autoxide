@@ -198,7 +198,9 @@ Postgres; vòng kiểm thử bảo mật kiểu bên ngoài cuối cùng không 
 - [ ] Chuyển 39 module sang lớp của kernel theo cụm; `cargo xtask check` và `check-module` chặn phụ thuộc trực tiếp vào
       thư viện đã có lớp
       - Cụm 2 (D-20261128-library-layer-plan mục 7): `address` xong (kèm `db::Find::page_by`, `http::PublicCache`,
-        `autoxide_testkit::control_plane`); còn `comments`, `forms`, `media`
+        `autoxide_testkit::control_plane`); `comments` xong (kèm `Find::page_tiers`/`page_keyed`, phép tính cột `i32`,
+        `JobContext::all_tenants`, `Routes::allowed_while_read_only`, `BodyLimit::post`…, `version::MaybeTagged`);
+        còn `forms`, `media`
 - [ ] Nhịp và công cụ nâng thư viện: `cargo xtask upgrade` hỗ trợ bản lớn (chạy thử, báo chỗ vỡ), giảm crate trùng phiên
       bản trong `Cargo.lock`, theo dõi hai cảnh báo RUSTSEC đang bỏ qua của `webauthn_rp`
 

@@ -35,21 +35,17 @@ mod tests;
 
 use std::sync::Arc;
 
-use autoxide_kernel::access::Permission;
 use autoxide_kernel::antispam::SpamGuard;
 use autoxide_kernel::config::{ConfigReader, Invalid};
+use autoxide_kernel::db::RecordInfo;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::{Event, EventInfo, Subscription};
+use autoxide_kernel::event::{Event, Subscription};
 use autoxide_kernel::http::BodyLimit;
 use autoxide_kernel::job::{JobRegistration, Schedule};
 use autoxide_kernel::mail::Mailer;
-use autoxide_kernel::mcp::Tool;
-use autoxide_kernel::migration::prelude::MigrationTrait;
-use autoxide_kernel::module::{Module, StartContext};
-use autoxide_kernel::resource::ResourceEvent;
+use autoxide_kernel::module::{Manifest, Module, StartContext};
+use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::secret::SecretKey;
-use axum::http::Method;
-use utoipa_axum::router::OpenApiRouter;
 
 use crate::config::CommentsConfig;
 use crate::service::{CommentsService, Parts};
@@ -67,72 +63,74 @@ pub fn module() -> impl Module {
 struct CommentsModule {
     /// Có sau `configure`.
     config: Option<CommentsConfig>,
-    /// Có sau `start`.
-    service: Option<Arc<CommentsService>>,
-    /// Event vòng đời của module sở hữu đích, cho các loại đích đang bật (D-202).
-    owner_events: Vec<ResourceEvent>,
-    /// Sổ database, có sau `start`: job dọn dẹp tra ngữ cảnh từng khách.
-    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
+// Hợp đồng module (D-20261126-module-manifest): `manifest` khai mọi thứ tĩnh (đọc lại sau `configure`, nên
+// thời hạn lưu lấy được từ cấu hình), `start` dựng service rồi đăng ký những gì cần service.
 impl Module for CommentsModule {
-    fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
+    fn manifest(&self) -> Manifest {
         use autoxide_kernel::module::navigation::{MobilePlacement, NavGroup, NavItem, Navigation};
-        Navigation::default().group(NavGroup::new("marketing", "Marketing", "megaphone", 40)).item(
-            NavItem::new("marketing.comments", "marketing", "Comments", 40)
-                .permissions(&[
-                    crate::permissions::COMMENTS_READ,
-                    crate::permissions::COMMENTS_MODERATE,
-                ])
-                .mobile(MobilePlacement::Primary, 40)
-                .counter("comments.pending"),
-        )
-    }
-
-    fn name(&self) -> &'static str {
-        "comments"
-    }
-
-    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
-    fn stability(&self) -> autoxide_kernel::module::Stability {
-        autoxide_kernel::module::Stability::Experimental
-    }
-
-    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
-    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
-    fn depends_on(&self) -> Vec<&'static str> {
-        vec!["mail"]
-    }
-
-    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
-    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         use autoxide_kernel::tenancy::Relocation;
-        Relocation::new()
-            .stay(&[
-                "comments_comments",
-                "comments_targets",
-                "comments_bans",
-                "comments_reports",
-                "comments_reply_subscriptions",
-                "comments_profiles",
-            ])
-            .ephemeral(&["comments_throttle", "comments_tokens", "comments_antispam_nonces"])
-    }
-
-    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        migration::all()
-    }
-
-    fn permissions(&self) -> Vec<Permission> {
-        permissions::all()
-    }
-
-    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
-        blocks::all()
-    }
-
-    fn events(&self) -> Vec<EventInfo> {
-        events::with_activity()
+        let navigation = Navigation::default()
+            .group(NavGroup::new("marketing", "Marketing", "megaphone", 40))
+            .item(
+                NavItem::new("marketing.comments", "marketing", "Comments", 40)
+                    .permissions(&[
+                        crate::permissions::COMMENTS_READ,
+                        crate::permissions::COMMENTS_MODERATE,
+                    ])
+                    .mobile(MobilePlacement::Primary, 40)
+                    .counter("comments.pending"),
+            );
+        Manifest::new(
+            "comments",
+            "Comments and questions on any record (posts, products…), with threads, moderation, \
+             reports, bans and answers.",
+        )
+        // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+        .stability(autoxide_kernel::module::Stability::Experimental)
+        // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+        // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+        .depends_on(["mail"])
+        // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+        .relocation(
+            Relocation::new()
+                .stay(&[
+                    "comments_comments",
+                    "comments_targets",
+                    "comments_bans",
+                    "comments_reports",
+                    "comments_reply_subscriptions",
+                    "comments_profiles",
+                ])
+                .ephemeral(&["comments_throttle", "comments_tokens", "comments_antispam_nonces"]),
+        )
+        .migrations(migration::all)
+        .records([
+            RecordInfo::of::<entity::comment::Model>(),
+            RecordInfo::of::<entity::target::Model>(),
+            RecordInfo::of::<entity::ban::Model>(),
+            RecordInfo::of::<entity::report::Model>(),
+            RecordInfo::of::<entity::subscription::Model>(),
+            RecordInfo::of::<entity::profile::Model>(),
+        ])
+        .permissions(permissions::all())
+        // Khối cho trang dựng bằng khối (bước 67): hạng thử nghiệm, khai trong `unstable`.
+        .unstable(|unstable| unstable.blocks(blocks::all()))
+        .events(events::with_activity())
+        .retention(self.retention())
+        .tenant_settings(config::tenant_settings())
+        .translation("vi", include_str!("../locales/vi.json"))
+        .schedules([Schedule::new(
+            retention::CLEANUP,
+            retention::CLEANUP,
+            std::time::Duration::from_secs(24 * 3600),
+        )])
+        .body_limits([
+            BodyLimit::post("/public/comments", MAX_BODY_BYTES),
+            BodyLimit::patch("/public/comments/{id}", MAX_BODY_BYTES),
+        ])
+        .navigation(navigation)
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -140,6 +138,97 @@ impl Module for CommentsModule {
         Ok(())
     }
 
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let config = self
+            .config
+            .clone()
+            .ok_or_else(|| Error::internal("module `comments` started before it was configured"))?;
+        // Nghe event vòng đời do module sở hữu đích khai (`Module::resource_events`) cho các loại
+        // đích được bật — kernel đã kiểm event có thật, nên không cần biết module nào có mặt.
+        let owner_events =
+            posting::targets::owner_events(context.resource_events(), &config.target_types);
+        let databases: autoxide_kernel::tenancy::DatabaseRegistry = context.kernel()?;
+        let parts = Parts {
+            databases: databases.clone(),
+            outbox: context.kernel()?,
+            guard: context.require::<SpamGuard>()?,
+            secret: (*context.require::<SecretKey>()?).clone(),
+            mailer: context.require::<dyn Mailer>()?,
+            translations: context.translations().clone(),
+            resources: context.kernel()?,
+            verification: context.kernel()?,
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
+            links: context
+                .require::<autoxide_kernel::tenancy::SiteLinks>()
+                .map(|links| (*links).clone())
+                .unwrap_or_default(),
+        };
+        let service = Arc::new(CommentsService::new(parts, config));
+        // Vụ việc của `compliance` kiểm đích và bên bị phản ánh qua sổ đối tượng (D-363).
+        context.resource_type(restriction::COMMENT, Arc::new(restriction::CommentResolver))?;
+        context.contribute::<dyn PersonalData>(service.clone())?;
+        context.contribute::<dyn autoxide_kernel::work::WorkSource>(Arc::new(work::Pending))?;
+        context
+            .contribute::<dyn autoxide_kernel::summary::SummaryMetric>(Arc::new(work::Pending))?;
+        for action in bulk::actions(&service) {
+            context.contribute::<dyn autoxide_kernel::bulk::BulkAction>(action)?;
+        }
+        // Trả lời được hiện: mail báo cho người theo dõi (`notify.rs`).
+        context.subscribe(Subscription::new(
+            events::CommentPublished::NAME,
+            Arc::new(notify::ReplyNotifier(service.clone())),
+        ))?;
+        // Tài khoản bị xoá: xoá mềm bình luận, bỏ `user_id` (`privacy.rs`).
+        context.subscribe(Subscription::new(
+            autoxide_kernel::privacy::USER_DELETED,
+            service.clone(),
+        ))?;
+        // Vụ việc của `compliance` ẩn / hiện lại bình luận (D-363, `restriction.rs`).
+        for event in [
+            autoxide_kernel::moderation::TARGET_RESTRICTED,
+            autoxide_kernel::moderation::TARGET_RESTORED,
+        ] {
+            context.subscribe(Subscription::new(
+                event,
+                Arc::new(restriction::Listener(service.clone())),
+            ))?;
+        }
+        let owner = Arc::new(posting::targets::OwnerEvents {
+            service: service.clone(),
+            events: owner_events.clone(),
+        });
+        for event in &owner_events {
+            context.subscribe(Subscription::new(event.event, owner.clone()))?;
+        }
+        context.job(JobRegistration::new(
+            retention::CLEANUP,
+            Arc::new(retention::Cleanup { service: service.clone(), databases: databases.clone() }),
+        ))?;
+        // Lệnh sinh dữ liệu đo (bước 39 B1): chỉ có khi bật cargo feature `bench-seed`.
+        #[cfg(feature = "bench-seed")]
+        context.task(bench_seed::task(databases))?;
+        for resource in mcp::resources() {
+            context.mcp_resource(resource)?;
+        }
+        for prompt in mcp::prompts() {
+            context.prompt(prompt)?;
+        }
+        context.tools(tools::all(&service))?;
+        context.routes(http::routes(service))
+    }
+
+    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất bình luận của người dùng và xoá chúng khi tài
+    // khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`).
+    fn dormant(
+        &self,
+        context: &mut autoxide_kernel::module::DormantContext<'_>,
+    ) -> Result<(), Error> {
+        context.personal_data(Arc::new(privacy::DormantPrivacy::new()))?;
+        context.on_user_deleted(Arc::new(privacy::DormantPrivacy::new()))
+    }
+}
+
+impl CommentsModule {
     // Thời hạn lưu dữ liệu cá nhân (bước 37 C5, D-360), đọc từ cấu hình đang có.
     fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
         use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
@@ -169,146 +258,6 @@ impl Module for CommentsModule {
             )
             .setting(config::IP_RETENTION_DAYS.name),
         ]
-    }
-
-    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        config::tenant_settings()
-    }
-
-    fn translations(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("vi", include_str!("../locales/vi.json"))]
-    }
-
-    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let config = self
-            .config
-            .clone()
-            .ok_or_else(|| Error::internal("module `comments` started before it was configured"))?;
-        // Nghe event vòng đời do module sở hữu đích khai (`Module::resource_events`) cho các loại
-        // đích được bật — kernel đã kiểm event có thật, nên không cần biết module nào có mặt.
-        self.owner_events =
-            posting::targets::owner_events(context.resource_events(), &config.target_types);
-        let parts = Parts {
-            databases: context.tenancy(),
-            outbox: context.outbox()?,
-            guard: context.require::<SpamGuard>()?,
-            secret: (*context.require::<SecretKey>()?).clone(),
-            mailer: context.require::<dyn Mailer>()?,
-            translations: context.translations().clone(),
-            resources: context.resources(),
-            verification: context.posting_verification(),
-            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
-            links: context
-                .require::<autoxide_kernel::tenancy::SiteLinks>()
-                .map(|links| (*links).clone())
-                .unwrap_or_default(),
-        };
-        let service = Arc::new(CommentsService::new(parts, config));
-        // Vụ việc của `compliance` kiểm đích và bên bị phản ánh qua sổ đối tượng (D-363).
-        context.resource_type(restriction::COMMENT, Arc::new(restriction::CommentResolver))?;
-        context.personal_data(service.clone())?;
-        context.work_source(Arc::new(work::Pending))?;
-        context.summary_metric(Arc::new(work::Pending))?;
-        for action in bulk::actions(&service) {
-            context.bulk_action(action)?;
-        }
-        self.service = Some(service);
-        self.databases = Some(context.tenancy());
-        Ok(())
-    }
-
-    // Chế độ nghỉ (bước 70 P9): module tắt vẫn xuất bình luận của người dùng và xoá chúng khi tài
-    // khoản bị xoá — cùng hàm với lúc bật, không cần service (xem `privacy.rs`).
-    fn dormant(
-        &self,
-        context: &mut autoxide_kernel::module::DormantContext<'_>,
-    ) -> Result<(), Error> {
-        context.personal_data(Arc::new(privacy::DormantPrivacy::new()))?;
-        context.on_user_deleted(Arc::new(privacy::DormantPrivacy::new()))
-    }
-
-    fn subscriptions(&self) -> Vec<Subscription> {
-        let Some(service) = self.service.clone() else {
-            return Vec::new();
-        };
-        let mut subscriptions = vec![
-            // Trả lời được hiện: mail báo cho người theo dõi (`notify.rs`).
-            Subscription::new(
-                events::CommentPublished::NAME,
-                Arc::new(notify::ReplyNotifier(service.clone())),
-            ),
-            // Tài khoản bị xoá: xoá mềm bình luận, bỏ `user_id` (`privacy.rs`).
-            Subscription::new(autoxide_kernel::privacy::USER_DELETED, service.clone()),
-            // Vụ việc của `compliance` ẩn / hiện lại bình luận (D-363, `restriction.rs`).
-            Subscription::new(
-                autoxide_kernel::moderation::TARGET_RESTRICTED,
-                Arc::new(restriction::Listener(service.clone())),
-            ),
-            Subscription::new(
-                autoxide_kernel::moderation::TARGET_RESTORED,
-                Arc::new(restriction::Listener(service.clone())),
-            ),
-        ];
-        let owner = Arc::new(posting::targets::OwnerEvents {
-            service: service.clone(),
-            events: self.owner_events.clone(),
-        });
-        for event in &self.owner_events {
-            subscriptions.push(Subscription::new(event.event, owner.clone()));
-        }
-        subscriptions
-    }
-
-    fn jobs(&self) -> Vec<JobRegistration> {
-        match (self.service.clone(), self.databases.clone()) {
-            (Some(service), Some(databases)) => vec![JobRegistration::new(
-                retention::CLEANUP,
-                Arc::new(retention::Cleanup { service, databases }),
-            )],
-            _ => Vec::new(),
-        }
-    }
-
-    fn schedules(&self) -> Vec<Schedule> {
-        let day = std::time::Duration::from_secs(24 * 3600);
-        vec![Schedule::new(retention::CLEANUP, retention::CLEANUP, day)]
-    }
-
-    fn body_limits(&self) -> Vec<BodyLimit> {
-        vec![
-            BodyLimit::new(Method::POST, "/public/comments", MAX_BODY_BYTES),
-            BodyLimit::new(Method::PATCH, "/public/comments/{id}", MAX_BODY_BYTES),
-        ]
-    }
-
-    fn routes(&self) -> OpenApiRouter {
-        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
-    }
-
-    // Lệnh sinh dữ liệu đo (bước 39 B1): chỉ có khi bật cargo feature `bench-seed`.
-    #[cfg(feature = "bench-seed")]
-    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
-        self.databases
-            .clone()
-            .map(|databases| vec![bench_seed::task(databases)])
-            .unwrap_or_default()
-    }
-
-    fn tools(&self) -> Vec<Tool> {
-        self.service.as_ref().map_or_else(Vec::new, tools::all)
-    }
-
-    fn mcp_resources(&self) -> Vec<autoxide_kernel::mcp::McpResource> {
-        mcp::resources()
-    }
-
-    fn prompts(&self) -> Vec<autoxide_kernel::mcp::Prompt> {
-        mcp::prompts()
-    }
-
-    fn description(&self) -> &'static str {
-        "Comments and questions on any record (posts, products…), with threads, moderation, \
-         reports, bans and answers."
     }
 }
 
@@ -344,7 +293,7 @@ pub(crate) mod testing {
     /// còn lại không có.
     pub struct Entries;
 
-    #[async_trait::async_trait]
+    #[autoxide_kernel::async_trait]
     impl ResourceResolver for Entries {
         async fn resolve(
             &self,

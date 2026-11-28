@@ -14,15 +14,13 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::http::ClientInfo;
+use autoxide_kernel::http::{ClientInfo, Schema, Validate};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use uuid::Uuid;
-use validator::Validate;
 
 use crate::http::{CommentDetail, TargetResponse, choice, page_request};
 use crate::moderation::QueueFilter;
@@ -45,7 +43,7 @@ fn versioned(found: Comment) -> Versioned {
 }
 
 /// Filters and paging of the moderation queue.
-#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Default, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct QueueInput {
     /// `pending` (the default), `published`, `rejected`, `spam` or `deleted`.
@@ -68,7 +66,7 @@ pub(crate) struct QueueInput {
 }
 
 /// Filters and paging of the unanswered questions.
-#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Default, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UnansweredInput {
     /// Only questions on targets of this kind, e.g. `catalog.product`.
@@ -89,7 +87,7 @@ pub(crate) struct UnansweredInput {
 }
 
 /// An answer to a question.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AnswerInput {
     /// Id of the question (a shown top-level comment).
@@ -101,7 +99,7 @@ pub(crate) struct AnswerInput {
 }
 
 /// A comment to read.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CommentId {
     /// Id of the comment.
@@ -109,7 +107,7 @@ pub(crate) struct CommentId {
 }
 
 /// A moderation decision.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ModerateInput {
     /// Id of the comment.
@@ -122,7 +120,7 @@ pub(crate) struct ModerateInput {
 }
 
 /// A new comment state for a target.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize, Validate, Schema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TargetInput {
     /// Kind of the target, e.g. `content.entry`.

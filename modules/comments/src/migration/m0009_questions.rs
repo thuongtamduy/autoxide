@@ -12,7 +12,6 @@
 use std::collections::HashMap;
 
 use autoxide_kernel::migration::prelude::*;
-use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
 pub(crate) struct Migration;
@@ -26,7 +25,7 @@ impl MigrationName for Migration {
 /// Số dòng điền mỗi lượt đọc.
 const BATCH: u64 = 500;
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // SQLite chỉ thêm được một cột mỗi câu `ALTER TABLE`.

@@ -7,15 +7,15 @@
 //! gốc, `published_count` / `published_thread_count` của đích. Làm từng đích một nên biết trước số
 //! trả lời của mỗi bình luận gốc, không phải sửa lại dòng đã ghi. Không phát event.
 
+use autoxide_kernel::time::Duration;
 use autoxide_kernel::time::Timestamp;
-use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::bench_seed::{self, Pseudo, SeedArgs};
+use autoxide_kernel::db::{Queries as _, TenantKey};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::task::{Task, TaskArgs, TaskRun};
-use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext};
-use sea_orm::{EntityTrait, PaginatorTrait, Set};
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
 use uuid::Uuid;
 
 use crate::entity::{comment, profile, target};
@@ -50,17 +50,16 @@ struct Seed {
 /// Các dòng chờ ghi.
 #[derive(Default)]
 struct Batch {
-    comments: Vec<comment::ActiveModel>,
-    targets: Vec<target::ActiveModel>,
+    comments: Vec<comment::Model>,
+    targets: Vec<target::Model>,
 }
 
-#[async_trait::async_trait]
+#[autoxide_kernel::async_trait]
 impl TaskRun for Seed {
     async fn run(&self, args: &TaskArgs) -> Result<String, Error> {
         let args = SeedArgs::parse(args, 1_000_000)?;
         let tenant = args.tenant(&self.databases).await?;
-        let existing =
-            comment::Entity::find().scoped(&tenant).count(tenant.database().read()).await?;
+        let existing = tenant.db().read().find::<comment::Model>().count().await?;
         if existing > 0 {
             return Err(bench_seed::refused(&format!(
                 "the customer already has {existing} comments; seed only a fresh database"
@@ -91,16 +90,16 @@ async fn profiles(
         .collect();
     let rows = named
         .iter()
-        .map(|(id, name)| profile::ActiveModel {
-            tenant_id: Set(tenant.id().as_uuid()),
-            user_id: Set(*id),
-            display_name: Set(name.clone()),
-            name_key: Set(name_key(name)),
-            created_at: Set(now),
-            updated_at: Set(now),
+        .map(|(id, name)| profile::Model {
+            tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
+            user_id: *id,
+            display_name: name.clone(),
+            name_key: name_key(name),
+            created_at: now,
+            updated_at: now,
         })
         .collect();
-    bench_seed::insert_all(tenant.database(), rows).await?;
+    bench_seed::insert_records(&tenant.db(), rows).await?;
     Ok(named)
 }
 
@@ -149,14 +148,14 @@ fn thread(
     share: u64,
     now: Timestamp,
 ) -> Result<u64, Error> {
-    let tenant_id = tenant.id().as_uuid();
+    let tenant_id = TenantKey::new(tenant.id());
     let target_id = entry.to_string();
     let roots = (share * ROOT_PER_MILLE / 1000).max(1);
-    let started = now
-        - SignedDuration::from_mins(i64::try_from(random.below(1_000_000)).unwrap_or(0) + 10_000);
+    let started =
+        now - Duration::from_mins(i64::try_from(random.below(1_000_000)).unwrap_or(0) + 10_000);
     let mut rows: Vec<comment::Model> = Vec::new();
     for position in 0..share {
-        let at = started + SignedDuration::from_secs(i64::try_from(position * 37).unwrap_or(0));
+        let at = started + Duration::from_secs(i64::try_from(position * 37).unwrap_or(0));
         let words = 12 + usize::try_from(random.below(30)).unwrap_or(0);
         let body = random.sentence(words);
         let (user_id, name) = match random.pick(users) {
@@ -216,35 +215,34 @@ fn thread(
     }
     let published = i32::try_from(rows.len()).map_err(Error::internal)?;
     let threads = i32::try_from(roots).map_err(Error::internal)?;
-    batch.targets.push(target::ActiveModel {
-        tenant_id: Set(tenant_id),
-        target_type: Set(TARGET_TYPE.to_owned()),
-        target_id: Set(target_id),
-        uid: Set(Uuid::now_v7()),
-        state: Set("open".to_owned()),
-        hidden: Set(false),
-        closes_at: Set(None),
-        published_count: Set(published),
-        pending_count: Set(0),
-        published_thread_count: Set(threads),
-        pending_thread_count: Set(0),
-        created_at: Set(started),
-        updated_at: Set(now),
+    batch.targets.push(target::Model {
+        tenant_id: tenant_id,
+        target_type: TARGET_TYPE.to_owned(),
+        target_id: target_id,
+        uid: Some(Uuid::now_v7()),
+        state: "open".to_owned(),
+        hidden: false,
+        closes_at: None,
+        published_count: published,
+        pending_count: 0,
+        published_thread_count: threads,
+        pending_thread_count: 0,
+        created_at: started,
+        updated_at: now,
     });
-    batch.comments.extend(rows.into_iter().map(sea_orm::IntoActiveModel::into_active_model));
+    batch.comments.extend(rows);
     Ok(u64::try_from(published).unwrap_or(0))
 }
 
 async fn flush(tenant: &TenantContext, batch: Batch) -> Result<(), Error> {
-    bench_seed::insert_all(tenant.database(), batch.targets).await?;
-    bench_seed::insert_all(tenant.database(), batch.comments).await
+    bench_seed::insert_records(&tenant.db(), batch.targets).await?;
+    bench_seed::insert_records(&tenant.db(), batch.comments).await
 }
 
 #[cfg(test)]
 mod tests {
     use autoxide_kernel::bench_seed::CONFIRM;
     use autoxide_testkit::TestDatabase;
-    use sea_orm::{ColumnTrait, QueryFilter};
 
     use super::*;
 
@@ -265,35 +263,37 @@ mod tests {
             ];
             let report = task.run(&task.parse(&raw).unwrap()).await.unwrap();
             assert!(report.starts_with("Made 2500 published comments on 7 posts"), "{report}");
-            let read = harness.database.read();
-            assert_eq!(comment::Entity::find().count(read).await.unwrap(), 2500);
-            assert_eq!(profile::Entity::find().count(read).await.unwrap(), 4);
+            let all = autoxide_testkit::all_tenants(&harness.database);
+            let read = all.read();
+            assert_eq!(read.find::<comment::Model>().count().await.unwrap(), 2500);
+            assert_eq!(read.find::<profile::Model>().count().await.unwrap(), 4);
             // Số đếm của đích và của bình luận gốc khớp dòng thật.
             let mut total = 0;
-            for row in target::Entity::find().all(read).await.unwrap() {
+            for row in read.find::<target::Model>().all().await.unwrap() {
                 let of = |depth: i32| {
-                    comment::Entity::find()
-                        .filter(comment::Column::TargetId.eq(row.target_id.as_str()))
-                        .filter(comment::Column::Depth.eq(depth))
-                        .count(read)
+                    read.find::<comment::Model>()
+                        .filter(comment::Model::TARGET_ID.eq(row.target_id.as_str().to_owned()))
+                        .filter(comment::Model::DEPTH.eq(depth))
+                        .count()
                 };
                 let (roots, replies) = (of(0).await.unwrap(), of(1).await.unwrap());
-                assert_eq!(u64::try_from(row.published_count).unwrap(), roots + replies);
-                assert_eq!(u64::try_from(row.published_thread_count).unwrap(), roots);
+                assert_eq!(i64::from(row.published_count), roots + replies);
+                assert_eq!(i64::from(row.published_thread_count), roots);
                 total += roots + replies;
             }
             assert_eq!(total, 2500);
-            let roots = comment::Entity::find()
-                .filter(comment::Column::Depth.eq(0))
-                .all(read)
+            let roots = read
+                .find::<comment::Model>()
+                .filter(comment::Model::DEPTH.eq(0))
+                .all()
                 .await
                 .unwrap();
             let replies: i64 = roots.iter().map(|root| i64::from(root.reply_count)).sum();
             assert_eq!(
-                u64::try_from(replies).unwrap(),
-                comment::Entity::find()
-                    .filter(comment::Column::Depth.eq(1))
-                    .count(read)
+                replies,
+                read.find::<comment::Model>()
+                    .filter(comment::Model::DEPTH.eq(1))
+                    .count()
                     .await
                     .unwrap()
             );

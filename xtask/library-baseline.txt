@@ -14,7 +14,6 @@ wrapped-libraries 7 modules/auth/Cargo.toml
 wrapped-libraries 7 modules/automations/Cargo.toml
 wrapped-libraries 7 modules/bookings/Cargo.toml
 wrapped-libraries 7 modules/catalog/Cargo.toml
-wrapped-libraries 7 modules/comments/Cargo.toml
 wrapped-libraries 7 modules/compliance/Cargo.toml
 wrapped-libraries 7 modules/content/Cargo.toml
 wrapped-libraries 7 modules/conversations/Cargo.toml
@@ -151,19 +150,6 @@ raw-database 2 modules/catalog/src/synonyms.rs
 raw-database 12 modules/catalog/src/transfers.rs
 raw-database 3 modules/catalog/src/variant_attributes.rs
 raw-database 7 modules/catalog/src/variants.rs
-raw-database 4 modules/comments/src/bench_seed.rs
-raw-database 10 modules/comments/src/moderation.rs
-raw-database 2 modules/comments/src/moderation/reports.rs
-raw-database 5 modules/comments/src/notify.rs
-raw-database 7 modules/comments/src/posting.rs
-raw-database 7 modules/comments/src/posting/authoring.rs
-raw-database 4 modules/comments/src/posting/targets.rs
-raw-database 4 modules/comments/src/privacy.rs
-raw-database 2 modules/comments/src/restriction.rs
-raw-database 3 modules/comments/src/retention.rs
-raw-database 2 modules/comments/src/service.rs
-raw-database 4 modules/comments/src/threads.rs
-raw-database 2 modules/comments/src/work.rs
 raw-database 5 modules/compliance/src/cases.rs
 raw-database 2 modules/compliance/src/cases/reminders.rs
 raw-database 2 modules/compliance/src/cases/respond.rs

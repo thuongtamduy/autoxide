@@ -2,17 +2,15 @@
 //! không đọc `auth` (D-046), nên tên nằm ở đây; `user_id` không có foreign key. Khoá chính
 //! (`tenant_id`, `user_id`).
 
+use autoxide_kernel::db::{Record, TenantKey};
 use autoxide_kernel::time::Timestamp;
-use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
-#[sea_orm::model]
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "comments_profiles")]
-pub struct Model {
+#[derive(Record, Clone, Debug, PartialEq, Eq)]
+#[record(table = "comments_profiles", scope = tenant)]
+pub(crate) struct Model {
     /// Khách sở hữu dòng (bước 33), cột đầu của khoá chính.
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub tenant_id: Uuid,
-    #[sea_orm(primary_key, auto_increment = false)]
+    pub tenant_id: TenantKey,
     pub user_id: Uuid,
     pub display_name: String,
     /// `text::name_key` của tên, unique trong khách: hai người không trùng tên, kể cả tên viết bằng chữ Kirin /
@@ -20,12 +18,4 @@ pub struct Model {
     pub name_key: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-impl autoxide_kernel::tenancy::TenantScoped for Entity {
-    fn tenant_column() -> Self::Column {
-        Column::TenantId
-    }
 }

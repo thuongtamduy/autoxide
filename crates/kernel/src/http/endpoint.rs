@@ -226,6 +226,14 @@ impl<S: Clone + Send + Sync + 'static> Routes<S> {
         Routes(routes)
     }
 
+    /// Marks every route added so far as callable while the tenant is read-only (`tenancy::ensure_writable`): links in
+    /// mails that confirm an address or withdraw consent must keep working. Routes added after this call are not
+    /// marked.
+    #[must_use]
+    pub fn allowed_while_read_only(self) -> Self {
+        Routes(self.0.layer(crate::tenancy::allowed_while_read_only()))
+    }
+
     /// Gives the handlers their state (`State<T>`, where `T` is `state`'s type).
     pub fn with_state<S2: Clone + Send + Sync + 'static>(self, state: S) -> Routes<S2> {
         Routes(self.0.with_state(state))

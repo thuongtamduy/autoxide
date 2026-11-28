@@ -10,7 +10,6 @@ module-contract-legacy 30 modules/auth/src/lib.rs
 module-contract-legacy 14 modules/automations/src/lib.rs
 module-contract-legacy 16 modules/bookings/src/lib.rs
 module-contract-legacy 21 modules/catalog/src/lib.rs
-module-contract-legacy 22 modules/comments/src/lib.rs
 module-contract-legacy 21 modules/compliance/src/lib.rs
 module-contract-legacy 30 modules/content/src/lib.rs
 module-contract-legacy 16 modules/conversations/src/lib.rs
@@ -50,7 +49,6 @@ start-context-legacy 14 modules/auth/src/lib.rs
 start-context-legacy 6 modules/automations/src/lib.rs
 start-context-legacy 4 modules/bookings/src/lib.rs
 start-context-legacy 7 modules/catalog/src/lib.rs
-start-context-legacy 9 modules/comments/src/lib.rs
 start-context-legacy 8 modules/compliance/src/lib.rs
 start-context-legacy 19 modules/content/src/lib.rs
 start-context-legacy 7 modules/conversations/src/lib.rs

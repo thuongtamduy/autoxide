@@ -9,28 +9,24 @@
 //! đổi trong CÙNG transaction với trạng thái, bằng `UPDATE … SET n = n + k` (không đọc rồi ghi),
 //! nên đúng cả khi nhiều request chạy cùng lúc, trên cả hai database.
 
-use autoxide_kernel::time::Timestamp;
-use jiff::SignedDuration;
+use autoxide_kernel::time::{Duration, Timestamp};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use autoxide_kernel::access::PostingVerification;
 use autoxide_kernel::antispam::SpamGuard;
+use autoxide_kernel::db::{AcceptedBy, Expr, Queries, TenantKey, TenantTx};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Outbox;
+use autoxide_kernel::http::Schema;
 use autoxide_kernel::i18n::Translations;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::resource::ResourceDirectory;
 use autoxide_kernel::secret::SecretKey;
-use autoxide_kernel::tenancy::{
-    DatabaseRegistry, ScopeExt, TenantContext, TenantSettings, parsed_setting,
-};
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, TenantSettings, parsed_setting};
 use autoxide_kernel::tokens::OneTimeTokens;
-use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
-use sea_orm::{ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::config::{self, CommentsConfig, Rules};
@@ -129,7 +125,7 @@ impl CommentsService {
 }
 
 /// Where a comment stands.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 #[schema(as = CommentStatus)]
 pub(crate) enum Status {
@@ -183,9 +179,7 @@ pub(crate) fn now() -> Timestamp {
     Timestamp::now()
 }
 
-pub(crate) fn is_unique_violation(error: &DbErr) -> bool {
-    matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_)))
-}
+pub(crate) use autoxide_kernel::db::is_unique_violation;
 
 pub(crate) fn comment_not_found(id: Uuid) -> Error {
     Error::not_found("comments.not_found", "No comment has the id `{id}`.").with_param("id", id)
@@ -207,8 +201,8 @@ pub(crate) fn summary(row: &comment::Model) -> Value {
 
 /// Dòng `comments_targets` của đích, tạo nếu chưa có (`ON CONFLICT DO NOTHING`: hai request
 /// cùng lúc ra một dòng). Đích mới tự đóng sau `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS` (nếu đặt).
-pub(crate) async fn ensure_target<C: ConnectionTrait>(
-    connection: &C,
+pub(crate) async fn ensure_target(
+    transaction: &TenantTx,
     tenant: &TenantContext,
     config: &CommentsConfig,
     kind: &str,
@@ -216,33 +210,30 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
     now: Timestamp,
 ) -> Result<(), Error> {
     let closes_at = (config.auto_close_days > 0)
-        .then(|| now + SignedDuration::from_hours(24 * (i64::from(config.auto_close_days))));
-    let row = target::ActiveModel {
-        tenant_id: Set(tenant.id().as_uuid()),
-        target_type: Set(kind.to_owned()),
-        target_id: Set(id.to_owned()),
-        uid: Set(Uuid::now_v7()),
-        state: Set("open".to_owned()),
-        hidden: Set(false),
-        closes_at: Set(closes_at),
-        published_count: Set(0),
-        pending_count: Set(0),
-        published_thread_count: Set(0),
-        pending_thread_count: Set(0),
-        created_at: Set(now),
-        updated_at: Set(now),
+        .then(|| now + Duration::from_days(i64::from(config.auto_close_days)));
+    let row = target::Model {
+        tenant_id: TenantKey::new(tenant.id()),
+        target_type: kind.to_owned(),
+        target_id: id.to_owned(),
+        uid: Some(Uuid::now_v7()),
+        state: "open".to_owned(),
+        hidden: false,
+        closes_at,
+        published_count: 0,
+        pending_count: 0,
+        published_thread_count: 0,
+        pending_thread_count: 0,
+        created_at: now,
+        updated_at: now,
     };
-    target::Entity::insert(row)
-        .on_conflict(
-            OnConflict::columns([
-                target::Column::TenantId,
-                target::Column::TargetType,
-                target::Column::TargetId,
-            ])
-            .do_nothing()
-            .to_owned(),
-        )
-        .exec_without_returning(connection)
+    transaction
+        .insert(row)
+        .on_conflict_do_nothing([
+            target::Model::TENANT_ID.key(),
+            target::Model::TARGET_TYPE.key(),
+            target::Model::TARGET_ID.key(),
+        ])
+        .exec()
         .await?;
     Ok(())
 }
@@ -253,26 +244,25 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
 /// Thứ tự khoá cố định trong cả module: dòng bình luận đang đổi → dòng bình luận gốc
 /// (`reply_count`) → dòng đích. Mọi lệnh ghi đi cùng một thứ tự thì Postgres không gặp
 /// deadlock (hai transaction giữ khoá của nhau rồi chờ nhau).
-pub(crate) async fn shift_counts<C: ConnectionTrait>(
-    connection: &C,
-    tenant: &TenantContext,
+pub(crate) async fn shift_counts(
+    transaction: &TenantTx,
     row: &comment::Model,
     from: Option<Status>,
     to: Option<Status>,
 ) -> Result<(), Error> {
     let published = delta(from, to, Status::Published);
     if published != 0 && row.depth > 0 {
-        comment::Entity::update_many()
-            .col_expr(
-                comment::Column::ReplyCount,
-                Expr::col(comment::Column::ReplyCount).add(published),
+        transaction
+            .update::<comment::Model>()
+            .set_expr(
+                comment::Model::REPLY_COUNT,
+                comment::Model::REPLY_COUNT.expr() + Expr::value(published),
             )
-            .filter(comment::Column::Id.eq(row.root_id))
-            .scoped(tenant)
-            .exec(connection)
+            .filter(comment::Model::ID.eq(row.root_id))
+            .exec()
             .await?;
     }
-    shift_target_counts(connection, tenant, row, from, to).await
+    shift_target_counts(transaction, row, from, to).await
 }
 
 /// `+1` / `-1` / `0`: bình luận vào hay ra khỏi trạng thái `status`.
@@ -282,9 +272,8 @@ pub(crate) fn delta(from: Option<Status>, to: Option<Status>, status: Status) ->
 
 /// Phần số đếm của đích trong [`shift_counts`] (không đụng `reply_count`). Bình luận gốc đổi
 /// thêm số câu hỏi (`…_thread_count`, D-202) trong cùng câu lệnh.
-pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
-    connection: &C,
-    tenant: &TenantContext,
+pub(crate) async fn shift_target_counts(
+    transaction: &TenantTx,
     row: &comment::Model,
     from: Option<Status>,
     to: Option<Status>,
@@ -293,48 +282,53 @@ pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
         (delta(from, to, Status::Published), delta(from, to, Status::Pending));
     if published != 0 || pending != 0 {
         let root = i32::from(row.depth == 0);
-        target::Entity::update_many()
-            .col_expr(
-                target::Column::PublishedCount,
-                Expr::col(target::Column::PublishedCount).add(published),
+        // `n = n + k` trong câu lệnh (không đọc rồi ghi): đúng cả khi nhiều request chạy cùng lúc.
+        let plus = |column: autoxide_kernel::db::Col<target::Model, i32>, by: i32| {
+            column.expr() + Expr::value(by)
+        };
+        transaction
+            .update::<target::Model>()
+            .set_expr(
+                target::Model::PUBLISHED_COUNT,
+                plus(target::Model::PUBLISHED_COUNT, published),
             )
-            .col_expr(
-                target::Column::PendingCount,
-                Expr::col(target::Column::PendingCount).add(pending),
+            .set_expr(target::Model::PENDING_COUNT, plus(target::Model::PENDING_COUNT, pending))
+            .set_expr(
+                target::Model::PUBLISHED_THREAD_COUNT,
+                plus(target::Model::PUBLISHED_THREAD_COUNT, published * root),
             )
-            .col_expr(
-                target::Column::PublishedThreadCount,
-                Expr::col(target::Column::PublishedThreadCount).add(published * root),
+            .set_expr(
+                target::Model::PENDING_THREAD_COUNT,
+                plus(target::Model::PENDING_THREAD_COUNT, pending * root),
             )
-            .col_expr(
-                target::Column::PendingThreadCount,
-                Expr::col(target::Column::PendingThreadCount).add(pending * root),
-            )
-            .filter(target::Column::TargetType.eq(row.target_type.as_str()))
-            .filter(target::Column::TargetId.eq(row.target_id.as_str()))
-            .scoped(tenant)
-            .exec(connection)
+            .filter(target::Model::TARGET_TYPE.eq(row.target_type.clone()))
+            .filter(target::Model::TARGET_ID.eq(row.target_id.clone()))
+            .exec()
             .await?;
     }
     Ok(())
 }
 
-/// Tên hiển thị của người dùng `user_ids` (bảng hồ sơ của module).
-pub(crate) async fn display_names<C: ConnectionTrait>(
-    connection: &C,
-    tenant: &TenantContext,
+/// Tên hiển thị của người dùng `user_ids` (bảng hồ sơ của module), đọc qua handle `db` của khách
+/// (đọc hay transaction ghi).
+pub(crate) async fn display_names<H>(
+    db: &H,
     user_ids: impl IntoIterator<Item = Uuid>,
-) -> Result<HashMap<Uuid, String>, Error> {
+) -> Result<HashMap<Uuid, String>, Error>
+where
+    H: Queries,
+    autoxide_kernel::db::Tenant: AcceptedBy<H::Access>,
+{
     let mut ids: Vec<Uuid> = user_ids.into_iter().collect();
     ids.sort();
     ids.dedup();
     if ids.is_empty() {
         return Ok(HashMap::new());
     }
-    Ok(profile::Entity::find()
-        .scoped(tenant)
-        .filter(profile::Column::UserId.is_in(ids))
-        .all(connection)
+    Ok(db
+        .find::<profile::Model>()
+        .filter(profile::Model::USER_ID.is_in(ids))
+        .all()
         .await?
         .into_iter()
         .map(|row| (row.user_id, row.display_name))
@@ -367,12 +361,8 @@ impl CommentsService {
         tenant: &TenantContext,
         rows: Vec<comment::Model>,
     ) -> Result<Vec<Comment>, Error> {
-        let names = display_names(
-            tenant.database().read(),
-            tenant,
-            rows.iter().filter_map(|row| row.user_id),
-        )
-        .await?;
+        let names =
+            display_names(&tenant.db().read(), rows.iter().filter_map(|row| row.user_id)).await?;
         Ok(rows
             .into_iter()
             .map(|row| {
@@ -392,9 +382,12 @@ impl CommentsService {
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<comment::Model, Error> {
-        comment::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(tenant.database().read())
+        tenant
+            .db()
+            .read()
+            .find::<comment::Model>()
+            .filter(comment::Model::ID.eq(id))
+            .one()
             .await?
             .ok_or_else(|| comment_not_found(id))
     }

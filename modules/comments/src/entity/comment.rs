@@ -1,16 +1,16 @@
 //! Bảng `comments_comments`: một bình luận (gốc hay trả lời).
 
+use autoxide_kernel::db::{Record, TenantKey};
 use autoxide_kernel::time::Timestamp;
-use sea_orm::entity::prelude::*;
+use uuid::Uuid;
 
-#[sea_orm::model]
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "comments_comments")]
-pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+#[derive(Record, Clone, Debug, PartialEq, Eq)]
+#[record(table = "comments_comments", scope = tenant)]
+pub(crate) struct Model {
+    #[record(primary_key)]
     pub id: Uuid,
     /// Khách sở hữu dòng (bước 33).
-    pub tenant_id: Uuid,
+    pub tenant_id: TenantKey,
     /// Loại đích (`content.entry`…) — chỉ là chuỗi, không foreign key.
     pub target_type: String,
     pub target_id: String,
@@ -67,12 +67,4 @@ pub struct Model {
     pub restricted_status: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-impl autoxide_kernel::tenancy::TenantScoped for Entity {
-    fn tenant_column() -> Self::Column {
-        Column::TenantId
-    }
 }

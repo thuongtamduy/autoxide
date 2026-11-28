@@ -41,6 +41,21 @@ impl BodyLimit {
     pub fn new(method: Method, path: &'static str, max_bytes: usize) -> Self {
         BodyLimit { method, path, max_bytes }
     }
+
+    /// `POST path` accepts up to `max_bytes` (without naming the `http` crate's `Method`).
+    pub fn post(path: &'static str, max_bytes: usize) -> Self {
+        BodyLimit::new(Method::POST, path, max_bytes)
+    }
+
+    /// `PUT path` accepts up to `max_bytes`.
+    pub fn put(path: &'static str, max_bytes: usize) -> Self {
+        BodyLimit::new(Method::PUT, path, max_bytes)
+    }
+
+    /// `PATCH path` accepts up to `max_bytes`.
+    pub fn patch(path: &'static str, max_bytes: usize) -> Self {
+        BodyLimit::new(Method::PATCH, path, max_bytes)
+    }
 }
 
 /// Lookup table (method, full path pattern) -> limit; a route without a declaration uses the default.
@@ -115,4 +130,16 @@ pub fn is_too_large(error: &axum::Error) -> bool {
         source = current.source();
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ham_dung_theo_method() {
+        assert_eq!(BodyLimit::post("/", 1), BodyLimit::new(Method::POST, "/", 1));
+        assert_eq!(BodyLimit::put("/{id}", 2), BodyLimit::new(Method::PUT, "/{id}", 2));
+        assert_eq!(BodyLimit::patch("/{id}", 3), BodyLimit::new(Method::PATCH, "/{id}", 3));
+    }
 }

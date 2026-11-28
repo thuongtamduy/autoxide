@@ -14,16 +14,14 @@ use std::net::{IpAddr, Ipv6Addr};
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
+use autoxide_kernel::db::{Expr, Queries as _};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::http::ClientInfo;
-use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::http::{ClientInfo, Schema};
+use autoxide_kernel::pagination::{Page, PageRequest};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
-use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::entity::{comment, report};
@@ -37,7 +35,7 @@ use crate::service::{
 const HOUR: Duration = Duration::from_secs(3600);
 
 /// Why a comment is reported.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "snake_case")]
 #[schema(as = CommentReportReason)]
 pub(crate) enum ReportReason {
@@ -118,66 +116,60 @@ impl CommentsService {
         }
 
         let now = now();
-        let transaction = tenant.database().begin_write().await?;
-        let inserted = report::Entity::insert(report::ActiveModel {
-            id: Set(Uuid::now_v7()),
-            tenant_id: Set(tenant.id().as_uuid()),
-            comment_id: Set(id),
-            reporter_key: Set(reporter_key),
-            reporter_user_id: Set(principal.map(Principal::user_id)),
-            reason: Set(reason.as_str().to_owned()),
-            note: Set(note.map(str::to_owned)),
-            created_at: Set(now),
-        })
-        .on_conflict(
-            OnConflict::columns([
-                report::Column::TenantId,
-                report::Column::CommentId,
-                report::Column::ReporterKey,
+        let transaction = tenant.db().begin_write().await?;
+        let inserted = transaction
+            .insert(report::Model {
+                id: Uuid::now_v7(),
+                tenant_id: autoxide_kernel::db::TenantKey::new(tenant.id()),
+                comment_id: id,
+                reporter_key: reporter_key,
+                reporter_user_id: principal.map(Principal::user_id),
+                reason: reason.as_str().to_owned(),
+                note: note.map(str::to_owned),
+                created_at: now,
+            })
+            .on_conflict_do_nothing([
+                report::Model::TENANT_ID.key(),
+                report::Model::COMMENT_ID.key(),
+                report::Model::REPORTER_KEY.key(),
             ])
-            .do_nothing()
-            .to_owned(),
-        )
-        .exec_without_returning(&transaction)
-        .await?;
+            .exec()
+            .await?;
         if inserted == 0 {
             transaction.commit().await?;
             return Ok(());
         }
-        comment::Entity::update_many()
-            .scoped(tenant)
-            .col_expr(comment::Column::ReportCount, Expr::col(comment::Column::ReportCount).add(1))
-            .filter(comment::Column::Id.eq(id))
-            .exec(&transaction)
+        transaction
+            .update::<comment::Model>()
+            .set_expr(
+                comment::Model::REPORT_COUNT,
+                comment::Model::REPORT_COUNT.expr() + Expr::value(1),
+            )
+            .filter(comment::Model::ID.eq(id))
+            .exec()
             .await?;
         let threshold = i32::try_from(self.config.report_threshold).map_err(Error::internal)?;
-        let held = comment::Entity::update_many()
-            .scoped(tenant)
-            .col_expr(comment::Column::Status, Expr::value(Status::Pending.as_str()))
-            .col_expr(comment::Column::HoldReason, Expr::value(Some("reported".to_owned())))
-            .col_expr(comment::Column::ReportsHeldAt, Expr::value(Some(now)))
-            .col_expr(comment::Column::UpdatedAt, Expr::value(now))
-            .filter(comment::Column::Id.eq(id))
-            .filter(comment::Column::Status.eq(Status::Published.as_str()))
-            .filter(comment::Column::ReportsHeldAt.is_null())
-            .filter(comment::Column::ReportCount.gte(threshold))
-            .exec(&transaction)
-            .await?
-            .rows_affected;
+        let held = transaction
+            .update::<comment::Model>()
+            .set(comment::Model::STATUS, Status::Pending.as_str().to_owned())
+            .set(comment::Model::HOLD_REASON, Some("reported".to_owned()))
+            .set(comment::Model::REPORTS_HELD_AT, Some(now))
+            .set(comment::Model::UPDATED_AT, now)
+            .filter(comment::Model::ID.eq(id))
+            .filter(comment::Model::STATUS.eq(Status::Published.as_str().to_owned()))
+            .filter(comment::Model::REPORTS_HELD_AT.is_null())
+            .filter(comment::Model::REPORT_COUNT.gte(threshold))
+            .exec()
+            .await?;
         if held == 1 {
-            let after = comment::Entity::find_by_id(id)
-                .scoped(tenant)
-                .one(&transaction)
+            let after = transaction
+                .find::<comment::Model>()
+                .filter(comment::Model::ID.eq(id))
+                .one()
                 .await?
                 .ok_or_else(|| comment_not_found(id))?;
-            shift_counts(
-                &transaction,
-                tenant,
-                &after,
-                Some(Status::Published),
-                Some(Status::Pending),
-            )
-            .await?;
+            shift_counts(&transaction, &after, Some(Status::Published), Some(Status::Pending))
+                .await?;
             let before =
                 comment::Model { status: Status::Published.as_str().to_owned(), ..after.clone() };
             let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
@@ -207,8 +199,13 @@ impl CommentsService {
     ) -> Result<Page<report::Model>, Error> {
         principal.require(&COMMENTS_READ)?;
         self.find(tenant, id).await?;
-        let select = report::Entity::find().scoped(tenant).filter(report::Column::CommentId.eq(id));
-        fetch_page(select, report::Column::Id, |row| row.id, page, tenant.database().read()).await
+        tenant
+            .db()
+            .read()
+            .find::<report::Model>()
+            .filter(report::Model::COMMENT_ID.eq(id))
+            .page(report::Model::ID, page)
+            .await
     }
 }
 
