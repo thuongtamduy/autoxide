@@ -58,6 +58,10 @@ impl IntoResponse for Download {
 /// an optional `ETag` — e.g. a reference list that changes only when an administrator imports a new one. The
 /// kernel's cache layer still turns `public` into `private` for a signed-in request, and answers `304` when
 /// `If-None-Match` matches the `ETag`. Wraps any result a handler returns (`Data`, `Page`).
+///
+/// The handler picks `max_age` itself, so `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` does not apply and no
+/// `Vary: Accept-Language` is added: use it only for bodies that do not depend on the language and that may be
+/// kept that long. Content that can change at any time uses the `public, no-cache` convention of the cache layer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicCache<T> {
     body: T,
