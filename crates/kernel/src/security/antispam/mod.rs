@@ -26,7 +26,6 @@ mod token;
 
 use crate::time::Timestamp;
 use jiff::SignedDuration;
-use sea_orm::ConnectionTrait;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
@@ -403,13 +402,14 @@ impl Checked {
     /// Phase two, INSIDE the module's transaction (after creating the record): inserts the nonce with
     /// `result` (e.g. the ID of the record just created). With no nonce (a signed-in caller — they use
     /// `Idempotency-Key`) it is always [`Claim::New`].
-    pub async fn claim<C: ConnectionTrait>(
+    pub async fn claim<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
         module: &str,
         result: Option<&str>,
     ) -> Result<Claim, Error> {
+        let connection = &crate::db::Via::of(connection);
         match &self.nonce {
             Some(nonce) => {
                 nonce::claim(connection, tenant, module, nonce, result, self.expires_at).await
@@ -606,11 +606,12 @@ impl SpamGuard {
     }
 
     /// Deletes expired nonces of `module` (the module's cleanup job). Returns the number of rows deleted.
-    pub async fn purge_nonces<C: ConnectionTrait>(
+    pub async fn purge_nonces<C: crate::db::Executor>(
         &self,
         connection: &C,
         module: &str,
     ) -> Result<u64, Error> {
+        let connection = &crate::db::Via::of(connection);
         nonce::purge(connection, module, Timestamp::now()).await
     }
 

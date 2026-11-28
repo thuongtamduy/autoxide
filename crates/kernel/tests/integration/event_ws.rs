@@ -442,3 +442,40 @@ async fn may_chu_tat_stream_tra_404_ca_khi_khong_phai_ban_tay() {
     .await
     .unwrap();
 }
+
+/// P16: WebSocket không qua CORS nên máy chủ tự kiểm `Origin` (chống cross-site WebSocket hijacking), cùng nguồn với
+/// CORS và MCP: origin trong `AUTOXIDE_HTTP_CORS_ORIGINS` qua (tới lỗi "không phải bắt tay"), origin lạ bị 403;
+/// máy gọi máy không gửi `Origin` thì không bị chặn.
+#[tokio::test]
+async fn origin_la_khong_mo_duoc_websocket() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_EVENTS_STREAM", "true")
+            .setting("AUTOXIDE_HTTP_CORS_ORIGINS", "https://app.example")
+            .user("ada", 0xada, &[])
+            .build()
+            .await
+            .unwrap();
+        // Tên event không có: qua được kiểm `Origin` thì là 422 (lỗi kế tiếp theo thứ tự).
+        let path = "/api/v1/kernel/events/ws?names=nothing.missing";
+        let response = app
+            .get(path)
+            .token("ada")
+            .header("origin", "https://evil.example")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status().as_u16(), 403, "{}", response.text());
+        assert_eq!(response.json()["code"], "kernel.ws_origin_not_allowed");
+        for origin in [Some("https://app.example"), None] {
+            let mut request = app.get(path).token("ada");
+            if let Some(origin) = origin {
+                request = request.header("origin", origin);
+            }
+            let response = request.send().await.unwrap();
+            assert_eq!(response.status().as_u16(), 422, "{origin:?}: {}", response.text());
+        }
+    })
+    .await
+    .unwrap();
+}

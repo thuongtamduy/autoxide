@@ -193,7 +193,9 @@ pub(crate) struct ProfileRequest {
 pub(crate) struct SessionRequest {
     /// `vneid`, `ekyc` or `business_registry`; default the provider's first method.
     method: Option<String>,
-    /// Page to come back to after the provider's steps.
+    /// Page to come back to after the provider's steps. Must be on one of this tenant's own
+    /// addresses: `https://` on a verified domain, or an origin listed in the tenant setting
+    /// `compliance.kyc.return_origins`; otherwise 422 `compliance.return_url_not_allowed`.
     return_url: Option<String>,
 }
 
@@ -265,7 +267,7 @@ async fn open_my_kyc(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No profile yet; code `compliance.kyc_not_found`.", body = Problem),
         (status = 409, description = "Already verified or revoked; code `compliance.kyc_state_invalid`.", body = Problem),
-        (status = 422, description = "The method is not offered; every problem in `errors`.", body = Problem),
+        (status = 422, description = "The method is not offered, or `return_url` is not on one of this tenant's own addresses (`compliance.return_url_not_allowed`) or not an http(s) URL; every problem in `errors`.", body = Problem),
         (status = 503, description = "No identity provider is set up; code `identity_verification_disabled`.", body = Problem),
     )
 )]
@@ -278,7 +280,7 @@ async fn start_my_session(
     let (_, profile) = service.my_kyc(&tenant, &principal).await?;
     let profile = profile.ok_or_else(crate::kyc::kyc_not_found)?;
     let session = service
-        .start_session(
+        .start_caller_session(
             &tenant,
             Actor::from(&principal),
             profile.id,
@@ -436,6 +438,7 @@ async fn get_profile(
         (status = 403, description = "Missing `compliance.kyc.submit`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such profile you may submit; code `compliance.kyc_not_found`.", body = Problem),
         (status = 409, description = "Already verified or revoked; code `compliance.kyc_state_invalid`.", body = Problem),
+        (status = 422, description = "The method is not offered, or `return_url` is not on one of this tenant's own addresses (`compliance.return_url_not_allowed`) or not an http(s) URL; every problem in `errors`.", body = Problem),
         (status = 503, description = "No identity provider is set up; code `identity_verification_disabled`.", body = Problem),
     )
 )]
@@ -449,7 +452,7 @@ async fn start_session(
     principal.require(&crate::permissions::KYC_SUBMIT)?;
     let profile = service.submittable(&tenant, &principal, id).await?;
     let session = service
-        .start_session(
+        .start_caller_session(
             &tenant,
             Actor::from(&principal),
             profile.id,

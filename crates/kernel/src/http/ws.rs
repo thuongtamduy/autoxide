@@ -115,7 +115,7 @@ pub(crate) struct WsQuery {
         (status = 101, description = "Switched to the WebSocket protocol."),
         (status = 400, description = "Not a WebSocket handshake; code `bad_request`.", body = crate::response::Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = crate::response::Problem),
-        (status = 403, description = "You may not receive an event you named (code `permission_denied`, naming the permission), or any of them.", body = crate::response::Problem),
+        (status = 403, description = "You may not receive an event you named (code `permission_denied`, naming the permission), or any of them; or the page's `Origin` is neither listed in AUTOXIDE_HTTP_CORS_ORIGINS nor a verified domain of a tenant (code `kernel.ws_origin_not_allowed`).", body = crate::response::Problem),
         (status = 404, description = "Streaming is disabled on this server; code `kernel.stream_disabled`.", body = crate::response::Problem),
         (status = 422, description = "An event does not exist or is not streamable (code `kernel.stream_unknown_event`), or `names` / `last_event_id` is invalid (see `errors`).", body = crate::response::Problem),
         (status = 429, description = "Too many streams are open (per user, per tenant or on this server); code `kernel.stream_too_many`.", body = crate::response::Problem),
@@ -134,6 +134,14 @@ async fn events_ws(
 ) -> Result<Response, Error> {
     if !state.hub.enabled() {
         return Err(disabled());
+    }
+    // Chống cross-site WebSocket hijacking: trình duyệt luôn gửi `Origin` khi mở WebSocket, và WebSocket không qua
+    // CORS — nên kiểm như MCP, cùng một nguồn sự thật (`OriginGrant` của `http::cors::classify`): origin không được
+    // phép thì không có grant. Máy gọi máy không gửi `Origin` thì không bị chặn (P16).
+    if parts.headers.contains_key(axum::http::header::ORIGIN)
+        && parts.extensions.get::<crate::http::OriginGrant>().is_none()
+    {
+        return Err(origin_not_allowed());
     }
     let names = patterns(&query.names);
     let filter = state.hub.filter(&tenant, &principal, &join(&names))?;
@@ -531,6 +539,14 @@ fn error(problem: &Error) -> Message {
         message.push_str(&format!(" `{}` {}.", field.field, field.message));
     }
     text(&Reply::Error { code: problem.code(), message })
+}
+
+fn origin_not_allowed() -> Error {
+    Error::forbidden(
+        "kernel.ws_origin_not_allowed",
+        "This page's origin may not open the event WebSocket. Open it from an origin listed in \
+         AUTOXIDE_HTTP_CORS_ORIGINS or from a verified domain of the tenant.",
+    )
 }
 
 fn unknown_command() -> Error {

@@ -57,7 +57,7 @@ Event được giữ 7 ngày. Khi `id` cuối cũ hơn, stream gửi `event: res
 
 ## Hai chiều: WebSocket
 
-App còn gửi tín hiệu tức thời ("đang gõ", "online") — chat, màn hình vị trí người giao hàng — dùng `GET /api/v1/kernel/events/ws`: cùng event, cùng quyền, cùng cách nối lại và giới hạn qua WebSocket, thêm lệnh điều khiển từ app. Ghi dữ liệu vẫn qua REST. Xem [Làm app điện thoại hay app máy tính](mobile.vi.md#7-event-thời-gian-thực-và-tín-hiệu-tức-thời).
+App còn gửi tín hiệu tức thời ("đang gõ", "online") — chat, màn hình vị trí người giao hàng — dùng `GET /api/v1/kernel/events/ws`: cùng event, cùng quyền, cùng cách nối lại và giới hạn qua WebSocket, thêm lệnh điều khiển từ app. Ghi dữ liệu vẫn qua REST. Trang trên trình duyệt chỉ mở được từ origin có trong `AUTOXIDE_HTTP_CORS_ORIGINS` hoặc từ tên miền đã xác minh của khách; trang khác nhận 403 `kernel.ws_origin_not_allowed` (app không gửi `Origin` thì không bị ảnh hưởng). Xem [Làm app điện thoại hay app máy tính](mobile.vi.md#7-event-thời-gian-thực-và-tín-hiệu-tức-thời).
 
 ## Giới hạn
 

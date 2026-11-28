@@ -37,6 +37,7 @@ pub(crate) async fn app(test: &TestDatabase) -> (TestApp, Arc<FakeIdentityVerifi
         .user("alice", 2, &[])
         .user("bob", 3, &[])
         .user("staff", 5, &["compliance.rules.read", "compliance.rules.manage"])
+        .user("settings", 6, &["kernel.settings.manage"])
         .principal(
             "robot",
             Principal::new(Uuid::from_u128(4), ALL.iter().map(|name| (*name).to_owned()))
@@ -182,6 +183,24 @@ async fn nhan_vien_dinh_danh_to_chuc_qua_dang_ky_kinh_doanh() {
         let profile = opened["data"]["id"].as_str().unwrap().to_owned();
         let body = json!({"method": "business_registry", "return_url": "https://shop.example/kyc"});
         let uri = format!("/kyc/profiles/{profile}/sessions");
+        // L-11: địa chỉ quay về chưa khai là của khách thì 422 (không phải open redirect), kể cả tên miền "giống".
+        for url in
+            ["https://shop.example/kyc", "https://shop.example.evil.example/kyc", "javascript:x"]
+        {
+            let body = json!({"method": "business_registry", "return_url": url});
+            let (status, refused) = call(&app, "POST", &uri, "admin", Some(body)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{url}: {refused}");
+            assert_eq!(refused["errors"][0]["field"], "return_url", "{refused}");
+        }
+        let setting = |value: &str| {
+            app.request(Method::PUT, "/api/v1/kernel/settings/compliance.kyc.return_origins")
+                .token("settings")
+                .json(json!({"value": value}))
+        };
+        let answer = setting("https://shop.example/kyc").send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::UNPROCESSABLE_ENTITY, "an origin has no path");
+        let answer = setting("https://shop.example, http://localhost:3000").send().await.unwrap();
+        assert!(answer.status().is_success(), "{}", answer.json());
         let (status, session) = call(&app, "POST", &uri, "admin", Some(body)).await;
         assert_eq!(status, StatusCode::OK, "{session}");
         assert_eq!(session["data"]["profile_id"], profile.as_str());

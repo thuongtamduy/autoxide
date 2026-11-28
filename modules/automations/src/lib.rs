@@ -129,6 +129,7 @@ impl Module for AutomationsModule {
                 .ok(),
             notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
             metrics: metrics::MetricSources::new(&sources, context.summary_metrics()),
+            permissions: context.permissions().clone(),
             config: self.config,
         };
         for source in work::sources() {

@@ -49,6 +49,8 @@ impl KycGate for Provider {
     ) -> Result<KycSession, Error> {
         let tenant = self.0.tenant(tenant).await?;
         let profile = self.0.open_profile(&tenant, &subject, party).await?;
+        // URL từ module gọi (cấu hình máy chủ), không phải của người gọi API: tin như hợp đồng `KycGate::start` nêu.
+        let return_url = return_url.map(crate::kyc::ReturnUrl::from_module);
         self.0.start_session(&tenant, Actor::system(), profile.id, None, return_url).await
     }
 }

@@ -57,7 +57,7 @@ Events are kept 7 days. When your last id is older, the stream sends `event: res
 
 ## Two-way: WebSocket
 
-Apps that also send live signals ("typing", "online") — chat, a courier's position screen — use `GET /api/v1/kernel/events/ws` instead: the same events, permissions, resuming and limits over a WebSocket, plus control messages from the app. Data is still written over REST. See [Building a mobile or desktop app](mobile.md#7-real-time-events-and-live-signals).
+Apps that also send live signals ("typing", "online") — chat, a courier's position screen — use `GET /api/v1/kernel/events/ws` instead: the same events, permissions, resuming and limits over a WebSocket, plus control messages from the app. Data is still written over REST. A browser page may open it only from an origin listed in `AUTOXIDE_HTTP_CORS_ORIGINS` or from a tenant's verified domain; other pages get 403 `kernel.ws_origin_not_allowed` (apps that send no `Origin` are not affected). See [Building a mobile or desktop app](mobile.md#7-real-time-events-and-live-signals).
 
 ## Limits
 

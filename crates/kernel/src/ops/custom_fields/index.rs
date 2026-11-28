@@ -6,7 +6,7 @@ use super::*;
 impl CustomFields {
     /// Writes the filter index of record `record` (module `module`) from the stored values: call it in the same
     /// transaction as the record. Only `filterable` fields.
-    pub async fn write_index<C: ConnectionTrait>(
+    pub async fn write_index<C: crate::db::Executor>(
         &self,
         connection: &C,
         tenant: &TenantContext,
@@ -15,6 +15,7 @@ impl CustomFields {
         record: Uuid,
         values: &Map<String, Value>,
     ) -> Result<(), Error> {
+        let connection = &crate::db::Via::of(connection);
         let table = format!("{module}_custom_index");
         let delete = SqlQuery::delete()
             .from_table(Alias::new(&table))

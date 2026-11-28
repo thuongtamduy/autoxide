@@ -3941,7 +3941,11 @@ export type ComplianceKycSession = {
 export type ComplianceKycSessionRequest = {
   /** `vneid`, `ekyc` or `business_registry`; default the provider's first method. */
   method?: string | null;
-  /** Page to come back to after the provider's steps. */
+  /**
+   * Page to come back to after the provider's steps. Must be on one of this tenant's own
+   * addresses: `https://` on a verified domain, or an origin listed in the tenant setting
+   * `compliance.kyc.return_origins`; otherwise 422 `compliance.return_url_not_allowed`.
+   */
   return_url?: string | null;
 };
 
@@ -39374,6 +39378,7 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
         503: Problem;
         default: Problem;
       };

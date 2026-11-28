@@ -328,6 +328,7 @@ impl Automations {
             let failure = json!({
                 "run_id": run.id,
                 "rule_id": run.rule_id,
+                "org_id": run.org_id,
                 "error_code": error.code(),
                 "error_message": error.message(),
             });
@@ -587,6 +588,7 @@ impl Automations {
             let failure = json!({
                 "run_id": run.id,
                 "rule_id": run.rule_id,
+                "org_id": run.org_id,
                 "error_code": run.error_code,
                 "error_message": run.error_message,
             });

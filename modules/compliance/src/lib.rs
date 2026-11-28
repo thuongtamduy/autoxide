@@ -215,6 +215,7 @@ impl Module for ComplianceModule {
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
         let mut settings = sms_templates::all();
         settings.push(config::CASE_TRACKING_LINK);
+        settings.push(config::KYC_RETURN_ORIGINS);
         settings
     }
 
@@ -248,6 +249,7 @@ impl Module for ComplianceModule {
             callback_retention_days: self.config.callback_retention_days,
             sms: context.require::<dyn autoxide_kernel::sms::SmsSender>().ok(),
             settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
+            domains: context.require::<autoxide_kernel::tenancy::TenantDomains>().ok(),
             secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
             otp: self.config.otp,
             units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),

@@ -556,7 +556,7 @@ impl ComplianceService {
         }
         row.updated_at = now();
         let event = events::WebsiteUpdated(json!({
-            "website_id": row.id, "domain": row.domain, "kind": row.website_kind,
+            "website_id": row.id, "org_id": row.org_id, "domain": row.domain, "kind": row.website_kind,
         }));
         self.save_website(tenant, principal, &row, expected.unwrap_or(before.updated_at), &event)
             .await?;
@@ -655,7 +655,7 @@ impl ComplianceService {
         row.moit_status = change.status;
         row.updated_at = at;
         let event = events::WebsiteStatusChanged(json!({
-            "website_id": row.id, "domain": row.domain, "kind": row.website_kind,
+            "website_id": row.id, "org_id": row.org_id, "domain": row.domain, "kind": row.website_kind,
             "status": row.moit_status, "previous_status": before.moit_status,
         }));
         self.save_website(tenant, principal, &row, expected.unwrap_or(before.updated_at), &event)
@@ -720,7 +720,7 @@ impl ComplianceService {
             .exec_without_returning(&transaction)
             .await?;
         let event = events::WebsiteUpdated(json!({
-            "website_id": site.id, "domain": site.domain, "kind": site.website_kind,
+            "website_id": site.id, "org_id": site.org_id, "domain": site.domain, "kind": site.website_kind,
             "page_kind": page_kind,
         }));
         self.outbox
@@ -753,7 +753,7 @@ impl ComplianceService {
             .await?;
         if result.rows_affected > 0 {
             let event = events::WebsiteUpdated(json!({
-                "website_id": site.id, "domain": site.domain, "kind": site.website_kind,
+                "website_id": site.id, "org_id": site.org_id, "domain": site.domain, "kind": site.website_kind,
                 "page_kind": page_kind,
             }));
             self.outbox

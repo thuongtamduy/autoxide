@@ -247,7 +247,7 @@ Route của bạn nằm trong tài liệu API ở `$API/api/v1/openapi.json` (c�
 
 ## 5. Test trên cả hai database
 
-Mỗi test nhận một database trống từ `TestDatabase::run`; `TestApp` dựng module của bạn như máy chủ dựng, rồi gọi nó qua REST và bằng một client MCP thật:
+Mỗi test nhận một database trống từ `TestDatabase::run`; `TestApp` dựng module của bạn như máy chủ dựng, rồi gọi nó qua REST và bằng một client MCP thật. Mã trạng thái và method lấy từ `autoxide_testkit::http`, nên test không khai `axum` hay `http`:
 
 ```rust
 #[tokio::test]
@@ -266,7 +266,7 @@ async fn a_bookmark_can_be_created() {
             .send()
             .await
             .unwrap();
-        assert_eq!(answer.status(), StatusCode::CREATED);
+        assert_eq!(answer.status_code(), StatusCode::CREATED);
     })
     .await
     .unwrap();

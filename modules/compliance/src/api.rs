@@ -95,6 +95,11 @@ pub trait KycGate: Send + Sync {
     /// Opens (or returns) the identification profile of `subject` and starts a verification round at the
     /// provider; returns a page / token for the user. Used when there is no account yet (e.g. a new tenant
     /// signing up).
+    ///
+    /// `return_url` is trusted as given: the calling module is responsible for it, and must pass only an
+    /// address from the server's configuration (such as `AUTOXIDE_PLANS_SIGNUP_RETURN_URL`) or one it has
+    /// checked itself — never a string an API caller sent unchecked. (`return_url` sent over this module's REST
+    /// and MCP is checked against the tenant's own addresses.)
     async fn start(
         &self,
         tenant: TenantId,

@@ -11440,7 +11440,7 @@
             ]
           },
           "return_url": {
-            "description": "Page to come back to after the provider's steps.",
+            "description": "Page to come back to after the provider's steps. Must be on one of this tenant's own\naddresses: `https://` on a verified domain, or an origin listed in the tenant setting\n`compliance.kyc.return_origins`; otherwise 422 `compliance.return_url_not_allowed`.",
             "type": [
               "string",
               "null"
@@ -151545,6 +151545,16 @@
             },
             "description": "Already verified or revoked; code `compliance.kyc_state_invalid`."
           },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The method is not offered, or `return_url` is not on one of this tenant's own addresses (`compliance.return_url_not_allowed`) or not an http(s) URL; every problem in `errors`."
+          },
           "503": {
             "content": {
               "application/problem+json": {
@@ -152888,7 +152898,7 @@
                 }
               }
             },
-            "description": "The method is not offered; every problem in `errors`."
+            "description": "The method is not offered, or `return_url` is not on one of this tenant's own addresses (`compliance.return_url_not_allowed`) or not an http(s) URL; every problem in `errors`."
           },
           "503": {
             "content": {
@@ -203348,7 +203358,7 @@
                 }
               }
             },
-            "description": "You may not receive an event you named (code `permission_denied`, naming the permission), or any of them."
+            "description": "You may not receive an event you named (code `permission_denied`, naming the permission), or any of them; or the page's `Origin` is neither listed in AUTOXIDE_HTTP_CORS_ORIGINS nor a verified domain of a tenant (code `kernel.ws_origin_not_allowed`)."
           },
           "404": {
             "content": {
