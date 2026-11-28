@@ -87,6 +87,11 @@ impl Policies {
         if problems.is_empty() { Ok(policies) } else { Err(problems) }
     }
 
+    /// Adds the switch-step hooks modules contributed in `start` (`contribute::<dyn SwitchHook>`).
+    pub(crate) fn add_switch_hooks(&mut self, hooks: Vec<std::sync::Arc<dyn super::SwitchHook>>) {
+        self.switch_hooks.extend(hooks);
+    }
+
     /// Switch-step hooks, every module.
     pub(crate) fn switch_hooks(&self) -> &[std::sync::Arc<dyn super::SwitchHook>] {
         &self.switch_hooks

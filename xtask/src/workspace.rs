@@ -20,6 +20,9 @@ pub enum Role {
     App,
     /// `crates/macros` — macro thủ tục của kernel; module dùng qua `autoxide_kernel`, không khai trực tiếp.
     Macros,
+    /// `crates/host` — phần chỉ binary dùng (log, bộ thu số đo, xuất trace); không phải hợp đồng
+    /// (D-20261128-host-crate).
+    Host,
     /// `modules/<tên>` — một module.
     Module,
     /// `xtask` — công cụ cho người phát triển.
@@ -36,6 +39,7 @@ impl Role {
             "crates/testkit" => Role::Testkit,
             "crates/app" => Role::App,
             "crates/macros" => Role::Macros,
+            "crates/host" => Role::Host,
             "xtask" => Role::Tool,
             _ => match dir.strip_prefix("modules/") {
                 // Module nằm ngay dưới modules/, không lồng thêm cấp.

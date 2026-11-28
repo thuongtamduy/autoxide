@@ -47,6 +47,7 @@ dbg_macro = "deny"
 # `cargo xtask check` (luật `publish-ready`) chặn chỗ lệch. Module mẫu `notes` không đăng nên không có.
 autoxide-kernel = { path = "crates/kernel", version = "=0.20.0" }
 autoxide-macros = { path = "crates/macros", version = "=0.20.0" }
+autoxide-host = { path = "crates/host", version = "=0.20.0" }
 autoxide-testkit = { path = "crates/testkit", version = "=0.20.0" }
 autoxide-audit = { path = "modules/audit", version = "=0.20.0" }
 autoxide-auth = { path = "modules/auth", version = "=0.20.0" }

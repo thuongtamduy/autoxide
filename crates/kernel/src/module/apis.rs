@@ -96,6 +96,24 @@ impl Apis {
             .unwrap_or_default()
     }
 
+    /// Like [`contributions`](Self::contributions), with the contributing module of each.
+    pub(super) fn contributions_named<T>(&self) -> Vec<(&'static str, Arc<T>)>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.contributed
+            .get(&TypeId::of::<T>())
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|(module, api)| {
+                        api.downcast_ref::<Arc<T>>().map(|api| (*module, Arc::clone(api)))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     pub(super) fn get<T>(&self) -> Option<Arc<T>>
     where
         T: ?Sized + Send + Sync + 'static,

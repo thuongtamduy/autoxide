@@ -35,7 +35,8 @@ Module khai về mình cho core ở hai chỗ, mỗi khái niệm một đườn
   không phải khởi động gì (migration, `.env.example`, chọn module, tài liệu).
 - **`Module::start`** dựng service của module và đăng ký trên `StartContext` những gì cần service: route, tool MCP,
   đăng ký nhận event, job, task, phép kiểm của doctor, trait cho module khác. Handle của kernel lấy bằng
-  `context.kernel::<Handle>()` (`Outbox`, `SyncLog`, `EntitlementsHandle`, `JobQueue`…).
+  `context.kernel::<Handle>()` (`Outbox`, `SyncLog`, `EntitlementsHandle`, `JobQueue`…); module cắm vào các điểm mở
+  rộng của kernel bằng `context.contribute::<dyn Trait>(…)` (bảng dưới).
 
 ```rust
 impl Module for NotesModule {
@@ -92,12 +93,28 @@ cho đường mới của từng hàm:
 | `prompts` | `StartContext::prompt` (mỗi thứ một lần gọi) |
 | `mcp_resources` | `StartContext::mcp_resource` (mỗi thứ một lần gọi) |
 | `client_config` | `StartContext::client_config` |
-| `seed_tenant` | `StartContext::seed_tenant` |
-| `sample_data` | `StartContext::sample_data` |
-| `sandbox_copy` | `StartContext::sandbox_copy` |
+| `seed_tenant` | `context.contribute::<dyn TenantSeed>(…)` |
+| `sample_data` | `context.contribute::<dyn SampleData>(…)` (`tenancy::SampleData`) |
+| `sandbox_copy` | `context.contribute::<dyn SandboxCopy>(…)` (thử nghiệm) |
 
-`StartContext::outbox()`, `sync_log()` và các getter khác vẫn chạy; code mới dùng một cách duy nhất là
-`StartContext::kernel::<H>()`.
+**Điểm mở rộng của kernel: `contribute`** (D-20261128-contribute). Mọi khái niệm "nhiều module cắm một cài đặt" của
+kernel dùng chung một lệnh, `context.contribute::<dyn Trait>(Arc::new(…))?`; kernel nhận ra trait và đăng ký vào đúng chỗ
+mà hàm riêng cũ đăng ký:
+
+| Đóng góp `dyn …` | Thay `StartContext::…` |
+| --- | --- |
+| `tenancy::TenantSeed`, `tenancy::SampleData`, `tenancy::sandbox::SandboxCopy` | `Module::seed_tenant`, `sample_data`, `sandbox_copy` |
+| `tenancy::SwitchHook` | `Relocation::on_switch` |
+| `privacy::PersonalData` | `personal_data` |
+| `access::PostingVerifier` | `posting_verifier` |
+| `ops::work::WorkSource`, `ops::find::FinderSource`, `ops::suggest::SuggestSource` | `work_source`, `finder_source`, `suggest_source` |
+| `ops::summary::SummaryMetric`, `ops::list_exports::ExportSource`, `ops::bulk::BulkAction` | `summary_metric`, `export_source`, `bulk_action` |
+| `ops::resolve::CodeResolver`, `ops::setup::SetupStep`, `ops::connections::ConnectionProbe`, `ops::usages::ReferenceSource` | `code_resolver`, `setup_step`, `connection_probe`, `reference_source` |
+
+Đăng ký gắn một khoá với cài đặt giữ lệnh riêng: `resource_type`, `badge_source`, `block_data`, `taggable`,
+`usage_counter`, `search_documents`, `search_backend`. Getter cũ (`outbox()`, `sync_log()`, `entitlements()`…) và các hàm
+đăng ký cũ ở trên vẫn chạy trong lúc chuyển; code mới dùng `context.kernel::<H>()` và `contribute`, `cargo xtask check`
+đếm chỗ gọi cũ (`start-context-legacy`).
 
 ## Từng bước
 
@@ -214,7 +231,8 @@ job vào hàng đợi bằng `JobQueue::enqueue(…, tenant, …)` trong transac
 dẹp quét mọi khách dùng `enqueue_database` và một index `_sweep_idx`.
 
 **Khách mới bắt đầu với gì.** Dữ liệu khách cần trước request đầu tiên (role `admin`, dòng khoá,
-bộ đếm) do `Module::seed_tenant` tạo — một `TenantSeed` chạy khi tạo khách. Nó phải chạy lại được:
+bộ đếm) do một `TenantSeed` module đóng góp trong `start` tạo (`context.contribute::<dyn TenantSeed>(…)`), chạy khi tạo
+khách. Nó phải chạy lại được:
 `autoxide tenant provision` làm lại lần tạo khách hỏng giữa chừng.
 
 **Khi khách bị xoá hẳn.** Xoá hẳn một khách (`POST /api/v1/kernel/tenants/{id}/erase`, hay khi thuê
@@ -340,14 +358,12 @@ sandbox. Đừng rẽ nhánh theo `TenantContext::is_sandbox()` trong code nghi�
 chính module định nghĩa (như hãng vận chuyển của `shipping`) thì đổi sang bản giả cho sandbox ở đúng một
 chỗ.
 
-**Sao cấu hình** bằng `Module::sandbox_copy`. Kernel gọi một lần, theo thứ tự đăng ký, khi tạo sandbox
-và trước khi ai vào được:
+**Sao cấu hình** bằng một `SandboxCopy` đóng góp trong `start`. Kernel gọi một lần, theo thứ tự đăng ký, khi
+tạo sandbox và trước khi ai vào được:
 
 ```rust
-fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
-    let service = self.service.clone()?;
-    Some(Arc::new(ShopCopy { service }))
-}
+// Trong `Module::start`:
+context.contribute::<dyn SandboxCopy>(Arc::new(ShopCopy { service: service.clone() }))?;
 
 #[async_trait::async_trait]
 impl SandboxCopy for ShopCopy {
@@ -572,7 +588,7 @@ Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu 
 `autoxide_kernel::privacy`):
 
 - cài `PersonalData` (trả dữ liệu của người dùng dạng JSON, không có secret) và đăng ký
-  trong `Module::start` bằng `context.personal_data(…)`; phần đó có mặt trong
+  trong `Module::start` bằng `context.contribute::<dyn PersonalData>(…)`; phần đó có mặt trong
   `GET /api/v1/auth/me/export` dưới tên module;
 - đăng ký nhận `privacy::USER_DELETED` trong `Module::subscriptions` và xoá các dòng của
   người đó khi nhận (`privacy::deleted_user(event)` cho id). Có thể nhận hai lần;

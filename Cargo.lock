@@ -257,6 +257,7 @@ dependencies = [
  "autoxide-files",
  "autoxide-forms",
  "autoxide-ghn",
+ "autoxide-host",
  "autoxide-idempotency",
  "autoxide-inventory",
  "autoxide-invoices",
@@ -724,6 +725,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "autoxide-host"
+version = "0.20.0"
+dependencies = [
+ "autoxide-kernel",
+ "axum",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-axum",
+]
+
+[[package]]
 name = "autoxide-idempotency"
 version = "0.20.0"
 dependencies = [
@@ -820,8 +842,6 @@ dependencies = [
  "metrics-exporter-prometheus",
  "minijinja",
  "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
  "proptest",
  "reqwest",
  "ring",

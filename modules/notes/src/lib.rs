@@ -28,6 +28,7 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Subscription;
 use autoxide_kernel::module::{Manifest, Module, StartContext};
+use autoxide_kernel::privacy::PersonalData;
 
 use crate::service::NoteService;
 
@@ -64,7 +65,9 @@ impl Module for NotesModule {
             Arc::new(NoteService::new(context.kernel()?, context.kernel()?, context.kernel()?));
         context.usage_counter(&service::NOTES_LIMIT, Arc::new(service::NoteCounter))?;
         // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>` / `Arc<dyn PersonalData>`…: bên nhận chỉ thấy trait.
-        context.personal_data(service.clone())?;
+        // `contribute::<dyn …>`: một cách cắm vào mọi điểm mở rộng của kernel (dữ liệu cá nhân, seed cho khách mới,
+        // hộp việc…); kernel nhận ra trait và gửi vào đúng chỗ (D-20261128-contribute).
+        context.contribute::<dyn PersonalData>(service.clone())?;
         // Tài khoản bị xoá: xoá ghi chú của người đó.
         context.subscribe(Subscription::new(
             autoxide_kernel::privacy::USER_DELETED,

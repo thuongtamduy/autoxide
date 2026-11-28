@@ -34,6 +34,7 @@ autoxide-mail.workspace = true
 autoxide-ai.workspace = true
 autoxide-files.workspace = true
 autoxide-kernel.workspace = true
+autoxide-host.workspace = true
 autoxide-webhooks.workspace = true
 autoxide-media.workspace = true
 autoxide-content.workspace = true

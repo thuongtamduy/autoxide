@@ -7,8 +7,6 @@
 // (`tools()`, `subscriptions()`…). Nhờ vậy kernel không phải sửa hàng trăm chỗ đọc trong lúc chuyển; khi module
 // cuối đã chuyển, các hàm cũ bị gỡ và kernel đọc thẳng (D-20261127-transition-paths).
 
-use std::sync::Arc;
-
 use crate::error::Error;
 use crate::event::Subscription;
 use crate::job::JobRegistration;
@@ -27,9 +25,6 @@ pub(crate) struct Registered {
     prompts: Vec<crate::mcp::Prompt>,
     mcp_resources: Vec<crate::mcp::McpResource>,
     client_config: Option<ClientSection>,
-    seed_tenant: Option<Arc<dyn crate::tenancy::TenantSeed>>,
-    sample_data: Option<Arc<dyn crate::tenancy::TenantSeed>>,
-    sandbox_copy: Option<Arc<dyn crate::tenancy::sandbox::SandboxCopy>>,
 }
 
 impl StartContext<'_> {
@@ -117,38 +112,6 @@ impl StartContext<'_> {
         let registered = self.registered("client configuration (`StartContext::client_config`)")?;
         if registered.client_config.replace(section).is_some() {
             return Err(Error::internal("client configuration registered twice".to_owned()));
-        }
-        Ok(())
-    }
-
-    /// Seeds the module's initial data for a new tenant (the `admin` role, lock rows...); must be re-runnable.
-    pub fn seed_tenant(&mut self, seed: Arc<dyn crate::tenancy::TenantSeed>) -> Result<(), Error> {
-        let registered = self.registered("a tenant seed (`StartContext::seed_tenant`)")?;
-        if registered.seed_tenant.replace(seed).is_some() {
-            return Err(Error::internal("tenant seed registered twice".to_owned()));
-        }
-        Ok(())
-    }
-
-    /// Sample data for tenants provisioned under a plan with `sample_data` (step 35); must be re-runnable and
-    /// must not create duplicates.
-    pub fn sample_data(&mut self, seed: Arc<dyn crate::tenancy::TenantSeed>) -> Result<(), Error> {
-        let registered = self.registered("sample data (`StartContext::sample_data`)")?;
-        if registered.sample_data.replace(seed).is_some() {
-            return Err(Error::internal("sample data registered twice".to_owned()));
-        }
-        Ok(())
-    }
-
-    /// Copies the module's configuration into a new sandbox (step 38, D-232): configuration only, never personal
-    /// data, transactions or secrets.
-    pub fn sandbox_copy(
-        &mut self,
-        copy: Arc<dyn crate::tenancy::sandbox::SandboxCopy>,
-    ) -> Result<(), Error> {
-        let registered = self.registered("a sandbox copy (`StartContext::sandbox_copy`)")?;
-        if registered.sandbox_copy.replace(copy).is_some() {
-            return Err(Error::internal("sandbox copy registered twice".to_owned()));
         }
         Ok(())
     }
@@ -387,18 +350,6 @@ impl Module for Started {
 
     fn client_config(&self) -> Result<Option<ClientSection>, Error> {
         Ok(self.registered.client_config.clone())
-    }
-
-    fn seed_tenant(&self) -> Option<Arc<dyn crate::tenancy::TenantSeed>> {
-        self.registered.seed_tenant.clone()
-    }
-
-    fn sample_data(&self) -> Option<Arc<dyn crate::tenancy::TenantSeed>> {
-        self.registered.sample_data.clone()
-    }
-
-    fn sandbox_copy(&self) -> Option<Arc<dyn crate::tenancy::sandbox::SandboxCopy>> {
-        self.registered.sandbox_copy.clone()
     }
 }
 

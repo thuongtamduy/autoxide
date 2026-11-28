@@ -90,7 +90,7 @@ const FIXES: &[(&str, &str)] = &[
     ),
     (
         "layout",
-        "Move the crate to crates/kernel, crates/testkit, crates/app, modules/<name> or xtask.",
+        "Move the crate to crates/kernel, crates/host, crates/testkit, crates/app, modules/<name> or xtask.",
     ),
     ("license", "Add `license.workspace = true` to the crate's Cargo.toml."),
     (
@@ -154,6 +154,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "site-links",
         "Declare a `TenantSetting::link(…)` that names this `AUTOXIDE_…_URL` setting (so each tenant can set its own page), or add the variable to NOT_SITE_LINKS in xtask/src/site_links.rs if it is a partner API or platform address.",
+    ),
+    (
+        "start-context-legacy",
+        "Get kernel handles with `context.kernel::<Handle>()` and register extension points with `context.contribute::<dyn Trait>(…)` (table in docs/MODULE_GUIDE.md); then lower or remove the file's `start-context-legacy` line in xtask/module-contract-legacy.txt.",
     ),
     (
         "tenant-scope",

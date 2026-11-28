@@ -297,12 +297,12 @@ Khi chủ dự án bảo đăng, lần đầu (làm tay, một lần):
    `publish-new` và `publish-update` (https://crates.io/settings/tokens). Token là secret: không vào git, không dán
    vào trò chuyện.
 2. Kiểm lại tên còn trống: 36 tên `autoxide`, `autoxide-kernel`, `autoxide-testkit`, `autoxide-<module>` (ngày
-   2026-11-21 đều trống). Tên đã bị người khác lấy thì dừng lại hỏi chủ dự án.
+   2026-11-21 đều trống), cùng `autoxide-macros` và `autoxide-host` (thêm sau). Tên đã bị người khác lấy thì dừng lại hỏi chủ dự án.
 3. Đổi `publish = false` ở `[workspace.package]` của `Cargo.toml` gốc thành `publish = true` (`xtask` tự khai `publish = false`;
    module mẫu `notes` luôn bị loại bằng `--exclude autoxide-notes`), commit.
 4. Trên đúng commit của tag phát hành, gate xanh: `cargo publish --workspace --exclude xtask --exclude
    autoxide-notes --dry-run`, rồi bỏ `--dry-run`. Cargo tự xếp thứ tự theo phụ thuộc: `autoxide-kernel` →
-   `autoxide-testkit` → các module (module nền trước module dùng nó) → `autoxide`. crates.io giới hạn số crate MỚI
+   `autoxide-testkit` / `autoxide-host` → các module (module nền trước module dùng nó) → `autoxide`. crates.io giới hạn số crate MỚI
    mỗi tài khoản (một đợt vài crate, sau đó chậm lại): lệnh dừng giữa chừng vì giới hạn thì chờ rồi chạy lại — crate
    đã đăng được bỏ qua; có thể xin nâng giới hạn qua help@crates.io trước.
 5. Với từng crate, trên crates.io: Settings → Trusted Publishing → thêm repo GitHub này, workflow `release.yml`
