@@ -3,6 +3,10 @@
   `PUT /api/v1/compliance/kyc/profiles/{id}/details`. From 2027-01-01 (rule `kyc.required_activities` version 2) a
   seller missing one cannot sell (`compliance.kyc_required`, `profile_status` `incomplete`, `missing`); a passport must
   stay valid 6 months after the verification; a profile never stays verified past its document's end date.
+  **Upgrade note:** on a marketplace, from 2027-01-01 the daily sweep pauses goods of sellers verified earlier whose
+  profile lacks these items. No bundled eKYC provider returns them yet: have a reviewer record them before that date
+  (list profiles with `GET /api/v1/compliance/kyc/profiles?status=verified` and check the new fields). Recording them
+  emits `compliance.kyc_details_recorded` (field names only).
 - Module `catalog`: on a marketplace, goods of a seller whose verification expired or was revoked go `inactive`; a
   daily job `catalog.seller_kyc_sweep` and a branch move check sellers again (a tenant that became a marketplace, a
   rule that started to apply).

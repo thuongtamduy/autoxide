@@ -127,7 +127,9 @@ fn deadlines(
 }
 
 /// Yêu cầu quá hạn: chưa trả lời (`received`) mà qua hạn trả lời, hay chưa xong (`received`, `in_progress`) mà
-/// qua hạn thực hiện. Đã nhận xử lý (`in_progress`) thì hạn trả lời đã đạt.
+/// qua hạn thực hiện. Đã nhận xử lý (`in_progress`) thì hạn trả lời đã đạt. Yêu cầu ghi trước khi có hạn thực hiện
+/// (m0025, `fulfil_due_at` trống) hay loại quy tắc không đặt hạn: so với hạn trả lời như trước — không mất cảnh báo
+/// (kiểm độc lập #620).
 pub(crate) fn overdue_condition(at: Timestamp) -> sea_orm::Condition {
     use sea_orm::Condition;
     Condition::any()
@@ -139,15 +141,21 @@ pub(crate) fn overdue_condition(at: Timestamp) -> sea_orm::Condition {
         .add(
             Condition::all()
                 .add(subject_request::Column::Status.is_in(["received", "in_progress"]))
-                .add(subject_request::Column::FulfilDueAt.lt(at)),
+                .add(
+                    Condition::any().add(subject_request::Column::FulfilDueAt.lt(at)).add(
+                        Condition::all()
+                            .add(subject_request::Column::FulfilDueAt.is_null())
+                            .add(subject_request::Column::DueAt.lt(at)),
+                    ),
+                ),
         )
 }
 
 /// Như [`overdue_condition`] cho một dòng đã đọc.
 pub(crate) fn is_overdue(row: &subject_request::Model, at: Timestamp) -> bool {
-    (row.status == "received" && row.due_at < at)
-        || (matches!(row.status.as_str(), "received" | "in_progress")
-            && row.fulfil_due_at.is_some_and(|due| due < at))
+    let open = matches!(row.status.as_str(), "received" | "in_progress");
+    let fulfil_due = row.fulfil_due_at.unwrap_or(row.due_at);
+    (row.status == "received" && row.due_at < at) || (open && fulfil_due < at)
 }
 
 impl ComplianceService {

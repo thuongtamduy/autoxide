@@ -30,6 +30,23 @@ pub(crate) struct SellerDetails {
     pub document_expires_on: Option<String>,
 }
 
+impl SellerDetails {
+    /// Tên các mục có giá trị (cho event audit, không kèm giá trị).
+    pub(crate) fn names(&self) -> Vec<&'static str> {
+        [
+            ("birth_date", &self.birth_date),
+            ("address", &self.address),
+            ("representative_name", &self.representative_name),
+            ("document_country", &self.document_country),
+            ("document_expires_on", &self.document_expires_on),
+        ]
+        .into_iter()
+        .filter(|(_, value)| value.is_some())
+        .map(|(name, _)| name)
+        .collect()
+    }
+}
+
 fn present(value: Option<&String>) -> bool {
     value.is_some_and(|text| !text.trim().is_empty())
 }

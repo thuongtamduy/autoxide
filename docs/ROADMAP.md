@@ -299,6 +299,10 @@ Việc từ rà pháp lý vòng 1 do AI đóng vai (`docs/legal/review-2026-11-r
 - [x] LG-7: gói thuế `vn` v2 theo NĐ 68/2026 (ngưỡng hộ kinh doanh, tỉ lệ khấu trừ); `orders` hỏi
       `TaxEngine::invoice_requirements` thay vì quyết theo kênh `pos` — #620: gói bản 4, `TaxEngine::invoice_advice`
       (D-20261128-tax-pack-vn-decree-68)
+- [ ] LG-7b: tỉ lệ khấu trừ thay của sàn năm 2026 theo NĐ 68/2026 Điều 11 (gói `vn` bản 4 giữ tỉ lệ NĐ 117/2025, các
+      nguồn không thống nhất — cần đối chiếu văn bản gốc); quy tắc `household.tax_free_revenue` mới là dữ liệu, chưa module
+      nào dùng (hoàn thuế đã khấu trừ, tờ khai — cùng LG-8 code); xác nhận ngày hiệu lực ngưỡng 500 triệu (gói ghi
+      05/3/2026)
 - [x] LG-8 (phần tài liệu xong; code là dòng nợ **sau 1.0** bên dưới): tài liệu tách phần khấu trừ thay đã có và chưa có; phát `TaxWithheld`, chứng từ khấu trừ, dữ liệu tờ khai là điều
       kiện của module sàn
 - [x] LG-9: huỷ hoá đơn đã gửi SePay — lỗi rõ hướng sang điều chỉnh / thay thế; xác định nghĩa vụ 04/SS sau NĐ 70/2025

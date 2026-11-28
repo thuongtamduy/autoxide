@@ -349,15 +349,32 @@ enum InvoiceChoice {
 
 /// `advice`: lời khuyên của engine thuế (`None`: chưa cài `tax` hay người bán chưa có hồ sơ thuế — như trước:
 /// bán tại quầy → hoá đơn máy tính tiền, còn lại theo cài đặt).
+///
+/// `requested`: người mua đã xin hoá đơn (`invoice_request` của đơn) — luật không buộc thì vẫn lập theo yêu cầu,
+/// chỉ thôi TỰ lập. `configured`: người bán tự đặt `orders.invoice_kind` (không tính giá trị mặc định) — lựa chọn
+/// đó thắng loại engine gợi ý cho người bán không theo phương pháp khấu trừ (ghi cảnh báo), không âm thầm đổi.
 fn invoice_choice(
     advice: Option<autoxide_tax::api::InvoiceAdvice>,
     at_counter: bool,
+    requested: bool,
+    configured: Option<&str>,
 ) -> InvoiceChoice {
-    if advice.as_ref().is_some_and(|advice| !advice.einvoice_required) {
+    if !requested && advice.as_ref().is_some_and(|advice| !advice.einvoice_required) {
         return InvoiceChoice::NotRequired;
     }
     match advice.and_then(|advice| advice.kind) {
-        Some(kind) => InvoiceChoice::Kind(kind),
+        Some(kind) if kind == "cash_register_invoice" => InvoiceChoice::Kind(kind),
+        Some(kind) => match configured {
+            Some(chosen) if chosen != kind => {
+                tracing::warn!(
+                    suggested = %kind,
+                    chosen,
+                    "orders.invoice_kind differs from the invoice the tax data suggests; the setting wins"
+                );
+                InvoiceChoice::Configured
+            }
+            _ => InvoiceChoice::Kind(kind),
+        },
         None if at_counter => InvoiceChoice::Kind("cash_register_invoice".to_owned()),
         None => InvoiceChoice::Configured,
     }
@@ -461,9 +478,20 @@ impl OrdersService {
             }
             None => None,
         };
-        let kind = match invoice_choice(advice, at_counter) {
+        // Giá trị người bán tự đặt (không tính mặc định của cài đặt).
+        let configured = match &self.orgs {
+            Some(orgs) => orgs
+                .setting(tenant, org, INVOICE_KIND.key())
+                .await?
+                .and_then(|found| found.value)
+                .and_then(|value| value.as_str().map(str::to_owned)),
+            None => None,
+        };
+        let requested = row.invoice_request.is_some();
+        let kind = match invoice_choice(advice, at_counter, requested, configured.as_deref()) {
             InvoiceChoice::NotRequired => {
-                // Hộ kinh doanh dưới ngưỡng: luật không buộc hoá đơn điện tử; không tự lập (người bán vẫn lập tay).
+                // Hộ kinh doanh dưới ngưỡng, người mua chưa xin: luật không buộc hoá đơn điện tử, không tự lập.
+                // Người mua xin (`POST …/invoice`) thì `invoice_request` có giá trị và hoá đơn vẫn được lập.
                 tracing::info!(order_id = %id, "no e-invoice required for this seller; none issued automatically");
                 return Ok(None);
             }
@@ -859,21 +887,49 @@ mod choice_tests {
             Some(InvoiceAdvice::new(required, kind.map(str::to_owned), Vec::new()))
         };
         let kind = |name: &str| InvoiceChoice::Kind(name.to_owned());
-        // Hộ dưới ngưỡng NĐ 68/2026: không tự lập, kể cả tại quầy.
-        assert_eq!(invoice_choice(advice(false, None), true), InvoiceChoice::NotRequired);
-        // Hộ kinh doanh bán online: hoá đơn bán hàng, không phải hoá đơn GTGT.
+        // Hộ dưới ngưỡng NĐ 68/2026: không tự lập, kể cả tại quầy…
         assert_eq!(
-            invoice_choice(advice(true, Some("sales_invoice")), false),
+            invoice_choice(advice(false, None), true, false, None),
+            InvoiceChoice::NotRequired
+        );
+        // …nhưng người mua đã xin hoá đơn thì vẫn lập (kiểm độc lập #620).
+        assert_eq!(
+            invoice_choice(advice(false, Some("sales_invoice")), false, true, None),
             kind("sales_invoice")
         );
         assert_eq!(
-            invoice_choice(advice(true, Some("cash_register_invoice")), true),
+            invoice_choice(advice(false, None), true, true, None),
+            kind("cash_register_invoice")
+        );
+        // Hộ kinh doanh bán online: hoá đơn bán hàng, không phải hoá đơn GTGT.
+        assert_eq!(
+            invoice_choice(advice(true, Some("sales_invoice")), false, false, None),
+            kind("sales_invoice")
+        );
+        // Người bán đã tự chọn loại khác: lựa chọn đó thắng, không âm thầm đổi.
+        assert_eq!(
+            invoice_choice(advice(true, Some("sales_invoice")), false, false, Some("vat_invoice")),
+            InvoiceChoice::Configured
+        );
+        assert_eq!(
+            invoice_choice(
+                advice(true, Some("cash_register_invoice")),
+                true,
+                false,
+                Some("vat_invoice")
+            ),
             kind("cash_register_invoice")
         );
         // Người bán khấu trừ: tự chọn; tại quầy giữ mặc định máy tính tiền.
-        assert_eq!(invoice_choice(advice(true, None), false), InvoiceChoice::Configured);
-        assert_eq!(invoice_choice(advice(true, None), true), kind("cash_register_invoice"));
-        assert_eq!(invoice_choice(None, true), kind("cash_register_invoice"));
-        assert_eq!(invoice_choice(None, false), InvoiceChoice::Configured);
+        assert_eq!(
+            invoice_choice(advice(true, None), false, false, None),
+            InvoiceChoice::Configured
+        );
+        assert_eq!(
+            invoice_choice(advice(true, None), true, false, None),
+            kind("cash_register_invoice")
+        );
+        assert_eq!(invoice_choice(None, true, false, None), kind("cash_register_invoice"));
+        assert_eq!(invoice_choice(None, false, false, None), InvoiceChoice::Configured);
     }
 }

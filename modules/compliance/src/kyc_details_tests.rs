@@ -118,6 +118,16 @@ async fn ban_hang_can_du_muc_dieu_18() {
         let (status, done) = call(&app, "PUT", &uri, "admin", Some(body)).await;
         assert_eq!(status, StatusCode::OK, "{done}");
         gate.require_verified(DEFAULT_TENANT, alice(), Activity::Sell).await.unwrap();
+        // Mỗi lần ghi mục là một event audit, chỉ có tên mục, không có giá trị.
+        use sea_orm::ConnectionTrait as _;
+        let read = app.database().read();
+        let sql =
+            "SELECT payload FROM compliance_events WHERE name = 'compliance.kyc_details_recorded'";
+        let statement = sea_orm::Statement::from_string(read.get_database_backend(), sql);
+        let rows = read.query_all_raw(statement).await.unwrap();
+        assert_eq!(rows.len(), 2);
+        let payload: String = rows[0].try_get("", "payload").unwrap();
+        assert!(payload.contains("document_country") && !payload.contains("\"US\""), "{payload}");
     })
     .await
     .unwrap();

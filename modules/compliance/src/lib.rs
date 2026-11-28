@@ -57,6 +57,8 @@ mod kyc_details_tests;
 #[cfg(test)]
 mod sign_in_codes_tests;
 #[cfg(test)]
+mod subject_requests_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod tests_cases;

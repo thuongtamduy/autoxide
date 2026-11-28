@@ -245,7 +245,10 @@ not handle yet. Until they are done, the deployer covers them:
   valid at least 6 more months counted from the verification, with its issuing country. Missing items give
   `compliance.kyc_required` with `profile_status` `incomplete` and the missing names in `missing`. The eKYC
   provider returns them, or a reviewer records them with `PUT /api/v1/compliance/kyc/profiles/{id}/details`
-  (`compliance.kyc.review`); a profile never stays verified past the document's end date. Still open: livestream
+  (`compliance.kyc.review`); a profile never stays verified past the document's end date. **Before 1 January
+  2027**, on a marketplace: no bundled eKYC provider returns these items yet, so sellers verified earlier lack them
+  and the daily sweep will pause their goods from that day — have a reviewer record them first (list verified
+  profiles with `GET /api/v1/compliance/kyc/profiles?status=verified` and look at the new fields). Still open: livestream
   and affiliate flows (no module yet). Check the originals before relying on this.
 - **Personal data of children.** Law 91/2025/QH15 sets special rules for children and persons under guardianship
   (consent of a parent or guardian; from age 7 also the child's — the article and ages need checking). Core has no

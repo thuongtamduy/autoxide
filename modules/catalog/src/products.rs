@@ -145,8 +145,6 @@ pub(crate) fn parse_status(raw: &str) -> ProductStatus {
     }
 }
 
-/// Chuyển trạng thái được phép: nháp → đang bán / lưu trữ; đang bán ↔ ngừng bán; mọi trạng
-/// thái → lưu trữ; lưu trữ → nháp (mở lại để sửa rồi bán lại).
 /// Ai đổi trạng thái sản phẩm.
 #[derive(Clone, Copy)]
 enum StatusBy<'a> {
@@ -156,6 +154,8 @@ enum StatusBy<'a> {
     System,
 }
 
+/// Chuyển trạng thái được phép: nháp → đang bán / lưu trữ; đang bán ↔ ngừng bán; mọi trạng
+/// thái → lưu trữ; lưu trữ → nháp (mở lại để sửa rồi bán lại).
 fn transition_allowed(from: ProductStatus, to: ProductStatus) -> bool {
     use ProductStatus::{Active, Archived, Draft, Inactive};
     matches!(

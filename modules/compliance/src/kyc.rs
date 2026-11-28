@@ -924,7 +924,7 @@ impl ComplianceService {
         id: Uuid,
         input: &crate::kyc_details::SellerDetails,
     ) -> Result<kyc_profile::Model, Error> {
-        let database = tenant.database();
+        let (database, outbox) = (tenant.database(), &self.outbox);
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -955,6 +955,13 @@ impl ComplianceService {
                 active.reviewed_by = Set(Some(reviewer));
                 active.updated_at = Set(now());
                 let saved = kyc_profile::Entity::update(active).exec(&transaction).await?;
+                // Audit như các thao tác KYC khác: chỉ tên mục, không giá trị (dữ liệu cá nhân).
+                let mut payload = profile_payload(&saved);
+                payload["fields"] = json!(input.names());
+                let event = events::KycDetailsRecorded(payload);
+                outbox
+                    .record(&transaction, tenant, Actor::user(reviewer), subject_of(&saved), &event)
+                    .await?;
                 transaction.commit().await?;
                 Ok(saved)
             })
